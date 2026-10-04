@@ -40,7 +40,7 @@ make build
 - 原始最终 payload 保留词级信息、`additions` 和未知字段，供追溯。负数词时间留在原始证据中，不拿来补造分句时间。
 - 分句 ID 与说话人作用域包含来源、录音、请求及版本，避免不同供应商或请求的同名标签被误合并。
 - 不凭相同文字跨分片去重，不提取话题、摘要或承诺，也不匹配真实人物。
-- 不完整、错误或矛盾的结果必须拒绝；失败不应覆盖已有输出文件。
+- 不完整、错误或矛盾的结果必须拒绝；失败不应覆盖已有输出文件。例外：final 结果既无 text 也无 utterances（如静音段）属于正常空结果，按“已接收、零轮次”转换并记 warning，原始 payload 保留在 raw_source。
 
 输出是记忆层的输入产物。本命令本身不写 SQLite，不调用 MCP，也不声称完成记忆分析。可用 `import-transcript --db ./data/context-memory.db --input ./data/normalized-transcript.json` 或 MCP `ingest_transcript` 写入公共记忆层。完整链路见 [运行说明](context-layer-runtime.md)。旧 `import-conversation` 保留另一种实验输入结构。
 

@@ -132,9 +132,6 @@ func Convert(meta asrinput.Metadata, src io.Reader) (asrinput.Result, error) {
 	if p.Result == nil {
 		return asrinput.Result{}, errors.New("final payload has no result")
 	}
-	if p.Result.Text == nil && p.Result.Utterances == nil {
-		return asrinput.Result{}, errors.New("final result has neither text nor utterances")
-	}
 	var utterances []utterance
 	if p.Result.Utterances != nil {
 		utterances = *p.Result.Utterances
@@ -151,6 +148,9 @@ func Convert(meta asrinput.Metadata, src io.Reader) (asrinput.Result, error) {
 		}
 	}
 	result.Source.RawEnvelope = metaRaw
+	if p.Result.Text == nil && p.Result.Utterances == nil {
+		result.Warnings = append(result.Warnings, "final response has neither text nor utterances (silent segment); recorded as received with zero turns")
+	}
 	if meta.SourceAudioSHA256 == nil {
 		result.Warnings = append(result.Warnings, "source_audio_sha256 unavailable; no response digest is substituted")
 	}

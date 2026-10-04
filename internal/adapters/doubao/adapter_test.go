@@ -149,6 +149,15 @@ func TestMetadataAndFinalStructureValidation(t *testing.T) {
 	if _, e := Convert(m, strings.NewReader(bad)); e == nil {
 		t.Fatal("end before start accepted")
 	}
+	// A silent segment: well-formed final with no text and no utterances is kept as zero turns.
+	silent := response(3, true, map[string]any{"result": map[string]any{"additions": map[string]any{}}})
+	rs, e := Convert(m, strings.NewReader(silent))
+	if e != nil {
+		t.Fatalf("silent final rejected: %v", e)
+	}
+	if len(rs.Turns) != 0 || len(rs.Warnings) == 0 {
+		t.Fatalf("silent final should be zero turns with a warning: %+v", rs)
+	}
 	if _, e := Convert(m, bytes.NewBufferString("not json\n")); e == nil {
 		t.Fatal("invalid response JSON accepted")
 	}
