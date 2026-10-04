@@ -165,6 +165,25 @@ func EnqueueTx(ctx context.Context, tx *sql.Tx, spec Spec, now time.Time) (jobID
 	return existing, false, nil
 }
 
+// Enqueue inserts a queued job in its own transaction, mirroring EnqueueTx. It
+// is idempotent on IdempotencyKey: when the job already exists it returns the
+// existing id with inserted=false.
+func Enqueue(ctx context.Context, db *sql.DB, spec Spec, now time.Time) (jobID string, inserted bool, err error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", false, err
+	}
+	defer tx.Rollback()
+	jobID, inserted, err = EnqueueTx(ctx, tx, spec, now)
+	if err != nil {
+		return "", false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", false, err
+	}
+	return jobID, inserted, nil
+}
+
 // Claim atomically recovers expired leases and claims the next eligible job.
 func Claim(ctx context.Context, db *sql.DB, opts ClaimOptions) (*Job, error) {
 	now := opts.Now

@@ -12,6 +12,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"recordingmcp/internal/decision"
+	"recordingmcp/internal/generate"
 	"recordingmcp/internal/migrations"
 	"recordingmcp/internal/process"
 )
@@ -357,5 +358,208 @@ func TestLoadConversationTurnsOrdering(t *testing.T) {
 	}
 	if turns[0].OriginalIndex != 3 || turns[1].OriginalIndex != 1 {
 		t.Fatalf("original indexes = %d,%d", turns[0].OriginalIndex, turns[1].OriginalIndex)
+	}
+}
+
+// stubGenerator returns a fixed set of drafts, letting tests exercise the
+// validation rules without depending on the synthetic generator's hash.
+type stubGenerator struct {
+	drafts []generate.Draft
+	model  string
+	err    error
+}
+
+func (s stubGenerator) Generate(context.Context, string, []string) ([]generate.Draft, string, error) {
+	if s.err != nil {
+		return nil, "", s.err
+	}
+	return s.drafts, s.model, nil
+}
+
+// countPublishJobs counts the publish jobs enqueued for one conversation/run.
+func countPublishJobs(t *testing.T, db *sql.DB, conversationID, runID string) int {
+	t.Helper()
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM processing_jobs WHERE stage='publish' AND idempotency_key=?`,
+		"publish|"+conversationID+"|"+runID).Scan(&n); err != nil {
+		t.Fatalf("count publish jobs: %v", err)
+	}
+	return n
+}
+
+func TestExtractHandlerGeneratesAndPublishesCandidates(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(100)
+	speaker := "speaker-1"
+	seedConversation(t, db, "conv-gen", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "t1", seg: 0, start: &start, orig: 1, speaker: &speaker},
+		{id: "t2", seg: 1, start: nil, orig: 2, speaker: nil},
+		{id: "t3", seg: 2, start: nil, orig: 3, speaker: &speaker},
+	})
+	job := enqueueExtract(t, db, "conv-gen")
+
+	// Derive the exact drafts generate.Synthetic will propose for this window.
+	turns, err := LoadConversationTurns(ctx, db, "conv-gen")
+	if err != nil {
+		t.Fatalf("load turns: %v", err)
+	}
+	windows := BuildWindows(turns, maxTurnsPerWindow)
+	if len(windows) != 1 {
+		t.Fatalf("windows = %d, want 1", len(windows))
+	}
+	state := RenderState(turns, windows[0], defaultMaxChars)
+	expected, model, err := generate.Synthetic{}.Generate(ctx, state, windows[0].TurnIDs)
+	if err != nil {
+		t.Fatalf("synthetic generate: %v", err)
+	}
+	if len(expected) == 0 {
+		t.Fatal("synthetic generator produced no drafts; test seed is not meaningful")
+	}
+
+	handler := &ExtractHandler{DB: db, Engine: decision.Synthetic{}, Endpoint: "http://test/v1", ProcessorVersion: "extract-v1", Generator: generate.Synthetic{}}
+	resultRef, err := handler.Execute(ctx, job)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+
+	const marker = "+candidates:"
+	runID, countStr, ok := strings.Cut(strings.TrimPrefix(resultRef, "decision-run:"), marker)
+	if !ok {
+		t.Fatalf("result ref %q missing candidates marker", resultRef)
+	}
+	if !strings.HasPrefix(runID, "run:") {
+		t.Fatalf("run id %q lacks run: prefix", runID)
+	}
+	if countStr != itoa(len(expected)) {
+		t.Fatalf("validated count = %s, want %d", countStr, len(expected))
+	}
+
+	all, err := ListCandidates(ctx, db, "conv-gen", "")
+	if err != nil {
+		t.Fatalf("list candidates: %v", err)
+	}
+	if len(all) != len(expected) {
+		t.Fatalf("candidates = %d, want %d", len(all), len(expected))
+	}
+	windowIDs := make(map[string]bool, len(windows[0].TurnIDs))
+	for _, id := range windows[0].TurnIDs {
+		windowIDs[id] = true
+	}
+	for _, c := range all {
+		if c.Status != "validated" {
+			t.Fatalf("candidate %s status = %q, want validated", c.ID, c.Status)
+		}
+		if !generate.ValidKind(c.Kind) {
+			t.Fatalf("candidate %s kind = %q", c.ID, c.Kind)
+		}
+		if c.Summary == "" || c.RunID != runID || c.JobID != job.ID {
+			t.Fatalf("candidate %s fields wrong: summary=%q run=%q job=%q", c.ID, c.Summary, c.RunID, c.JobID)
+		}
+		if c.GeneratorModel != model {
+			t.Fatalf("candidate %s model = %q, want %q", c.ID, c.GeneratorModel, model)
+		}
+		if len(c.EvidenceTurnIDs) == 0 {
+			t.Fatalf("candidate %s has no evidence", c.ID)
+		}
+		for _, id := range c.EvidenceTurnIDs {
+			if !windowIDs[id] {
+				t.Fatalf("candidate %s evidence %q outside window", c.ID, id)
+			}
+		}
+	}
+
+	if n := countPublishJobs(t, db, "conv-gen", runID); n != 1 {
+		t.Fatalf("publish jobs = %d, want 1", n)
+	}
+	var payload string
+	if err := db.QueryRow(`SELECT payload_json FROM processing_jobs WHERE stage='publish' AND idempotency_key=?`,
+		"publish|conv-gen|"+runID).Scan(&payload); err != nil {
+		t.Fatalf("read publish payload: %v", err)
+	}
+	if !strings.Contains(payload, `"conversation_id":"conv-gen"`) {
+		t.Fatalf("publish payload = %q", payload)
+	}
+
+	// Replaying the same attempt is idempotent: same reference, no duplicate
+	// candidates and no duplicate publish job.
+	again, err := handler.Execute(ctx, job)
+	if err != nil {
+		t.Fatalf("re-execute: %v", err)
+	}
+	if again != resultRef {
+		t.Fatalf("re-execute ref = %q, want %q", again, resultRef)
+	}
+	if got, err := ListCandidates(ctx, db, "conv-gen", ""); err != nil || len(got) != len(expected) {
+		t.Fatalf("candidates after replay = %d (err %v), want %d", len(got), err, len(expected))
+	}
+	if n := countPublishJobs(t, db, "conv-gen", runID); n != 1 {
+		t.Fatalf("publish jobs after replay = %d, want 1", n)
+	}
+}
+
+func TestExtractHandlerRejectsInvalidCandidates(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(10)
+	seedConversation(t, db, "conv-rej", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "t1", seg: 0, start: &start, orig: 1, speaker: nil},
+		{id: "t2", seg: 1, start: nil, orig: 2, speaker: nil},
+	})
+	job := enqueueExtract(t, db, "conv-rej")
+
+	gen := stubGenerator{model: "stub-v1", drafts: []generate.Draft{
+		{Kind: "observation", Summary: "valid", EvidenceTurnIDs: []string{"t1"}},
+		{Kind: "bogus", Summary: "bad kind", EvidenceTurnIDs: []string{"t1"}},
+		{Kind: "request", Summary: "   ", EvidenceTurnIDs: []string{"t1"}},
+		{Kind: "intention", Summary: "outside window", EvidenceTurnIDs: []string{"t9"}},
+	}}
+	handler := &ExtractHandler{DB: db, Engine: decision.Synthetic{}, Generator: gen}
+	resultRef, err := handler.Execute(ctx, job)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if !strings.HasSuffix(resultRef, "+candidates:1") {
+		t.Fatalf("result ref = %q, want one validated candidate", resultRef)
+	}
+
+	validated, err := ListCandidates(ctx, db, "conv-rej", "validated")
+	if err != nil {
+		t.Fatalf("list validated: %v", err)
+	}
+	if len(validated) != 1 {
+		t.Fatalf("validated = %d, want 1", len(validated))
+	}
+	rejected, err := ListCandidates(ctx, db, "conv-rej", "rejected")
+	if err != nil {
+		t.Fatalf("list rejected: %v", err)
+	}
+	if len(rejected) != 3 {
+		t.Fatalf("rejected = %d, want 3", len(rejected))
+	}
+	for _, c := range rejected {
+		if c.RejectionReason == "" {
+			t.Fatalf("rejected candidate %s has no reason", c.ID)
+		}
+		if c.GeneratorModel != "stub-v1" {
+			t.Fatalf("rejected candidate %s model = %q", c.ID, c.GeneratorModel)
+		}
+	}
+
+	runID, _, _ := strings.Cut(strings.TrimPrefix(resultRef, "decision-run:"), "+candidates:")
+	if n := countPublishJobs(t, db, "conv-rej", runID); n != 1 {
+		t.Fatalf("publish jobs = %d, want 1", n)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -20,6 +21,8 @@ import (
 	_ "modernc.org/sqlite"
 
 	"recordingmcp/internal/decision"
+	"recordingmcp/internal/generate"
+	"recordingmcp/internal/memory"
 	"recordingmcp/internal/migrations"
 	"recordingmcp/internal/pipeline"
 	"recordingmcp/internal/process"
@@ -36,13 +39,18 @@ func main() {
 func run() error {
 	dbPath := flag.String("db", "", "path to the SQLite database (required)")
 	workerID := flag.String("worker-id", defaultWorkerID(), "worker identity recorded on claims")
-	stages := flag.String("stages", "extract", "comma-separated stage names to claim")
+	stages := flag.String("stages", "extract,publish", "comma-separated stage names to claim")
 	lease := flag.Duration("lease", 30*time.Second, "lease duration held while executing a job")
 	poll := flag.Duration("poll", time.Second, "idle poll interval")
 	once := flag.Bool("once", false, "claim and process at most one job, then exit")
 	executor := flag.String("executor", "synthetic", "executor implementation: synthetic|pipeline")
 	decisionURL := flag.String("decision-url", "http://127.0.0.1:8765/v1/systemone", "decision service endpoint used by the pipeline executor")
 	decisionModel := flag.String("decision-model", "jev-style-2b-v2", "decision model name used by the pipeline executor")
+	generatorName := flag.String("generator", "synthetic", "candidate generator used by the pipeline executor: synthetic|openai")
+	generatorURL := flag.String("generator-url", "", "OpenAI-compatible chat completions endpoint used by the openai generator")
+	generatorModel := flag.String("generator-model", "glm-5.3-flash", "generator model name")
+	generatorKeyEnv := flag.String("generator-key-env", "GENERATOR_API_KEY", "environment variable holding the generator API key")
+	generatorTimeout := flag.Duration("generator-timeout", 180*time.Second, "HTTP timeout for the openai generator")
 	syntheticDelay := flag.Duration("synthetic-delay", 0, "artificial delay for the synthetic executor")
 	flag.Parse()
 
@@ -72,7 +80,18 @@ func run() error {
 		return fmt.Errorf("apply migrations: %w", err)
 	}
 
-	inner, err := buildExecutor(*executor, db, *decisionURL, *decisionModel, *syntheticDelay)
+	store, err := memory.Open(*dbPath)
+	if err != nil {
+		return fmt.Errorf("open memory store: %w", err)
+	}
+	defer store.Close()
+
+	gen, err := buildGenerator(*generatorName, *generatorURL, *generatorModel, *generatorKeyEnv, *generatorTimeout)
+	if err != nil {
+		return err
+	}
+
+	inner, err := buildExecutor(*executor, db, store, *decisionURL, *decisionModel, gen, *syntheticDelay)
 	if err != nil {
 		return err
 	}
@@ -104,21 +123,71 @@ func run() error {
 	return worker.Run(ctx, cfg)
 }
 
-// buildExecutor selects the executor implementation named by --executor.
-func buildExecutor(name string, db *sql.DB, decisionURL, decisionModel string, syntheticDelay time.Duration) (worker.Executor, error) {
+// buildExecutor selects the executor implementation named by --executor. The
+// pipeline executor routes extract and publish jobs to their stage handlers.
+func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, decisionModel string, gen generate.Generator, syntheticDelay time.Duration) (worker.Executor, error) {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "synthetic":
 		return worker.Synthetic{Delay: syntheticDelay}, nil
 	case "pipeline":
-		return &pipeline.ExtractHandler{
-			DB:               db,
-			Engine:           &decision.SystemOneClient{Endpoint: decisionURL, Model: decisionModel},
-			Endpoint:         decisionURL,
-			ProcessorVersion: "extract-v1",
-		}, nil
+		return &stageExecutor{stages: map[string]worker.Executor{
+			"extract": &pipeline.ExtractHandler{
+				DB:               db,
+				Engine:           &decision.SystemOneClient{Endpoint: decisionURL, Model: decisionModel},
+				Endpoint:         decisionURL,
+				ProcessorVersion: "extract-v1",
+				Generator:        gen,
+			},
+			"publish": &pipeline.PublishHandler{
+				DB:               db,
+				Store:            store,
+				ProcessorVersion: "publish-v1",
+			},
+		}}, nil
 	default:
 		return nil, fmt.Errorf("unknown executor %q (want synthetic or pipeline)", name)
 	}
+}
+
+// buildGenerator selects the candidate generator named by --generator. The
+// openai generator reads its API key from the environment variable named by
+// --generator-key-env at startup and applies --generator-timeout to its HTTP
+// client.
+func buildGenerator(name, endpoint, model, keyEnv string, timeout time.Duration) (generate.Generator, error) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", "synthetic":
+		return generate.Synthetic{}, nil
+	case "openai":
+		if strings.TrimSpace(endpoint) == "" {
+			return nil, fmt.Errorf("--generator-url is required for the openai generator")
+		}
+		apiKey := ""
+		if strings.TrimSpace(keyEnv) != "" {
+			apiKey = os.Getenv(keyEnv)
+		}
+		return &generate.OpenAICompat{
+			Endpoint:   endpoint,
+			APIKey:     apiKey,
+			Model:      model,
+			HTTPClient: &http.Client{Timeout: timeout},
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown generator %q (want synthetic or openai)", name)
+	}
+}
+
+// stageExecutor dispatches each claimed job to the executor registered for its
+// stage, so a single worker can serve both extract and publish jobs.
+type stageExecutor struct {
+	stages map[string]worker.Executor
+}
+
+func (s *stageExecutor) Execute(ctx context.Context, job process.Job) (string, error) {
+	exec, ok := s.stages[job.Stage]
+	if !ok {
+		return "", fmt.Errorf("context-worker: no executor for stage %q", job.Stage)
+	}
+	return exec.Execute(ctx, job)
 }
 
 func parseStages(raw string) []string {

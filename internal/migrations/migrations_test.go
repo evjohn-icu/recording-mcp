@@ -68,8 +68,8 @@ func TestApplyFreshDatabase(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 3 {
-		t.Fatalf("Version() = %d, want 3", got)
+	if got := mustVersion(t, ctx, db); got != 4 {
+		t.Fatalf("Version() = %d, want 4", got)
 	}
 	names := tableNames(t, db)
 	for _, want := range []string{
@@ -78,6 +78,7 @@ func TestApplyFreshDatabase(t *testing.T) {
 		"source_attachments", "attachment_turns",
 		"processing_jobs", "processing_attempts",
 		"decision_runs", "decision_answers",
+		"memory_candidates", "publication_runs",
 	} {
 		if !names[want] {
 			t.Errorf("missing table %q", want)
@@ -99,7 +100,7 @@ func TestApplyFreshDatabase(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"turns_conv_order", "notes_conv", "source_attachments_conversation", "processing_jobs_claim"} {
+	for _, want := range []string{"turns_conv_order", "notes_conv", "source_attachments_conversation", "processing_jobs_claim", "memory_candidates_conv"} {
 		if !indexes[want] {
 			t.Errorf("missing index %q", want)
 		}
@@ -115,15 +116,15 @@ func TestApplyIdempotent(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("second Apply: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 3 {
-		t.Fatalf("Version() = %d, want 3 after repeated Apply", got)
+	if got := mustVersion(t, ctx, db); got != 4 {
+		t.Fatalf("Version() = %d, want 4 after repeated Apply", got)
 	}
 	var applied int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&applied); err != nil {
 		t.Fatal(err)
 	}
-	if applied != 3 {
-		t.Fatalf("schema_migrations rows = %d, want 3", applied)
+	if applied != 4 {
+		t.Fatalf("schema_migrations rows = %d, want 4", applied)
 	}
 }
 
@@ -143,8 +144,8 @@ func TestApplyOnLegacyDatabasePreservesData(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply on legacy database: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 3 {
-		t.Fatalf("Version() = %d, want 3", got)
+	if got := mustVersion(t, ctx, db); got != 4 {
+		t.Fatalf("Version() = %d, want 4", got)
 	}
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM conversations WHERE id='conv-1'`).Scan(&count); err != nil {
@@ -169,25 +170,31 @@ func TestApplyOnSingleVersionDatabaseOnlyAppliesLater(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version=3`); err != nil {
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (3,4)`); err != nil {
 		t.Fatal(err)
 	}
-	// Re-running Apply must re-create the (dropped) v3 objects only.
-	if _, err := db.Exec(`DROP TABLE decision_answers`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(`DROP TABLE decision_runs`); err != nil {
-		t.Fatal(err)
+	// Re-running Apply must re-create the (dropped) v3 and v4 objects only.
+	for _, stmt := range []string{
+		`DROP TABLE decision_answers`,
+		`DROP TABLE decision_runs`,
+		`DROP TABLE memory_candidates`,
+		`DROP TABLE publication_runs`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("re-Apply after partial rollback: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 3 {
-		t.Fatalf("Version() = %d, want 3", got)
+	if got := mustVersion(t, ctx, db); got != 4 {
+		t.Fatalf("Version() = %d, want 4", got)
 	}
 	names := tableNames(t, db)
-	if !names["decision_runs"] || !names["decision_answers"] {
-		t.Fatalf("decision tables not re-applied: %v", names)
+	for _, want := range []string{"decision_runs", "decision_answers", "memory_candidates", "publication_runs"} {
+		if !names[want] {
+			t.Fatalf("table %q not re-applied: %v", want, names)
+		}
 	}
 }
 
