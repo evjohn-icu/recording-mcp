@@ -1,0 +1,12 @@
+{
+  "provider": "doubao",
+  "provider_request_id": "synthetic-request-01",
+  "device_id": "device:demo",
+  "recording_id": "recording:demo",
+  "conversation_id": "conversation:demo",
+  "segment_id": "segment-01",
+  "segment_offset_ms": 0,
+  "segment_duration_ms": 10000,
+  "transcript_revision": "v1",
+  "completion_status": "final"
+}

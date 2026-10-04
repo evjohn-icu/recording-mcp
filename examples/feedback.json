@@ -1,0 +1,16 @@
+{
+  "event": {
+    "id": "feedback-network-bom-completed-20261009",
+    "type": "commitment.completed",
+    "timestamp": "2026-10-09T16:00:00+08:00",
+    "source": "agent:project-tracker",
+    "actors": ["demo_user", "person_a"],
+    "entities": ["示例联系人甲", "示例项目", "网络 BOM"],
+    "content": "网络 BOM 已发送给示例联系人甲。",
+    "structured_data": {"target_id": "demo-bom-delivery"},
+    "confidence": 1.0,
+    "priority": "high",
+    "observed_at": "2026-10-09T16:00:00+08:00",
+    "tags": ["feedback", "completed"]
+  }
+}

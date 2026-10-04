@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "recording-mcp": {
+      "command": "/absolute/path/to/recording-mcp/bin/recording-mcp",
+      "args": [
+        "--db",
+        "/absolute/path/to/recording-mcp/data/recordings.db",
+        "--seed"
+      ]
+    }
+  }
+}

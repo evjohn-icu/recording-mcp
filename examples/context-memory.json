@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "context-memory": {
+      "command": "/absolute/path/to/recording-mcp/bin/context-memory",
+      "args": ["--db", "/absolute/path/to/recording-mcp/data/context-memory.db"]
+    }
+  }
+}

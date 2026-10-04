@@ -1,0 +1,14 @@
+/bin/
+/data/
+*.db
+*.db-shm
+*.db-wal
+__pycache__/
+*.pyc
+
+# Local build artifacts and credentials
+/adapter-doubao
+.DS_Store
+.env
+.env.*
+!.env.example
