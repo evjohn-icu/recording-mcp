@@ -55,6 +55,15 @@ CREATE TABLE IF NOT EXISTS publication_runs(id TEXT PRIMARY KEY, conversation_id
 // previous run already covered. The primary key makes recording idempotent.
 const analysisCoverageDDL = `CREATE TABLE IF NOT EXISTS analysis_coverage(conversation_id TEXT NOT NULL REFERENCES conversations(id), turn_id TEXT NOT NULL REFERENCES turns(id), processor_version TEXT NOT NULL, run_id TEXT NOT NULL DEFAULT '', covered_at INTEGER NOT NULL, PRIMARY KEY(conversation_id, turn_id, processor_version));`
 
+// memoryLinksDDL adds the memory-link staging table: candidate associations
+// between two memory records proposed by an agent. Links are recorded as
+// suggestions only (status defaults to 'proposed'); nothing is merged
+// automatically. Evidence turn ids and the proposing model are kept so a
+// human can review the proposal before confirming or rejecting it.
+const memoryLinksDDL = `CREATE TABLE IF NOT EXISTS memory_links(id TEXT PRIMARY KEY, from_kind TEXT NOT NULL CHECK(from_kind IN ('topic','conversation','turn','note')), from_id TEXT NOT NULL, to_kind TEXT NOT NULL CHECK(to_kind IN ('topic','conversation','turn','note')), to_id TEXT NOT NULL, relation TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '', evidence_turn_ids_json TEXT NOT NULL DEFAULT '[]', confidence REAL NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'proposed' CHECK(status IN ('proposed','confirmed','rejected')), model TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS memory_links_from ON memory_links(from_kind, from_id);
+CREATE INDEX IF NOT EXISTS memory_links_to ON memory_links(to_kind, to_id);`
+
 type migration struct {
 	version    int
 	name       string
@@ -82,6 +91,7 @@ var migrations = []migration{
 	{version: 3, name: "decision-log", statements: statements(decisionLogDDL)},
 	{version: 4, name: "memory-candidates", statements: statements(memoryCandidatesDDL)},
 	{version: 5, name: "analysis-coverage", statements: statements(analysisCoverageDDL)},
+	{version: 6, name: "memory-links", statements: statements(memoryLinksDDL)},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`

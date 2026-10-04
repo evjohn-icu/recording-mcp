@@ -7,6 +7,7 @@ build:
 	go build -o bin/adapter-doubao ./cmd/adapter-doubao
 	go build -o bin/import-transcript ./cmd/import-transcript
 	go build -o bin/context-worker ./cmd/context-worker
+	go build -o bin/context-associate ./cmd/context-associate
 
 test:
 	go test -race ./...

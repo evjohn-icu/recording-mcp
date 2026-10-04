@@ -2,10 +2,13 @@ package pipeline
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -43,6 +46,8 @@ type ExtractHandler struct {
 // payload, evaluates every window and records each result. A conversation with
 // no turns succeeds with an empty result reference; any load, render, engine,
 // generation or persistence failure is returned so the worker can retry it.
+// Coverage is recorded only after a window completes successfully, so a failed
+// generation leaves its turns uncovered for the retry.
 //
 // With a Generator configured, every window additionally yields validated
 // memory candidates and a publish job. The returned reference is
@@ -129,24 +134,26 @@ func (h *ExtractHandler) Execute(ctx context.Context, job process.Job) (string, 
 		}
 		lastRunID = runID
 
-		if err := RecordCoverage(ctx, h.DB, payload.ConversationID, runID, h.ProcessorVersion, w.TurnIDs, time.Now()); err != nil {
-			return "", fmt.Errorf("pipeline: record coverage: %w", err)
+		if h.Generator != nil {
+			drafts, model, err := h.Generator.Generate(ctx, state, w.TurnIDs)
+			if err != nil {
+				return "", fmt.Errorf("pipeline: generate candidates: %w", err)
+			}
+			validated := validateDrafts(drafts, w.TurnIDs)
+			if _, err := InsertCandidates(ctx, h.DB, payload.ConversationID, runID, job.ID, model, validated, time.Now()); err != nil {
+				return "", fmt.Errorf("pipeline: insert candidates: %w", err)
+			}
+			validatedCount += countValidated(validated)
+			if err := enqueuePublish(ctx, h.DB, payload.ConversationID); err != nil {
+				return "", err
+			}
 		}
 
-		if h.Generator == nil {
-			continue
-		}
-		drafts, model, err := h.Generator.Generate(ctx, state, w.TurnIDs)
-		if err != nil {
-			return "", fmt.Errorf("pipeline: generate candidates: %w", err)
-		}
-		validated := validateDrafts(drafts, w.TurnIDs)
-		if _, err := InsertCandidates(ctx, h.DB, payload.ConversationID, runID, job.ID, model, validated, time.Now()); err != nil {
-			return "", fmt.Errorf("pipeline: insert candidates: %w", err)
-		}
-		validatedCount += countValidated(validated)
-		if err := enqueuePublish(ctx, h.DB, payload.ConversationID, runID); err != nil {
-			return "", err
+		// Coverage is only recorded once the window finished successfully, so a
+		// failed generation or persistence does not mark the turns as analysed
+		// and the retried job re-processes them.
+		if err := RecordCoverage(ctx, h.DB, payload.ConversationID, runID, h.ProcessorVersion, w.TurnIDs, time.Now()); err != nil {
+			return "", fmt.Errorf("pipeline: record coverage: %w", err)
 		}
 	}
 
@@ -219,10 +226,27 @@ func countValidated(drafts []ValidatedDraft) int {
 	return n
 }
 
-// enqueuePublish schedules the publish stage for one conversation and decision
-// run. The idempotency key ties the job to that run so replays of the same
-// extract attempt never enqueue a duplicate.
-func enqueuePublish(ctx context.Context, db *sql.DB, conversationID, runID string) error {
+// enqueuePublish schedules the publish stage for one conversation. The
+// idempotency key is derived from the conversation's current set of validated
+// candidates, so a retried attempt or a repeated window enqueues no new job
+// while that set is unchanged.
+func enqueuePublish(ctx context.Context, db *sql.DB, conversationID string) error {
+	validated, err := ListCandidates(ctx, db, conversationID, "validated")
+	if err != nil {
+		return fmt.Errorf("pipeline: enqueue publish: list candidates: %w", err)
+	}
+	ids := make([]string, 0, len(validated))
+	for _, c := range validated {
+		ids = append(ids, c.ID)
+	}
+	sort.Strings(ids)
+
+	setKey := "none"
+	if len(ids) > 0 {
+		sum := sha256.Sum256([]byte(strings.Join(ids, "|")))
+		setKey = hex.EncodeToString(sum[:])[:16]
+	}
+
 	payload, err := json.Marshal(struct {
 		ConversationID string `json:"conversation_id"`
 	}{ConversationID: conversationID})
@@ -232,7 +256,7 @@ func enqueuePublish(ctx context.Context, db *sql.DB, conversationID, runID strin
 	spec := process.Spec{
 		Stage:           "publish",
 		InputSnapshotID: conversationID,
-		IdempotencyKey:  "publish|" + conversationID + "|" + runID,
+		IdempotencyKey:  "publish|" + conversationID + "|" + setKey,
 		PayloadJSON:     string(payload),
 		MaxAttempts:     5,
 	}

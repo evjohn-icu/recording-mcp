@@ -376,12 +376,12 @@ func (s stubGenerator) Generate(context.Context, string, []string) ([]generate.D
 	return s.drafts, s.model, nil
 }
 
-// countPublishJobs counts the publish jobs enqueued for one conversation/run.
-func countPublishJobs(t *testing.T, db *sql.DB, conversationID, runID string) int {
+// countPublishJobs counts the publish jobs enqueued for one conversation.
+func countPublishJobs(t *testing.T, db *sql.DB, conversationID string) int {
 	t.Helper()
 	var n int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM processing_jobs WHERE stage='publish' AND idempotency_key=?`,
-		"publish|"+conversationID+"|"+runID).Scan(&n); err != nil {
+	if err := db.QueryRow(`SELECT COUNT(*) FROM processing_jobs WHERE stage='publish' AND idempotency_key LIKE ?`,
+		"publish|"+conversationID+"|%").Scan(&n); err != nil {
 		t.Fatalf("count publish jobs: %v", err)
 	}
 	return n
@@ -475,12 +475,12 @@ func TestExtractHandlerGeneratesAndPublishesCandidates(t *testing.T) {
 		}
 	}
 
-	if n := countPublishJobs(t, db, "conv-gen", runID); n != 1 {
+	if n := countPublishJobs(t, db, "conv-gen"); n != 1 {
 		t.Fatalf("publish jobs = %d, want 1", n)
 	}
 	var payload string
-	if err := db.QueryRow(`SELECT payload_json FROM processing_jobs WHERE stage='publish' AND idempotency_key=?`,
-		"publish|conv-gen|"+runID).Scan(&payload); err != nil {
+	if err := db.QueryRow(`SELECT payload_json FROM processing_jobs WHERE stage='publish' AND idempotency_key LIKE ?`,
+		"publish|conv-gen|%").Scan(&payload); err != nil {
 		t.Fatalf("read publish payload: %v", err)
 	}
 	if !strings.Contains(payload, `"conversation_id":"conv-gen"`) {
@@ -499,7 +499,7 @@ func TestExtractHandlerGeneratesAndPublishesCandidates(t *testing.T) {
 	if got, err := ListCandidates(ctx, db, "conv-gen", ""); err != nil || len(got) != len(expected) {
 		t.Fatalf("candidates after replay = %d (err %v), want %d", len(got), err, len(expected))
 	}
-	if n := countPublishJobs(t, db, "conv-gen", runID); n != 1 {
+	if n := countPublishJobs(t, db, "conv-gen"); n != 1 {
 		t.Fatalf("publish jobs after replay = %d, want 1", n)
 	}
 }
@@ -558,8 +558,7 @@ func TestExtractHandlerRejectsInvalidCandidates(t *testing.T) {
 		}
 	}
 
-	runID, _, _ := strings.Cut(strings.TrimPrefix(resultRef, "decision-run:"), "+candidates:")
-	if n := countPublishJobs(t, db, "conv-rej", runID); n != 1 {
+	if n := countPublishJobs(t, db, "conv-rej"); n != 1 {
 		t.Fatalf("publish jobs = %d, want 1", n)
 	}
 }
@@ -759,6 +758,139 @@ func TestExtractHandlerCoverageIdempotent(t *testing.T) {
 	}
 	if runs != 1 {
 		t.Fatalf("decision_runs after replay = %d, want 1", runs)
+	}
+}
+
+func TestExtractHandlerRetryIsIdempotent(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(100)
+	seedConversation(t, db, "conv-retry", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "t1", seg: 0, start: &start, orig: 1},
+		{id: "t2", seg: 1, start: nil, orig: 2},
+	})
+	job := enqueueExtractWithPayload(t, db,
+		`{"conversation_id":"conv-retry","turn_ids":["t1","t2"]}`,
+		"extract:conv-retry")
+
+	gen := stubGenerator{model: "stub-v1", drafts: []generate.Draft{
+		{Kind: "observation", Summary: "stable", EvidenceTurnIDs: []string{"t1"}},
+	}}
+	handler := &ExtractHandler{DB: db, Engine: decision.Synthetic{}, ProcessorVersion: "extract-v1", Generator: gen}
+	if _, err := handler.Execute(ctx, job); err != nil {
+		t.Fatalf("first execute: %v", err)
+	}
+
+	// Retry the same task as a new attempt: the run id changes, the content
+	// does not. Candidates, publish jobs and coverage must not be duplicated.
+	retry := job
+	retry.AttemptCount = job.AttemptCount + 1
+	if _, err := handler.Execute(ctx, retry); err != nil {
+		t.Fatalf("retry execute: %v", err)
+	}
+
+	cands, err := ListCandidates(ctx, db, "conv-retry", "")
+	if err != nil {
+		t.Fatalf("list candidates: %v", err)
+	}
+	if len(cands) != 1 {
+		t.Fatalf("candidates after retry = %d, want 1", len(cands))
+	}
+	if n := countPublishJobs(t, db, "conv-retry"); n != 1 {
+		t.Fatalf("publish jobs after retry = %d, want 1", n)
+	}
+	covered := coverageRows(t, db, "conv-retry", "extract-v1")
+	if len(covered) != 2 {
+		t.Fatalf("coverage rows after retry = %d (%v), want 2", len(covered), covered)
+	}
+}
+
+func TestExtractHandlerGeneratorErrorSkipsCoverage(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(10)
+	seedConversation(t, db, "conv-gen-err", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "t1", seg: 0, start: &start, orig: 1},
+		{id: "t2", seg: 1, start: nil, orig: 2},
+	})
+	job := enqueueExtractWithPayload(t, db,
+		`{"conversation_id":"conv-gen-err","turn_ids":["t1","t2"]}`,
+		"extract:conv-gen-err")
+
+	want := errors.New("generator exploded")
+	handler := &ExtractHandler{DB: db, Engine: decision.Synthetic{}, ProcessorVersion: "extract-v1", Generator: stubGenerator{err: want}}
+	if _, err := handler.Execute(ctx, job); !errors.Is(err, want) {
+		t.Fatalf("execute error = %v, want %v", err, want)
+	}
+
+	covered := coverageRows(t, db, "conv-gen-err", "extract-v1")
+	if len(covered) != 0 {
+		t.Fatalf("coverage rows = %d (%v), want 0 when generation fails", len(covered), covered)
+	}
+	var cands int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM memory_candidates WHERE conversation_id='conv-gen-err'`).Scan(&cands); err != nil {
+		t.Fatalf("count candidates: %v", err)
+	}
+	if cands != 0 {
+		t.Fatalf("candidates = %d, want 0", cands)
+	}
+	if n := countPublishJobs(t, db, "conv-gen-err"); n != 0 {
+		t.Fatalf("publish jobs = %d, want 0 when generation fails", n)
+	}
+	// The decision run is still recorded before generation runs.
+	var runs int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM decision_runs`).Scan(&runs); err != nil {
+		t.Fatalf("count runs: %v", err)
+	}
+	if runs != 1 {
+		t.Fatalf("decision_runs = %d, want 1", runs)
+	}
+}
+
+func TestExtractHandlerNilGeneratorRecordsCoverage(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(100)
+	seedConversation(t, db, "conv-nogen", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "t1", seg: 0, start: &start, orig: 1},
+		{id: "t2", seg: 1, start: nil, orig: 2},
+	})
+	job := enqueueExtractWithPayload(t, db,
+		`{"conversation_id":"conv-nogen","turn_ids":["t1","t2"]}`,
+		"extract:conv-nogen")
+
+	handler := &ExtractHandler{DB: db, Engine: decision.Synthetic{}, ProcessorVersion: "extract-v1"}
+	ref, err := handler.Execute(ctx, job)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if strings.Contains(ref, "+candidates:") {
+		t.Fatalf("ref = %q, want no candidates marker", ref)
+	}
+	covered := coverageRows(t, db, "conv-nogen", "extract-v1")
+	if len(covered) != 2 {
+		t.Fatalf("coverage rows = %d (%v), want 2 with a nil generator", len(covered), covered)
+	}
+	if n := countPublishJobs(t, db, "conv-nogen"); n != 0 {
+		t.Fatalf("publish jobs = %d, want 0 with a nil generator", n)
 	}
 }
 

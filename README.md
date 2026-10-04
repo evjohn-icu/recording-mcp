@@ -2,7 +2,7 @@
 
 可运行链路已接通：**ASR 结果 → 供应商适配器 → 原话和来源入库 → 带证据的记忆注释 → MCP 查询**。从 [Context Layer 运行说明](docs/context-layer-runtime.md) 开始使用，包含构建、导入和 11 个 MCP 工具。记忆层不调用 ASR；自动提炼的候选生成与发布已实现（内容未经人工复核），检索三件套 `list_conversations` / `get_evidence_context` / `search_memory` 已实现；真实人物匹配与完整层级视图尚未实现。
 
-下一阶段的处理流程、执行器对接、检索扩展、团队分工和验收条件见 [开发执行计划](docs/development-plan.md)。其中持久化任务队列与 Worker 租约执行（A 切片）、决策引擎契约与 shadow 判断记录（B 切片）、候选记忆的生成校验与会话级发布（C 切片）已实现，详见 [处理链路说明](docs/processing.md)；层级检索三件套 `list_conversations` / `get_evidence_context` / `search_memory` 已实现，详见 [Context Layer 运行说明](docs/context-layer-runtime.md)。本地 Decision 2.0 判断服务的 Adapter 已就绪，实际部署与权重加载仍在进行；自动发布的注释内容未经人工复核；Jevbox 的完整层级检索视图（如 `build_context`）尚未实现。
+下一阶段的处理流程、执行器对接、检索扩展、团队分工和验收条件见 [开发执行计划](docs/development-plan.md)。其中持久化任务队列与 Worker 租约执行（A 切片）、决策引擎契约与 shadow 判断记录（B 切片）、候选记忆的生成校验与会话级发布（C 切片）已实现，详见 [处理链路说明](docs/processing.md)；层级检索三件套 `list_conversations` / `get_evidence_context` / `search_memory` 已实现，详见 [Context Layer 运行说明](docs/context-layer-runtime.md)。本地 Decision 2.0 判断服务的 Adapter 已就绪，实际部署与权重加载仍在进行；自动发布的注释内容未经人工复核；话题关联建议已支持（仅建议层）：agent 只读记忆并产出提议，经 `context-associate` 校验后以 `proposed` 状态写入 `memory_links`，不自动合并，详见 [关联建议说明](docs/associations.md)，人工确认与自动触发尚未实现；Jevbox 的完整层级检索视图（如 `build_context`）尚未实现。
 
 0.1 的现实世界信息全部来自随身音频设备，经过录音分析中心处理后进入Context Layer。当前工作目标是制定两份 Context Layer 契约：**内部规范 0.1 规定存什么，MCP 规范 0.1 规定怎么传**。请从 [规范目录](docs/specs/README.md)、[内部规范](docs/specs/internal-context-0.1.md) 和 [MCP 规范](docs/specs/context-mcp-0.1.md) 开始阅读。
 

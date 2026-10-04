@@ -64,18 +64,22 @@ type PublicationRun struct {
 }
 
 // candidateID derives the deterministic id of a memory candidate from its
-// identity tuple. Identical (conversation, run, kind, summary, evidence) always
-// yields the same id, which is what makes InsertCandidates idempotent.
-func candidateID(conversationID, runID, kind, summary, evidenceJSON string) string {
+// content identity tuple. Identical (conversation, kind, summary, evidence)
+// always yields the same id regardless of the producing run or attempt, which
+// is what makes InsertCandidates idempotent across retries and repeated
+// windows.
+func candidateID(conversationID, kind, summary, evidenceJSON string) string {
 	sum := sha256.Sum256([]byte(strings.Join(
-		[]string{conversationID, runID, kind, summary, evidenceJSON}, "|")))
+		[]string{conversationID, kind, summary, evidenceJSON}, "|")))
 	return "cand:" + hex.EncodeToString(sum[:])[:32]
 }
 
 // InsertCandidates stores validated and rejected drafts for one conversation
 // and returns their deterministic ids in draft order. Rows are inserted with
 // INSERT OR IGNORE so re-inserting the same candidate is a no-op; the returned
-// id is stable across repeats. Every draft is written in a single transaction.
+// id is stable across repeats. runID and jobID are provenance only: a repeat of
+// the same content keeps the first producer's values. Every draft is written in
+// a single transaction.
 func InsertCandidates(ctx context.Context, db *sql.DB, conversationID, runID, jobID, generatorModel string, drafts []ValidatedDraft, now time.Time) ([]string, error) {
 	ids := make([]string, 0, len(drafts))
 
@@ -90,7 +94,7 @@ func InsertCandidates(ctx context.Context, db *sql.DB, conversationID, runID, jo
 		if err != nil {
 			return nil, fmt.Errorf("pipeline: insert candidates: marshal evidence: %w", err)
 		}
-		id := candidateID(conversationID, runID, d.Kind, d.Summary, string(evidenceJSON))
+		id := candidateID(conversationID, d.Kind, d.Summary, string(evidenceJSON))
 		if _, err := tx.ExecContext(ctx,
 			`INSERT OR IGNORE INTO memory_candidates(id, conversation_id, run_id, job_id, kind, summary, topic_title, evidence_turn_ids_json, interpretation_note, status, rejection_reason, generator_model, created_at)
 			 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

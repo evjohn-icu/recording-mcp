@@ -17,6 +17,7 @@
       → decision.Engine.Evaluate → RecordDecisionRun
       → generator.Generate（每个窗口一次）→ 候选校验
       → InsertCandidates → process.Enqueue 创建 publish 任务
+      → RecordCoverage（窗口成功完成后）
   → decision_runs / decision_answers 落库（shadow，不据此发布）
   → memory_candidates 落库（validated / rejected）
   → context-worker 领取 publish 任务 → pipeline.PublishHandler：
@@ -26,7 +27,7 @@
 
 - **接收与入队原子**：`IngestTranscript` 在同一数据库事务内写入原话、来源附件并调用 `process.EnqueueTx`，来源保存和任务创建不会半途分离。重复导入相同分片时，附件和任务都幂等（`INSERT OR IGNORE`），返回已存在的任务 ID，不会产生重复业务任务。
 - **任务标识**：任务 ID 为 `"job:" + sha256(幂等键)`；extract 幂等键由附件 ID 与处理器版本派生；附件 ID 作为任务的 `input_snapshot_id` 单独保存，payload 携带 `conversation_id`、`recording_id`、`segment_id` 与 `turn_ids`。
-- **分析范围与覆盖记录**：payload 的 `turn_ids` 是本次分片实际入库的原话 ID（空白文本轮次不入库也不入列表）。`pipeline.ExtractHandler` 优先按 `turn_ids` 加载轮次并按确定性顺序切块，形成 per-segment 分析窗口；payload 未携带 `turn_ids` 的旧任务则回退为整会话分析。每个窗口在决策记录之后调用 `pipeline.RecordCoverage` 把窗口内每个轮次写入 `analysis_coverage`：一行记录 (会话, 轮次, 处理器版本) 已被分析，`run_id` 记录对应的决策 run；`INSERT OR IGNORE` 使重复记录幂等，空列表为 no-op。`pipeline.UncoveredTurnIDs` 可按处理器版本列出尚未覆盖的轮次（顺序与 `LoadConversationTurns` 一致），`pipeline.ListCoverage` 按会话读取覆盖记录。
+- **分析范围与覆盖记录**：payload 的 `turn_ids` 是本次分片实际入库的原话 ID（空白文本轮次不入库也不入列表）。`pipeline.ExtractHandler` 优先按 `turn_ids` 加载轮次并按确定性顺序切块，形成 per-segment 分析窗口；payload 未携带 `turn_ids` 的旧任务则回退为整会话分析。每个窗口在**成功完成**决策记录、候选生成校验入库与发布入队之后（未配置生成器时则在决策记录之后）调用 `pipeline.RecordCoverage` 把窗口内每个轮次写入 `analysis_coverage`：一行记录 (会话, 轮次, 处理器版本) 已被分析，`run_id` 记录对应的决策 run；`INSERT OR IGNORE` 使重复记录幂等，空列表为 no-op。生成或入库失败时不记录覆盖，任务按可重试错误交回队列，重试时这些轮次仍是未覆盖状态。`pipeline.UncoveredTurnIDs` 可按处理器版本列出尚未覆盖的轮次（顺序与 `LoadConversationTurns` 一致），`pipeline.ListCoverage` 按会话读取覆盖记录。
 - **执行器**：`internal/worker` 不含业务逻辑，只负责领取、续租和收尾；`worker.Executor` 接口返回结果引用。执行器失败会作为可重试错误交回队列，直到尝试次数耗尽。
 - **候选生成**：每个窗口在决策记录后调用 `generate.Generator.Generate(ctx, state, windowTurnIDs)`，返回候选草稿与模型名。候选与证据校验结果在同一窗口内入库，extract 任务的 resultRef 形如 `decision-run:<runID>+candidates:<validatedCount>`；未配置生成器时跳过生成，resultRef 保持 `decision-run:<runID>`。
 
@@ -49,7 +50,7 @@
 - `summary` 非空且不超过 1000 个 rune；
 - `evidence_turn_ids` 非空，且全部属于当前窗口的轮次。
 
-违规候选不会被丢弃，而是以 `status=rejected` 连同 `rejection_reason` 入库，便于后续审计生成质量。允许的 kind 枚举为 `observation / suggestion / request / constraint / intention`。`InsertCandidates` 的候选 ID 是确定性的 `"cand:" + hex(sha256(conversationID|runID|kind|summary|evidenceJSON))[:32]`，配合 `INSERT OR IGNORE`：同一 (会话, run, 候选内容) 重放不会产生重复行。`ListCandidates(conversationID, status)` 按会话（可选按状态）读取候选，`status` 为空表示全部。校验完成后 extract 任务调用 `process.Enqueue`（事务包装 `EnqueueTx`）创建 publish 任务：`Spec{Stage: "publish", InputSnapshotID: conversationID, IdempotencyKey: "publish|<conversationID>|<runID>", Payload: {"conversation_id": …}, MaxAttempts: 5}`；幂等键保证每个 run 只入队一次发布。
+违规候选不会被丢弃，而是以 `status=rejected` 连同 `rejection_reason` 入库，便于后续审计生成质量。允许的 kind 枚举为 `observation / suggestion / request / constraint / intention`。`InsertCandidates` 的候选 ID 是内容确定性的 `"cand:" + hex(sha256(conversationID|kind|summary|evidenceJSON))[:32]`，不含 run/attempt，配合 `INSERT OR IGNORE`：同一会话内相同内容的候选无论来自哪次 run 或重试都映射到同一行，重放不会产生重复行；`run_id` / `job_id` 仅作为来源列，重复候选保留首个生产者的值。`ListCandidates(conversationID, status)` 按会话（可选按状态）读取候选，`status` 为空表示全部。校验完成后 extract 任务调用 `process.Enqueue`（事务包装 `EnqueueTx`）创建 publish 任务：`Spec{Stage: "publish", InputSnapshotID: conversationID, IdempotencyKey: "publish|<conversationID>|<setHash>", Payload: {"conversation_id": …}, MaxAttempts: 5}`，其中 `setHash` 是 `hex(sha256(该会话当前全部 validated 候选 ID 排序后以 | 连接))[:16]`，无 validated 候选时为 `none`；幂等键由候选集合派生，重试或重复窗口在候选集合不变时不会产生新的 publish 任务。
 
 ### 发布器（pipeline.PublishHandler）
 
@@ -100,9 +101,9 @@
 
 | 列 | 说明 |
 | --- | --- |
-| `id` | 主键，`cand:<hash>`，由会话、run、kind、summary 与证据列表确定性派生；重复候选 `INSERT OR IGNORE` |
+| `id` | 主键，`cand:<hash>`，由会话、kind、summary 与证据列表确定性派生（不含 run/attempt）；相同内容跨 run 映射到同一行，重复候选 `INSERT OR IGNORE` |
 | `conversation_id` | 所属会话 |
-| `run_id` / `job_id` | 产出候选的 decision run 与 extract 任务，可为空 |
+| `run_id` / `job_id` | 产出候选的 decision run 与 extract 任务，可为空；重复候选保留首个生产者的值 |
 | `kind` | 候选类型，允许枚举之外走 rejected |
 | `summary` / `topic_title` | 候选摘要与主题标题 |
 | `evidence_turn_ids_json` | 证据轮次 ID 列表 |

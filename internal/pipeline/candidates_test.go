@@ -145,7 +145,9 @@ func TestInsertCandidatesIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first InsertCandidates: %v", err)
 	}
-	second, err := InsertCandidates(ctx, db, "conv-1", "run-1", "job-1", "synthetic",
+	// A repeat from a different run/attempt with identical content must map to
+	// the same id and keep the first producer's provenance.
+	second, err := InsertCandidates(ctx, db, "conv-1", "run-2", "job-2", "synthetic",
 		[]ValidatedDraft{sampleValidatedDraft()}, now.Add(time.Second))
 	if err != nil {
 		t.Fatalf("second InsertCandidates: %v", err)
@@ -159,6 +161,13 @@ func TestInsertCandidatesIdempotent(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("candidate rows = %d, want 1 after repeat insert", count)
+	}
+	var runID, jobID string
+	if err := db.QueryRow(`SELECT run_id, job_id FROM memory_candidates WHERE conversation_id='conv-1'`).Scan(&runID, &jobID); err != nil {
+		t.Fatal(err)
+	}
+	if runID != "run-1" || jobID != "job-1" {
+		t.Fatalf("provenance = %q/%q, want first producer run-1/job-1", runID, jobID)
 	}
 
 	// A different summary must produce a different deterministic id.
