@@ -231,3 +231,44 @@ func TestSupersessionIsRejected(t *testing.T) {
 		t.Fatalf("rejected replacement changed snapshot: %+v", status)
 	}
 }
+
+func countExtractJobs(t *testing.T, s *Store) (int, string) {
+	t.Helper()
+	var n int
+	var status string
+	if err := s.db.QueryRow("SELECT COUNT(*), COALESCE(MAX(CAST(status AS TEXT)), '') FROM processing_jobs WHERE stage='extract'").Scan(&n, &status); err != nil {
+		t.Fatal(err)
+	}
+	return n, status
+}
+
+func TestIngestEnqueuesExtractJobIdempotently(t *testing.T) {
+	s := openTempStore(t)
+	ctx := context.Background()
+
+	report, err := s.IngestTranscript(ctx, sampleResult("seg-a", "rev-1", 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, status := countExtractJobs(t, s)
+	if n != 1 || status != "queued" {
+		t.Fatalf("after first import got %d extract jobs, status %q", n, status)
+	}
+
+	// Replay of the identical input is idempotent: no additional business job.
+	if _, err = s.IngestTranscript(ctx, sampleResult("seg-a", "rev-1", 0)); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ = countExtractJobs(t, s); n != 1 {
+		t.Fatalf("replay duplicated extract jobs: %d", n)
+	}
+
+	// A different segment produces its own job, guarded by distinct idempotency key.
+	if _, err = s.IngestTranscript(ctx, sampleResult("seg-b", "rev-1", 1000)); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ = countExtractJobs(t, s); n != 2 {
+		t.Fatalf("distinct segment got %d total extract jobs, want 2", n)
+	}
+	_ = report
+}

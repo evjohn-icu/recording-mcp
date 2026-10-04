@@ -9,9 +9,15 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"recordingmcp/internal/asrinput"
+	"recordingmcp/internal/process"
 )
+
+// extractProcessorVersion versions the extract-stage job identity so that a
+// change to the extract pipeline starts a fresh, disjoint idempotency key.
+const extractProcessorVersion = "extract-v1"
 
 // IngestReport describes one immutable, final transcript segment snapshot.
 type IngestReport struct {
@@ -202,6 +208,24 @@ func (s *Store) IngestTranscript(ctx context.Context, result asrinput.Result) (I
 		if _, err = tx.ExecContext(ctx, "INSERT INTO attachment_turns(attachment_id,turn_id) VALUES(?,?)", attachmentID, turnID); err != nil {
 			return IngestReport{}, err
 		}
+	}
+	payload, err := json.Marshal(map[string]string{
+		"conversation_id": conversationID,
+		"recording_id":    recordingID,
+		"segment_id":      src.SegmentID,
+		"attachment_id":   attachmentID,
+	})
+	if err != nil {
+		return IngestReport{}, err
+	}
+	if _, _, err := process.EnqueueTx(ctx, tx, process.Spec{
+		Stage:           "extract",
+		InputSnapshotID: attachmentID,
+		IdempotencyKey:  stableKey("job", "extract", attachmentID, extractProcessorVersion),
+		PayloadJSON:     string(payload),
+		MaxAttempts:     3,
+	}, time.Now()); err != nil {
+		return IngestReport{}, err
 	}
 	if err = tx.Commit(); err != nil {
 		return IngestReport{}, err

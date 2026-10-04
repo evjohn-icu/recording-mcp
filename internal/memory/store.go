@@ -16,6 +16,8 @@ import (
 	"unicode"
 
 	_ "modernc.org/sqlite"
+
+	"recordingmcp/internal/migrations"
 )
 
 type Store struct{ db *sql.DB }
@@ -31,28 +33,11 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	_, err = db.Exec(`PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
-CREATE TABLE IF NOT EXISTS conversations(id TEXT PRIMARY KEY,title TEXT NOT NULL,summary TEXT NOT NULL,annotation_version TEXT NOT NULL,annotation_basis TEXT NOT NULL,recording_id TEXT NOT NULL,source_sha256 TEXT NOT NULL,transcript_version TEXT NOT NULL,duration_ms INTEGER NOT NULL,transcript_json TEXT NOT NULL,annotations_json TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS recordings(id TEXT PRIMARY KEY,conversation_id TEXT NOT NULL REFERENCES conversations(id),source_file TEXT NOT NULL,source_sha256 TEXT NOT NULL,duration_ms INTEGER NOT NULL,recording_started_at TEXT NULL,absolute_time_known INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS topics(id TEXT PRIMARY KEY,title TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS topic_conversations(topic_id TEXT NOT NULL REFERENCES topics(id),conversation_id TEXT NOT NULL REFERENCES conversations(id),PRIMARY KEY(topic_id,conversation_id));
-CREATE TABLE IF NOT EXISTS turns(id TEXT PRIMARY KEY,conversation_id TEXT NOT NULL REFERENCES conversations(id),recording_id TEXT NOT NULL REFERENCES recordings(id),segment_index INTEGER NOT NULL,global_start_ms INTEGER NULL,global_end_ms INTEGER NULL,local_start_ms INTEGER NULL,local_end_ms INTEGER NULL,speaker_scoped_id TEXT NULL,speaker_entity_id TEXT NULL CHECK(speaker_entity_id IS NULL),content TEXT NOT NULL,definite INTEGER NULL,source_sha256 TEXT NOT NULL,transcript_version TEXT NOT NULL,original_turn_id TEXT NOT NULL,turn_json TEXT NOT NULL,UNIQUE(recording_id,original_turn_id));
-CREATE TABLE IF NOT EXISTS turn_topics(turn_id TEXT NOT NULL REFERENCES turns(id),topic_id TEXT NOT NULL REFERENCES topics(id),PRIMARY KEY(turn_id,topic_id));
-CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY,conversation_id TEXT NOT NULL REFERENCES conversations(id),kind TEXT NOT NULL CHECK(kind IN ('observation','suggestion','request','constraint','intention')),summary TEXT NOT NULL,topic_ids_json TEXT NOT NULL,claim_mode TEXT NOT NULL CHECK(claim_mode='inference'),interpretation_note TEXT NOT NULL,annotation_version TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS note_evidence(note_id TEXT NOT NULL REFERENCES notes(id),turn_id TEXT NOT NULL REFERENCES turns(id),ordinal INTEGER NOT NULL,PRIMARY KEY(note_id,turn_id));
-CREATE INDEX IF NOT EXISTS turns_conv_order ON turns(conversation_id,global_start_ms,id);
-CREATE INDEX IF NOT EXISTS notes_conv ON notes(conversation_id,id);`)
-	if err == nil {
-		_, err = db.Exec(`CREATE TABLE IF NOT EXISTS source_attachments(
- id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL REFERENCES conversations(id), recording_id TEXT NOT NULL REFERENCES recordings(id), segment_index INTEGER NOT NULL,
- segment_id TEXT NOT NULL, transcript_revision TEXT NOT NULL, source_json TEXT NOT NULL, result_json TEXT NOT NULL, content_sha256 TEXT NOT NULL,
- active INTEGER NOT NULL DEFAULT 1, supersedes_revision TEXT NULL, UNIQUE(recording_id,segment_id,transcript_revision));
-CREATE INDEX IF NOT EXISTS source_attachments_conversation ON source_attachments(conversation_id,recording_id);`)
-		if err == nil {
-			_, err = db.Exec(`CREATE TABLE IF NOT EXISTS attachment_turns(attachment_id TEXT NOT NULL REFERENCES source_attachments(id),turn_id TEXT NOT NULL REFERENCES turns(id),PRIMARY KEY(attachment_id,turn_id));`)
-		}
+	if _, err := db.Exec(`PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000`); err != nil {
+		db.Close()
+		return nil, err
 	}
-	if err != nil {
+	if err := migrations.Apply(context.Background(), db); err != nil {
 		db.Close()
 		return nil, err
 	}
