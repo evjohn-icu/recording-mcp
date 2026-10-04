@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -189,21 +188,32 @@ func TestRunRejectsMissingInputFile(t *testing.T) {
 }
 
 // TestProposalJSONFieldNames guards the wire contract used by the agent-side
-// proposal file.
+// proposal file: the decoder must map the snake_case keys onto LinkProposal and
+// reject unknown fields.
 func TestProposalJSONFieldNames(t *testing.T) {
-	var file proposalFile
-	if err := json.Unmarshal([]byte(validProposalJSON), &file); err != nil {
-		t.Fatalf("unmarshal: %v", err)
+	path := writeProposals(t, validProposalJSON)
+	proposals, err := pipeline.DecodeProposalFile(path)
+	if err != nil {
+		t.Fatalf("DecodeProposalFile: %v", err)
 	}
-	if len(file.Proposals) != 1 {
-		t.Fatalf("expected one proposal, got %d", len(file.Proposals))
+	if len(proposals) != 1 {
+		t.Fatalf("expected one proposal, got %d", len(proposals))
 	}
-	p := file.Proposals[0]
+	p := proposals[0]
 	if p.Kind != "topic_link" || p.FromTopicID != "topic:a" || p.ToTopicID != "topic:b" || p.Relation != "follow_up" {
 		t.Fatalf("unexpected proposal: %+v", p)
 	}
 	if p.Confidence != 0.7 || len(p.EvidenceTurnIDs) != 1 {
 		t.Fatalf("unexpected proposal fields: %+v", p)
+	}
+
+	unknown := writeProposals(t, `{"proposals":[{"kind":"topic_link","from_topic_id":"topic:a","to_topic_id":"topic:b","relation":"same_topic","reason":"r","evidence_turn_ids":["turn:1"],"confidence":0.5,"extra":true}]}`)
+	if _, err := pipeline.DecodeProposalFile(unknown); err == nil {
+		t.Fatal("decoder accepted an unknown field")
+	}
+	trailing := writeProposals(t, validProposalJSON+` {"proposals":[]}`)
+	if _, err := pipeline.DecodeProposalFile(trailing); err == nil {
+		t.Fatal("decoder accepted trailing content")
 	}
 }
 

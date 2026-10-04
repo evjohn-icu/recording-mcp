@@ -23,6 +23,10 @@
   → context-worker 领取 publish 任务 → pipeline.PublishHandler：
       ListCandidates(validated) → CurrentAnnotations → 合并
       → ApplyAnnotations → publication_runs（committed / conflict）
+      → process.Enqueue 创建 curate 任务（仅 committed 版本）
+  → context-worker 领取 curate 任务 → pipeline.CurateHandler：
+      运行 --curator-command（agent 经 MCP 只读调查，把提议写入 $CONTEXT_PROPOSALS）
+      → DecodeProposalFile → ValidateTopicLinks → InsertLinks（status=proposed）
 ```
 
 - **接收与入队原子**：`IngestTranscript` 在同一数据库事务内写入原话、来源附件并调用 `process.EnqueueTx`，来源保存和任务创建不会半途分离。重复导入相同分片时，附件和任务都幂等（`INSERT OR IGNORE`），返回已存在的任务 ID，不会产生重复业务任务。
@@ -54,7 +58,7 @@
 
 ### 发布器（pipeline.PublishHandler）
 
-`PublishHandler{DB, Store, ProcessorVersion}` 实现 `worker.Executor`，`context-worker` 的 pipeline 执行器按任务 stage 分发：extract → `ExtractHandler`，publish → `PublishHandler`。发布任务从 payload 读取 `conversation_id` 后执行：
+`PublishHandler{DB, Store, ProcessorVersion}` 实现 `worker.Executor`，`context-worker` 的 pipeline 执行器按任务 stage 分发：extract → `ExtractHandler`，publish → `PublishHandler`，curate → `CurateHandler`。发布任务从 payload 读取 `conversation_id` 后执行：
 
 1. `ListCandidates` 读取该会话全部 `validated` 候选；没有候选时直接返回 `"publish:noop"`。
 2. 通过 `memory.Store.CurrentAnnotations` 读取当前注释（`conversations.annotations_json` + `annotation_version`；为空时得到零值注释和空版本）。
@@ -62,7 +66,20 @@
 4. 合并结果的 `AnnotationVersion` 设为 `"auto-" + hex(sha256(candidateIDs 以 | 连接))[:12]`，`AnnotationBasis` 设为 `自动分析；未经人工复核`；合并结果没有标题时取 `conversations.title`。
 5. 以当前版本为期望版本调用 `ApplyAnnotations`：成功则写一条 `publication_runs`（`committed`）并返回 `"publish:<version>"`；版本冲突（期间注释被显式提交路径修改，错误含 `annotation version conflict`）则先写一条 `conflict` 记录，再把错误交回队列按可重试处理；其他应用失败同样先写一条 `failed` 记录再返回错误。
 
-失败与冲突都会记入 `publication_runs`：冲突行保留当时读取的期望版本，下次尝试会重新读取最新注释再合并；由于候选 ID 与 note ID 都确定性派生，重试不会注入重复内容。发布任务的默认 `max_attempts=5`，退避语义与 extract 任务一致。
+失败与冲突都会记入 `publication_runs`：冲突行保留当时读取的期望版本，下次尝试会重新读取最新注释再合并；由于候选 ID 与 note ID 都确定性派生，重试不会注入重复内容。发布任务的默认 `max_attempts=5`，退避语义与 extract 任务一致。提交成功后还会入队 curate 任务（见下节）；重放同一次发布不会重复入队。
+
+### 策展触发器（pipeline.CurateHandler）
+
+每次 publish 提交后自动入队一个 curate 任务，幂等键为 `curate|<conversation_id>|<annotation_version>`，payload 携带 `conversation_id` 与 `annotation_version`，`max_attempts=3`。`publish:noop`（没有 validated 候选）与冲突/失败路径不入队，因此 curator 只在会话注释真正变化后运行。
+
+`CurateHandler{DB, DBPath, Command, Timeout, Model, ProcessorVersion}` 执行一次策展：
+
+1. `Command` 为空时任务以 `curate:<version>+skipped:no-command` 成功结束，不写任何记录——未配置策展的部署不会陷入重试风暴，任务记录本身说明原因。
+2. 否则在临时目录里以 `sh -c` 运行命令，并注入环境变量：`CONTEXT_DB`（数据库绝对路径）、`CONTEXT_PROPOSALS`（命令必须写入的提议文件路径）、`CONTEXT_CURATE_CONVERSATION`、`CONTEXT_CURATE_VERSION`。curator 是外部 agent：它只通过 MCP 读记忆库，`CONTEXT_DB` 仅供其 MCP 客户端指向同一个库，校验与写入仍在本进程完成，agent 无法绕过证据规则。命令输出（合计上限 4 KiB）只用于错误信息。
+3. 命令失败、超时（`--curator-timeout`，默认 15 分钟）、没有写出提议文件或 JSON 非法，都作为可重试错误交回队列。
+4. 读到提议文件后依次调用 `DecodeProposalFile`（拒绝未知字段与多余内容）、`ValidateTopicLinks`、`InsertLinks`。结果引用形如 `curate:<version>+proposals:<通过数>+rejected:<被拒数>+written:<实际写入行数>`；`written` 只统计新建、刷新或重开的行，重放同一提议为 0。
+
+人工复核仍由 MCP 工具 `list_memory_links` / `review_memory_link` 执行（见 [associations.md](associations.md)），自动触发只负责产出 `status=proposed` 的建议。
 
 ## 表结构摘要
 
@@ -73,7 +90,7 @@
 | 列 | 说明 |
 | --- | --- |
 | `id` | 主键，`job:<hash>` |
-| `stage` | 阶段名，当前为 `extract` 或 `publish` |
+| `stage` | 阶段名，当前为 `extract`、`publish` 或 `curate` |
 | `input_snapshot_id` | 不可变输入快照（附件）ID |
 | `idempotency_key` | 唯一；幂等键决定任务 ID |
 | `status` | `queued / running / succeeded / retry_wait / failed / cancelled`（`cancelled` 仅保留在约束中，当前无取消路径） |
@@ -181,9 +198,16 @@ make build
   --executor pipeline --decision-url http://127.0.0.1:8765/v1/systemone \
   --generator openai --generator-url http://127.0.0.1:8000/v1/chat/completions \
   --generator-model glm-5.3-flash --generator-key-env GENERATOR_API_KEY
+
+# 自动策展：publish 提交后运行 curator 命令；命令必须把提议写入 $CONTEXT_PROPOSALS，
+# 校验与入库由 worker 完成（scripts/run-curator.sh 会按 CONTEXT_DB 配置 MCP）
+./bin/context-worker --db ./data/context-memory.db \
+  --executor pipeline --stages extract,publish,curate \
+  --curator-command 'scripts/run-curator.sh' \
+  --curator-model volces-agent-01/glm-5.3-flash
 ```
 
-`context-worker` 的完整参数：`--db`（必填）、`--worker-id`（默认 主机名+随机后缀）、`--stages`（默认 `extract,publish`）、`--lease`（默认 30s）、`--poll`（默认 1s）、`--once`、`--executor`（`synthetic|pipeline`，默认 `synthetic`）、`--decision-url`（默认 `http://127.0.0.1:8765/v1/systemone`）、`--decision-model`（默认 `jev-style-2b-v2`）、`--generator`（`synthetic|openai`，默认 `synthetic`）、`--generator-url`、`--generator-model`（默认 `glm-5.3-flash`）、`--generator-key-env`（默认 `GENERATOR_API_KEY`）、`--synthetic-delay`。启动时会先执行 `migrations.Apply`。本地 Decision 服务未部署时，`--executor pipeline` 的任务会失败并按可重试错误留在队列中；`--generator openai` 未提供 `--generator-url` 时启动即报错。
+`context-worker` 的完整参数：`--db`（必填）、`--worker-id`（默认 主机名+随机后缀）、`--stages`（默认 `extract,publish,curate`）、`--lease`（默认 30s）、`--poll`（默认 1s）、`--once`、`--executor`（`synthetic|pipeline`，默认 `synthetic`）、`--decision-url`（默认 `http://127.0.0.1:8765/v1/systemone`）、`--decision-model`（默认 `jev-style-2b-v2`）、`--generator`（`synthetic|openai`，默认 `synthetic`）、`--generator-url`、`--generator-model`（默认 `glm-5.3-flash`）、`--generator-key-env`（默认 `GENERATOR_API_KEY`）、`--curator-command`（默认空，空则 curate 任务以 skipped 结束）、`--curator-timeout`（默认 15m）、`--curator-model`（默认 `curator`）、`--synthetic-delay`。启动时会先执行 `migrations.Apply`。本地 Decision 服务未部署时，`--executor pipeline` 的任务会失败并按可重试错误留在队列中；`--generator openai` 未提供 `--generator-url` 时启动即报错。
 
 ## 与开发计划的对应
 
@@ -195,7 +219,7 @@ make build
 | B 决策服务与执行器 | `internal/decision` Engine 契约（choice/noul/score，完整分布校验，非法结果整体拒绝）；Synthetic 与本地 `SystemOneClient` 两个 Adapter；`worker.Run/RunOnce`；`pipeline.ExtractHandler` shadow 记录 | 本地权重实际部署与加载、三个小模型对比、TypeSafe 托管 Adapter、路由启用 |
 | C 提炼与发布 | `internal/generate`（Synthetic 与 OpenAI 兼容生成器）；候选校验（kind 枚举、summary 长度、证据⊆窗口）与 `memory_candidates` 入库；`pipeline.PublishHandler` 会话级发布、`publication_runs` 冲突/提交记录；`process.Enqueue` 包装 | 发布内容的人工复核与精化（合并/去重策略）、候选质量评测 |
 | D 层级检索与 MCP | `list_conversations` / `get_evidence_context` / `search_memory`（`internal/memory` 检索接口 + `cmd/context-memory` 注册，游标分页） | `build_context` 与完整层级视图 |
-| E/F | — | 人物绑定、话题关联、修订失效、模型评测 |
+| E/F | 话题关联建议层：`memory_links`（内容寻址、proposed/confirmed/rejected）、`context-associate` 校验入库、MCP `list_memory_links` / `review_memory_link` 复核、publish 提交后自动触发 `pipeline.CurateHandler` | 人物绑定、修订失效、模型评测、确认后的话题合并视图 |
 
 计划中的 Processing 层判断记录（`decision_runs` / `decision_answers`）已按拟议接口落地；窗口表尚未独立建表，窗口构建在 `internal/pipeline` 内存中完成（v1：默认单窗口，超过 200 轮按顺序切块；渲染超过 8000 字符截断并标注）。确定性保证：原话顺序为"有 `global_start_ms` 的按升序在前，再按 `segment_index`，再按 `original_turn_id`"，缺失时间仍有确定的来源序；输入哈希由 Decision 契约对 state 与问题集计算，缓存键与运行 ID 都可复现。候选与发布链路同样以确定性 ID 为基础：候选 ID、topic/note ID 与 publication run ID 都由内容哈希派生，重放不会产生重复行。
 

@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
+	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -52,15 +54,43 @@ var topicLinkRelations = map[string]bool{
 
 // LinkProposal is one association an agent proposes between two memory records.
 // For the topic_link kind FromTopicID and ToTopicID name existing topics and
-// EvidenceTurnIDs lists the turns supporting the association.
+// EvidenceTurnIDs lists the turns supporting the association. The JSON tags are
+// the wire format of a curator proposal file (docs/associations.md).
 type LinkProposal struct {
-	Kind            string
-	FromTopicID     string
-	ToTopicID       string
-	Relation        string
-	Reason          string
-	EvidenceTurnIDs []string
-	Confidence      float64
+	Kind            string   `json:"kind"`
+	FromTopicID     string   `json:"from_topic_id"`
+	ToTopicID       string   `json:"to_topic_id"`
+	Relation        string   `json:"relation"`
+	Reason          string   `json:"reason"`
+	EvidenceTurnIDs []string `json:"evidence_turn_ids"`
+	Confidence      float64  `json:"confidence"`
+}
+
+// ProposalFile is the top-level shape of a curator proposal file.
+type ProposalFile struct {
+	Proposals []LinkProposal `json:"proposals"`
+}
+
+// DecodeProposalFile reads a curator proposal file, rejecting unknown fields
+// and any trailing content so a malformed input fails loudly instead of
+// silently producing zero proposals.
+func DecodeProposalFile(path string) ([]LinkProposal, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	dec := json.NewDecoder(f)
+	dec.DisallowUnknownFields()
+	var file ProposalFile
+	if err := dec.Decode(&file); err != nil {
+		return nil, err
+	}
+	var trailing any
+	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return nil, errors.New("proposal file has trailing content after the top-level object")
+	}
+	return file.Proposals, nil
 }
 
 // ValidatedLink is a proposal together with the outcome of evidence

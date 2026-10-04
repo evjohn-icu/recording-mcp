@@ -124,6 +124,9 @@ func (h *PublishHandler) publish(ctx context.Context, conversationID, expectedVe
 	if err := InsertPublicationRun(ctx, h.DB, rec, time.Now()); err != nil {
 		return "", fmt.Errorf("pipeline: record publication run: %w", err)
 	}
+	if err := enqueueCurate(ctx, h.DB, conversationID, version); err != nil {
+		return "", err
+	}
 	return "publish:" + version, nil
 }
 

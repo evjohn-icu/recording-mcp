@@ -6,7 +6,7 @@ Context Layer 开发计划的 E 切片是“关联与失效”。当前先落地
 
 ## 工作流
 
-1. **只读调查**：agent 通过 MCP 工具 `list_conversations` / `list_topics` / `search_memory` / `get_evidence_context` 查看现有会话、话题、原话和证据上下文，不修改记忆库。
+1. **只读调查**：agent 通过 MCP 工具 `list_conversations` / `list_topics` / `search_memory` / `get_evidence_context` 查看现有会话、话题、原话和证据上下文，不修改记忆库。这一步可以由人工触发的 agent 会话完成，也可以由 publish 之后的 curate 任务自动触发（见下文“自动触发”）。
 2. **产出提议 JSON**：只在有真实原话证据时写出一个提议文件（模式见下文“提议 JSON”）。可直接使用的策展人提示词见 [curator-prompt.md](curator-prompt.md)。
 3. **校验与写入**：运行 `context-associate`，程序解析提议并执行 `ValidateTopicLinks` 校验；非 `--dry-run` 时通过校验的条目由 `InsertLinks` 写入 `memory_links`，`status=proposed`。
 4. **不自动合并**：校验只是挡住证据不足或字段非法的条目，通过校验也仅代表“形式合格”，语义是否成立仍需人工确认。任何条目都不会触发话题合并。
@@ -160,7 +160,21 @@ pi -p --approve --mode text --model volces-agent-01/glm-5.3-flash \
 - 工具参数名必须与 `docs/curator-prompt.md` 中的签名一致（例如 `search_memory` 用 `text`，不是 `query`）；写错会被 schema 拒绝，嵌套调用里容易被读成“没有命中”。
 - 一轮约 8–9 分钟（29 次只读调用、11 条提议、全部通过校验）；在消息里给出工具调用预算与“只写提议文件”的边界能显著减少跑偏。
 
+## 自动触发（curate 阶段）
+
+publish 提交后 `context-worker` 会自动入队一个 curate 任务（幂等键 `curate|<conversation_id>|<annotation_version>`；`publish:noop` 与冲突/失败不入队）。执行器 `pipeline.CurateHandler` 在临时目录里运行 `--curator-command`，向命令注入：
+
+| 变量 | 含义 |
+| --- | --- |
+| `CONTEXT_DB` | 记忆库绝对路径；命令用它把 MCP 客户端指向同一个库 |
+| `CONTEXT_PROPOSALS` | 命令必须写入的提议文件路径（格式与 `context-associate --input` 相同） |
+| `CONTEXT_CURATE_CONVERSATION` / `CONTEXT_CURATE_VERSION` | 触发这次策展的会话与注释版本 |
+
+命令结束后由 worker 读取该文件，并执行与 `context-associate` 完全相同的校验与写入，结果引用形如 `curate:<version>+proposals:3+rejected:0+written:2`（`written` 只计新建、刷新或重开的行，重放为 0）。命令失败、超时（`--curator-timeout`，默认 15 分钟）、没有写出文件或 JSON 非法，都按可重试错误交回队列；未配置 `--curator-command` 时任务以 `curate:<version>+skipped:no-command` 成功结束，不写任何记录。
+
+本仓库自带 `scripts/run-curator.sh`：它按 `CONTEXT_DB` 配置项目本地 MCP、以无头模式运行策展提示词，并把提议写到 `CONTEXT_PROPOSALS`。它与上一节手工配方的唯一区别是“谁把提议文件写出来”；两条路径的校验、状态与复核规则完全一致。
+
 ## 后续（尚未实现）
 
-- **自动触发**：导入或发布后自动扫描生成提议尚未实现，提议始终由 agent 显式产出。
 - **关联的下游使用**：确认后的话题合并、跨话题层级视图等尚未实现；`confirmed` 目前只是状态标记。
+- **复核界面**：复核只能通过 MCP 工具完成，尚未提供独立界面或批量操作。

@@ -9,7 +9,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -23,24 +22,6 @@ import (
 	"recordingmcp/internal/migrations"
 	"recordingmcp/internal/pipeline"
 )
-
-// proposal mirrors one entry of the input file. It is kept separate from
-// pipeline.LinkProposal so the CLI owns the wire format (snake_case keys)
-// independently of the store type used internally.
-type proposal struct {
-	Kind            string   `json:"kind"`
-	FromTopicID     string   `json:"from_topic_id"`
-	ToTopicID       string   `json:"to_topic_id"`
-	Relation        string   `json:"relation"`
-	Reason          string   `json:"reason"`
-	EvidenceTurnIDs []string `json:"evidence_turn_ids"`
-	Confidence      float64  `json:"confidence"`
-}
-
-// proposalFile is the top-level shape of the input JSON.
-type proposalFile struct {
-	Proposals []proposal `json:"proposals"`
-}
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
@@ -74,9 +55,9 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return errors.New("--input is required")
 	}
 
-	proposals, err := decodeProposals(*inputPath)
+	links, err := pipeline.DecodeProposalFile(*inputPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("decode %s: %w", *inputPath, err)
 	}
 
 	ctx := context.Background()
@@ -85,19 +66,6 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	defer db.Close()
-
-	links := make([]pipeline.LinkProposal, 0, len(proposals))
-	for _, p := range proposals {
-		links = append(links, pipeline.LinkProposal{
-			Kind:            p.Kind,
-			FromTopicID:     p.FromTopicID,
-			ToTopicID:       p.ToTopicID,
-			Relation:        p.Relation,
-			Reason:          p.Reason,
-			EvidenceTurnIDs: p.EvidenceTurnIDs,
-			Confidence:      p.Confidence,
-		})
-	}
 
 	validated, err := pipeline.ValidateTopicLinks(ctx, db, links)
 	if err != nil {
@@ -161,28 +129,6 @@ func run(args []string, stdout, stderr io.Writer) error {
 	}
 	fmt.Fprintf(stdout, "%s%s\n", summary, suffix)
 	return nil
-}
-
-// decodeProposals reads the proposal file, rejecting unknown fields and any
-// trailing JSON so a malformed input fails loudly rather than silently
-// producing zero proposals.
-func decodeProposals(path string) ([]proposal, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	var file proposalFile
-	dec := json.NewDecoder(f)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&file); err != nil {
-		return nil, fmt.Errorf("decode %s: %w", path, err)
-	}
-	var extra any
-	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("%s contains trailing JSON", path)
-	}
-	return file.Proposals, nil
 }
 
 // openDB opens the SQLite file, applies pending migrations and returns the

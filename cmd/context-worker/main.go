@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -39,7 +40,7 @@ func main() {
 func run() error {
 	dbPath := flag.String("db", "", "path to the SQLite database (required)")
 	workerID := flag.String("worker-id", defaultWorkerID(), "worker identity recorded on claims")
-	stages := flag.String("stages", "extract,publish", "comma-separated stage names to claim")
+	stages := flag.String("stages", "extract,publish,curate", "comma-separated stage names to claim")
 	lease := flag.Duration("lease", 30*time.Second, "lease duration held while executing a job")
 	poll := flag.Duration("poll", time.Second, "idle poll interval")
 	once := flag.Bool("once", false, "claim and process at most one job, then exit")
@@ -51,6 +52,9 @@ func run() error {
 	generatorModel := flag.String("generator-model", "glm-5.3-flash", "generator model name")
 	generatorKeyEnv := flag.String("generator-key-env", "GENERATOR_API_KEY", "environment variable holding the generator API key")
 	generatorTimeout := flag.Duration("generator-timeout", 180*time.Second, "HTTP timeout for the openai generator")
+	curatorCommand := flag.String("curator-command", "", "shell command running one curation pass; it must write proposals to $CONTEXT_PROPOSALS and may read $CONTEXT_DB. Empty completes curate jobs as skipped")
+	curatorTimeout := flag.Duration("curator-timeout", 15*time.Minute, "timeout for one curator command run")
+	curatorModel := flag.String("curator-model", "curator", "model identifier recorded on memory links written by the curate stage")
 	syntheticDelay := flag.Duration("synthetic-delay", 0, "artificial delay for the synthetic executor")
 	flag.Parse()
 
@@ -91,7 +95,11 @@ func run() error {
 		return err
 	}
 
-	inner, err := buildExecutor(*executor, db, store, *decisionURL, *decisionModel, gen, *syntheticDelay)
+	absDBPath, err := filepath.Abs(*dbPath)
+	if err != nil {
+		return fmt.Errorf("resolve database path: %w", err)
+	}
+	inner, err := buildExecutor(*executor, db, store, *decisionURL, *decisionModel, gen, *syntheticDelay, absDBPath, *curatorCommand, *curatorModel, *curatorTimeout)
 	if err != nil {
 		return err
 	}
@@ -124,8 +132,10 @@ func run() error {
 }
 
 // buildExecutor selects the executor implementation named by --executor. The
-// pipeline executor routes extract and publish jobs to their stage handlers.
-func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, decisionModel string, gen generate.Generator, syntheticDelay time.Duration) (worker.Executor, error) {
+// pipeline executor routes extract, publish and curate jobs to their stage
+// handlers; the curate handler runs the configured curator command and stores
+// the proposals it produces.
+func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, decisionModel string, gen generate.Generator, syntheticDelay time.Duration, dbPath, curatorCommand, curatorModel string, curatorTimeout time.Duration) (worker.Executor, error) {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "synthetic":
 		return worker.Synthetic{Delay: syntheticDelay}, nil
@@ -142,6 +152,14 @@ func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, de
 				DB:               db,
 				Store:            store,
 				ProcessorVersion: "publish-v1",
+			},
+			"curate": &pipeline.CurateHandler{
+				DB:               db,
+				DBPath:           dbPath,
+				Command:          curatorCommand,
+				Timeout:          curatorTimeout,
+				Model:            curatorModel,
+				ProcessorVersion: "curate-v1",
 			},
 		}}, nil
 	default:
