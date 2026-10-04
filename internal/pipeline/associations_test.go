@@ -181,28 +181,29 @@ func TestInsertLinksIdempotent(t *testing.T) {
 	p := baseLinkProposal()
 	links := []ValidatedLink{{LinkProposal: p, Status: linkStatusValidated}}
 
-	ids1, err := InsertLinks(ctx, db, "curator-model", links, now)
+	inserted1, err := InsertLinks(ctx, db, "curator-model", links, now)
 	if err != nil {
 		t.Fatalf("first InsertLinks: %v", err)
 	}
-	if len(ids1) != 1 {
-		t.Fatalf("got %d ids, want 1", len(ids1))
+	if len(inserted1) != 1 || inserted1[0].Outcome != LinkInserted {
+		t.Fatalf("first InsertLinks = %+v, want one inserted outcome", inserted1)
 	}
 	want := linkID("topic", p.FromTopicID, "topic", p.ToTopicID, p.Relation)
-	if ids1[0] != want {
-		t.Errorf("id = %q, want %q", ids1[0], want)
+	if inserted1[0].ID != want {
+		t.Errorf("id = %q, want %q", inserted1[0].ID, want)
 	}
-	if !strings.HasPrefix(ids1[0], "link:") || len(ids1[0]) != len("link:")+32 {
-		t.Errorf("id %q does not match link:<32 hex>", ids1[0])
+	if !strings.HasPrefix(inserted1[0].ID, "link:") || len(inserted1[0].ID) != len("link:")+32 {
+		t.Errorf("id %q does not match link:<32 hex>", inserted1[0].ID)
 	}
 
-	// Re-inserting the same tuple must not create a second row or change the id.
-	ids2, err := InsertLinks(ctx, db, "other-model", links, now.Add(time.Hour))
+	// Re-inserting the same tuple must not create a second row, must report
+	// that nothing changed, and must keep the first writer's attribution.
+	inserted2, err := InsertLinks(ctx, db, "other-model", links, now.Add(time.Hour))
 	if err != nil {
 		t.Fatalf("second InsertLinks: %v", err)
 	}
-	if len(ids2) != 1 || ids2[0] != ids1[0] {
-		t.Fatalf("second ids = %v, want [%s]", ids2, ids1[0])
+	if len(inserted2) != 1 || inserted2[0].ID != inserted1[0].ID || inserted2[0].Outcome != LinkUnchanged {
+		t.Fatalf("second InsertLinks = %+v, want one unchanged outcome for %s", inserted2, inserted1[0].ID)
 	}
 
 	stored, err := ListLinks(ctx, db, LinkFilter{})
@@ -243,12 +244,12 @@ func TestInsertLinksSkipsRejectedAndForeignKinds(t *testing.T) {
 	foreign.Kind = "note_link"
 	foreign.ToTopicID = "topic-3"
 
-	ids, err := InsertLinks(ctx, db, "model", []ValidatedLink{rejected, foreign}, time.UnixMilli(1_700_000_000_000))
+	outcomes, err := InsertLinks(ctx, db, "model", []ValidatedLink{rejected, foreign}, time.UnixMilli(1_700_000_000_000))
 	if err != nil {
 		t.Fatalf("InsertLinks: %v", err)
 	}
-	if len(ids) != 0 {
-		t.Fatalf("ids = %v, want none", ids)
+	if len(outcomes) != 0 {
+		t.Fatalf("outcomes = %+v, want none", outcomes)
 	}
 	stored, err := ListLinks(ctx, db, LinkFilter{})
 	if err != nil {
@@ -364,11 +365,11 @@ func TestReviewLinkTransitions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ValidateTopicLinks: %v", err)
 	}
-	ids, err := InsertLinks(ctx, db, "curator", validated, time.UnixMilli(1_700_000_000_000))
-	if err != nil || len(ids) != 1 {
-		t.Fatalf("InsertLinks: ids=%v err=%v", ids, err)
+	inserted, err := InsertLinks(ctx, db, "curator", validated, time.UnixMilli(1_700_000_000_000))
+	if err != nil || len(inserted) != 1 {
+		t.Fatalf("InsertLinks: %+v err=%v", inserted, err)
 	}
-	id := ids[0]
+	id := inserted[0].ID
 
 	confirmed, err := ReviewLink(ctx, db, id, ReviewConfirm)
 	if err != nil {
@@ -423,5 +424,113 @@ func TestReviewLinkTransitions(t *testing.T) {
 	}
 	if _, err := ReviewLink(ctx, db, "  ", ReviewConfirm); err == nil {
 		t.Fatal("blank link id accepted")
+	}
+}
+
+func TestInsertLinksReproposalSemantics(t *testing.T) {
+	db := newAssociationDB(t)
+	seedAssociationFixtures(t, db)
+	ctx := context.Background()
+	t0 := time.UnixMilli(1_700_000_000_000)
+
+	validated := func(p LinkProposal) []ValidatedLink {
+		t.Helper()
+		out, err := ValidateTopicLinks(ctx, db, []LinkProposal{p})
+		if err != nil || len(out) != 1 || out[0].Status != linkStatusValidated {
+			t.Fatalf("ValidateTopicLinks(%+v) = %+v, %v", p, out, err)
+		}
+		return out
+	}
+	status := func() MemoryLink {
+		t.Helper()
+		rows, err := ListLinks(ctx, db, LinkFilter{})
+		if err != nil || len(rows) != 1 {
+			t.Fatalf("ListLinks = %+v, %v", rows, err)
+		}
+		return rows[0]
+	}
+
+	base := baseLinkProposal()
+	inserted, err := InsertLinks(ctx, db, "curator-a", validated(base), t0)
+	if err != nil || len(inserted) != 1 || inserted[0].Outcome != LinkInserted {
+		t.Fatalf("first InsertLinks = %+v, %v", inserted, err)
+	}
+	id := inserted[0].ID
+
+	// New content on a pending row replaces the proposal and keeps the status,
+	// the original creation time and the first proposer's attribution.
+	better := base
+	better.Reason = "second pass quotes the follow-up turn as well"
+	better.EvidenceTurnIDs = []string{"turn-1", "turn-2"}
+	better.Confidence = 0.9
+	refreshed, err := InsertLinks(ctx, db, "curator-b", validated(better), t0.Add(time.Hour))
+	if err != nil || len(refreshed) != 1 || refreshed[0].Outcome != LinkRefreshed {
+		t.Fatalf("refresh InsertLinks = %+v, %v", refreshed, err)
+	}
+	got := status()
+	if got.Status != LinkStatusProposed || got.Reason != better.Reason || got.Confidence != better.Confidence {
+		t.Errorf("refreshed row = %+v, want the new reason, confidence and proposed status", got)
+	}
+	if len(got.EvidenceTurnIDs) != 2 {
+		t.Errorf("evidence = %v, want both turns", got.EvidenceTurnIDs)
+	}
+	if got.Model != "curator-a" || !got.CreatedAt.Equal(t0) {
+		t.Errorf("attribution changed: model=%q created_at=%v", got.Model, got.CreatedAt)
+	}
+
+	// A rejected verdict stands when the same evidence is proposed again, but
+	// genuinely new evidence reopens the link for review.
+	if _, err := ReviewLink(ctx, db, id, ReviewReject); err != nil {
+		t.Fatalf("reject: %v", err)
+	}
+	replay, err := InsertLinks(ctx, db, "curator-b", validated(better), t0.Add(2*time.Hour))
+	if err != nil || len(replay) != 1 || replay[0].Outcome != LinkUnchanged {
+		t.Fatalf("replay InsertLinks = %+v, %v", replay, err)
+	}
+	if got := status(); got.Status != LinkStatusRejected {
+		t.Errorf("status after identical replay = %q, want the rejection to stand", got.Status)
+	}
+	newer := better
+	newer.Reason = "third pass quotes both turns and a later confirmation"
+	newer.Confidence = 0.95
+	reopened, err := InsertLinks(ctx, db, "curator-b", validated(newer), t0.Add(3*time.Hour))
+	if err != nil || len(reopened) != 1 || reopened[0].Outcome != LinkReopened {
+		t.Fatalf("reopen InsertLinks = %+v, %v", reopened, err)
+	}
+	if got := status(); got.Status != LinkStatusProposed || got.Reason != newer.Reason {
+		t.Errorf("reopened row = %+v, want new content back in proposed", got)
+	}
+
+	// A confirmation is never overwritten by later proposals; it can only be
+	// changed by an explicit review action.
+	if _, err := ReviewLink(ctx, db, id, ReviewConfirm); err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+	latest := newer
+	latest.Reason = "fourth pass"
+	confirmed, err := InsertLinks(ctx, db, "curator-c", validated(latest), t0.Add(4*time.Hour))
+	if err != nil || len(confirmed) != 1 || confirmed[0].Outcome != LinkConfirmed {
+		t.Fatalf("confirmed InsertLinks = %+v, %v", confirmed, err)
+	}
+	if got := status(); got.Status != LinkStatusConfirmed || got.Reason != newer.Reason {
+		t.Errorf("confirmed row = %+v, want it untouched", got)
+	}
+
+	// Reopen returns a verdict to the pending pool, and the row can be
+	// reviewed again.
+	if got, err := ReviewLink(ctx, db, id, ReviewReopen); err != nil || got.Status != LinkStatusProposed {
+		t.Fatalf("reopen after confirm = %q, %v", got.Status, err)
+	}
+	if got, err := ReviewLink(ctx, db, id, ReviewReopen); err != nil || got.Status != LinkStatusProposed {
+		t.Fatalf("repeat reopen = %q, %v; want proposed, nil", got.Status, err)
+	}
+	if got, err := ReviewLink(ctx, db, id, ReviewConfirm); err != nil || got.Status != LinkStatusConfirmed {
+		t.Fatalf("confirm after reopen = %q, %v", got.Status, err)
+	}
+	if got, err := ReviewLink(ctx, db, id, ReviewReject); err != nil || got.Status != LinkStatusRejected {
+		t.Fatalf("reject after confirm after reopen = %q, %v", got.Status, err)
+	}
+	if got, err := ReviewLink(ctx, db, id, ReviewReopen); err != nil || got.Status != LinkStatusProposed {
+		t.Fatalf("reopen after reject = %q, %v", got.Status, err)
 	}
 }

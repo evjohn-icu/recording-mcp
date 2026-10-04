@@ -17,7 +17,7 @@ migration `v6 "memory-links"` 创建 `memory_links` 表及 `memory_links_from`�
 
 | 列 | 说明 |
 | --- | --- |
-| `id` | 内容寻址 ID：`"link:"` + `sha256(from_kind|from_id|to_kind|to_id|relation)` 的十六进制前 32 位。写入使用 `INSERT OR IGNORE`，同一关联重复提交不会产生重复行。 |
+| `id` | 内容寻址 ID：`"link:"` + `sha256(from_kind|from_id|to_kind|to_id|relation)` 的十六进制前 32 位。同一关联重复提交不会产生重复行，处理结果按下文“重复提议与状态”一节区分。 |
 | `from_kind` / `from_id` | 关联的源端。当前实现只写 `topic`，`from_id` 即话题 ID。 |
 | `to_kind` / `to_id` | 关联的目标端，同样只写 `topic` 与话题 ID。 |
 | `relation` | 关系类型：`same_topic`、`follow_up`、`contradiction`、`update`。 |
@@ -72,6 +72,21 @@ migration `v6 "memory-links"` 创建 `memory_links` 表及 `memory_links_from`�
 | 证据 | `evidence_turn_ids` 至少 1 条，且每条都必须存在于 `turns` 表。 |
 | 置信度 | `confidence` 必须在 [0, 1] 范围内。 |
 
+## 重复提议与状态
+
+`memory_links` 的行由 `(from, to, relation)` 决定，因此重新提议同一对话题不会新建行，也不会静默丢弃。`context-associate` 对每条通过的提议报告一个处理结果：
+
+| 现有行 | 处理 |
+| --- | --- |
+| 不存在 | 新建，`status=proposed`（`inserted`） |
+| `proposed`，内容不同 | 用新的 reason、证据与 confidence 覆盖，保留状态与 `created_at`（`refreshed`） |
+| `proposed`，内容相同 | 不改动（`unchanged`） |
+| `rejected`，内容不同 | 覆盖内容并回到 `proposed`：拒绝是针对旧证据的结论，新证据需要重新复核（`re-opened`） |
+| `rejected`，内容相同 | 不改动，拒绝结论保留（`unchanged`） |
+| `confirmed` | 不改动（`confirmed`）：确认不会被后续提议悄悄改写，只能由人工 `reopen` 或 `reject` 变更 |
+
+`model` 列记录首次写下该元组的提议方，后续刷新不改写它；`created_at` 同理只反映首次写入时间。需要记录更新的理由与证据时，由策展人重新提议即可（`refreshed` / `re-opened`），人工结论仍由复核工具显式修改。
+
 ## CLI 用法
 
 ```sh
@@ -88,29 +103,29 @@ go run ./cmd/context-associate \
 | `--model` | 记录到 `memory_links.model` 的模型标识，默认为空。 |
 | `--dry-run` | 只解析并校验，不写库。 |
 
-程序在标准输出逐条打印提议的处理结果，格式为 `<状态> <from> -> <to> [<relation>] <说明>`：状态是 `validated`（通过）或 `rejected`（被拒）；被拒条目的说明是拒绝原因（如 `from topic "topic:x" not found`），通过条目的说明是提议理由。最后汇总 `accepted=<n> rejected=<n>`，`--dry-run` 时在末尾追加 ` (dry-run)`。输出示例：
+程序在标准输出逐条打印提议的处理结果，格式为 `<状态> <from> -> <to> [<relation>] <说明>`：状态是 `validated`（通过）或 `rejected`（被拒）；被拒条目的说明是拒绝原因（如 `from topic "topic:x" not found`），通过条目的说明是提议理由。非 `--dry-run` 时，通过的行后面会附上写入结果标记：新建不带标记，另有 ` (refreshed pending suggestion)`、` (re-proposed after rejection)`、` (unchanged)`、` (already confirmed)` 四种（见“重复提议与状态”）。最后汇总 `accepted=<n> rejected=<n>`，非 `--dry-run` 时追加 ` written=<n>`（实际新建或更新的行数），`--dry-run` 时在末尾追加 ` (dry-run)`。输出示例：
 
 ```text
 validated topic:release -> topic:launch [same_topic] 两次讨论围绕同一交付物展开。
 rejected topic:missing -> topic:launch [follow_up] from topic "topic:missing" not found
-accepted=1 rejected=1
+accepted=1 rejected=1 written=1
 ```
 
 输入文件中出现未知字段、JSON 解析失败或文件缺失时以非零退出码结束，不写库；所有提议都被拒时仍正常退出（退出码 0），只报告计数。
 
-## 复核：确认与拒绝
+## 复核：确认、拒绝与重开
 
 复核通过 MCP 工具进行，状态机只有三个状态，且任何复核都不合并话题、不修改已有记忆：
 
 | 工具 | 类型 | 参数 | 行为 |
 | --- | --- | --- | --- |
 | `list_memory_links` | 只读 | `status`（`proposed` / `confirmed` / `rejected`，缺省为全部）、`topic_id`（任一端的限定）、`limit`（缺省 50、上限 200） | 按 `created_at, id` 返回关联，含两端 kind/id/标题、relation、reason、证据轮次、confidence、model 与状态 |
-| `review_memory_link` | 写入 | `link_id`、`action`（`confirm` / `reject`） | `confirm` 把 `proposed` 改为 `confirmed`；`reject` 把 `proposed` 或 `confirmed` 改为 `rejected` |
+| `review_memory_link` | 写入 | `link_id`、`action`（`confirm` / `reject` / `reopen`） | `confirm` 把 `proposed` 改为 `confirmed`；`reject` 把 `proposed` 或 `confirmed` 改为 `rejected`；`reopen` 把 `confirmed` 或 `rejected` 退回 `proposed` |
 
 规则：
 
 - 只允许上述迁移。重复执行同一动作（例如对已确认的关联再次 `confirm`）是幂等的空操作，返回当前状态；已拒绝的关联不能再 `confirm`，错误信息会指明当前状态。
-- 行永不删除：拒绝只是状态标记，保留证据与理由供审计（撤销一次错误的确认也用 `reject`）。
+- 行永不删除：拒绝只是状态标记，保留证据与理由供审计；`reopen` 把结论退回待复核，而不是抹掉记录（撤销一次错误的确认用 `reject` 或 `reopen`）。
 - 确认不等于合并：当前没有任何下游视图消费 `confirmed`，话题合并、跨话题层级视图仍未实现。
 
 ## 用 pi 运行一轮策展（实测配方）

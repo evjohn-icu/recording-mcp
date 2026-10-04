@@ -113,24 +113,53 @@ func run(args []string, stdout, stderr io.Writer) error {
 		}
 	}
 
+	var outcomes []pipeline.InsertedLink
 	if !*dryRun {
-		if _, err := pipeline.InsertLinks(ctx, db, *model, validated, time.Now()); err != nil {
+		outcomes, err = pipeline.InsertLinks(ctx, db, *model, validated, time.Now())
+		if err != nil {
 			return fmt.Errorf("insert links: %w", err)
 		}
 	}
 
+	next := 0
+	written := 0
 	for _, v := range validated {
 		detail := v.Reason
 		if v.Status == "rejected" {
 			detail = v.RejectionReason
 		}
-		fmt.Fprintf(stdout, "%s %s -> %s [%s] %s\n", v.Status, v.FromTopicID, v.ToTopicID, v.Relation, detail)
+		marker := ""
+		// InsertLinks reports one outcome per stored proposal, in the same
+		// order, skipping rejected and foreign-kind entries; mirror that skip
+		// rule to attach each outcome to its line.
+		if !*dryRun && v.Kind == "topic_link" && v.Status == "validated" {
+			outcome := outcomes[next].Outcome
+			next++
+			switch outcome {
+			case pipeline.LinkInserted:
+				written++
+			case pipeline.LinkRefreshed:
+				written++
+				marker = " (refreshed pending suggestion)"
+			case pipeline.LinkReopened:
+				written++
+				marker = " (re-proposed after rejection)"
+			case pipeline.LinkUnchanged:
+				marker = " (unchanged)"
+			case pipeline.LinkConfirmed:
+				marker = " (already confirmed)"
+			}
+		}
+		fmt.Fprintf(stdout, "%s %s -> %s [%s] %s%s\n", v.Status, v.FromTopicID, v.ToTopicID, v.Relation, detail, marker)
 	}
 	suffix := ""
+	summary := fmt.Sprintf("accepted=%d rejected=%d", accepted, rejected)
 	if *dryRun {
 		suffix = " (dry-run)"
+	} else {
+		summary += fmt.Sprintf(" written=%d", written)
 	}
-	fmt.Fprintf(stdout, "accepted=%d rejected=%d%s\n", accepted, rejected, suffix)
+	fmt.Fprintf(stdout, "%s%s\n", summary, suffix)
 	return nil
 }
 

@@ -36,6 +36,7 @@ const (
 const (
 	ReviewConfirm = "confirm"
 	ReviewReject  = "reject"
+	ReviewReopen  = "reopen"
 )
 
 // maxLinkReasonRunes bounds the free-text reason of a link proposal.
@@ -239,14 +240,54 @@ func linkID(fromKind, fromID, toKind, toID, relation string) string {
 	return "link:" + hex.EncodeToString(sum[:])[:32]
 }
 
-// InsertLinks stores accepted topic-link proposals as "proposed" suggestions
-// and returns their deterministic ids in input order. Rejected links and links
-// whose kind is not topic_link are skipped: rejected evidence is never
-// recorded, and only topic endpoints are written. Rows are inserted with
-// INSERT OR IGNORE, so re-inserting the same (from, to, relation) tuple is a
-// no-op; all writes happen in a single transaction.
-func InsertLinks(ctx context.Context, db *sql.DB, model string, links []ValidatedLink, now time.Time) ([]string, error) {
-	ids := make([]string, 0, len(links))
+// LinkOutcome describes what InsertLinks did with one accepted proposal. It is
+// reported for every accepted proposal so that re-proposing an existing
+// (from, to, relation) tuple is never silent.
+type LinkOutcome string
+
+const (
+	// LinkInserted means a new row was stored with status proposed.
+	LinkInserted LinkOutcome = "inserted"
+	// LinkRefreshed means an existing proposed row kept its status and took the
+	// new reason, evidence and confidence.
+	LinkRefreshed LinkOutcome = "refreshed"
+	// LinkReopened means an existing rejected row was replaced and returned to
+	// proposed: the new proposal carries evidence the reviewer has not seen.
+	LinkReopened LinkOutcome = "re-opened"
+	// LinkUnchanged means the stored row already carries exactly this
+	// proposal; for a rejected row the verdict stands.
+	LinkUnchanged LinkOutcome = "unchanged"
+	// LinkConfirmed means the row was already confirmed and is left untouched;
+	// a confirmation is never overwritten by a later proposal.
+	LinkConfirmed LinkOutcome = "confirmed"
+)
+
+// InsertedLink is the outcome of storing one accepted proposal, in input order.
+type InsertedLink struct {
+	ID      string
+	Outcome LinkOutcome
+}
+
+// InsertLinks stores accepted topic-link proposals and reports the outcome of
+// each. Rejected proposals and links whose kind is not topic_link are skipped:
+// rejected evidence is never recorded, and only topic endpoints are written.
+// A proposal's id is derived from (from, to, relation), so re-proposing a tuple
+// never creates a second row and never reports success silently:
+//
+//   - no row yet: store as proposed (inserted);
+//   - existing proposed row with new content: replace reason, evidence and
+//     confidence, keeping the status and created_at (refreshed);
+//   - existing rejected row with new content: replace the content and return
+//     the row to proposed, because the verdict applied to superseded evidence
+//     (re-opened);
+//   - existing row with identical content: leave it alone (unchanged), so a
+//     rejected verdict is not overturned by replaying the same evidence;
+//   - existing confirmed row: leave it alone (confirmed).
+//
+// The model column keeps the first proposer: it attributes who first recorded
+// the tuple. All writes happen in a single transaction.
+func InsertLinks(ctx context.Context, db *sql.DB, model string, links []ValidatedLink, now time.Time) ([]InsertedLink, error) {
+	out := make([]InsertedLink, 0, len(links))
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -263,21 +304,52 @@ func InsertLinks(ctx context.Context, db *sql.DB, model string, links []Validate
 			return nil, fmt.Errorf("pipeline: insert links: marshal evidence: %w", err)
 		}
 		id := linkID("topic", l.FromTopicID, "topic", l.ToTopicID, l.Relation)
-		if _, err := tx.ExecContext(ctx,
-			`INSERT OR IGNORE INTO memory_links(id, from_kind, from_id, to_kind, to_id, relation, reason, evidence_turn_ids_json, confidence, status, model, created_at)
-			 VALUES(?, 'topic', ?, 'topic', ?, ?, ?, ?, ?, ?, ?, ?)`,
-			id, l.FromTopicID, l.ToTopicID, l.Relation, l.Reason,
-			string(evidenceJSON), l.Confidence, LinkStatusProposed, model, now.UnixMilli(),
-		); err != nil {
-			return nil, fmt.Errorf("pipeline: insert links: insert %s: %w", id, err)
+
+		var (
+			storedStatus, storedReason, storedEvidence string
+			storedConfidence                           float64
+		)
+		err = tx.QueryRowContext(ctx,
+			`SELECT status, reason, evidence_turn_ids_json, confidence FROM memory_links WHERE id = ?`, id).
+			Scan(&storedStatus, &storedReason, &storedEvidence, &storedConfidence)
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO memory_links(id, from_kind, from_id, to_kind, to_id, relation, reason, evidence_turn_ids_json, confidence, status, model, created_at)
+				 VALUES(?, 'topic', ?, 'topic', ?, ?, ?, ?, ?, ?, ?, ?)`,
+				id, l.FromTopicID, l.ToTopicID, l.Relation, l.Reason,
+				string(evidenceJSON), l.Confidence, LinkStatusProposed, model, now.UnixMilli(),
+			); err != nil {
+				return nil, fmt.Errorf("pipeline: insert links: %w", err)
+			}
+			out = append(out, InsertedLink{ID: id, Outcome: LinkInserted})
+		case err != nil:
+			return nil, fmt.Errorf("pipeline: insert links: read %s: %w", id, err)
+		case storedStatus == LinkStatusConfirmed:
+			out = append(out, InsertedLink{ID: id, Outcome: LinkConfirmed})
+		case storedReason == l.Reason && storedEvidence == string(evidenceJSON) && storedConfidence == l.Confidence:
+			out = append(out, InsertedLink{ID: id, Outcome: LinkUnchanged})
+		case storedStatus == LinkStatusProposed, storedStatus == LinkStatusRejected:
+			outcome := LinkRefreshed
+			if storedStatus == LinkStatusRejected {
+				outcome = LinkReopened
+			}
+			if _, err := tx.ExecContext(ctx,
+				`UPDATE memory_links SET reason = ?, evidence_turn_ids_json = ?, confidence = ?, status = ? WHERE id = ?`,
+				l.Reason, string(evidenceJSON), l.Confidence, LinkStatusProposed, id,
+			); err != nil {
+				return nil, fmt.Errorf("pipeline: insert links: update %s: %w", id, err)
+			}
+			out = append(out, InsertedLink{ID: id, Outcome: outcome})
+		default:
+			return nil, fmt.Errorf("pipeline: insert links: unexpected status %q on %s", storedStatus, id)
 		}
-		ids = append(ids, id)
 	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("pipeline: insert links: commit: %w", err)
 	}
-	return ids, nil
+	return out, nil
 }
 
 // ListLinks loads memory links in deterministic order (created_at, then id).
@@ -344,10 +416,12 @@ func ListLinks(ctx context.Context, db *sql.DB, filter LinkFilter) ([]MemoryLink
 
 // ReviewLink transitions one memory link to the status implied by action.
 // ReviewConfirm moves a proposed link to confirmed; ReviewReject moves a
-// proposed or confirmed link to rejected. Repeating an action whose target
-// status already holds is a no-op that returns the stored row, so replays are
-// safe; any other transition fails with an error naming the current status.
-// Rows are never deleted, so rejected links stay auditable.
+// proposed or confirmed link to rejected; ReviewReopen returns a confirmed or
+// rejected link to proposed so a mistaken verdict can be reconsidered.
+// Repeating an action whose target status already holds is a no-op that
+// returns the stored row, so replays are safe; any other transition fails with
+// an error naming the current status. Rows are never deleted, so rejected
+// links stay auditable.
 func ReviewLink(ctx context.Context, db *sql.DB, id, action string) (MemoryLink, error) {
 	if strings.TrimSpace(id) == "" {
 		return MemoryLink{}, fmt.Errorf("pipeline: review link: link id is required")
@@ -374,8 +448,15 @@ func ReviewLink(ctx context.Context, db *sql.DB, id, action string) (MemoryLink,
 		default:
 			return link, nil
 		}
+	case ReviewReopen:
+		switch link.Status {
+		case LinkStatusConfirmed, LinkStatusRejected:
+			target = LinkStatusProposed
+		default:
+			return link, nil
+		}
 	default:
-		return MemoryLink{}, fmt.Errorf("pipeline: unknown review action %q: want %q or %q", action, ReviewConfirm, ReviewReject)
+		return MemoryLink{}, fmt.Errorf("pipeline: unknown review action %q: want %q, %q or %q", action, ReviewConfirm, ReviewReject, ReviewReopen)
 	}
 	if _, err := db.ExecContext(ctx, `UPDATE memory_links SET status = ? WHERE id = ?`, target, id); err != nil {
 		return MemoryLink{}, fmt.Errorf("pipeline: review link %s: %w", id, err)

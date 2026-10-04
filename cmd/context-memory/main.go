@@ -309,7 +309,7 @@ func newServer(store *memory.Store) *mcp.Server {
 		}
 		return nil, MemoryLinkList{Links: views}, nil
 	})
-	mcp.AddTool(s, write("review_memory_link", "确认或拒绝一条记忆关联建议。confirm 把 proposed 变为 confirmed；reject 把 proposed 或 confirmed 变为 rejected；重复提交同一动作是幂等的，拒绝只改状态、不删除记录，也不合并话题。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ReviewMemoryLinkInput) (*mcp.CallToolResult, MemoryLinkView, error) {
+	mcp.AddTool(s, write("review_memory_link", "复核一条记忆关联建议。confirm 把 proposed 变为 confirmed；reject 把 proposed 或 confirmed 变为 rejected；reopen 把 confirmed 或 rejected 退回 proposed 以便重新考虑；重复提交同一动作是幂等的，复核只改状态、不删除记录，也不合并话题。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ReviewMemoryLinkInput) (*mcp.CallToolResult, MemoryLinkView, error) {
 		if strings.TrimSpace(in.LinkID) == "" {
 			return nil, MemoryLinkView{}, fmt.Errorf("link_id is required")
 		}

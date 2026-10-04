@@ -206,3 +206,46 @@ func TestProposalJSONFieldNames(t *testing.T) {
 		t.Fatalf("unexpected proposal fields: %+v", p)
 	}
 }
+
+func TestRunReportsReproposalOutcomes(t *testing.T) {
+	dbPath := seededDBPath(t)
+	path := writeProposals(t, validProposalJSON)
+
+	var out, errOut bytes.Buffer
+	if err := run([]string{"--db", dbPath, "--input", path, "--model", "pi-test"}, &out, &errOut); err != nil {
+		t.Fatalf("first run: %v (stderr %q)", err, errOut.String())
+	}
+	if !strings.Contains(out.String(), "accepted=1 rejected=0 written=1") {
+		t.Fatalf("first run stdout: %q", out.String())
+	}
+
+	// An identical replay must report that nothing was written instead of
+	// looking like a fresh insert.
+	out.Reset()
+	if err := run([]string{"--db", dbPath, "--input", path, "--model", "other"}, &out, &errOut); err != nil {
+		t.Fatalf("replay run: %v (stderr %q)", err, errOut.String())
+	}
+	if !strings.Contains(out.String(), "(unchanged)") || !strings.Contains(out.String(), "written=0") {
+		t.Fatalf("replay stdout: %q", out.String())
+	}
+
+	// New content on a pending row refreshes it and stays attributed to the
+	// first proposer.
+	better := strings.Replace(validProposalJSON, `"reason":"follows the earlier topic"`, `"reason":"sharpened reason citing both turns"`, 1)
+	better = strings.Replace(better, `"confidence":0.7`, `"confidence":0.9`, 1)
+	path2 := writeProposals(t, better)
+	out.Reset()
+	if err := run([]string{"--db", dbPath, "--input", path2, "--model", "second-pass"}, &out, &errOut); err != nil {
+		t.Fatalf("refresh run: %v (stderr %q)", err, errOut.String())
+	}
+	if !strings.Contains(out.String(), "(refreshed pending suggestion)") || !strings.Contains(out.String(), "written=1") {
+		t.Fatalf("refresh stdout: %q", out.String())
+	}
+	links, err := pipeline.ListLinks(context.Background(), openReadDB(t, dbPath), pipeline.LinkFilter{})
+	if err != nil || len(links) != 1 {
+		t.Fatalf("list links: %+v %v", links, err)
+	}
+	if links[0].Reason != "sharpened reason citing both turns" || links[0].Confidence != 0.9 || links[0].Model != "pi-test" {
+		t.Fatalf("refreshed link = %+v", links[0])
+	}
+}
