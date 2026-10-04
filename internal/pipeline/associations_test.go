@@ -478,27 +478,42 @@ func TestInsertLinksReproposalSemantics(t *testing.T) {
 		t.Errorf("attribution changed: model=%q created_at=%v", got.Model, got.CreatedAt)
 	}
 
-	// A rejected verdict stands when the same evidence is proposed again, but
-	// genuinely new evidence reopens the link for review.
+	// A reviewer's rejection is sticky: a later agent pass proposing the same
+	// pair — even with a reworded reason and an extra evidence turn — must not
+	// overturn it, and the reviewed content stays untouched.
 	if _, err := ReviewLink(ctx, db, id, ReviewReject); err != nil {
 		t.Fatalf("reject: %v", err)
 	}
 	replay, err := InsertLinks(ctx, db, "curator-b", validated(better), t0.Add(2*time.Hour))
-	if err != nil || len(replay) != 1 || replay[0].Outcome != LinkUnchanged {
-		t.Fatalf("replay InsertLinks = %+v, %v", replay, err)
+	if err != nil || len(replay) != 1 || replay[0].Outcome != LinkRejectionHeld {
+		t.Fatalf("identical replay InsertLinks = %+v, %v; want the rejection held", replay, err)
 	}
-	if got := status(); got.Status != LinkStatusRejected {
-		t.Errorf("status after identical replay = %q, want the rejection to stand", got.Status)
+	if got := status(); got.Status != LinkStatusRejected || got.Reason != better.Reason {
+		t.Errorf("rejected row changed on identical replay: %+v", got)
 	}
 	newer := better
 	newer.Reason = "third pass quotes both turns and a later confirmation"
+	newer.EvidenceTurnIDs = []string{"turn-1", "turn-2"}
 	newer.Confidence = 0.95
-	reopened, err := InsertLinks(ctx, db, "curator-b", validated(newer), t0.Add(3*time.Hour))
-	if err != nil || len(reopened) != 1 || reopened[0].Outcome != LinkReopened {
-		t.Fatalf("reopen InsertLinks = %+v, %v", reopened, err)
+	held, err := InsertLinks(ctx, db, "curator-b", validated(newer), t0.Add(3*time.Hour))
+	if err != nil || len(held) != 1 || held[0].Outcome != LinkRejectionHeld {
+		t.Fatalf("rewritten replay InsertLinks = %+v, %v; want the rejection held", held, err)
+	}
+	if got := status(); got.Status != LinkStatusRejected || got.Reason != better.Reason || got.Confidence != better.Confidence {
+		t.Errorf("rejected row was rewritten by a later pass: %+v", got)
+	}
+
+	// Only an explicit human reopen clears the verdict; afterwards the curator
+	// may refresh the pending row with its newer wording.
+	if got, err := ReviewLink(ctx, db, id, ReviewReopen); err != nil || got.Status != LinkStatusProposed {
+		t.Fatalf("reopen after reject = %q, %v", got.Status, err)
+	}
+	refreshedAgain, err := InsertLinks(ctx, db, "curator-b", validated(newer), t0.Add(4*time.Hour))
+	if err != nil || len(refreshedAgain) != 1 || refreshedAgain[0].Outcome != LinkRefreshed {
+		t.Fatalf("refresh after reopen = %+v, %v", refreshedAgain, err)
 	}
 	if got := status(); got.Status != LinkStatusProposed || got.Reason != newer.Reason {
-		t.Errorf("reopened row = %+v, want new content back in proposed", got)
+		t.Errorf("row after reopen and refresh = %+v", got)
 	}
 
 	// A confirmation is never overwritten by later proposals; it can only be
@@ -508,7 +523,7 @@ func TestInsertLinksReproposalSemantics(t *testing.T) {
 	}
 	latest := newer
 	latest.Reason = "fourth pass"
-	confirmed, err := InsertLinks(ctx, db, "curator-c", validated(latest), t0.Add(4*time.Hour))
+	confirmed, err := InsertLinks(ctx, db, "curator-c", validated(latest), t0.Add(5*time.Hour))
 	if err != nil || len(confirmed) != 1 || confirmed[0].Outcome != LinkConfirmed {
 		t.Fatalf("confirmed InsertLinks = %+v, %v", confirmed, err)
 	}

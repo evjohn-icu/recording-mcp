@@ -281,11 +281,11 @@ const (
 	// LinkRefreshed means an existing proposed row kept its status and took the
 	// new reason, evidence and confidence.
 	LinkRefreshed LinkOutcome = "refreshed"
-	// LinkReopened means an existing rejected row was replaced and returned to
-	// proposed: the new proposal carries evidence the reviewer has not seen.
-	LinkReopened LinkOutcome = "re-opened"
-	// LinkUnchanged means the stored row already carries exactly this
-	// proposal; for a rejected row the verdict stands.
+	// LinkRejectionHeld means the row was already rejected and keeps that
+	// verdict: a later proposal, however it is phrased, is not new evidence.
+	// Only an explicit human reopen returns the row to proposed.
+	LinkRejectionHeld LinkOutcome = "rejection-held"
+	// LinkUnchanged means the stored row already carries exactly this proposal.
 	LinkUnchanged LinkOutcome = "unchanged"
 	// LinkConfirmed means the row was already confirmed and is left untouched;
 	// a confirmation is never overwritten by a later proposal.
@@ -307,11 +307,11 @@ type InsertedLink struct {
 //   - no row yet: store as proposed (inserted);
 //   - existing proposed row with new content: replace reason, evidence and
 //     confidence, keeping the status and created_at (refreshed);
-//   - existing rejected row with new content: replace the content and return
-//     the row to proposed, because the verdict applied to superseded evidence
-//     (re-opened);
-//   - existing row with identical content: leave it alone (unchanged), so a
-//     rejected verdict is not overturned by replaying the same evidence;
+//   - existing proposed row with identical content: leave it alone
+//     (unchanged);
+//   - existing rejected row: leave it alone (rejection-held). A reviewer's
+//     verdict is sticky; a later agent pass, however it rephrases the reason,
+//     is not new evidence, so only an explicit review reopen clears it;
 //   - existing confirmed row: leave it alone (confirmed).
 //
 // The model column keeps the first proposer: it attributes who first recorded
@@ -357,20 +357,18 @@ func InsertLinks(ctx context.Context, db *sql.DB, model string, links []Validate
 			return nil, fmt.Errorf("pipeline: insert links: read %s: %w", id, err)
 		case storedStatus == LinkStatusConfirmed:
 			out = append(out, InsertedLink{ID: id, Outcome: LinkConfirmed})
+		case storedStatus == LinkStatusRejected:
+			out = append(out, InsertedLink{ID: id, Outcome: LinkRejectionHeld})
 		case storedReason == l.Reason && storedEvidence == string(evidenceJSON) && storedConfidence == l.Confidence:
 			out = append(out, InsertedLink{ID: id, Outcome: LinkUnchanged})
-		case storedStatus == LinkStatusProposed, storedStatus == LinkStatusRejected:
-			outcome := LinkRefreshed
-			if storedStatus == LinkStatusRejected {
-				outcome = LinkReopened
-			}
+		case storedStatus == LinkStatusProposed:
 			if _, err := tx.ExecContext(ctx,
-				`UPDATE memory_links SET reason = ?, evidence_turn_ids_json = ?, confidence = ?, status = ? WHERE id = ?`,
-				l.Reason, string(evidenceJSON), l.Confidence, LinkStatusProposed, id,
+				`UPDATE memory_links SET reason = ?, evidence_turn_ids_json = ?, confidence = ? WHERE id = ?`,
+				l.Reason, string(evidenceJSON), l.Confidence, id,
 			); err != nil {
 				return nil, fmt.Errorf("pipeline: insert links: update %s: %w", id, err)
 			}
-			out = append(out, InsertedLink{ID: id, Outcome: outcome})
+			out = append(out, InsertedLink{ID: id, Outcome: LinkRefreshed})
 		default:
 			return nil, fmt.Errorf("pipeline: insert links: unexpected status %q on %s", storedStatus, id)
 		}

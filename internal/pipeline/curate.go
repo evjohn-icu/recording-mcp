@@ -99,7 +99,7 @@ func (h *CurateHandler) Execute(ctx context.Context, job process.Job) (string, e
 		}
 		for _, l := range stored {
 			switch l.Outcome {
-			case LinkInserted, LinkRefreshed, LinkReopened:
+			case LinkInserted, LinkRefreshed:
 				written++
 			}
 		}

@@ -77,7 +77,7 @@
 1. `Command` 为空时任务以 `curate:<version>+skipped:no-command` 成功结束，不写任何记录——未配置策展的部署不会陷入重试风暴，任务记录本身说明原因。
 2. 否则在临时目录里以 `sh -c` 运行命令，并注入环境变量：`CONTEXT_DB`（数据库绝对路径）、`CONTEXT_PROPOSALS`（命令必须写入的提议文件路径）、`CONTEXT_CURATE_CONVERSATION`、`CONTEXT_CURATE_VERSION`。curator 是外部 agent：它只通过 MCP 读记忆库，`CONTEXT_DB` 仅供其 MCP 客户端指向同一个库，校验与写入仍在本进程完成，agent 无法绕过证据规则。命令输出（合计上限 4 KiB）只用于错误信息。
 3. 命令失败、超时（`--curator-timeout`，默认 15 分钟）、没有写出提议文件或 JSON 非法，都作为可重试错误交回队列。
-4. 读到提议文件后依次调用 `DecodeProposalFile`（拒绝未知字段与多余内容）、`ValidateTopicLinks`、`InsertLinks`。结果引用形如 `curate:<version>+proposals:<通过数>+rejected:<被拒数>+written:<实际写入行数>`；`written` 只统计新建、刷新或重开的行，重放同一提议为 0。
+4. 读到提议文件后依次调用 `DecodeProposalFile`（拒绝未知字段与多余内容）、`ValidateTopicLinks`、`InsertLinks`。结果引用形如 `curate:<version>+proposals:<通过数>+rejected:<被拒数>+written:<实际写入行数>`；`written` 只统计新建或刷新的行，重放同一提议为 0，被拒绝过的行保持原判不动。
 
 人工复核仍由 MCP 工具 `list_memory_links` / `review_memory_link` 执行（见 [associations.md](associations.md)），自动触发只负责产出 `status=proposed` 的建议。
 

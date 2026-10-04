@@ -109,9 +109,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 			case pipeline.LinkRefreshed:
 				written++
 				marker = " (refreshed pending suggestion)"
-			case pipeline.LinkReopened:
-				written++
-				marker = " (re-proposed after rejection)"
+			case pipeline.LinkRejectionHeld:
+				marker = " (rejected earlier; unchanged)"
 			case pipeline.LinkUnchanged:
 				marker = " (unchanged)"
 			case pipeline.LinkConfirmed:

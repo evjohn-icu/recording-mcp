@@ -81,11 +81,10 @@ migration `v6 "memory-links"` 创建 `memory_links` 表及 `memory_links_from`�
 | 不存在 | 新建，`status=proposed`（`inserted`） |
 | `proposed`，内容不同 | 用新的 reason、证据与 confidence 覆盖，保留状态与 `created_at`（`refreshed`） |
 | `proposed`，内容相同 | 不改动（`unchanged`） |
-| `rejected`，内容不同 | 覆盖内容并回到 `proposed`：拒绝是针对旧证据的结论，新证据需要重新复核（`re-opened`） |
-| `rejected`，内容相同 | 不改动，拒绝结论保留（`unchanged`） |
+| `rejected`，内容相同或不同 | 不改动（`rejection-held`）：拒绝是人工结论，agent 换个措辞或换一条证据不是新证据。只有人工 `reopen` 才把行退回 `proposed`，之后策展人可以再刷新内容 |
 | `confirmed` | 不改动（`confirmed`）：确认不会被后续提议悄悄改写，只能由人工 `reopen` 或 `reject` 变更 |
 
-`model` 列记录首次写下该元组的提议方，后续刷新不改写它；`created_at` 同理只反映首次写入时间。需要记录更新的理由与证据时，由策展人重新提议即可（`refreshed` / `re-opened`），人工结论仍由复核工具显式修改。
+`model` 列记录首次写下该元组的提议方，后续刷新不改写它；`created_at` 同理只反映首次写入时间。共识是：agent 只能提议与刷新待复核内容，状态变更始终由人工复核驱动。
 
 ## CLI 用法
 
@@ -103,7 +102,7 @@ go run ./cmd/context-associate \
 | `--model` | 记录到 `memory_links.model` 的模型标识，默认为空。 |
 | `--dry-run` | 只解析并校验，不写库。 |
 
-程序在标准输出逐条打印提议的处理结果，格式为 `<状态> <from> -> <to> [<relation>] <说明>`：状态是 `validated`（通过）或 `rejected`（被拒）；被拒条目的说明是拒绝原因（如 `from topic "topic:x" not found`），通过条目的说明是提议理由。非 `--dry-run` 时，通过的行后面会附上写入结果标记：新建不带标记，另有 ` (refreshed pending suggestion)`、` (re-proposed after rejection)`、` (unchanged)`、` (already confirmed)` 四种（见“重复提议与状态”）。最后汇总 `accepted=<n> rejected=<n>`，非 `--dry-run` 时追加 ` written=<n>`（实际新建或更新的行数），`--dry-run` 时在末尾追加 ` (dry-run)`。输出示例：
+程序在标准输出逐条打印提议的处理结果，格式为 `<状态> <from> -> <to> [<relation>] <说明>`：状态是 `validated`（通过）或 `rejected`（被拒）；被拒条目的说明是拒绝原因（如 `from topic "topic:x" not found`），通过条目的说明是提议理由。非 `--dry-run` 时，通过的行后面会附上写入结果标记：新建不带标记，另有 ` (refreshed pending suggestion)`、` (rejected earlier; unchanged)`、` (unchanged)`、` (already confirmed)` 四种（见“重复提议与状态”）。最后汇总 `accepted=<n> rejected=<n>`，非 `--dry-run` 时追加 ` written=<n>`（实际新建或更新的行数），`--dry-run` 时在末尾追加 ` (dry-run)`。输出示例：
 
 ```text
 validated topic:release -> topic:launch [same_topic] 两次讨论围绕同一交付物展开。
@@ -170,7 +169,7 @@ publish 提交后 `context-worker` 会自动入队一个 curate 任务（幂等�
 | `CONTEXT_PROPOSALS` | 命令必须写入的提议文件路径（格式与 `context-associate --input` 相同） |
 | `CONTEXT_CURATE_CONVERSATION` / `CONTEXT_CURATE_VERSION` | 触发这次策展的会话与注释版本 |
 
-命令结束后由 worker 读取该文件，并执行与 `context-associate` 完全相同的校验与写入，结果引用形如 `curate:<version>+proposals:3+rejected:0+written:2`（`written` 只计新建、刷新或重开的行，重放为 0）。命令失败、超时（`--curator-timeout`，默认 15 分钟）、没有写出文件或 JSON 非法，都按可重试错误交回队列；未配置 `--curator-command` 时任务以 `curate:<version>+skipped:no-command` 成功结束，不写任何记录。
+命令结束后由 worker 读取该文件，并执行与 `context-associate` 完全相同的校验与写入，结果引用形如 `curate:<version>+proposals:3+rejected:0+written:2`（`written` 只计新建或刷新的行，重放为 0，被拒过的行保持原判）。命令失败、超时（`--curator-timeout`，默认 15 分钟）、没有写出文件或 JSON 非法，都按可重试错误交回队列；未配置 `--curator-command` 时任务以 `curate:<version>+skipped:no-command` 成功结束，不写任何记录。
 
 本仓库自带 `scripts/run-curator.sh`：它按 `CONTEXT_DB` 配置项目本地 MCP、以无头模式运行策展提示词，并把提议写到 `CONTEXT_PROPOSALS`。它与上一节手工配方的唯一区别是“谁把提议文件写出来”；两条路径的校验、状态与复核规则完全一致。
 

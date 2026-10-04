@@ -258,4 +258,21 @@ func TestRunReportsReproposalOutcomes(t *testing.T) {
 	if links[0].Reason != "sharpened reason citing both turns" || links[0].Confidence != 0.9 || links[0].Model != "pi-test" {
 		t.Fatalf("refreshed link = %+v", links[0])
 	}
+
+	// A reviewer's rejection is sticky: the same proposal is reported as held
+	// instead of quietly re-opening the link.
+	if _, err := pipeline.ReviewLink(context.Background(), openReadDB(t, dbPath), links[0].ID, pipeline.ReviewReject); err != nil {
+		t.Fatalf("reject link: %v", err)
+	}
+	out.Reset()
+	if err := run([]string{"--db", dbPath, "--input", path2}, &out, &errOut); err != nil {
+		t.Fatalf("held run: %v (stderr %q)", err, errOut.String())
+	}
+	if !strings.Contains(out.String(), "(rejected earlier; unchanged)") || !strings.Contains(out.String(), "written=0") {
+		t.Fatalf("held stdout: %q", out.String())
+	}
+	after, err := pipeline.ListLinks(context.Background(), openReadDB(t, dbPath), pipeline.LinkFilter{})
+	if err != nil || len(after) != 1 || after[0].Status != "rejected" || after[0].Reason != links[0].Reason {
+		t.Fatalf("rejected link changed: %+v %v", after, err)
+	}
 }
