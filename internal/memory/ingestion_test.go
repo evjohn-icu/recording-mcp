@@ -272,3 +272,69 @@ func TestIngestEnqueuesExtractJobIdempotently(t *testing.T) {
 	}
 	_ = report
 }
+
+func TestIngestPayloadTurnIDsMatchSegmentTurns(t *testing.T) {
+	s := openTempStore(t)
+	ctx := context.Background()
+
+	// Three turns: the middle one is blank, so only two are retained.
+	r := sampleResult("seg-a", "rev-1", 0)
+	r.Turns = append(r.Turns, asrinput.Turn{ID: "utt-2", OriginalIndex: 2, Text: "\n\t "}, asrinput.Turn{ID: "utt-3", OriginalIndex: 3, Text: "second utterance"})
+	if _, err := s.IngestTranscript(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+
+	var payloadJSON string
+	if err := s.db.QueryRow("SELECT payload_json FROM processing_jobs WHERE stage='extract'").Scan(&payloadJSON); err != nil {
+		t.Fatal(err)
+	}
+	var payload struct {
+		ConversationID string   `json:"conversation_id"`
+		RecordingID    string   `json:"recording_id"`
+		SegmentID      string   `json:"segment_id"`
+		TurnIDs        []string `json:"turn_ids"`
+	}
+	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
+		t.Fatalf("payload_json is not a JSON object: %v", err)
+	}
+	if len(payload.TurnIDs) != 2 {
+		t.Fatalf("payload turn_ids got %d entries, want 2 (blank turn excluded): %q", len(payload.TurnIDs), payload.TurnIDs)
+	}
+
+	// turn_ids must equal the turns persisted for this segment, in insertion order.
+	rows, err := s.db.Query("SELECT id FROM turns WHERE recording_id=? AND segment_index=(SELECT segment_index FROM source_attachments WHERE recording_id=? AND segment_id=?) ORDER BY rowid", payload.RecordingID, payload.RecordingID, payload.SegmentID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var stored []string
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		stored = append(stored, id)
+	}
+	if err = rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != len(payload.TurnIDs) {
+		t.Fatalf("turns table has %d turns for the segment, payload lists %d", len(stored), len(payload.TurnIDs))
+	}
+	for i := range stored {
+		if stored[i] != payload.TurnIDs[i] {
+			t.Fatalf("turn_ids order mismatch at %d: payload %q, turns table %q", i, payload.TurnIDs[i], stored[i])
+		}
+	}
+	if payload.ConversationID == "" || payload.RecordingID == "" || payload.SegmentID != "seg-a" {
+		t.Fatalf("payload identity fields missing: %+v", payload)
+	}
+
+	// Replay of the identical input still leaves exactly one job.
+	if _, err = s.IngestTranscript(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := countExtractJobs(t, s); n != 1 {
+		t.Fatalf("replay with turn_ids payload duplicated extract jobs: %d", n)
+	}
+}

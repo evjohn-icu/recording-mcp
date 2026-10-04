@@ -56,7 +56,9 @@ func (h *ExtractHandler) Execute(ctx context.Context, job process.Job) (string, 
 		return "", errors.New("pipeline: ExtractHandler.Engine is required")
 	}
 	var payload struct {
-		ConversationID string `json:"conversation_id"`
+		ConversationID string   `json:"conversation_id"`
+		SegmentID      string   `json:"segment_id"`
+		TurnIDs        []string `json:"turn_ids"`
 	}
 	if err := json.Unmarshal([]byte(job.PayloadJSON), &payload); err != nil {
 		return "", fmt.Errorf("pipeline: decode payload: %w", err)
@@ -65,7 +67,17 @@ func (h *ExtractHandler) Execute(ctx context.Context, job process.Job) (string, 
 		return "", errors.New("pipeline: payload.conversation_id is required")
 	}
 
-	turns, err := LoadConversationTurns(ctx, h.DB, payload.ConversationID)
+	// A payload carrying turn_ids scopes the run to those turns (per-segment
+	// windows); otherwise the whole conversation is analysed.
+	var (
+		turns []Turn
+		err   error
+	)
+	if len(payload.TurnIDs) > 0 {
+		turns, err = LoadTurnsByIDs(ctx, h.DB, payload.ConversationID, payload.TurnIDs)
+	} else {
+		turns, err = LoadConversationTurns(ctx, h.DB, payload.ConversationID)
+	}
 	if err != nil {
 		return "", fmt.Errorf("pipeline: load turns: %w", err)
 	}
@@ -116,6 +128,10 @@ func (h *ExtractHandler) Execute(ctx context.Context, job process.Job) (string, 
 			return "", fmt.Errorf("pipeline: record decision run: %w", err)
 		}
 		lastRunID = runID
+
+		if err := RecordCoverage(ctx, h.DB, payload.ConversationID, runID, h.ProcessorVersion, w.TurnIDs, time.Now()); err != nil {
+			return "", fmt.Errorf("pipeline: record coverage: %w", err)
+		}
 
 		if h.Generator == nil {
 			continue

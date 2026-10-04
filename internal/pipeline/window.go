@@ -39,18 +39,50 @@ type turnRow struct {
 	originalTurnID string
 }
 
+// turnsSelect is the shared column list for every turn read.
+const turnsSelect = `SELECT id,content,speaker_scoped_id,global_start_ms,global_end_ms,segment_index,original_turn_id,turn_json FROM turns`
+
 // LoadConversationTurns reads every turn of a conversation and returns them in
 // deterministic order: turns with a global start time first (ascending), then
 // by segment index, then by original turn id. OriginalIndex is parsed from
 // turn_json's original_index field; when that is absent or invalid the row
 // order is used instead.
 func LoadConversationTurns(ctx context.Context, db *sql.DB, conversationID string) ([]Turn, error) {
-	rows, err := db.QueryContext(ctx, `SELECT id,content,speaker_scoped_id,global_start_ms,global_end_ms,segment_index,original_turn_id,turn_json FROM turns WHERE conversation_id=?`, conversationID)
+	rows, err := db.QueryContext(ctx, turnsSelect+` WHERE conversation_id=?`, conversationID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+	return scanTurns(rows)
+}
 
+// LoadTurnsByIDs reads only the turns of a conversation whose ids appear in
+// turnIDs and returns them in the same deterministic order as
+// LoadConversationTurns. Ids absent from the conversation are omitted; an empty
+// turnIDs yields no turns.
+func LoadTurnsByIDs(ctx context.Context, db *sql.DB, conversationID string, turnIDs []string) ([]Turn, error) {
+	if len(turnIDs) == 0 {
+		return []Turn{}, nil
+	}
+	placeholders := make([]string, len(turnIDs))
+	args := make([]any, 0, len(turnIDs)+1)
+	args = append(args, conversationID)
+	for i, id := range turnIDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+	query := turnsSelect + ` WHERE conversation_id=? AND id IN (` + strings.Join(placeholders, ",") + `)`
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanTurns(rows)
+}
+
+// scanTurns consumes turn rows and applies the canonical ordering shared by
+// every turn loader.
+func scanTurns(rows *sql.Rows) ([]Turn, error) {
 	ordered := make([]turnRow, 0)
 	rowIndex := 0
 	for rows.Next() {

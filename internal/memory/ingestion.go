@@ -180,6 +180,8 @@ func (s *Store) IngestTranscript(ctx context.Context, result asrinput.Result) (I
 	if _, err = tx.ExecContext(ctx, `INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active,supersedes_revision) VALUES(?,?,?,?,?,?,?,?,?,1,NULL)`, attachmentID, conversationID, recordingID, segmentIndex, src.SegmentID, src.TranscriptRevision, string(sourceJSON), resultJSON, digest); err != nil {
 		return IngestReport{}, err
 	}
+	// Retained turns only: blank text is skipped below and never enters turns.
+	retainedTurnIDs := []string{}
 	for i, turn := range result.Turns {
 		if !validID(turn.ID) {
 			return IngestReport{}, fmt.Errorf("invalid turn id at index %d", i)
@@ -193,6 +195,7 @@ func (s *Store) IngestTranscript(ctx context.Context, result asrinput.Result) (I
 		}
 		origID := src.SegmentID + "/" + src.TranscriptRevision + "/" + turn.ID
 		turnID := stableKey("turn", recordingID, origID)
+		retainedTurnIDs = append(retainedTurnIDs, turnID)
 		globalStart, globalEnd := turn.GlobalStartMS, turn.GlobalEndMS
 		if globalStart == nil && turn.LocalStartMS != nil {
 			v := src.SegmentOffsetMS + *turn.LocalStartMS
@@ -209,11 +212,16 @@ func (s *Store) IngestTranscript(ctx context.Context, result asrinput.Result) (I
 			return IngestReport{}, err
 		}
 	}
-	payload, err := json.Marshal(map[string]string{
-		"conversation_id": conversationID,
-		"recording_id":    recordingID,
-		"segment_id":      src.SegmentID,
-		"attachment_id":   attachmentID,
+	payload, err := json.Marshal(struct {
+		ConversationID string   `json:"conversation_id"`
+		RecordingID    string   `json:"recording_id"`
+		SegmentID      string   `json:"segment_id"`
+		TurnIDs        []string `json:"turn_ids"`
+	}{
+		ConversationID: conversationID,
+		RecordingID:    recordingID,
+		SegmentID:      src.SegmentID,
+		TurnIDs:        retainedTurnIDs,
 	})
 	if err != nil {
 		return IngestReport{}, err

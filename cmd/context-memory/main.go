@@ -9,7 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"recordingmcp/internal/asrinput"
@@ -101,6 +103,41 @@ type ConversationResult struct {
 	Context        memory.Page             `json:"context"`
 	Processing     memory.ProcessingStatus `json:"processing"`
 }
+type ListConversationsInput struct {
+	TopicID       string `json:"topic_id,omitempty"`
+	Status        string `json:"status,omitempty"`
+	StartedAfter  string `json:"started_after,omitempty"`
+	StartedBefore string `json:"started_before,omitempty"`
+	Limit         int    `json:"limit,omitempty"`
+	Cursor        string `json:"cursor,omitempty"`
+}
+type GetEvidenceContextInput struct {
+	TurnID   string `json:"turn_id"`
+	Radius   int    `json:"radius,omitempty"`
+	MaxBytes int    `json:"max_bytes,omitempty"`
+}
+type SearchMemoryInput struct {
+	Text          string `json:"text"`
+	Scope         string `json:"scope,omitempty"`
+	TopicID       string `json:"topic_id,omitempty"`
+	StartedAfter  string `json:"started_after,omitempty"`
+	StartedBefore string `json:"started_before,omitempty"`
+	Limit         int    `json:"limit,omitempty"`
+	Cursor        string `json:"cursor,omitempty"`
+}
+
+// parseRFC3339 converts an optional RFC3339 timestamp string into a *time.Time.
+// An empty value yields nil so callers can distinguish "unset" from a zero time.
+func parseRFC3339(label, value string) (*time.Time, error) {
+	if value == "" {
+		return nil, nil
+	}
+	t, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, fmt.Errorf("%s must be an RFC3339 timestamp: %w", label, err)
+	}
+	return &t, nil
+}
 
 func newServer(store *memory.Store) *mcp.Server {
 	no := false
@@ -176,6 +213,40 @@ func newServer(store *memory.Store) *mcp.Server {
 		}
 		r, e := store.GetAnnotationHistory(ctx, in.ConversationID)
 		return nil, HistoryResult{Experimental: true, ConversationID: in.ConversationID, Revisions: r}, e
+	})
+	mcp.AddTool(s, read("list_conversations", "列出本地记忆库中的会话：可按主题、分析状态与录音开始时间过滤，并按录音开始时间倒序游标分页返回摘要。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ListConversationsInput) (*mcp.CallToolResult, memory.ConversationPage, error) {
+		after, e := parseRFC3339("started_after", in.StartedAfter)
+		if e != nil {
+			return nil, memory.ConversationPage{}, e
+		}
+		before, e := parseRFC3339("started_before", in.StartedBefore)
+		if e != nil {
+			return nil, memory.ConversationPage{}, e
+		}
+		r, e := store.ListConversations(ctx, memory.ConversationFilter{Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, Status: in.Status, StartedAfter: after, StartedBefore: before})
+		return nil, r, e
+	})
+	mcp.AddTool(s, read("get_evidence_context", "读取某个转录轮次及其同一录音内相邻轮次的上下文，用于核对原始证据；超出 max_bytes 预算时会截断并置 Truncated。"), func(ctx context.Context, _ *mcp.CallToolRequest, in GetEvidenceContextInput) (*mcp.CallToolResult, memory.EvidenceContext, error) {
+		if in.TurnID == "" {
+			return nil, memory.EvidenceContext{}, fmt.Errorf("turn_id is required")
+		}
+		r, e := store.GetEvidenceContext(ctx, in.TurnID, in.Radius, in.MaxBytes)
+		return nil, r, e
+	})
+	mcp.AddTool(s, read("search_memory", "在原始转录与派生笔记中执行大小写不敏感的子串检索；scope 可选 raw（仅转录）、derived（仅笔记）或 both（全部），并可按主题与录音开始时间过滤。"), func(ctx context.Context, _ *mcp.CallToolRequest, in SearchMemoryInput) (*mcp.CallToolResult, memory.SearchPage, error) {
+		if strings.TrimSpace(in.Text) == "" {
+			return nil, memory.SearchPage{}, fmt.Errorf("text is required")
+		}
+		after, e := parseRFC3339("started_after", in.StartedAfter)
+		if e != nil {
+			return nil, memory.SearchPage{}, e
+		}
+		before, e := parseRFC3339("started_before", in.StartedBefore)
+		if e != nil {
+			return nil, memory.SearchPage{}, e
+		}
+		r, e := store.SearchMemory(ctx, memory.MemorySearch{Text: in.Text, Scope: in.Scope, Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, StartedAfter: after, StartedBefore: before})
+		return nil, r, e
 	})
 	return s
 }

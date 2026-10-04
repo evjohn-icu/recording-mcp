@@ -563,3 +563,270 @@ func TestExtractHandlerRejectsInvalidCandidates(t *testing.T) {
 		t.Fatalf("publish jobs = %d, want 1", n)
 	}
 }
+
+// enqueueExtractWithPayload enqueues and claims one extract job with an
+// explicit payload and idempotency key.
+func enqueueExtractWithPayload(t *testing.T, db *sql.DB, payloadJSON, key string) process.Job {
+	t.Helper()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	spec := process.Spec{
+		Stage:           "extract",
+		InputSnapshotID: "snap-1",
+		IdempotencyKey:  key,
+		PayloadJSON:     payloadJSON,
+	}
+	if _, _, err := process.EnqueueTx(context.Background(), tx, spec, time.Now()); err != nil {
+		tx.Rollback()
+		t.Fatalf("enqueue: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+	job, err := process.Claim(context.Background(), db, process.ClaimOptions{
+		WorkerID: "test-worker", Stages: []string{"extract"}, Lease: time.Minute, Now: time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	return *job
+}
+
+// coverageRows maps each covered turn id to the run id that covered it.
+func coverageRows(t *testing.T, db *sql.DB, conversationID, processorVersion string) map[string]string {
+	t.Helper()
+	rows, err := db.Query(`SELECT turn_id,run_id FROM analysis_coverage WHERE conversation_id=? AND processor_version=?`, conversationID, processorVersion)
+	if err != nil {
+		t.Fatalf("query coverage: %v", err)
+	}
+	defer rows.Close()
+	out := make(map[string]string)
+	for rows.Next() {
+		var turnID, runID string
+		if err := rows.Scan(&turnID, &runID); err != nil {
+			t.Fatalf("scan coverage: %v", err)
+		}
+		out[turnID] = runID
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("coverage rows: %v", err)
+	}
+	return out
+}
+
+// captureGenerator records the turn ids of every window it is asked to process.
+type captureGenerator struct {
+	model string
+	seen  [][]string
+}
+
+func (c *captureGenerator) Generate(_ context.Context, _ string, turnIDs []string) ([]generate.Draft, string, error) {
+	c.seen = append(c.seen, append([]string(nil), turnIDs...))
+	return nil, c.model, nil
+}
+
+func TestExtractHandlerScopesToTurnIDs(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(100)
+	seedConversation(t, db, "conv-scope", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "t1", seg: 0, start: &start, orig: 1},
+		{id: "t2", seg: 1, start: nil, orig: 2},
+		{id: "t3", seg: 2, start: nil, orig: 3},
+	})
+	// turn_ids are deliberately scrambled to prove canonical ordering wins.
+	job := enqueueExtractWithPayload(t, db,
+		`{"conversation_id":"conv-scope","segment_id":"seg-2","turn_ids":["t3","t2"]}`,
+		"extract:conv-scope:seg-2")
+
+	gen := &captureGenerator{model: "cap-v1"}
+	handler := &ExtractHandler{DB: db, Engine: decision.Synthetic{}, ProcessorVersion: "extract-v1", Generator: gen}
+	ref, err := handler.Execute(ctx, job)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	runID, _, _ := strings.Cut(strings.TrimPrefix(ref, "decision-run:"), "+candidates:")
+
+	// The engine only saw the scoped turns, in canonical order.
+	if len(gen.seen) != 1 {
+		t.Fatalf("windows seen = %d, want 1", len(gen.seen))
+	}
+	if got := strings.Join(gen.seen[0], ","); got != "t2,t3" {
+		t.Fatalf("window turn ids = %q, want t2,t3", got)
+	}
+
+	covered := coverageRows(t, db, "conv-scope", "extract-v1")
+	if len(covered) != 2 {
+		t.Fatalf("coverage rows = %d (%v), want 2", len(covered), covered)
+	}
+	for _, id := range []string{"t2", "t3"} {
+		if got := covered[id]; got != runID {
+			t.Fatalf("coverage[%s] run = %q, want %q", id, got, runID)
+		}
+	}
+	if _, ok := covered["t1"]; ok {
+		t.Fatalf("t1 must not be covered: %v", covered)
+	}
+}
+
+func TestExtractHandlerFallsBackToWholeConversation(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(100)
+	seedConversation(t, db, "conv-fallback", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "t1", seg: 0, start: &start, orig: 1},
+		{id: "t2", seg: 1, start: nil, orig: 2},
+		{id: "t3", seg: 2, start: nil, orig: 3},
+	})
+	job := enqueueExtract(t, db, "conv-fallback")
+
+	gen := &captureGenerator{model: "cap-v1"}
+	handler := &ExtractHandler{DB: db, Engine: decision.Synthetic{}, ProcessorVersion: "extract-v1", Generator: gen}
+	if _, err := handler.Execute(ctx, job); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(gen.seen) != 1 || strings.Join(gen.seen[0], ",") != "t1,t2,t3" {
+		t.Fatalf("window = %v, want one window with t1,t2,t3", gen.seen)
+	}
+	covered := coverageRows(t, db, "conv-fallback", "extract-v1")
+	if len(covered) != 3 {
+		t.Fatalf("coverage rows = %d (%v), want 3", len(covered), covered)
+	}
+	for _, id := range []string{"t1", "t2", "t3"} {
+		if _, ok := covered[id]; !ok {
+			t.Fatalf("missing coverage for %s: %v", id, covered)
+		}
+	}
+}
+
+func TestExtractHandlerCoverageIdempotent(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(100)
+	seedConversation(t, db, "conv-idem", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "t1", seg: 0, start: &start, orig: 1},
+		{id: "t2", seg: 1, start: nil, orig: 2},
+	})
+	job := enqueueExtractWithPayload(t, db,
+		`{"conversation_id":"conv-idem","turn_ids":["t1","t2"]}`,
+		"extract:conv-idem")
+
+	handler := &ExtractHandler{DB: db, Engine: decision.Synthetic{}, ProcessorVersion: "extract-v1"}
+	if _, err := handler.Execute(ctx, job); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	first := coverageRows(t, db, "conv-idem", "extract-v1")
+	if len(first) != 2 {
+		t.Fatalf("coverage rows = %d (%v), want 2", len(first), first)
+	}
+
+	// Replaying the same attempt must not duplicate coverage rows.
+	if _, err := handler.Execute(ctx, job); err != nil {
+		t.Fatalf("re-execute: %v", err)
+	}
+	second := coverageRows(t, db, "conv-idem", "extract-v1")
+	if len(second) != 2 {
+		t.Fatalf("coverage rows after replay = %d (%v), want 2", len(second), second)
+	}
+	for id, runID := range first {
+		if second[id] != runID {
+			t.Fatalf("coverage[%s] run changed on replay: %q -> %q", id, runID, second[id])
+		}
+	}
+	var runs int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM decision_runs`).Scan(&runs); err != nil {
+		t.Fatalf("count runs: %v", err)
+	}
+	if runs != 1 {
+		t.Fatalf("decision_runs after replay = %d, want 1", runs)
+	}
+}
+
+func TestLoadTurnsByIDsOrderingAndFilter(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(500)
+	seedConversation(t, db, "conv-byid", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "b", seg: 5, start: nil, orig: 2},
+		{id: "a", seg: 3, start: &start, orig: 3},
+		{id: "c", seg: 4, start: nil, orig: 1},
+	})
+	seedConversation(t, db, "conv-other", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{{id: "x", seg: 0, start: nil, orig: 1}})
+
+	all, err := LoadConversationTurns(ctx, db, "conv-byid")
+	if err != nil {
+		t.Fatalf("load all: %v", err)
+	}
+	if len(all) != 3 {
+		t.Fatalf("all = %d, want 3", len(all))
+	}
+
+	got, err := LoadTurnsByIDs(ctx, db, "conv-byid", []string{"b", "c", "a"})
+	if err != nil {
+		t.Fatalf("load by ids: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("by ids = %d, want 3", len(got))
+	}
+	for i := range all {
+		if got[i].ID != all[i].ID {
+			t.Fatalf("order[%d] = %s, want %s", i, got[i].ID, all[i].ID)
+		}
+	}
+
+	partial, err := LoadTurnsByIDs(ctx, db, "conv-byid", []string{"a", "missing"})
+	if err != nil {
+		t.Fatalf("partial: %v", err)
+	}
+	if len(partial) != 1 || partial[0].ID != "a" {
+		t.Fatalf("partial = %+v, want just a", partial)
+	}
+
+	empty, err := LoadTurnsByIDs(ctx, db, "conv-byid", nil)
+	if err != nil {
+		t.Fatalf("empty: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Fatalf("empty = %+v, want none", empty)
+	}
+
+	foreign, err := LoadTurnsByIDs(ctx, db, "conv-byid", []string{"x"})
+	if err != nil {
+		t.Fatalf("foreign: %v", err)
+	}
+	if len(foreign) != 0 {
+		t.Fatalf("foreign ids leaked: %+v", foreign)
+	}
+}

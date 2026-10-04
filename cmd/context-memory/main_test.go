@@ -44,10 +44,10 @@ func TestMCPToolsExposeQueryAndConversationMemory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := false
+	got := map[string]bool{}
 	for _, tool := range tools.Tools {
+		got[tool.Name] = true
 		if tool.Name == "query_context" {
-			found = true
 			b, _ := json.Marshal(tool.InputSchema)
 			var schema map[string]any
 			_ = json.Unmarshal(b, &schema)
@@ -57,8 +57,14 @@ func TestMCPToolsExposeQueryAndConversationMemory(t *testing.T) {
 			}
 		}
 	}
-	if !found {
-		t.Fatal("query_context tool was not registered")
+	wantTools := []string{"query_context", "get_conversation_context", "get_context_item", "list_topics", "ingest_transcript", "get_processing_status", "apply_annotations", "get_annotation_history", "list_conversations", "get_evidence_context", "search_memory"}
+	if len(tools.Tools) != len(wantTools) {
+		t.Fatalf("expected %d tools, got %d: %v", len(wantTools), len(tools.Tools), tools.Tools)
+	}
+	for _, name := range wantTools {
+		if !got[name] {
+			t.Fatalf("tool %s was not registered", name)
+		}
 	}
 	res, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "query_context", Arguments: map[string]any{"query": "同步", "include_turns": true, "limit": 10}})
 	if err != nil {
@@ -221,6 +227,67 @@ func TestNeutralIngestAnnotateAndTrackCoverageOverMCP(t *testing.T) {
 }
 
 func ptr(s string) *string { return &s }
+
+func TestRetrievalToolsOverMCP(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	store, err := memory.Open(filepath.Join(t.TempDir(), "retrieval.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	st, ct := mcp.NewInMemoryTransports()
+	ss, err := newServer(store).Connect(ctx, st, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ss.Close()
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+
+	page, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "list_conversations", Arguments: map[string]any{"started_after": "2024-01-01T00:00:00Z", "limit": 5}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.IsError {
+		t.Fatalf("list_conversations rejected valid input: %+v", page.Content)
+	}
+	var cp memory.ConversationPage
+	b, _ := json.Marshal(page.StructuredContent)
+	if err = json.Unmarshal(b, &cp); err != nil {
+		t.Fatal(err)
+	}
+	if len(cp.Items) != 0 || cp.NextCursor != "" {
+		t.Fatalf("empty database should list no conversations: %+v", cp)
+	}
+
+	ev, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "get_evidence_context", Arguments: map[string]any{"turn_id": "missing-turn"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ev.IsError {
+		t.Fatal("get_evidence_context accepted an unknown turn")
+	}
+
+	sr, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "search_memory", Arguments: map[string]any{"text": "   "}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sr.IsError {
+		t.Fatal("search_memory accepted blank text")
+	}
+
+	bad, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "list_conversations", Arguments: map[string]any{"started_after": "not-a-time"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bad.IsError {
+		t.Fatal("list_conversations accepted a malformed timestamp")
+	}
+}
 
 func TestMCPReplayPreservesRawProviderNumbers(t *testing.T) {
 	ctx := context.Background()

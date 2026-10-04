@@ -38,10 +38,15 @@ make build
 | `get_conversation_context` | 查看沟通内容和处理状态，按需分页展开原话 |
 | `get_context_item` | 展开一条记录及引用的原话 |
 | `list_topics` | 发现已保存的话题 |
+| `list_conversations` | 列出本地记忆库中的会话：可按主题、分析状态与录音开始时间过滤，并按录音开始时间倒序游标分页返回摘要 |
+| `get_evidence_context` | 读取某个转录轮次及其同一录音内相邻轮次的上下文，用于核对原始证据。`turn_id` 必填；`radius`（默认 3，负数按 0 处理）取目标前后各若干条；`max_bytes`（默认 16000）是逐条累加的文本字节预算，超出时停止并置 `truncated` |
+| `search_memory` | 在原始转录与派生笔记中执行大小写不敏感的子串检索。`text` 必填（trim 后非空）；scope 可选 `raw`（仅转录）、`derived`（仅笔记）或 `both`（默认全部），并可用 `topic_id`、`started_after`、`started_before` 过滤 |
+
+上表后三行是新的检索工具，与既有工具使用独立契约：它们不走 `query_context` / `get_conversation_context` 的 offset 分页，而是返回游标（`next_cursor`），下一页请求把游标原样带回 `cursor` 字段。时间过滤字段（`started_after` / `started_before`）为 RFC 3339 字符串，且只对录音开始时间已知的会话生效。`list_conversations` 的 `status` 只接受 `pending` / `partial`（大小写不敏感），语义与 `get_processing_status` 的 `analysis_status` 一致；`limit` 缺省 20、上限 100。`search_memory` 的 `limit` 同理，多读一条记录判断是否有下一页。
 
 `analysis_status` 为 `pending` 或 `partial`，不会自动宣称整场沟通已分析完成。空白分句留在原始附件，不计为可检索原话；不自动删除跨分片的重复文字。
 
-`include_turns=true` 才将原话纳入查询。默认没有提炼记录时，结果可能为空；这表示尚未形成可检索的派生记忆，不能解释为没有发生沟通。使用处理状态了解覆盖情况，或显式检索原话。
+`include_turns=true` 才将原话纳入 `query_context` / `get_conversation_context` 的结果。`search_memory` 不受该开关约束：命中直接区分 kind（派生笔记在前、原话在后，组内按 ID 升序），每条命中附带 `why` 说明命中原因；在没有提炼记录时检索仍可能只有原话命中，这表示尚未形成可检索的派生记忆，不能解释为没有发生沟通。使用处理状态了解覆盖情况，或显式检索原话。
 
 ## 记忆注释的修订
 

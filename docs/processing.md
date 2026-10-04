@@ -1,6 +1,6 @@
 # 处理链路现状
 
-本文描述当前已实现的处理链路：接收统一 ASR 结果、原子入队处理任务、Worker 领取并在租约保护下执行、决策判断的持久记录，以及候选记忆的生成校验与会话级发布。对应[开发执行计划](development-plan.md)中的 A（存储与任务）、B（决策服务与执行器）与 C（候选记忆与会话级发布）切片；层级检索工具尚未实现，文末有对照表。事实以代码为准，主要入口是 `internal/memory/ingestion.go`、`internal/process`、`internal/worker`、`internal/pipeline`、`internal/generate`、`internal/decision` 与 `cmd/context-worker`。
+本文描述当前已实现的处理链路：接收统一 ASR 结果、原子入队处理任务、Worker 领取并在租约保护下执行、决策判断的持久记录、候选记忆的生成校验与会话级发布，以及分析覆盖记录。对应[开发执行计划](development-plan.md)中的 A（存储与任务）、B（决策服务与执行器）与 C（候选记忆与会话级发布）切片；D 切片的基础检索工具（`list_conversations` / `get_evidence_context` / `search_memory`）已落地，文末有对照表。事实以代码为准，主要入口是 `internal/memory/ingestion.go`、`internal/memory/retrieval.go`、`internal/process`、`internal/worker`、`internal/pipeline`、`internal/generate`、`internal/decision` 与 `cmd/context-worker`。
 
 决策判断仍处于 **shadow 模式**：Worker 对每个分析窗口调用 Decision 引擎并把问题和回答完整写入 `decision_runs` / `decision_answers`，但不依据判断结果修改注释，也不跳过任何基线提炼。C 切片在此基础上新增了一条独立于判断结果的自动链路：每个窗口在决策记录之后由生成器产出候选记忆，经证据校验后写入 `memory_candidates`，再由独立的 publish 任务合并进会话注释（标注为未经人工复核）。既有的 `apply_annotations` 显式提交路径不受影响。
 
@@ -25,7 +25,8 @@
 ```
 
 - **接收与入队原子**：`IngestTranscript` 在同一数据库事务内写入原话、来源附件并调用 `process.EnqueueTx`，来源保存和任务创建不会半途分离。重复导入相同分片时，附件和任务都幂等（`INSERT OR IGNORE`），返回已存在的任务 ID，不会产生重复业务任务。
-- **任务标识**：任务 ID 为 `"job:" + sha256(幂等键)`；extract 幂等键由附件 ID 与处理器版本派生，任务 payload 携带 `conversation_id`、`recording_id`、`segment_id`、`attachment_id`。
+- **任务标识**：任务 ID 为 `"job:" + sha256(幂等键)`；extract 幂等键由附件 ID 与处理器版本派生；附件 ID 作为任务的 `input_snapshot_id` 单独保存，payload 携带 `conversation_id`、`recording_id`、`segment_id` 与 `turn_ids`。
+- **分析范围与覆盖记录**：payload 的 `turn_ids` 是本次分片实际入库的原话 ID（空白文本轮次不入库也不入列表）。`pipeline.ExtractHandler` 优先按 `turn_ids` 加载轮次并按确定性顺序切块，形成 per-segment 分析窗口；payload 未携带 `turn_ids` 的旧任务则回退为整会话分析。每个窗口在决策记录之后调用 `pipeline.RecordCoverage` 把窗口内每个轮次写入 `analysis_coverage`：一行记录 (会话, 轮次, 处理器版本) 已被分析，`run_id` 记录对应的决策 run；`INSERT OR IGNORE` 使重复记录幂等，空列表为 no-op。`pipeline.UncoveredTurnIDs` 可按处理器版本列出尚未覆盖的轮次（顺序与 `LoadConversationTurns` 一致），`pipeline.ListCoverage` 按会话读取覆盖记录。
 - **执行器**：`internal/worker` 不含业务逻辑，只负责领取、续租和收尾；`worker.Executor` 接口返回结果引用。执行器失败会作为可重试错误交回队列，直到尝试次数耗尽。
 - **候选生成**：每个窗口在决策记录后调用 `generate.Generator.Generate(ctx, state, windowTurnIDs)`，返回候选草稿与模型名。候选与证据校验结果在同一窗口内入库，extract 任务的 resultRef 形如 `decision-run:<runID>+candidates:<validatedCount>`；未配置生成器时跳过生成，resultRef 保持 `decision-run:<runID>`。
 
@@ -64,14 +65,14 @@
 
 ## 表结构摘要
 
-迁移集中在 `internal/migrations`（当前版本 4），时间列为 unix 毫秒 INTEGER。
+迁移集中在 `internal/migrations`（当前版本 5），时间列为 unix 毫秒 INTEGER。
 
 ### processing_jobs（迁移 v2 processing-queue）
 
 | 列 | 说明 |
 | --- | --- |
 | `id` | 主键，`job:<hash>` |
-| `stage` | 阶段名，当前只有 `extract` |
+| `stage` | 阶段名，当前为 `extract` 或 `publish` |
 | `input_snapshot_id` | 不可变输入快照（附件）ID |
 | `idempotency_key` | 唯一；幂等键决定任务 ID |
 | `status` | `queued / running / succeeded / retry_wait / failed / cancelled`（`cancelled` 仅保留在约束中，当前无取消路径） |
@@ -126,6 +127,19 @@
 | `error` | 冲突或失败详情 |
 | `created_at` | unix 毫秒 |
 
+### analysis_coverage（迁移 v5 analysis-coverage）
+
+分析覆盖账本：一行记录某个处理器版本已经分析过某条原话，供查询覆盖情况并避免未来增量重分析时重复处理。
+
+| 列 | 说明 |
+| --- | --- |
+| `conversation_id` / `turn_id` | 所属会话与被覆盖的原话 |
+| `processor_version` | 完成分析的处理器版本；覆盖按版本隔离，不同版本互不掩盖 |
+| `run_id` | 对应的 decision run ID，可为空字符串 |
+| `covered_at` | unix 毫秒 |
+
+主键 `(conversation_id, turn_id, processor_version)` 配合 `INSERT OR IGNORE`：同一会话的同一轮次在同一处理器版本下重复记录时保留首行，重放不会产生重复行。`pipeline.RecordCoverage` 每个窗口一次写入，`pipeline.UncoveredTurnIDs`（LEFT JOIN 反查）与 `pipeline.ListCoverage` 提供读取。
+
 ## 状态机与租约语义
 
 ```text
@@ -176,10 +190,10 @@ make build
 
 | 工作包 | 已完成 | 未完成 |
 | --- | --- | --- |
-| A 存储与任务 | `internal/migrations` v1–v4；`IngestTranscript` 与 `process.EnqueueTx` 原子提交；`Claim/Renew/Complete/Fail` 租约与幂等；重复导入幂等 | outbox 形式的跨命令任务、`analysis_coverage`、`processing_windows` 落表 |
+| A 存储与任务 | `internal/migrations` v1–v5（含 `analysis_coverage` 覆盖账本）；`IngestTranscript` 与 `process.EnqueueTx` 原子提交；`Claim/Renew/Complete/Fail` 租约与幂等；重复导入幂等 | outbox 形式的跨命令任务、`processing_windows` 落表 |
 | B 决策服务与执行器 | `internal/decision` Engine 契约（choice/noul/score，完整分布校验，非法结果整体拒绝）；Synthetic 与本地 `SystemOneClient` 两个 Adapter；`worker.Run/RunOnce`；`pipeline.ExtractHandler` shadow 记录 | 本地权重实际部署与加载、三个小模型对比、TypeSafe 托管 Adapter、路由启用 |
 | C 提炼与发布 | `internal/generate`（Synthetic 与 OpenAI 兼容生成器）；候选校验（kind 枚举、summary 长度、证据⊆窗口）与 `memory_candidates` 入库；`pipeline.PublishHandler` 会话级发布、`publication_runs` 冲突/提交记录；`process.Enqueue` 包装 | 发布内容的人工复核与精化（合并/去重策略）、候选质量评测 |
-| D 层级检索与 MCP | — | `list_conversations` / `get_evidence_context` / `search_memory` / `build_context` 三个首批工具与层级视图 |
+| D 层级检索与 MCP | `list_conversations` / `get_evidence_context` / `search_memory`（`internal/memory` 检索接口 + `cmd/context-memory` 注册，游标分页） | `build_context` 与完整层级视图 |
 | E/F | — | 人物绑定、话题关联、修订失效、模型评测 |
 
 计划中的 Processing 层判断记录（`decision_runs` / `decision_answers`）已按拟议接口落地；窗口表尚未独立建表，窗口构建在 `internal/pipeline` 内存中完成（v1：默认单窗口，超过 200 轮按顺序切块；渲染超过 8000 字符截断并标注）。确定性保证：原话顺序为"有 `global_start_ms` 的按升序在前，再按 `segment_index`，再按 `original_turn_id`"，缺失时间仍有确定的来源序；输入哈希由 Decision 契约对 state 与问题集计算，缓存键与运行 ID 都可复现。候选与发布链路同样以确定性 ID 为基础：候选 ID、topic/note ID 与 publication run ID 都由内容哈希派生，重放不会产生重复行。

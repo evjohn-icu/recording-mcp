@@ -49,6 +49,12 @@ const memoryCandidatesDDL = `CREATE TABLE IF NOT EXISTS memory_candidates(id TEX
 CREATE INDEX IF NOT EXISTS memory_candidates_conv ON memory_candidates(conversation_id, status);
 CREATE TABLE IF NOT EXISTS publication_runs(id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL REFERENCES conversations(id), expected_version TEXT NOT NULL, committed_version TEXT NOT NULL DEFAULT '', candidate_ids_json TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL CHECK(status IN ('committed','conflict','failed')), error TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);`
 
+// analysisCoverageDDL adds the per-turn analysis-coverage ledger: one row per
+// (conversation, turn, processor version) records that the extract stage has
+// already evaluated that turn, so per-segment jobs never re-analyse turns a
+// previous run already covered. The primary key makes recording idempotent.
+const analysisCoverageDDL = `CREATE TABLE IF NOT EXISTS analysis_coverage(conversation_id TEXT NOT NULL REFERENCES conversations(id), turn_id TEXT NOT NULL REFERENCES turns(id), processor_version TEXT NOT NULL, run_id TEXT NOT NULL DEFAULT '', covered_at INTEGER NOT NULL, PRIMARY KEY(conversation_id, turn_id, processor_version));`
+
 type migration struct {
 	version    int
 	name       string
@@ -75,6 +81,7 @@ var migrations = []migration{
 	{version: 2, name: "processing-queue", statements: statements(processingQueueDDL)},
 	{version: 3, name: "decision-log", statements: statements(decisionLogDDL)},
 	{version: 4, name: "memory-candidates", statements: statements(memoryCandidatesDDL)},
+	{version: 5, name: "analysis-coverage", statements: statements(analysisCoverageDDL)},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`
