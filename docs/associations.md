@@ -98,6 +98,32 @@ accepted=1 rejected=1
 
 输入文件中出现未知字段、JSON 解析失败或文件缺失时以非零退出码结束，不写库；所有提议都被拒时仍正常退出（退出码 0），只报告计数。
 
+## 用 pi 运行一轮策展（实测配方）
+
+本机实测可用的最小配方（模型可替换为任意可用项）：
+
+```bash
+cd /home/ev/code/recording-mcp
+# 1) 项目本地 MCP 配置（写入 .pi/mcp.json，该目录已在 .gitignore）
+pi mcp add context-memory -l -- /home/ev/code/recording-mcp/bin/context-memory --db <数据库路径>
+
+# 2) 跑一轮策展（-p 非交互；--approve 信任项目本地 .pi/mcp.json）
+pi -p --approve --mode text --model volces-agent-01/glm-5.3-flash \
+  --exclude-tools "bash,edit,subagent,fusion_investigate,fusion_research,fusion_reason,fusion_validate,record_advisor_outcome" \
+  --append-system-prompt docs/curator-prompt.md \
+  "对当前记忆库执行一轮策展。只用 context-memory 的只读工具调查（经 codemode 调用），预算最多 30 次工具调用；把提议 JSON 写入 /tmp/curator-proposals.json，完成后只回复路径与条数。不要运行命令、不要查找数据库。"
+
+# 3) 校验并入库
+./bin/context-associate --db <数据库路径> --input /tmp/curator-proposals.json --model volces-agent-01/glm-5.3-flash --dry-run
+./bin/context-associate --db <数据库路径> --input /tmp/curator-proposals.json --model volces-agent-01/glm-5.3-flash
+```
+
+实测注意：
+
+- pi 中 MCP 工具经 `codemode` 调用；**不要**用 `--tools` 白名单把 codemode 排除，否则 MCP 不可用。
+- 用 `--exclude-tools` 去掉 `bash` 等工具，防止 agent 自行查找数据库或运行命令（首次实测即因此超时）。
+- 一轮约 8–9 分钟（29 次只读调用、11 条提议、全部通过校验）；在消息里给出工具调用预算与"只写提议文件"的边界能显著减少跑偏。
+
 ## 后续（尚未实现）
 
 - **人工确认**：把 `proposed` 改为 `confirmed` 或 `rejected` 的确认/撤销流程尚未实现；当前表中不会出现 `confirmed` 状态。

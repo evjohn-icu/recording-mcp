@@ -55,11 +55,12 @@ reason 写具体：说明证据中的原话支持了什么关系，不超过 500
 - evidence_turn_ids 至少 1 条，每个 ID 必须是检索或证据工具返回的真实轮次 ID。
 - 没有足够证据就宁可不提议；宁可少提议，不要编造。
 
-## 第四步：交给校验
+## 第四步：写出文件并交给调用方
 
-提议写好后提示用户运行：
+把提议写入本地 JSON 文件后（例如 proposals.json），只报告文件路径与条数，然后停止：
 
-go run ./cmd/context-associate --db <数据库路径> --input proposals.json --model <模型标识>
+- 不要自行运行 `context-associate` 或任何命令；不要查找数据库文件；不要调用除写提议文件以外的写工具。
+- 校验由调用方执行：`bin/context-associate --db <数据库路径> --input proposals.json --model <模型标识>`。
 
 校验被拒（rejected）是正常结果：类型、ID 存在性、关系枚举、理由长度、证据存在性、置信度范围任一不满足都会被拒并保留原因。根据被拒原因修正提议后重新提交即可；通过校验的条目也只是 status=proposed，等待人工确认，不要声称关联已经生效。
 ```
