@@ -19,7 +19,9 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"recordingmcp/internal/decision"
 	"recordingmcp/internal/migrations"
+	"recordingmcp/internal/pipeline"
 	"recordingmcp/internal/process"
 	"recordingmcp/internal/worker"
 )
@@ -38,6 +40,9 @@ func run() error {
 	lease := flag.Duration("lease", 30*time.Second, "lease duration held while executing a job")
 	poll := flag.Duration("poll", time.Second, "idle poll interval")
 	once := flag.Bool("once", false, "claim and process at most one job, then exit")
+	executor := flag.String("executor", "synthetic", "executor implementation: synthetic|pipeline")
+	decisionURL := flag.String("decision-url", "http://127.0.0.1:8765/v1/systemone", "decision service endpoint used by the pipeline executor")
+	decisionModel := flag.String("decision-model", "jev-style-2b-v2", "decision model name used by the pipeline executor")
 	syntheticDelay := flag.Duration("synthetic-delay", 0, "artificial delay for the synthetic executor")
 	flag.Parse()
 
@@ -67,6 +72,11 @@ func run() error {
 		return fmt.Errorf("apply migrations: %w", err)
 	}
 
+	inner, err := buildExecutor(*executor, db, *decisionURL, *decisionModel, *syntheticDelay)
+	if err != nil {
+		return err
+	}
+
 	cfg := worker.Config{
 		DB:               db,
 		WorkerID:         *workerID,
@@ -76,7 +86,7 @@ func run() error {
 		PollInterval:     *poll,
 		Executor: &loggingExecutor{
 			logger: logger,
-			inner:  worker.Synthetic{Delay: *syntheticDelay},
+			inner:  inner,
 		},
 	}
 
@@ -92,6 +102,23 @@ func run() error {
 	}
 	logger.Printf("worker %s started stages=%v lease=%s poll=%s", cfg.WorkerID, cfg.Stages, cfg.Lease, cfg.PollInterval)
 	return worker.Run(ctx, cfg)
+}
+
+// buildExecutor selects the executor implementation named by --executor.
+func buildExecutor(name string, db *sql.DB, decisionURL, decisionModel string, syntheticDelay time.Duration) (worker.Executor, error) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "synthetic":
+		return worker.Synthetic{Delay: syntheticDelay}, nil
+	case "pipeline":
+		return &pipeline.ExtractHandler{
+			DB:               db,
+			Engine:           &decision.SystemOneClient{Endpoint: decisionURL, Model: decisionModel},
+			Endpoint:         decisionURL,
+			ProcessorVersion: "extract-v1",
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown executor %q (want synthetic or pipeline)", name)
+	}
 }
 
 func parseStages(raw string) []string {

@@ -261,6 +261,31 @@ func TestSystemOneRejectsInvalidResults(t *testing.T) {
 	}
 }
 
+func TestSystemOneUsageFloat(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{
+			"answers": {
+				"q-choice": {"type": "choice", "choice": "billing", "probabilities": {"billing": 0.8, "technical": 0.2}},
+				"q-noul": {"type": "noul", "noul": 0.7},
+				"q-score": {"type": "score", "score": 1.4, "probabilities": [0.1, 0.3, 0.6]}
+			},
+			"usage": {"latency_ms": 815.3, "input_tokens": 10.6, "output_tokens": 3}
+		}`)
+	}))
+	defer srv.Close()
+	client := &SystemOneClient{Endpoint: srv.URL, Model: "kai", HTTPClient: srv.Client()}
+	res, err := client.Evaluate(context.Background(), "state", testQuestions())
+	if err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	if res.Usage.LatencyMS != 815 {
+		t.Fatalf("latency_ms = %d, want 815", res.Usage.LatencyMS)
+	}
+	if res.Usage.InputTokens != 11 || res.Usage.OutputTokens != 3 {
+		t.Fatalf("token usage = %+v", res.Usage)
+	}
+}
+
 func TestSystemOneHTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)

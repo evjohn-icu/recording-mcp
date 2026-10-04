@@ -2,7 +2,7 @@
 
 可运行链路已接通：**ASR 结果 → 供应商适配器 → 原话和来源入库 → 带证据的记忆注释 → MCP 查询**。从 [Context Layer 运行说明](docs/context-layer-runtime.md) 开始使用，包含构建、导入和 8 个 MCP 工具。记忆层不调用 ASR；自动提炼与真实人物匹配尚未实现。
 
-下一阶段的处理流程、执行器对接、检索扩展、团队分工和验收条件见 [开发执行计划](docs/development-plan.md)。计划中的新增能力尚未实现；Jevbox 的层级检索与本地 Decision 2.0 判断服务已纳入实施设计，尚未部署。
+下一阶段的处理流程、执行器对接、检索扩展、团队分工和验收条件见 [开发执行计划](docs/development-plan.md)。其中持久化任务队列与 Worker 租约执行（A 切片）、决策引擎契约与 shadow 判断记录（B 切片）已实现，详见 [处理链路说明](docs/processing.md)；候选记忆、发布与层级检索尚未实现。本地 Decision 2.0 判断服务的 Adapter 已就绪，实际部署与权重加载仍在进行；Jevbox 的层级检索已纳入实施设计，尚未实现。
 
 0.1 的现实世界信息全部来自随身音频设备，经过录音分析中心处理后进入Context Layer。当前工作目标是制定两份 Context Layer 契约：**内部规范 0.1 规定存什么，MCP 规范 0.1 规定怎么传**。请从 [规范目录](docs/specs/README.md)、[内部规范](docs/specs/internal-context-0.1.md) 和 [MCP 规范](docs/specs/context-mcp-0.1.md) 开始阅读。
 

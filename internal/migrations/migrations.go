@@ -34,6 +34,12 @@ const processingQueueDDL = `CREATE TABLE IF NOT EXISTS processing_jobs(id TEXT P
 CREATE TABLE IF NOT EXISTS processing_attempts(id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES processing_jobs(id), attempt INTEGER NOT NULL, worker_id TEXT NOT NULL, lease_token TEXT NOT NULL, processor_version TEXT NOT NULL, started_at INTEGER NOT NULL, finished_at INTEGER NULL, outcome TEXT NOT NULL CHECK(outcome IN ('running','succeeded','retryable_error','fatal_error','lease_lost','cancelled')), error_json TEXT NULL, result_ref TEXT NULL, usage_json TEXT NULL, UNIQUE(job_id,attempt));
 CREATE INDEX IF NOT EXISTS processing_jobs_claim ON processing_jobs(status, priority DESC, available_at);`
 
+// decisionLogDDL adds the decision-run log: one row per (job, attempt, input)
+// evaluation plus one row per answered question. It is append-only; reruns
+// with the same identity keep the first run row and replace its answers.
+const decisionLogDDL = `CREATE TABLE IF NOT EXISTS decision_runs(id TEXT PRIMARY KEY, job_id TEXT NULL, attempt INTEGER NOT NULL DEFAULT 0, input_snapshot_id TEXT NOT NULL, input_hash TEXT NOT NULL, model TEXT NOT NULL, weights_version TEXT NOT NULL DEFAULT '', endpoint TEXT NOT NULL DEFAULT '', questions_json TEXT NOT NULL, usage_json TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS decision_answers(run_id TEXT NOT NULL REFERENCES decision_runs(id), question_id TEXT NOT NULL, question_type TEXT NOT NULL, answer_json TEXT NOT NULL, distribution_json TEXT NOT NULL, PRIMARY KEY(run_id, question_id));`
+
 type migration struct {
 	version    int
 	name       string
@@ -58,6 +64,7 @@ func statements(ddl string) []string {
 var migrations = []migration{
 	{version: 1, name: "base-schema", statements: statements(baseSchemaDDL)},
 	{version: 2, name: "processing-queue", statements: statements(processingQueueDDL)},
+	{version: 3, name: "decision-log", statements: statements(decisionLogDDL)},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`

@@ -50,11 +50,40 @@ type rawAnswer struct {
 	Legend        map[string]string `json:"legend"`
 }
 
+// rawUsage decodes usage tolerantly: local services may report latency as a
+// float (e.g. 2484.4) while the contract exposes integer milliseconds.
+type rawUsage struct {
+	LatencyMS    json.Number `json:"latency_ms"`
+	InputTokens  json.Number `json:"input_tokens"`
+	OutputTokens json.Number `json:"output_tokens"`
+}
+
 type systemOneResponse struct {
 	Model          string               `json:"model"`
 	WeightsVersion string               `json:"weights_version"`
 	Answers        map[string]rawAnswer `json:"answers"`
-	Usage          Usage                `json:"usage"`
+	Usage          rawUsage             `json:"usage"`
+}
+
+// usageFromRaw converts the tolerant wire usage into the contract Usage,
+// rounding fractional values to the nearest integer.
+func usageFromRaw(raw rawUsage) Usage {
+	return Usage{
+		LatencyMS:    roundToInt64(raw.LatencyMS),
+		InputTokens:  int(roundToInt64(raw.InputTokens)),
+		OutputTokens: int(roundToInt64(raw.OutputTokens)),
+	}
+}
+
+func roundToInt64(n json.Number) int64 {
+	if n == "" {
+		return 0
+	}
+	f, err := n.Float64()
+	if err != nil {
+		return 0
+	}
+	return int64(math.Round(f))
 }
 
 // Evaluate implements Engine. Any contract violation rejects the whole result
@@ -144,7 +173,7 @@ func (c *SystemOneClient) Evaluate(ctx context.Context, state string, questions 
 		WeightsVersion: weights,
 		InputHash:      inputHash(state, questions),
 		Answers:        answers,
-		Usage:          out.Usage,
+		Usage:          usageFromRaw(out.Usage),
 	}, nil
 }
 
