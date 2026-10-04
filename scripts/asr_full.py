@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Private, segmented full-file SAUC transcription runner. API key is read via getpass."""
 from __future__ import annotations
-import asyncio, base64, getpass, gzip, json, os, struct, sys, time, uuid, hashlib
+import asyncio, base64, getpass, gzip, json, os, shutil, struct, sys, time, uuid, hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 import websockets
 
 ROOT=Path(__file__).resolve().parents[1]
 AUDIO: Path | None = None
-OUT=ROOT/'data/full-transcription'; TMP=OUT/'segments'; URL='wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_async'; RESOURCE='volc.seedasr.sauc.duration'
+OUT=Path(os.environ.get('JEV_ASR_OUT') or (ROOT/'data/full-transcription')); TMP=OUT/'segments'; URL='wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_async'; RESOURCE='volc.seedasr.sauc.duration'
 CHUNK=6400; SEG_MS=300000; OVERLAP_MS=2000; CONCURRENCY=3
+FFPROBE=os.environ.get('JEV_FFPROBE') or shutil.which('ffprobe') or '/opt/homebrew/bin/ffprobe'
+FFMPEG=os.environ.get('JEV_FFMPEG') or shutil.which('ffmpeg') or '/opt/homebrew/bin/ffmpeg'
 
 def hdr(t,f): return bytes((0x11,(t<<4)|f,0x11,0))
 def full(seq,obj):
@@ -32,11 +34,11 @@ def prep():
  OUT.mkdir(parents=True,exist_ok=True); TMP.mkdir(exist_ok=True); os.chmod(OUT,0o700); os.chmod(TMP,0o700)
  # duration via ffprobe, then fixed 5m windows stepped by 298s
  import subprocess
- dur=float(subprocess.check_output(['/opt/homebrew/bin/ffprobe','-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',str(AUDIO)],text=True).strip())
+ dur=float(subprocess.check_output([FFPROBE,'-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',str(AUDIO)],text=True).strip())
  step=SEG_MS-OVERLAP_MS; segments=[]; start=0; n=0
  while start<round(dur*1000):
   end=min(start+SEG_MS,round(dur*1000)); n+=1; pcm=TMP/f'segment-{n:02d}.pcm'
-  subprocess.run(['/opt/homebrew/bin/ffmpeg','-nostdin','-v','error','-ss',f'{start/1000:.3f}','-i',str(AUDIO),'-t',f'{(end-start)/1000:.3f}','-f','s16le','-acodec','pcm_s16le','-ar','16000','-ac','1','-y',str(pcm)],check=True)
+  subprocess.run([FFMPEG,'-nostdin','-v','error','-ss',f'{start/1000:.3f}','-i',str(AUDIO),'-t',f'{(end-start)/1000:.3f}','-f','s16le','-acodec','pcm_s16le','-ar','16000','-ac','1','-y',str(pcm)],check=True)
   mode(pcm); segments.append({'index':n,'start_ms':start,'end_ms':end,'pcm':pcm.name,'status':'prepared','attempts':[]})
   if end>=round(dur*1000): break
   start+=step
