@@ -90,7 +90,7 @@ func TestRunPersistsValidatedLink(t *testing.T) {
 		t.Fatalf("unexpected stdout: %q", out.String())
 	}
 
-	links, err := pipeline.ListLinks(context.Background(), openReadDB(t, dbPath), "proposed")
+	links, err := pipeline.ListLinks(context.Background(), openReadDB(t, dbPath), pipeline.LinkFilter{Status: "proposed"})
 	if err != nil {
 		t.Fatalf("list links: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestRunDryRunWritesNothing(t *testing.T) {
 		t.Fatalf("unexpected stdout: %q", out.String())
 	}
 
-	links, err := pipeline.ListLinks(context.Background(), openReadDB(t, dbPath), "")
+	links, err := pipeline.ListLinks(context.Background(), openReadDB(t, dbPath), pipeline.LinkFilter{})
 	if err != nil {
 		t.Fatalf("list links: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestRunRejectsInvalidProposalsButExitsZero(t *testing.T) {
 		t.Fatalf("expected two rejected lines, got %q", out.String())
 	}
 
-	links, err := pipeline.ListLinks(context.Background(), openReadDB(t, dbPath), "")
+	links, err := pipeline.ListLinks(context.Background(), openReadDB(t, dbPath), pipeline.LinkFilter{})
 	if err != nil {
 		t.Fatalf("list links: %v", err)
 	}

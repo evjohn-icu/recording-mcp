@@ -16,6 +16,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"recordingmcp/internal/asrinput"
 	"recordingmcp/internal/memory"
+	"recordingmcp/internal/pipeline"
 )
 
 type ConversationInput struct {
@@ -124,6 +125,43 @@ type SearchMemoryInput struct {
 	StartedBefore string `json:"started_before,omitempty"`
 	Limit         int    `json:"limit,omitempty"`
 	Cursor        string `json:"cursor,omitempty"`
+}
+type ListMemoryLinksInput struct {
+	Status  string `json:"status,omitempty"`
+	TopicID string `json:"topic_id,omitempty"`
+	Limit   int    `json:"limit,omitempty"`
+}
+type ReviewMemoryLinkInput struct {
+	LinkID string `json:"link_id"`
+	Action string `json:"action"`
+}
+type MemoryLinkView struct {
+	LinkID          string   `json:"link_id"`
+	FromKind        string   `json:"from_kind"`
+	FromID          string   `json:"from_id"`
+	FromTitle       string   `json:"from_title,omitempty"`
+	ToKind          string   `json:"to_kind"`
+	ToID            string   `json:"to_id"`
+	ToTitle         string   `json:"to_title,omitempty"`
+	Relation        string   `json:"relation"`
+	Reason          string   `json:"reason"`
+	EvidenceTurnIDs []string `json:"evidence_turn_ids"`
+	Confidence      float64  `json:"confidence"`
+	Status          string   `json:"status"`
+	Model           string   `json:"model,omitempty"`
+	CreatedAtMS     int64    `json:"created_at_ms"`
+}
+type MemoryLinkList struct {
+	Links []MemoryLinkView `json:"links"`
+}
+
+func memoryLinkView(l pipeline.MemoryLink) MemoryLinkView {
+	return MemoryLinkView{
+		LinkID: l.ID, FromKind: l.FromKind, FromID: l.FromID, FromTitle: l.FromTitle,
+		ToKind: l.ToKind, ToID: l.ToID, ToTitle: l.ToTitle, Relation: l.Relation,
+		Reason: l.Reason, EvidenceTurnIDs: l.EvidenceTurnIDs, Confidence: l.Confidence,
+		Status: l.Status, Model: l.Model, CreatedAtMS: l.CreatedAt.UnixMilli(),
+	}
 }
 
 // parseRFC3339 converts an optional RFC3339 timestamp string into a *time.Time.
@@ -247,6 +285,39 @@ func newServer(store *memory.Store) *mcp.Server {
 		}
 		r, e := store.SearchMemory(ctx, memory.MemorySearch{Text: in.Text, Scope: in.Scope, Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, StartedAfter: after, StartedBefore: before})
 		return nil, r, e
+	})
+	mcp.AddTool(s, read("list_memory_links", "列出话题之间的记忆关联（proposed 建议 / confirmed 已确认 / rejected 已拒绝），可按状态与话题过滤；返回端点标题、理由、证据轮次与置信度，用于人工复核和避免重复提议。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ListMemoryLinksInput) (*mcp.CallToolResult, MemoryLinkList, error) {
+		switch in.Status {
+		case "", pipeline.LinkStatusProposed, pipeline.LinkStatusConfirmed, pipeline.LinkStatusRejected:
+		default:
+			return nil, MemoryLinkList{}, fmt.Errorf("status must be proposed, confirmed, rejected or empty")
+		}
+		limit := in.Limit
+		if limit <= 0 {
+			limit = 50
+		}
+		if limit > 200 {
+			limit = 200
+		}
+		links, e := pipeline.ListLinks(ctx, store.DB(), pipeline.LinkFilter{Status: in.Status, TopicID: in.TopicID, Limit: limit})
+		if e != nil {
+			return nil, MemoryLinkList{}, e
+		}
+		views := make([]MemoryLinkView, 0, len(links))
+		for _, l := range links {
+			views = append(views, memoryLinkView(l))
+		}
+		return nil, MemoryLinkList{Links: views}, nil
+	})
+	mcp.AddTool(s, write("review_memory_link", "确认或拒绝一条记忆关联建议。confirm 把 proposed 变为 confirmed；reject 把 proposed 或 confirmed 变为 rejected；重复提交同一动作是幂等的，拒绝只改状态、不删除记录，也不合并话题。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ReviewMemoryLinkInput) (*mcp.CallToolResult, MemoryLinkView, error) {
+		if strings.TrimSpace(in.LinkID) == "" {
+			return nil, MemoryLinkView{}, fmt.Errorf("link_id is required")
+		}
+		l, e := pipeline.ReviewLink(ctx, store.DB(), in.LinkID, in.Action)
+		if e != nil {
+			return nil, MemoryLinkView{}, e
+		}
+		return nil, memoryLinkView(l), nil
 	})
 	return s
 }

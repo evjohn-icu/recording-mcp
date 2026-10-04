@@ -98,14 +98,30 @@ accepted=1 rejected=1
 
 输入文件中出现未知字段、JSON 解析失败或文件缺失时以非零退出码结束，不写库；所有提议都被拒时仍正常退出（退出码 0），只报告计数。
 
+## 复核：确认与拒绝
+
+复核通过 MCP 工具进行，状态机只有三个状态，且任何复核都不合并话题、不修改已有记忆：
+
+| 工具 | 类型 | 参数 | 行为 |
+| --- | --- | --- | --- |
+| `list_memory_links` | 只读 | `status`（`proposed` / `confirmed` / `rejected`，缺省为全部）、`topic_id`（任一端的限定）、`limit`（缺省 50、上限 200） | 按 `created_at, id` 返回关联，含两端 kind/id/标题、relation、reason、证据轮次、confidence、model 与状态 |
+| `review_memory_link` | 写入 | `link_id`、`action`（`confirm` / `reject`） | `confirm` 把 `proposed` 改为 `confirmed`；`reject` 把 `proposed` 或 `confirmed` 改为 `rejected` |
+
+规则：
+
+- 只允许上述迁移。重复执行同一动作（例如对已确认的关联再次 `confirm`）是幂等的空操作，返回当前状态；已拒绝的关联不能再 `confirm`，错误信息会指明当前状态。
+- 行永不删除：拒绝只是状态标记，保留证据与理由供审计（撤销一次错误的确认也用 `reject`）。
+- 确认不等于合并：当前没有任何下游视图消费 `confirmed`，话题合并、跨话题层级视图仍未实现。
+
 ## 用 pi 运行一轮策展（实测配方）
 
-本机实测可用的最小配方（模型可替换为任意可用项）：
+本机实测可用的最小配方（模型可替换为任意可用项）。下面统一使用示例数据库 `/tmp/ctx-gen/ctx.db`；**MCP 服务器与 `context-associate` 必须指向同一个库**，否则校验会以 “topic not found” 拒绝全部提议。
 
 ```bash
 cd /home/ev/code/recording-mcp
+DB=/tmp/ctx-gen/ctx.db
 # 1) 项目本地 MCP 配置（写入 .pi/mcp.json，该目录已在 .gitignore）
-pi mcp add context-memory -l -- /home/ev/code/recording-mcp/bin/context-memory --db <数据库路径>
+pi mcp add context-memory -l -- /home/ev/code/recording-mcp/bin/context-memory --db "$DB"
 
 # 2) 跑一轮策展（-p 非交互；--approve 信任项目本地 .pi/mcp.json）
 pi -p --approve --mode text --model volces-agent-01/glm-5.3-flash \
@@ -113,20 +129,23 @@ pi -p --approve --mode text --model volces-agent-01/glm-5.3-flash \
   --append-system-prompt docs/curator-prompt.md \
   "对当前记忆库执行一轮策展。只用 context-memory 的只读工具调查（经 codemode 调用），预算最多 30 次工具调用；把提议 JSON 写入 /tmp/curator-proposals.json，完成后只回复路径与条数。不要运行命令、不要查找数据库。"
 
-# 3) 校验并入库
-./bin/context-associate --db <数据库路径> --input /tmp/curator-proposals.json --model volces-agent-01/glm-5.3-flash --dry-run
-./bin/context-associate --db <数据库路径> --input /tmp/curator-proposals.json --model volces-agent-01/glm-5.3-flash
+# 3) 校验并入库（--db 必须与 MCP 服务器一致）
+./bin/context-associate --db "$DB" --input /tmp/curator-proposals.json --model volces-agent-01/glm-5.3-flash --dry-run
+./bin/context-associate --db "$DB" --input /tmp/curator-proposals.json --model volces-agent-01/glm-5.3-flash
+
+# 4) 复核（由人工通过 MCP 工具执行，例如在 agent 会话里）
+#    list_memory_links {"status":"proposed"}
+#    review_memory_link {"link_id":"link:...","action":"confirm"}
 ```
 
 实测注意：
 
-- pi 中 MCP 工具经 `codemode` 调用；**不要**用 `--tools` 白名单把 codemode 排除，否则 MCP 不可用。
+- pi 中 MCP 工具经 `codemode` 调用；**不要**用 `--tools` 白名单把 codemode 排除，也不要指望把 MCP 工具名写进 `--tools`，那样 MCP 会不可用。
 - 用 `--exclude-tools` 去掉 `bash` 等工具，防止 agent 自行查找数据库或运行命令（首次实测即因此超时）。
-- 一轮约 8–9 分钟（29 次只读调用、11 条提议、全部通过校验）；在消息里给出工具调用预算与"只写提议文件"的边界能显著减少跑偏。
+- 工具参数名必须与 `docs/curator-prompt.md` 中的签名一致（例如 `search_memory` 用 `text`，不是 `query`）；写错会被 schema 拒绝，嵌套调用里容易被读成“没有命中”。
+- 一轮约 8–9 分钟（29 次只读调用、11 条提议、全部通过校验）；在消息里给出工具调用预算与“只写提议文件”的边界能显著减少跑偏。
 
 ## 后续（尚未实现）
 
-- **人工确认**：把 `proposed` 改为 `confirmed` 或 `rejected` 的确认/撤销流程尚未实现；当前表中不会出现 `confirmed` 状态。
 - **自动触发**：导入或发布后自动扫描生成提议尚未实现，提议始终由 agent 显式产出。
-- **读取接口**：查询 `memory_links` 的 MCP 工具尚未提供，当前只能直接查库。
-- **关联的下游使用**：确认后的话题合并、跨话题层级视图等尚未实现。
+- **关联的下游使用**：确认后的话题合并、跨话题层级视图等尚未实现；`confirmed` 目前只是状态标记。

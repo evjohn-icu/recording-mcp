@@ -45,6 +45,12 @@ func Open(path string) (*Store, error) {
 }
 func (s *Store) Close() error { return s.db.Close() }
 
+// DB exposes the underlying connection pool so packages that operate on the
+// same database (for example link curation) share one SQLite connection
+// instead of opening a competing pool. Callers must not close the handle;
+// Store.Close owns it.
+func (s *Store) DB() *sql.DB { return s.db }
+
 func hashJSON(v any) (string, string, error) {
 	b, e := json.Marshal(v)
 	if e != nil {

@@ -14,8 +14,17 @@
 1. 用 list_conversations 浏览现有会话，用 list_topics 浏览现有话题，确定调查范围。
 2. 用 search_memory 按关键词检索原话与笔记，定位可能相关的话题对。
 3. 对每条候选证据，用 get_evidence_context 展开该轮次及其相邻上下文，核对原话是否真的支持你认为的关联。
+4. 用 list_memory_links 查看已有建议，避免重复提议同一条关联（可先用 status="proposed" 过滤，或用 topic_id 限定某个话题）。
 
-调查过程中不要修改记忆库：不调用 ingest_transcript、apply_annotations 等写入类工具。
+工具与参数（字段名必须逐字使用，写错会被 schema 拒绝）：
+
+- list_conversations：{"topic_id"?, "status"?, "started_after"?, "started_before"?, "limit"?, "cursor"?}
+- list_topics：{"conversation_id"?}
+- search_memory：{"text": "关键词（必填，不是 query）", "scope"?, "topic_id"?, "limit"?, "cursor"?}
+- get_evidence_context：{"turn_id": "轮次 ID（必填）", "radius"?, "max_bytes"?}
+- list_memory_links：{"status"?, "topic_id"?, "limit"?}
+
+调查过程中不要修改记忆库：不调用 ingest_transcript、apply_annotations、review_memory_link 等写入类工具；在不确定字段名时先按上表逐字使用，不要自行改名重试猜测。
 
 ## 第二步：产出提议
 
@@ -68,4 +77,5 @@ reason 写具体：说明证据中的原话支持了什么关系，不超过 500
 ## 边界
 
 - 提示词只约束 agent 行为；校验逻辑在 `context-associate` 中，agent 无法绕过。
-- 通过校验并入库的条目状态是 `proposed`；人工确认、撤销与自动触发尚未实现（见 [associations.md](associations.md) 的“后续”）。
+- 通过校验并入库的条目状态是 `proposed`；确认与撤销由人工通过 MCP 工具 `review_memory_link` 执行（见 [associations.md](associations.md)），自动触发尚未实现。
+- 本机用 pi 跑策展时，MCP 工具只经 `codemode` 暴露（`tools.mcp__context_memory__<工具名>({...})`），不能把 `codemode` 排除出工具集，也不要从 `bash` 里找数据库；完整命令见 [associations.md](associations.md) 的“用 pi 运行一轮策展”。

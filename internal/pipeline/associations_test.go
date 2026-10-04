@@ -139,7 +139,7 @@ func TestValidateTopicLinksRejectsViolations(t *testing.T) {
 			p := baseLinkProposal()
 			tt.mutate(&p)
 			got := validateOne(t, db, p)
-			if got.Status != linkStatusRejected {
+			if got.Status != LinkStatusRejected {
 				t.Fatalf("status = %q, want rejected", got.Status)
 			}
 			if got.RejectionReason == "" {
@@ -167,7 +167,7 @@ func TestValidateTopicLinksKeepsInputOrder(t *testing.T) {
 	if len(out) != 2 {
 		t.Fatalf("got %d links, want 2", len(out))
 	}
-	if out[0].Status != linkStatusRejected || out[1].Status != linkStatusValidated {
+	if out[0].Status != LinkStatusRejected || out[1].Status != linkStatusValidated {
 		t.Fatalf("order not preserved: %q, %q", out[0].Status, out[1].Status)
 	}
 }
@@ -205,7 +205,7 @@ func TestInsertLinksIdempotent(t *testing.T) {
 		t.Fatalf("second ids = %v, want [%s]", ids2, ids1[0])
 	}
 
-	stored, err := ListLinks(ctx, db, "")
+	stored, err := ListLinks(ctx, db, LinkFilter{})
 	if err != nil {
 		t.Fatalf("ListLinks: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestInsertLinksIdempotent(t *testing.T) {
 		t.Fatalf("stored rows = %d, want 1", len(stored))
 	}
 	got := stored[0]
-	if got.Status != linkStatusProposed {
+	if got.Status != LinkStatusProposed {
 		t.Errorf("status = %q, want proposed", got.Status)
 	}
 	if got.FromKind != "topic" || got.FromID != p.FromTopicID || got.ToKind != "topic" || got.ToID != p.ToTopicID {
@@ -238,7 +238,7 @@ func TestInsertLinksSkipsRejectedAndForeignKinds(t *testing.T) {
 	seedAssociationFixtures(t, db)
 	ctx := context.Background()
 
-	rejected := ValidatedLink{LinkProposal: baseLinkProposal(), Status: linkStatusRejected, RejectionReason: "reason is empty"}
+	rejected := ValidatedLink{LinkProposal: baseLinkProposal(), Status: LinkStatusRejected, RejectionReason: "reason is empty"}
 	foreign := ValidatedLink{LinkProposal: baseLinkProposal(), Status: linkStatusValidated}
 	foreign.Kind = "note_link"
 	foreign.ToTopicID = "topic-3"
@@ -250,7 +250,7 @@ func TestInsertLinksSkipsRejectedAndForeignKinds(t *testing.T) {
 	if len(ids) != 0 {
 		t.Fatalf("ids = %v, want none", ids)
 	}
-	stored, err := ListLinks(ctx, db, "")
+	stored, err := ListLinks(ctx, db, LinkFilter{})
 	if err != nil {
 		t.Fatalf("ListLinks: %v", err)
 	}
@@ -279,7 +279,7 @@ func TestListLinksFiltersAndOrders(t *testing.T) {
 	insertRawLink("link:aaa", "follow_up", "proposed", base)
 	insertRawLink("link:ccc", "update", "confirmed", base.Add(time.Second))
 
-	all, err := ListLinks(ctx, db, "")
+	all, err := ListLinks(ctx, db, LinkFilter{})
 	if err != nil {
 		t.Fatalf("ListLinks all: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestListLinksFiltersAndOrders(t *testing.T) {
 		t.Fatalf("order = %s, %s, %s; want aaa, bbb, ccc", all[0].ID, all[1].ID, all[2].ID)
 	}
 
-	proposed, err := ListLinks(ctx, db, "proposed")
+	proposed, err := ListLinks(ctx, db, LinkFilter{Status: "proposed"})
 	if err != nil {
 		t.Fatalf("ListLinks proposed: %v", err)
 	}
@@ -303,11 +303,125 @@ func TestListLinksFiltersAndOrders(t *testing.T) {
 		}
 	}
 
-	confirmed, err := ListLinks(ctx, db, "confirmed")
+	confirmed, err := ListLinks(ctx, db, LinkFilter{Status: "confirmed"})
 	if err != nil {
 		t.Fatalf("ListLinks confirmed: %v", err)
 	}
 	if len(confirmed) != 1 || confirmed[0].ID != "link:ccc" {
 		t.Fatalf("confirmed = %+v, want link:ccc", confirmed)
+	}
+}
+
+func TestListLinksTopicFilterLimitAndTitles(t *testing.T) {
+	db := newAssociationDB(t)
+	ctx := context.Background()
+	for _, id := range []string{"topic-1", "topic-2", "topic-9"} {
+		seedTopic(t, db, id)
+	}
+	insert := func(id, from, to string, createdAt time.Time) {
+		t.Helper()
+		if _, err := db.Exec(
+			`INSERT INTO memory_links(id, from_kind, from_id, to_kind, to_id, relation, reason, evidence_turn_ids_json, confidence, status, model, created_at)
+			 VALUES(?,'topic',?,'topic',?,'same_topic','r','[]',0.5,'proposed','m',?)`,
+			id, from, to, createdAt.UnixMilli()); err != nil {
+			t.Fatalf("insert link %s: %v", id, err)
+		}
+	}
+	base := time.UnixMilli(1_700_000_000_000)
+	insert("link:1-2", "topic-1", "topic-2", base)
+	insert("link:2-9", "topic-2", "topic-9", base.Add(time.Second))
+	insert("link:1-9", "topic-1", "topic-9", base.Add(2*time.Second))
+
+	got, err := ListLinks(ctx, db, LinkFilter{TopicID: "topic-2"})
+	if err != nil {
+		t.Fatalf("ListLinks topic filter: %v", err)
+	}
+	if len(got) != 2 || got[0].ID != "link:1-2" || got[1].ID != "link:2-9" {
+		t.Fatalf("topic filter = %+v, want both topic-2 links in created_at order", got)
+	}
+	if got[0].FromTitle != "title topic-1" || got[0].ToTitle != "title topic-2" {
+		t.Errorf("titles = %q/%q, want seeded titles", got[0].FromTitle, got[0].ToTitle)
+	}
+	if got[1].ToTitle != "title topic-9" {
+		t.Errorf("to title = %q, want %q", got[1].ToTitle, "title topic-9")
+	}
+
+	limited, err := ListLinks(ctx, db, LinkFilter{Limit: 2})
+	if err != nil {
+		t.Fatalf("ListLinks limit: %v", err)
+	}
+	if len(limited) != 2 || limited[1].ID != "link:2-9" {
+		t.Fatalf("limited = %+v, want the two oldest links", limited)
+	}
+}
+
+func TestReviewLinkTransitions(t *testing.T) {
+	db := newAssociationDB(t)
+	seedAssociationFixtures(t, db)
+	ctx := context.Background()
+
+	validated, err := ValidateTopicLinks(ctx, db, []LinkProposal{baseLinkProposal()})
+	if err != nil {
+		t.Fatalf("ValidateTopicLinks: %v", err)
+	}
+	ids, err := InsertLinks(ctx, db, "curator", validated, time.UnixMilli(1_700_000_000_000))
+	if err != nil || len(ids) != 1 {
+		t.Fatalf("InsertLinks: ids=%v err=%v", ids, err)
+	}
+	id := ids[0]
+
+	confirmed, err := ReviewLink(ctx, db, id, ReviewConfirm)
+	if err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+	if confirmed.Status != LinkStatusConfirmed {
+		t.Fatalf("status after confirm = %q, want confirmed", confirmed.Status)
+	}
+	stored, err := ListLinks(ctx, db, LinkFilter{Status: LinkStatusConfirmed})
+	if err != nil {
+		t.Fatalf("ListLinks confirmed: %v", err)
+	}
+	if len(stored) != 1 || stored[0].ID != id {
+		t.Fatalf("stored confirmed = %+v, want the confirmed link", stored)
+	}
+
+	// Replaying the same decision is a no-op, not an error.
+	if again, err := ReviewLink(ctx, db, id, ReviewConfirm); err != nil || again.Status != LinkStatusConfirmed {
+		t.Fatalf("repeat confirm = %q, %v; want confirmed, nil", again.Status, err)
+	}
+
+	// A mistaken confirmation can be revoked.
+	rejected, err := ReviewLink(ctx, db, id, ReviewReject)
+	if err != nil {
+		t.Fatalf("reject confirmed: %v", err)
+	}
+	if rejected.Status != LinkStatusRejected {
+		t.Fatalf("status = %q, want rejected", rejected.Status)
+	}
+	if again, err := ReviewLink(ctx, db, id, ReviewReject); err != nil || again.Status != LinkStatusRejected {
+		t.Fatalf("repeat reject = %q, %v; want rejected, nil", again.Status, err)
+	}
+
+	// A rejected link cannot be confirmed; the error names the current status.
+	if _, err := ReviewLink(ctx, db, id, ReviewConfirm); err == nil || !strings.Contains(err.Error(), `"rejected"`) {
+		t.Fatalf("confirm after reject err = %v, want a status error", err)
+	}
+	// The row survives review for audit.
+	all, err := ListLinks(ctx, db, LinkFilter{})
+	if err != nil {
+		t.Fatalf("ListLinks all: %v", err)
+	}
+	if len(all) != 1 || all[0].Status != LinkStatusRejected {
+		t.Fatalf("rows after review = %+v", all)
+	}
+
+	if _, err := ReviewLink(ctx, db, "link:missing", ReviewConfirm); err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("missing link err = %v, want not found", err)
+	}
+	if _, err := ReviewLink(ctx, db, id, "approve"); err == nil || !strings.Contains(err.Error(), "unknown review action") {
+		t.Fatalf("unknown action err = %v", err)
+	}
+	if _, err := ReviewLink(ctx, db, "  ", ReviewConfirm); err == nil {
+		t.Fatal("blank link id accepted")
 	}
 }

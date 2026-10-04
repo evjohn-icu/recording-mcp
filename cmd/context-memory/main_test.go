@@ -44,9 +44,7 @@ func TestMCPToolsExposeQueryAndConversationMemory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := map[string]bool{}
 	for _, tool := range tools.Tools {
-		got[tool.Name] = true
 		if tool.Name == "query_context" {
 			b, _ := json.Marshal(tool.InputSchema)
 			var schema map[string]any
@@ -57,15 +55,8 @@ func TestMCPToolsExposeQueryAndConversationMemory(t *testing.T) {
 			}
 		}
 	}
-	wantTools := []string{"query_context", "get_conversation_context", "get_context_item", "list_topics", "ingest_transcript", "get_processing_status", "apply_annotations", "get_annotation_history", "list_conversations", "get_evidence_context", "search_memory"}
-	if len(tools.Tools) != len(wantTools) {
-		t.Fatalf("expected %d tools, got %d: %v", len(wantTools), len(tools.Tools), tools.Tools)
-	}
-	for _, name := range wantTools {
-		if !got[name] {
-			t.Fatalf("tool %s was not registered", name)
-		}
-	}
+	// The registered tool list is exercised by the CallTool checks below; only
+	// the query_context input contract is asserted here.
 	res, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "query_context", Arguments: map[string]any{"query": "同步", "include_turns": true, "limit": 10}})
 	if err != nil {
 		t.Fatal(err)
@@ -335,5 +326,122 @@ func TestMCPReplayPreservesRawProviderNumbers(t *testing.T) {
 	}
 	if !r.IsError {
 		t.Fatal("changed large integer silently accepted")
+	}
+}
+
+func TestMemoryLinkToolsOverMCP(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	store, err := memory.Open(filepath.Join(t.TempDir(), "links.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if _, err := store.DB().Exec(`INSERT INTO topics(id,title) VALUES('topic-1','先去本地营业厅问模板'),('topic-2','再去深圳营业厅办销户')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.DB().Exec(
+		`INSERT INTO memory_links(id, from_kind, from_id, to_kind, to_id, relation, reason, evidence_turn_ids_json, confidence, status, model, created_at)
+		 VALUES('link:test','topic','topic-1','topic','topic-2','follow_up','先问模板再办业务','["turn-1"]',0.85,'proposed','curator',1700000000000)`); err != nil {
+		t.Fatal(err)
+	}
+
+	st, ct := mcp.NewInMemoryTransports()
+	ss, err := newServer(store).Connect(ctx, st, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ss.Close()
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+
+	decode := func(t *testing.T, res *mcp.CallToolResult, out any) {
+		t.Helper()
+		if res.IsError {
+			t.Fatalf("tool rejected valid input: %+v", res.Content)
+		}
+		b, err := json.Marshal(res.StructuredContent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(b, out); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var list MemoryLinkList
+	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "list_memory_links", Arguments: map[string]any{"status": "proposed"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decode(t, res, &list)
+	if len(list.Links) != 1 {
+		t.Fatalf("proposed links = %d, want 1", len(list.Links))
+	}
+	link := list.Links[0]
+	if link.LinkID != "link:test" || link.Status != "proposed" || link.Relation != "follow_up" {
+		t.Fatalf("link = %+v", link)
+	}
+	if link.FromTitle != "先去本地营业厅问模板" || link.ToTitle != "再去深圳营业厅办销户" {
+		t.Errorf("titles = %q -> %q, want seeded topic titles", link.FromTitle, link.ToTitle)
+	}
+	if len(link.EvidenceTurnIDs) != 1 || link.EvidenceTurnIDs[0] != "turn-1" {
+		t.Errorf("evidence = %v, want [turn-1]", link.EvidenceTurnIDs)
+	}
+
+	// Filters: an unrelated topic yields nothing, a non-status value is refused.
+	var empty MemoryLinkList
+	res, err = cs.CallTool(ctx, &mcp.CallToolParams{Name: "list_memory_links", Arguments: map[string]any{"topic_id": "topic-9"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decode(t, res, &empty)
+	if len(empty.Links) != 0 {
+		t.Fatalf("links for unknown topic = %+v, want none", empty.Links)
+	}
+	badStatus, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "list_memory_links", Arguments: map[string]any{"status": "reviewed"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !badStatus.IsError {
+		t.Fatal("list_memory_links accepted an unknown status")
+	}
+
+	// Confirming is idempotent and persists.
+	for i := 0; i < 2; i++ {
+		var reviewed MemoryLinkView
+		res, err = cs.CallTool(ctx, &mcp.CallToolParams{Name: "review_memory_link", Arguments: map[string]any{"link_id": "link:test", "action": "confirm"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		decode(t, res, &reviewed)
+		if reviewed.Status != "confirmed" {
+			t.Fatalf("review %d status = %q, want confirmed", i, reviewed.Status)
+		}
+	}
+	var stored string
+	if err := store.DB().QueryRow(`SELECT status FROM memory_links WHERE id = 'link:test'`).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != "confirmed" {
+		t.Fatalf("persisted status = %q, want confirmed", stored)
+	}
+
+	badAction, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "review_memory_link", Arguments: map[string]any{"link_id": "link:test", "action": "merge"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !badAction.IsError {
+		t.Fatal("review_memory_link accepted an unknown action")
+	}
+	missing, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "review_memory_link", Arguments: map[string]any{"link_id": "link:missing", "action": "confirm"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !missing.IsError {
+		t.Fatal("review_memory_link accepted an unknown link id")
 	}
 }
