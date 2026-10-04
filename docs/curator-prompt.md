@@ -76,6 +76,6 @@ reason 写具体：说明证据中的原话支持了什么关系，不超过 500
 
 ## 边界
 
-- 提示词只约束 agent 行为；校验逻辑在 `context-associate` 中，agent 无法绕过。
-- 通过校验并入库的条目状态是 `proposed`；确认与撤销由人工通过 MCP 工具 `review_memory_link` 执行（见 [associations.md](associations.md)），自动触发尚未实现。
+- 提示词只约束 agent 行为。策展人是本机进程，物理上能打开数据库文件；实际强制手段是三层：一、MCP 客户端以 `--read-only` 注册 `context-memory`，只暴露只读工具（`scripts/run-curator.sh` 即如此）；二、提示词要求只读调查；三、提议写库前由 worker 进程内的 `ValidateTopicLinks` 重新校验（类型、话题与证据存在性、关系枚举、长度、置信度范围），不合格条目不会写入 `memory_links`。
+- 通过校验并入库的条目状态是 `proposed`；确认与撤销由人工通过 MCP 工具 `review_memory_link` 执行（见 [associations.md](associations.md)），确认不等于合并话题；publish 提交后 worker 会自动入队 curate 任务触发策展。
 - 本机用 pi 跑策展时，MCP 工具只经 `codemode` 暴露（`tools.mcp__context_memory__<工具名>({...})`），不能把 `codemode` 排除出工具集，也不要从 `bash` 里找数据库；完整命令见 [associations.md](associations.md) 的“用 pi 运行一轮策展”。

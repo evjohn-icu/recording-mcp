@@ -66,7 +66,7 @@ func TestImportAtomicIdempotentAndPreservesUncertainty(t *testing.T) {
 	if p.Total != 5 || len(p.Items) != 1 || p.NextOffset == nil {
 		t.Fatalf("bad page: %+v", p)
 	}
-	turn, err := s.GetItem(ctx, turnKey(a.RecordingID, "seg01-turn0001"))
+	turn, err := s.GetItem(ctx, turnKey(a.RecordingID, "seg01-turn0001"), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestImportAtomicIdempotentAndPreservesUncertainty(t *testing.T) {
 	if e != nil || len(notes.Items) != 1 || notes.Items[0].Kind != "suggestion" {
 		t.Fatalf("topic filter: %+v %v", notes, e)
 	}
-	if _, e = s.GetItem(ctx, "note:"+hashID(a.ConversationID+"\x00note:one")); e != nil {
+	if _, e = s.GetItem(ctx, "note:"+hashID(a.ConversationID+"\x00note:one"), false); e != nil {
 		t.Fatalf("note evidence lookup: %v", e)
 	}
 	if e = s.Close(); e != nil {
@@ -179,7 +179,7 @@ func TestValidationRejectsInvalidTypeAndTime(t *testing.T) {
 	if _, e = s.Conversation(context.Background(), a.ConversationID); e == nil {
 		t.Fatal("invalid batch partially persisted")
 	}
-	if _, e = s.GetItem(context.Background(), "missing"); e == nil || !strings.Contains(e.Error(), "not found") {
+	if _, e = s.GetItem(context.Background(), "missing", false); e == nil || !strings.Contains(e.Error(), "not found") {
 		t.Fatalf("missing item error=%v", e)
 	}
 	if !errors.Is(nil, nil) {
@@ -208,7 +208,7 @@ func TestFiveMillisecondSegmentEndTolerancePreservesOriginalValue(t *testing.T) 
 	if _, err = s.Import(context.Background(), tr, a, "audio", strings.Repeat("d", 64)); err != nil {
 		t.Fatalf("2ms rounding variance should be accepted: %v", err)
 	}
-	it, err := s.GetItem(context.Background(), turnKey(a.RecordingID, tr.Turns[0].ID))
+	it, err := s.GetItem(context.Background(), turnKey(a.RecordingID, tr.Turns[0].ID), false)
 	if err != nil || it.Item.GlobalEndMS == nil || *it.Item.GlobalEndMS != 1002 {
 		t.Fatalf("raw out-of-segment timestamp must be preserved: %+v %v", it, err)
 	}

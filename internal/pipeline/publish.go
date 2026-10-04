@@ -71,6 +71,27 @@ func (h *PublishHandler) publish(ctx context.Context, conversationID, expectedVe
 	if len(candidates) == 0 {
 		return "publish:noop", nil
 	}
+	// Superseded evidence must never re-enter the published view: candidates
+	// whose backing attachment revision is no longer active are excluded, and
+	// the published version is derived only from the candidates that remain.
+	validatedIDs := make([]string, 0, len(candidates))
+	for _, c := range candidates {
+		validatedIDs = append(validatedIDs, c.ID)
+	}
+	staleIDs, err := staleArtifactIDs(ctx, h.DB, "candidate", validatedIDs)
+	if err != nil {
+		return "", fmt.Errorf("pipeline: read candidate staleness: %w", err)
+	}
+	fresh := make([]Candidate, 0, len(candidates))
+	for _, c := range candidates {
+		if !staleIDs[c.ID] {
+			fresh = append(fresh, c)
+		}
+	}
+	if len(fresh) == 0 {
+		return "publish:noop", nil
+	}
+	candidates = fresh
 
 	current, currentVersion, err := h.Store.CurrentAnnotations(ctx, conversationID)
 	if err != nil {

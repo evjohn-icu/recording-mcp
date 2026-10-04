@@ -91,6 +91,13 @@ type Item struct {
 	ClaimMode          string   `json:"claim_mode,omitempty"`
 	InterpretationNote string   `json:"interpretation_note,omitempty"`
 	AnnotationVersion  string   `json:"annotation_version,omitempty"`
+	// Stale reports that the item derives from a superseded transcript
+	// attachment. Legacy items with no attachment rows are never stale.
+	Stale bool `json:"stale,omitempty"`
+	// DerivedFrom lists the transcript_revision values of the source
+	// attachments the item was built from, sorted ascending; empty for legacy
+	// items.
+	DerivedFrom []string `json:"derived_from,omitempty"`
 }
 type Query struct {
 	Query           string `json:"query,omitempty"`
@@ -99,6 +106,7 @@ type Query struct {
 	RecordingID     string `json:"recording_id,omitempty"`
 	SpeakerScopedID string `json:"speaker_scoped_id,omitempty"`
 	IncludeTurns    bool   `json:"include_turns,omitempty"`
+	IncludeStale    bool   `json:"include_stale,omitempty"`
 	Limit           int    `json:"limit,omitempty"`
 	Offset          int    `json:"offset,omitempty"`
 }

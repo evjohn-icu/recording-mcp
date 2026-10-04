@@ -59,11 +59,11 @@ func TestApplyAnnotationsRevisionAndHistory(t *testing.T) {
 	if currentNote.AnnotationVersion != "annotation-v2" {
 		t.Fatalf("query omitted annotation version: %+v", currentNote)
 	}
-	detail, err := s.GetItem(ctx, currentNote.ID)
+	detail, err := s.GetItem(ctx, currentNote.ID, false)
 	if err != nil || detail.Item.AnnotationVersion != "annotation-v2" {
 		t.Fatalf("GetItem omitted annotation version: %+v %v", detail, err)
 	}
-	if _, err = s.GetItem(ctx, noteKey(initial.ConversationID, "note:one")); err == nil {
+	if _, err = s.GetItem(ctx, noteKey(initial.ConversationID, "note:one"), false); err == nil {
 		t.Fatal("old note remained in current view")
 	}
 }

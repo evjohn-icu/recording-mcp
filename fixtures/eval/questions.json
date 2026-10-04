@@ -1,0 +1,600 @@
+{
+  "description": "Context-eval questions. Gold evidence is authored by content as human turn refs (segment_id + transcript_revision + turn_id); the harness resolves them through turns.original_turn_id. expect_stale_excluded marks questions whose gold lives on a superseded (v1) revision and must therefore never surface in current results.",
+  "questions": [
+    {
+      "id": "budget-v1-approval",
+      "query": "预算批准了",
+      "purpose": "stale_excluded",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-budget",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "expect_stale_excluded": true,
+      "notes": "Gold is the superseded v1 turn; current state must not expose it."
+    },
+    {
+      "id": "budget-v1-payment",
+      "query": "下周三就能打款",
+      "purpose": "stale_excluded",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-budget",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "expect_stale_excluded": true,
+      "notes": "Second stale question on the same superseded turn."
+    },
+    {
+      "id": "budget-v2-current",
+      "query": "下周五再审一次",
+      "purpose": "current_after_supersede",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-budget",
+          "transcript_revision": "rev-2",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_topic_refs": [
+        {
+          "segment_id": "seg-budget",
+          "transcript_revision": "rev-2",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "venue-hall",
+      "query": "艺术中心三号厅",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-venue-a",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "venue-mic",
+      "query": "话麦要自己带电池",
+      "purpose": "asr_typo",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-venue-a",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ],
+      "gold_topic_refs": [
+        {
+          "segment_id": "seg-venue-a",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "venue-invoice",
+      "query": "报销发票抬头",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-venue-b",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-3"
+        }
+      ],
+      "gold_topic_refs": [
+        {
+          "segment_id": "seg-venue-b",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-3"
+        }
+      ]
+    },
+    {
+      "id": "standup-cancel",
+      "query": "评审会不开了",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-standup",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "standup-noemail",
+      "query": "不要提前发邮件",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-standup",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "update-deadline",
+      "query": "推迟到十五号",
+      "purpose": "update",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-update",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "update-contact",
+      "query": "联系方式更新成小李",
+      "purpose": "update",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-update",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ],
+      "gold_topic_refs": [
+        {
+          "segment_id": "seg-update",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "weather-park",
+      "query": "照常去公园拍摄",
+      "purpose": "contradiction",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-weather",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "weather-indoor",
+      "query": "改室内棚拍",
+      "purpose": "contradiction",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-weather",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "contract-template",
+      "query": "合同模板发一份",
+      "purpose": "unknown_speaker",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-contract",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "contract-stamp",
+      "query": "盖章原件才收",
+      "purpose": "unknown_speaker",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-contract",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "typo-host",
+      "query": "猪持人你联系了吗",
+      "purpose": "asr_typo",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-typo",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "typo-confirm",
+      "query": "确认一下时间",
+      "purpose": "asr_typo",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-typo",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "planning-meeting",
+      "query": "季度总结会定在下周二",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-q1",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "planning-budget",
+      "query": "预算表要提前一天",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-q2",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ],
+      "gold_topic_refs": [
+        {
+          "segment_id": "seg-q2",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "planning-teambuild",
+      "query": "团建改到月底",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-q3",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-3"
+        }
+      ]
+    },
+    {
+      "id": "client-amount",
+      "query": "合同金额还得再谈",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-client",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_topic_refs": [
+        {
+          "segment_id": "seg-client",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "client-legal",
+      "query": "法务周五给反馈",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-client",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "shipping-air",
+      "query": "不走海运了",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-ship",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_topic_refs": [
+        {
+          "segment_id": "seg-ship",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "shipping-customs",
+      "query": "报关资料今晚必须补齐",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-ship",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "design-color",
+      "query": "配色换成深蓝",
+      "purpose": "unknown_speaker",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-design",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "design-font",
+      "query": "字体也统一成思源黑体",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-design",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ],
+      "gold_topic_refs": [
+        {
+          "segment_id": "seg-design",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "travel-train",
+      "query": "出差改成坐高铁",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-travel",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "travel-hotel",
+      "query": "酒店订在会展中心旁边",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-travel",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ],
+      "gold_topic_refs": [
+        {
+          "segment_id": "seg-travel",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "training-saturday",
+      "query": "培训定在周六",
+      "purpose": "contradiction",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-training",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "training-sunday",
+      "query": "改成周日半天",
+      "purpose": "contradiction",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-training",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ],
+      "gold_topic_refs": [
+        {
+          "segment_id": "seg-training",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "security-password",
+      "query": "每九十天换一次",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-security",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "security-log",
+      "query": "录日志要留半年",
+      "purpose": "asr_typo",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-security",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "party-deadline",
+      "query": "报名截止到周五下班前",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-party",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "party-family",
+      "query": "备注里写清楚人数",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-party",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "patent-report",
+      "query": "专利检索报告下周三",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-patent",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "patent-template",
+      "query": "别用去年的模板",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-patent",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ],
+      "gold_topic_refs": [
+        {
+          "segment_id": "seg-patent",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "factory-shoes",
+      "query": "防滑鞋",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-factory",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_topic_refs": [
+        {
+          "segment_id": "seg-factory",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "factory-phone",
+      "query": "手机不能带进车间",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-factory",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "insurance-original",
+      "query": "理赔材料要拍原件",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-insurance",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ]
+    },
+    {
+      "id": "insurance-courier",
+      "query": "顺丰到付",
+      "purpose": "recall",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-insurance",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ]
+    },
+    {
+      "id": "relation-venue-to-travel",
+      "query": "彩排场地定在",
+      "purpose": "relation_assisted",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-travel",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ],
+      "notes": "Gold lives on a topic reachable only through the confirmed link venue-a:utt-1 <-> travel:utt-2."
+    },
+    {
+      "id": "relation-ship-to-insurance",
+      "query": "不走海运了",
+      "purpose": "relation_assisted",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-insurance",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "Gold lives on a topic reachable only through the confirmed link ship:utt-1 <-> insurance:utt-1."
+    },
+    {
+      "id": "relation-proposed-not-confirmed",
+      "query": "改成周日半天",
+      "purpose": "link_proposed_not_confirmed",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-patent",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-2"
+        }
+      ],
+      "notes": "The training<->patent link is proposed but not confirmed, so the gold must stay unreachable."
+    }
+  ]
+}

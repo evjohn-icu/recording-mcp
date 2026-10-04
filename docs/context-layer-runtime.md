@@ -41,10 +41,11 @@ make build
 | `list_conversations` | 列出本地记忆库中的会话：可按主题、分析状态与录音开始时间过滤，并按录音开始时间倒序游标分页返回摘要 |
 | `get_evidence_context` | 读取某个转录轮次及其同一录音内相邻轮次的上下文，用于核对原始证据。`turn_id` 必填；`radius`（默认 3，负数按 0 处理）取目标前后各若干条；`max_bytes`（默认 16000）是逐条累加的文本字节预算，超出时停止并置 `truncated` |
 | `search_memory` | 在原始转录与派生笔记中执行大小写不敏感的子串检索。`text` 必填（trim 后非空）；scope 可选 `raw`（仅转录）、`derived`（仅笔记）或 `both`（默认全部），并可用 `topic_id`、`started_after`、`started_before` 过滤 |
+| `build_context` | 实验性：为任务组装带预算与来源的上下文包，返回 `items` / `evidence` / `coverage` / `gaps` / `truncated` / `degraded` / `degrade_reason` / `trace`。`query`、`conversation_id`、`topic_ids` 至少一项必填；`max_bytes` 默认 16000、`max_items` 默认 12；`include_raw_evidence` 纳入原始轮次证据。默认排除 stale 派生记忆；仅在服务端配置 `--decision-url` 时做决策重排，否则 `degraded=true` 但确定性结果仍完整返回 |
 | `list_memory_links` | 列出话题之间的记忆关联（`proposed` / `confirmed` / `rejected`）。`status` 与 `topic_id` 可选；`limit` 缺省 50、上限 200，按 `created_at, id` 返回端点标题、理由、证据轮次与置信度 |
 | `review_memory_link` | 复核一条关联建议。`link_id` 与 `action` 必填：`confirm` 把 `proposed` 变为 `confirmed`；`reject` 把 `proposed` 或 `confirmed` 变为 `rejected`；`reopen` 把 `confirmed` 或 `rejected` 退回 `proposed`。重复同一动作幂等，记录不删除 |
 
-上表后三行是新的检索工具，与既有工具使用独立契约：它们不走 `query_context` / `get_conversation_context` 的 offset 分页，而是返回游标（`next_cursor`），下一页请求把游标原样带回 `cursor` 字段。时间过滤字段（`started_after` / `started_before`）为 RFC 3339 字符串，且只对录音开始时间已知的会话生效。`list_conversations` 的 `status` 只接受 `pending` / `partial`（大小写不敏感），语义与 `get_processing_status` 的 `analysis_status` 一致；`limit` 缺省 20、上限 100。`search_memory` 的 `limit` 同理，多读一条记录判断是否有下一页。
+上表中的 `list_conversations`、`get_evidence_context` 与 `search_memory` 是与既有工具不同的检索契约：它们不走 `query_context` / `get_conversation_context` 的 offset 分页，而是返回游标（`next_cursor`），下一页请求把游标原样带回 `cursor` 字段。时间过滤字段（`started_after` / `started_before`）为 RFC 3339 字符串，且只对录音开始时间已知的会话生效；有界查询会排除开始时间未知的会话。`list_conversations` 的 `status` 只接受 `pending` / `partial`（大小写不敏感），语义与 `get_processing_status` 的 `analysis_status` 一致；`limit` 缺省 20、上限 100。`search_memory` 的 `limit` 同理，多读一条记录判断是否有下一页。
 
 `list_memory_links` 与 `review_memory_link` 服务于关联建议层（见 [associations.md](associations.md)）：提议由 `context-associate` 写入并停留在 `proposed`，只有显式复核才改变状态；确认不代表合并话题，下游视图尚未实现。
 
@@ -62,6 +63,6 @@ make build
 
 已接收多少分片不等于整份录音已上传完整；系统不靠最大的时间位置宣称全部覆盖。话题关联覆盖不等于语义提取准确或人工复核通过。说话人标签只在来源范围内有效，未确认身份仍返回未知。
 
-转写来源修订与记忆注释修订是不同操作。当前拒绝替换已接收分片的转写版本，即使提供 `supersedes_revision` 也不会执行替换；同键不同内容拒绝，新请求 ID 不能绕过版本冲突。完整的来源修订与派生记忆失效传播仍需进一步实现。
+转写来源修订与记忆注释修订是不同操作。已接收分片可通过 `supersedes_revision` 替换为新的 `transcript_revision`：新修订必须显式指明被替换的活动修订，替换后旧附件置为非活动但保留原始结果与原话作为审计历史；由旧附件派生的笔记与候选记忆被标记为 stale，不再出现在常规检索中，同时自动为新修订入队重新提炼与发布。每个分片任意时刻只有一个活动修订，同键不同内容仍然拒绝，跨分片替换不允许。stale 内容仍可显式审计：`search_memory` 与 `get_context_item` 支持 `include_stale`，`get_evidence_context` 的结果带 `stale` 标记（标明目标轮次来自已被替换的分片），`get_annotation_history` 保留旧注释版本。
 
-这是独立的实验接口，不宣称完整兼容领域 0.1 草案的快照分页、双时间、字节预算和状态推导。客户端使用 [配置模板](../examples/context-memory.json) 并替换路径；项目不会自动修改用户的 MCP 配置。
+这是独立的实验接口，不宣称完整兼容领域 0.1 草案的快照分页、双时间与状态推导；`build_context` 提供实验性的字节预算与覆盖缺口，但其契约不是草案契约。客户端使用 [配置模板](../examples/context-memory.json) 并替换路径；项目不会自动修改用户的 MCP 配置。

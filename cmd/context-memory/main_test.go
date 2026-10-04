@@ -10,6 +10,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"recordingmcp/internal/asrinput"
+	"recordingmcp/internal/contextbuild"
 	"recordingmcp/internal/memory"
 )
 
@@ -29,7 +30,7 @@ func TestMCPToolsExposeQueryAndConversationMemory(t *testing.T) {
 		t.Fatal(err)
 	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, false, nil).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +83,7 @@ func TestNeutralIngestAnnotateAndTrackCoverageOverMCP(t *testing.T) {
 	}
 	defer store.Close()
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, false, nil).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +229,7 @@ func TestRetrievalToolsOverMCP(t *testing.T) {
 	}
 	defer store.Close()
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store).Connect(ctx, st, nil)
+	ss, err := newServer(store, false, nil).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +293,7 @@ func TestMCPReplayPreservesRawProviderNumbers(t *testing.T) {
 		t.Fatal(err)
 	}
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store).Connect(ctx, st, nil)
+	ss, err := newServer(store, false, nil).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +348,7 @@ func TestMemoryLinkToolsOverMCP(t *testing.T) {
 	}
 
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store).Connect(ctx, st, nil)
+	ss, err := newServer(store, false, nil).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,5 +444,160 @@ func TestMemoryLinkToolsOverMCP(t *testing.T) {
 	}
 	if !missing.IsError {
 		t.Fatal("review_memory_link accepted an unknown link id")
+	}
+}
+
+// TestReadOnlyServerExposesOnlyReadTools proves the curator trust boundary:
+// with --read-only the server registers exactly the read tools and the write
+// tools are not callable.
+func TestReadOnlyServerExposesOnlyReadTools(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	store, err := memory.Open(filepath.Join(t.TempDir(), "ro.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	st, ct := mcp.NewInMemoryTransports()
+	ss, err := newServer(store, true, nil).Connect(ctx, st, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ss.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "ro-client", Version: "1"}, nil)
+	cs, err := client.Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+	tools, err := cs.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make(map[string]bool, len(tools.Tools))
+	for _, tool := range tools.Tools {
+		got[tool.Name] = true
+	}
+	wantRead := []string{
+		"query_context", "get_conversation_context", "get_context_item", "list_topics",
+		"get_processing_status", "get_annotation_history", "list_conversations",
+		"get_evidence_context", "search_memory", "build_context", "list_memory_links",
+	}
+	if len(got) != len(wantRead) {
+		t.Fatalf("read-only server exposes %d tools %v, want %d", len(got), got, len(wantRead))
+	}
+	for _, name := range wantRead {
+		if !got[name] {
+			t.Fatalf("read-only server missing read tool %s", name)
+		}
+	}
+	for _, name := range []string{"ingest_transcript", "apply_annotations", "review_memory_link"} {
+		if got[name] {
+			t.Fatalf("read-only server exposed write tool %s", name)
+		}
+		res, callErr := cs.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: map[string]any{}})
+		if callErr == nil && res != nil && !res.IsError {
+			t.Fatalf("read-only server executed write tool %s", name)
+		}
+	}
+}
+
+// TestBuildContextToolSmoke exercises the registered build_context tool over a
+// real ingested segment plus a derived note: the package must carry items,
+// evidence, coverage, gaps, the degradation marker and the trace, with the
+// exact wire field names of the experimental contract.
+func TestBuildContextToolSmoke(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	store, err := memory.Open(filepath.Join(t.TempDir(), "build-context.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	speaker := "speaker-1"
+	start, end := int64(10), int64(900)
+	result := asrinput.Result{
+		ContractVersion: asrinput.ContractVersion,
+		Source: asrinput.Source{
+			Provider: "synthetic-provider", ProviderRequestID: "req-bc-1",
+			DeviceID: "device-bc", RecordingID: "rec-bc", ConversationID: "conv-bc",
+			SegmentID: "seg-bc-1", SegmentOffsetMS: 0, SegmentDurationMS: 1000,
+			TranscriptRevision: "rev-1", CompletionStatus: "final",
+		},
+		Turns: []asrinput.Turn{{
+			ID: "utt-1", OriginalIndex: 1, Text: "设备同步已经完成，固件需要升级",
+			LocalStartMS: &start, LocalEndMS: &end, GlobalStartMS: &start, GlobalEndMS: &end,
+			SpeakerScopedID: &speaker,
+		}},
+	}
+	report, err := store.IngestTranscript(ctx, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.ApplyAnnotations(ctx, report.ConversationID, "", memory.Annotations{
+		ConversationID: report.ConversationID, AnnotationVersion: "manual-1", Title: "设备同步",
+		Topics: []memory.TopicAnnotation{{ID: "topic:sync", Title: "同步"}},
+		Notes: []memory.NoteAnnotation{{
+			ID: "note:sync", Kind: "observation", TopicIDs: []string{"topic:sync"},
+			Summary: "设备同步完成，固件仍待升级", EvidenceTurnIDs: []string{"seg-bc-1/rev-1/utt-1"},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	st, ct := mcp.NewInMemoryTransports()
+	ss, err := newServer(store, false, nil).Connect(ctx, st, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ss.Close()
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+
+	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "build_context", Arguments: map[string]any{
+		"purpose": "check device sync status", "query": "同步", "include_raw_evidence": true, "max_items": 5,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.IsError {
+		for _, c := range res.Content {
+			if tc, ok := c.(*mcp.TextContent); ok {
+				t.Fatalf("build_context rejected valid input: %s", tc.Text)
+			}
+		}
+		t.Fatalf("build_context rejected valid input: %#v", res.Content)
+	}
+	b, _ := json.Marshal(res.StructuredContent)
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"items", "evidence", "coverage", "gaps", "truncated", "degraded", "degrade_reason", "trace"} {
+		if _, ok := raw[key]; !ok {
+			t.Fatalf("build_context result missing %q: %s", key, b)
+		}
+	}
+	var pkg contextbuild.Package
+	if err := json.Unmarshal(b, &pkg); err != nil {
+		t.Fatal(err)
+	}
+	if len(pkg.Items) == 0 {
+		t.Fatalf("build_context returned no items: %s", b)
+	}
+	if len(pkg.Evidence) == 0 {
+		t.Fatalf("build_context returned no raw evidence: %s", b)
+	}
+	if len(pkg.Coverage.Conversations) == 0 || len(pkg.Coverage.TopicIDs) == 0 {
+		t.Fatalf("build_context coverage not populated: %+v", pkg.Coverage)
+	}
+	if !pkg.Degraded || pkg.DegradeReason == "" {
+		t.Fatalf("build_context without decision engine = degraded %v reason %q", pkg.Degraded, pkg.DegradeReason)
+	}
+	if pkg.Trace.DecisionRerank {
+		t.Fatal("build_context reported a decision rerank without an engine")
 	}
 }

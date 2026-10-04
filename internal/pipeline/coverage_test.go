@@ -236,3 +236,47 @@ func assertStrings(t *testing.T, got, want []string) {
 		}
 	}
 }
+
+// TestCoverageIsRevisionAware shows coverage is scoped to the revision that
+// produced the turns: extract-v1 already evaluated the superseded revision's
+// turns, so the turns left to process are exactly the current revision's, in
+// LoadConversationTurns order.
+func TestCoverageIsRevisionAware(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	conv := "conv-coverage-revision"
+	seedCoverageConversation(t, db, conv)
+
+	// t1/t2 were materialized by the superseded revision "v1"; t3/t4 by the
+	// current revision "v2".
+	insertSourceAttachment(t, db, conv, "att-v1", 0, "v1", false)
+	linkAttachmentTurn(t, db, "att-v1", "t1")
+	linkAttachmentTurn(t, db, "att-v1", "t2")
+	insertSourceAttachment(t, db, conv, "att-v2", 1, "v2", true)
+	linkAttachmentTurn(t, db, "att-v2", "t3")
+	linkAttachmentTurn(t, db, "att-v2", "t4")
+
+	// extract-v1 already covered the turns of the revision it evaluated.
+	if err := RecordCoverage(ctx, db, conv, "run-v1", "extract-v1", []string{"t1", "t2"}, time.UnixMilli(1700000000000)); err != nil {
+		t.Fatalf("record coverage: %v", err)
+	}
+
+	got, err := UncoveredTurnIDs(ctx, db, conv, "extract-v1")
+	if err != nil {
+		t.Fatalf("uncovered turn ids: %v", err)
+	}
+
+	// The expected set is the current revision's turns in the same order
+	// LoadConversationTurns returns them.
+	turns, err := LoadConversationTurns(ctx, db, conv)
+	if err != nil {
+		t.Fatalf("load turns: %v", err)
+	}
+	want := []string{}
+	for _, turn := range turns {
+		if turn.ID == "t3" || turn.ID == "t4" {
+			want = append(want, turn.ID)
+		}
+	}
+	assertStrings(t, got, want)
+}

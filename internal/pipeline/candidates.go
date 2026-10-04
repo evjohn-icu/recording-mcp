@@ -104,6 +104,13 @@ func InsertCandidates(ctx context.Context, db *sql.DB, conversationID, runID, jo
 		); err != nil {
 			return nil, fmt.Errorf("pipeline: insert candidates: insert %s: %w", id, err)
 		}
+		states, err := evidenceAttachmentStates(ctx, tx, d.EvidenceTurnIDs)
+		if err != nil {
+			return nil, fmt.Errorf("pipeline: insert candidates: evidence attachments %s: %w", id, err)
+		}
+		if err := recordDerivedArtifact(ctx, tx, "candidate", id, conversationID, states, now); err != nil {
+			return nil, fmt.Errorf("pipeline: insert candidates: provenance %s: %w", id, err)
+		}
 		ids = append(ids, id)
 	}
 

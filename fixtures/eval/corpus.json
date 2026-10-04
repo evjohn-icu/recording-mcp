@@ -1,0 +1,927 @@
+{
+  "description": "Deterministic synthetic ASR corpus for the context-eval harness. Chinese colloquial dialogue with ASR typos, negation, multi-topic conversations, updates, contradictions and unknown speaker labels. One segment (seg-budget) carries a v1 -> v2 supersede pair (rev-1 superseded by rev-2). All ids and times are fixed.",
+  "conversations": [
+    {
+      "conversation_id": "conv-budget-approval",
+      "description": "同一个片段先批后否，v2 取代 v1；用于验证过期证据不会作为当前结果出现",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-budget-approval-seg-budget-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-budget-approval",
+            "conversation_id": "conv-budget-approval",
+            "segment_id": "seg-budget",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/budget-approval"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "预算批准了，下周三就能打款",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            }
+          ]
+        },
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-budget-approval-seg-budget-rev-2",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-budget-approval",
+            "conversation_id": "conv-budget-approval",
+            "segment_id": "seg-budget",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-2",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/budget-approval",
+            "supersedes_revision": "rev-1"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "预算还没批，财务说等下周五再审一次",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-venue-rehearsal",
+      "description": "场地与报销两个话题；含 ASR 错字“话麦”",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-venue-rehearsal-seg-venue-a-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-venue-rehearsal",
+            "conversation_id": "conv-venue-rehearsal",
+            "segment_id": "seg-venue-a",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/venue-rehearsal"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "彩排场地定在艺术中心三号厅，周五下午两点",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "音响师说那个话麦要自己带电池",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            }
+          ]
+        },
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-venue-rehearsal-seg-venue-b-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-venue-rehearsal",
+            "conversation_id": "conv-venue-rehearsal",
+            "segment_id": "seg-venue-b",
+            "segment_offset_ms": 30000,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/venue-rehearsal"
+          },
+          "turns": [
+            {
+              "id": "utt-3",
+              "original_index": 1,
+              "text": "另外提醒，报销发票抬头写公司全名，别写简称",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 30000,
+              "global_end_ms": 33500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-standup-negation",
+      "description": "否定语句：会议取消、不要发邮件",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-standup-negation-seg-standup-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-standup-negation",
+            "conversation_id": "conv-standup-negation",
+            "segment_id": "seg-standup",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/standup-negation"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "周五的评审会不开了，改到下周一",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "不要提前发邮件给客户，等定稿再说",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-project-update",
+      "description": "信息更新：交付时间与联系人变更",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-project-update-seg-update-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-project-update",
+            "conversation_id": "conv-project-update",
+            "segment_id": "seg-update",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/project-update"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "项目甲方的交付时间从月底推迟到十五号",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "负责人的联系方式更新成小李的手机号",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-weather-contradiction",
+      "description": "前后矛盾：先说不下雨后又改口雷阵雨",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-weather-contradiction-seg-weather-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-weather-contradiction",
+            "conversation_id": "conv-weather-contradiction",
+            "segment_id": "seg-weather",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/weather-contradiction"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "明天不下雨，照常去公园拍摄",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "等等，预报说明天有雷阵雨，还是改室内棚拍吧",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-contract-vendor",
+      "description": "未知说话人标签：第一句没有 speaker",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-contract-vendor-seg-contract-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-contract-vendor",
+            "conversation_id": "conv-contract-vendor",
+            "segment_id": "seg-contract",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/contract-vendor"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "帮我把合同模板发一份给供应商",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "供应商那边说要盖章原件才收",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-asr-typos",
+      "description": "ASR 常见错字：猪持人、踩排、在再不分",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-asr-typos-seg-typo-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-asr-typos",
+            "conversation_id": "conv-asr-typos",
+            "segment_id": "seg-typo",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/asr-typos"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "那个猪持人你联系了吗，他说周四踩排来不了",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "我再（在）确认一下时间，晚点回你",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quarterly-planning",
+      "description": "跨三个片段的多个话题：会议、预算、团建",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-quarterly-planning-seg-q1-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-quarterly-planning",
+            "conversation_id": "conv-quarterly-planning",
+            "segment_id": "seg-q1",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/quarterly-planning"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "季度总结会定在下周二上午十点，会议室B",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            }
+          ]
+        },
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-quarterly-planning-seg-q2-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-quarterly-planning",
+            "conversation_id": "conv-quarterly-planning",
+            "segment_id": "seg-q2",
+            "segment_offset_ms": 30000,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/quarterly-planning"
+          },
+          "turns": [
+            {
+              "id": "utt-2",
+              "original_index": 1,
+              "text": "预算表要提前一天交给财务，电子版就行",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 30000,
+              "global_end_ms": 33500,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            }
+          ]
+        },
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-quarterly-planning-seg-q3-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-quarterly-planning",
+            "conversation_id": "conv-quarterly-planning",
+            "segment_id": "seg-q3",
+            "segment_offset_ms": 60000,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/quarterly-planning"
+          },
+          "turns": [
+            {
+              "id": "utt-3",
+              "original_index": 1,
+              "text": "团建改到月底那个周末，地点还没定",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 60000,
+              "global_end_ms": 63500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-client-call",
+      "description": "客户沟通：金额再谈与法务反馈",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-client-call-seg-client-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-client-call",
+            "conversation_id": "conv-client-call",
+            "segment_id": "seg-client",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/client-call"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "客户说合同金额还得再谈，先别签",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "他们法务周五给反馈意见",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-shipping-change",
+      "description": "物流改空运并催报关资料",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-shipping-change-seg-ship-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-shipping-change",
+            "conversation_id": "conv-shipping-change",
+            "segment_id": "seg-ship",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/shipping-change"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "这批货不走海运了，改空运，时间来不及",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "报关资料今晚必须补齐",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-design-review",
+      "description": "设计评审：配色与字体，首句说话人未知",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-design-review-seg-design-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-design-review",
+            "conversation_id": "conv-design-review",
+            "segment_id": "seg-design",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/design-review"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "首页配色换成深蓝，原来的橙色太跳",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "字体也统一成思源黑体",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-travel-plan",
+      "description": "出差改为高铁并指定酒店",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-travel-plan-seg-travel-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-travel-plan",
+            "conversation_id": "conv-travel-plan",
+            "segment_id": "seg-travel",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/travel-plan"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "出差改成坐高铁，机票太贵了",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "酒店订在会展中心旁边那家",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-training-contradiction",
+      "description": "培训时间先定周六后改周日半天",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-training-contradiction-seg-training-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-training-contradiction",
+            "conversation_id": "conv-training-contradiction",
+            "segment_id": "seg-training",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/training-contradiction"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "培训定在周六，全天封闭",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "不对，改成周日半天，上午就结束",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-security-rules",
+      "description": "安全规则：改密码周期与日志留存，含错字",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-security-rules-seg-security-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-security-rules",
+            "conversation_id": "conv-security-rules",
+            "segment_id": "seg-security",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/security-rules"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "密码要每九十天换一次，别用生日",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "服务器登（陆）录日志要留半年",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-annual-party",
+      "description": "年会报名截止与家属备注",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-annual-party-seg-party-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-annual-party",
+            "conversation_id": "conv-annual-party",
+            "segment_id": "seg-party",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/annual-party"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "年会报名截止到周五下班前",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "带家属的要在备注里写清楚人数",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-patent-search",
+      "description": "专利检索报告与模板格式",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-patent-search-seg-patent-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-patent-search",
+            "conversation_id": "conv-patent-search",
+            "segment_id": "seg-patent",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/patent-search"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "专利检索报告下周三之前发我",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "别用去年的模板，格式变了",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-factory-visit",
+      "description": "下厂参观着装与手机管理",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-factory-visit-seg-factory-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-factory-visit",
+            "conversation_id": "conv-factory-visit",
+            "segment_id": "seg-factory",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/factory-visit"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "下厂参观要穿长裤和防滑鞋",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "手机不能带进车间，放门口柜子",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-insurance-claim",
+      "description": "理赔材料与快递要求",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-insurance-claim-seg-insurance-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-insurance-claim",
+            "conversation_id": "conv-insurance-claim",
+            "segment_id": "seg-insurance",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/insurance-claim"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "理赔材料要拍原件，别拍复印件",
+              "local_start_ms": 0,
+              "local_end_ms": 3500,
+              "global_start_ms": 0,
+              "global_end_ms": 3500,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "快递用顺丰到付寄给王经理",
+              "local_start_ms": 4000,
+              "local_end_ms": 7500,
+              "global_start_ms": 4000,
+              "global_end_ms": 7500,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -68,8 +68,8 @@ func TestApplyFreshDatabase(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 6 {
-		t.Fatalf("Version() = %d, want 6", got)
+	if got := mustVersion(t, ctx, db); got != 9 {
+		t.Fatalf("Version() = %d, want 9", got)
 	}
 	names := tableNames(t, db)
 	for _, want := range []string{
@@ -81,6 +81,9 @@ func TestApplyFreshDatabase(t *testing.T) {
 		"memory_candidates", "publication_runs",
 		"analysis_coverage",
 		"memory_links",
+		"annotation_history",
+		"derived_artifacts", "derived_artifact_sources",
+		"speaker_bindings", "speaker_binding_events",
 	} {
 		if !names[want] {
 			t.Errorf("missing table %q", want)
@@ -102,7 +105,7 @@ func TestApplyFreshDatabase(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"turns_conv_order", "notes_conv", "source_attachments_conversation", "processing_jobs_claim", "memory_candidates_conv", "memory_links_from", "memory_links_to"} {
+	for _, want := range []string{"turns_conv_order", "notes_conv", "source_attachments_conversation", "processing_jobs_claim", "memory_candidates_conv", "memory_links_from", "memory_links_to", "derived_artifact_conv", "derived_artifact_sources_attachment"} {
 		if !indexes[want] {
 			t.Errorf("missing index %q", want)
 		}
@@ -118,15 +121,15 @@ func TestApplyIdempotent(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("second Apply: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 6 {
-		t.Fatalf("Version() = %d, want 6 after repeated Apply", got)
+	if got := mustVersion(t, ctx, db); got != 9 {
+		t.Fatalf("Version() = %d, want 9 after repeated Apply", got)
 	}
 	var applied int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&applied); err != nil {
 		t.Fatal(err)
 	}
-	if applied != 6 {
-		t.Fatalf("schema_migrations rows = %d, want 6", applied)
+	if applied != 9 {
+		t.Fatalf("schema_migrations rows = %d, want 9", applied)
 	}
 }
 
@@ -146,8 +149,8 @@ func TestApplyOnLegacyDatabasePreservesData(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply on legacy database: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 6 {
-		t.Fatalf("Version() = %d, want 6", got)
+	if got := mustVersion(t, ctx, db); got != 9 {
+		t.Fatalf("Version() = %d, want 9", got)
 	}
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM conversations WHERE id='conv-1'`).Scan(&count); err != nil {
@@ -172,10 +175,13 @@ func TestApplyOnSingleVersionDatabaseOnlyAppliesLater(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (3,4,5,6)`); err != nil {
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (3,4,5,6,7,8,9)`); err != nil {
 		t.Fatal(err)
 	}
-	// Re-running Apply must re-create the (dropped) v3..v6 objects only.
+	// Re-running Apply must re-create the (dropped) v3..v9 objects only.
+	// annotation_history is deliberately kept: v7 must be a no-op on a
+	// database that already has the table (it was created lazily by older
+	// builds of memory.Store before v7 existed).
 	for _, stmt := range []string{
 		`DROP TABLE decision_answers`,
 		`DROP TABLE decision_runs`,
@@ -183,6 +189,10 @@ func TestApplyOnSingleVersionDatabaseOnlyAppliesLater(t *testing.T) {
 		`DROP TABLE publication_runs`,
 		`DROP TABLE analysis_coverage`,
 		`DROP TABLE memory_links`,
+		`DROP TABLE derived_artifact_sources`,
+		`DROP TABLE derived_artifacts`,
+		`DROP TABLE speaker_binding_events`,
+		`DROP TABLE speaker_bindings`,
 	} {
 		if _, err := db.Exec(stmt); err != nil {
 			t.Fatal(err)
@@ -191,14 +201,42 @@ func TestApplyOnSingleVersionDatabaseOnlyAppliesLater(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("re-Apply after partial rollback: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 6 {
-		t.Fatalf("Version() = %d, want 6", got)
+	if got := mustVersion(t, ctx, db); got != 9 {
+		t.Fatalf("Version() = %d, want 9", got)
 	}
 	names := tableNames(t, db)
-	for _, want := range []string{"decision_runs", "decision_answers", "memory_candidates", "publication_runs", "analysis_coverage", "memory_links"} {
+	for _, want := range []string{"decision_runs", "decision_answers", "memory_candidates", "publication_runs", "analysis_coverage", "memory_links", "annotation_history", "derived_artifacts", "derived_artifact_sources", "speaker_bindings", "speaker_binding_events"} {
 		if !names[want] {
 			t.Fatalf("table %q not re-applied: %v", want, names)
 		}
+	}
+}
+
+func TestApplySucceedsWithPreexistingLazyAnnotationHistory(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	// Older builds created annotation_history on demand, outside the migration
+	// ledger. v7 must adopt such a database without failing.
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS annotation_history (
+		conversation_id TEXT NOT NULL REFERENCES conversations(id), annotation_version TEXT NOT NULL,
+		annotation_basis TEXT NOT NULL, summary TEXT NOT NULL, annotations_json TEXT NOT NULL,
+		PRIMARY KEY(conversation_id,annotation_version))`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Apply(ctx, db); err != nil {
+		t.Fatalf("Apply with preexisting annotation_history: %v", err)
+	}
+	if got := mustVersion(t, ctx, db); got != 9 {
+		t.Fatalf("Version() = %d, want 9", got)
+	}
+	// annotation_history references conversations, so seed the parent row the
+	// adopted table points at; without it the foreign key rejects the insert
+	// regardless of which migration created the table.
+	if _, err := db.Exec(`INSERT INTO conversations(id,title,summary,annotation_version,annotation_basis,recording_id,source_sha256,transcript_version,duration_ms,transcript_json,annotations_json) VALUES('conv-x','t','','v1','','rec-x','sha','v1',1000,'{}','{}')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO annotation_history VALUES('conv-x','v1','basis','summary','{}')`); err != nil {
+		t.Fatalf("adopted annotation_history is not usable: %v", err)
 	}
 }
 
@@ -218,5 +256,85 @@ func TestVersionOnFileWithoutMigrations(t *testing.T) {
 	}
 	if got, err := Version(context.Background(), db); err != nil || got != 0 {
 		t.Fatalf("Version() = %d, %v; want 0, nil", got, err)
+	}
+}
+
+// TestDerivedArtifactBackfillMarksSupersededEvidence proves that applying the
+// derived-artifact migration over a database that already carries notes,
+// candidates, attachments and turns derives the same staleness state the
+// write paths would have recorded live: artifacts whose only evidence sits on
+// a superseded attachment (active=0) land stale, artifacts on the active
+// revision stay current, and both get their source-attachment links.
+func TestDerivedArtifactBackfillMarksSupersededEvidence(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	if err := Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	// Roll back only the derived-artifact migration so the backfill runs over
+	// pre-existing rows, like a database upgraded from an older build.
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (8,9)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`DROP TABLE derived_artifact_sources`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`DROP TABLE derived_artifacts`); err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		`INSERT INTO conversations(id,title,summary,annotation_version,annotation_basis,recording_id,source_sha256,transcript_version,duration_ms,transcript_json,annotations_json) VALUES('conv-1','t','s','v1','basis','rec-1','sha','v1',1000,'{}','{}')`,
+		`INSERT INTO recordings(id,conversation_id,source_file,source_sha256,duration_ms,recording_started_at,absolute_time_known) VALUES('rec-1','conv-1','f','sha',1000,NULL,0)`,
+		`INSERT INTO turns(id,conversation_id,recording_id,segment_index,global_start_ms,global_end_ms,local_start_ms,local_end_ms,speaker_scoped_id,speaker_entity_id,content,definite,source_sha256,transcript_version,original_turn_id,turn_json) VALUES('turn-1','conv-1','rec-1',1,NULL,NULL,NULL,NULL,NULL,NULL,'text one',NULL,'sha','v1','orig-1','{}')`,
+		`INSERT INTO turns(id,conversation_id,recording_id,segment_index,global_start_ms,global_end_ms,local_start_ms,local_end_ms,speaker_scoped_id,speaker_entity_id,content,definite,source_sha256,transcript_version,original_turn_id,turn_json) VALUES('turn-2','conv-1','rec-1',2,NULL,NULL,NULL,NULL,NULL,NULL,'text two',NULL,'sha','v1','orig-2','{}')`,
+		`INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active,supersedes_revision) VALUES('att-1','conv-1','rec-1',1,'seg-1','rev-1','{}','{}','sha1',0,NULL)`,
+		`INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active,supersedes_revision) VALUES('att-2','conv-1','rec-1',2,'seg-1','rev-2','{}','{}','sha2',1,'rev-1')`,
+		`INSERT INTO attachment_turns(attachment_id,turn_id) VALUES('att-1','turn-1')`,
+		`INSERT INTO attachment_turns(attachment_id,turn_id) VALUES('att-2','turn-2')`,
+		`INSERT INTO notes(id,conversation_id,kind,summary,topic_ids_json,claim_mode,interpretation_note,annotation_version) VALUES('note-1','conv-1','observation','stale note','[]','inference','n','v1')`,
+		`INSERT INTO note_evidence(note_id,turn_id,ordinal) VALUES('note-1','turn-1',0)`,
+		`INSERT INTO memory_candidates(id,conversation_id,kind,summary,evidence_turn_ids_json,status,created_at) VALUES('cand-1','conv-1','observation','current candidate','["turn-2"]','validated',1)`,
+		`INSERT INTO memory_candidates(id,conversation_id,kind,summary,evidence_turn_ids_json,status,created_at) VALUES('cand-2','conv-1','observation','superseded candidate','["turn-1"]','validated',2)`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("seed %q: %v", stmt, err)
+		}
+	}
+	if err := Apply(ctx, db); err != nil {
+		t.Fatalf("re-Apply for backfill: %v", err)
+	}
+	if got := mustVersion(t, ctx, db); got != 9 {
+		t.Fatalf("Version() = %d, want 9", got)
+	}
+	for _, want := range []struct {
+		kind, id string
+		stale    int
+	}{
+		{"note", "note-1", 1},
+		{"candidate", "cand-1", 0},
+		{"candidate", "cand-2", 1},
+	} {
+		var stale int
+		if err := db.QueryRow(`SELECT stale FROM derived_artifacts WHERE kind=? AND artifact_id=?`, want.kind, want.id).Scan(&stale); err != nil {
+			t.Fatalf("derived artifact %s/%s: %v", want.kind, want.id, err)
+		}
+		if stale != want.stale {
+			t.Errorf("%s/%s stale = %d, want %d", want.kind, want.id, stale, want.stale)
+		}
+	}
+	for _, want := range []struct {
+		kind, id, attachment string
+	}{
+		{"note", "note-1", "att-1"},
+		{"candidate", "cand-1", "att-2"},
+		{"candidate", "cand-2", "att-1"},
+	} {
+		var n int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM derived_artifact_sources WHERE kind=? AND artifact_id=? AND attachment_id=?`, want.kind, want.id, want.attachment).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 1 {
+			t.Errorf("missing source link %s/%s -> %s", want.kind, want.id, want.attachment)
+		}
 	}
 }

@@ -15,6 +15,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"recordingmcp/internal/asrinput"
+	"recordingmcp/internal/contextbuild"
+	"recordingmcp/internal/decision"
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/pipeline"
 )
@@ -26,7 +28,8 @@ type ConversationInput struct {
 	Offset         int    `json:"offset,omitempty"`
 }
 type ItemInput struct {
-	ID string `json:"id"`
+	ID           string `json:"id"`
+	IncludeStale bool   `json:"include_stale"`
 }
 type TopicsInput struct {
 	ConversationID string `json:"conversation_id,omitempty"`
@@ -125,6 +128,7 @@ type SearchMemoryInput struct {
 	StartedBefore string `json:"started_before,omitempty"`
 	Limit         int    `json:"limit,omitempty"`
 	Cursor        string `json:"cursor,omitempty"`
+	IncludeStale  bool   `json:"include_stale"`
 }
 type ListMemoryLinksInput struct {
 	Status  string `json:"status,omitempty"`
@@ -177,7 +181,7 @@ func parseRFC3339(label, value string) (*time.Time, error) {
 	return &t, nil
 }
 
-func newServer(store *memory.Store) *mcp.Server {
+func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker) *mcp.Server {
 	no := false
 	s := mcp.NewServer(&mcp.Implementation{Name: "context-memory-experimental", Version: "0.1-experimental"}, &mcp.ServerOptions{Instructions: "Experimental local conversation memory for private audio transcripts. Results preserve source evidence and are not verified facts. Speaker labels are recording-scoped and never identify real people. No audio is downloaded or processed by this server."})
 	read := func(name, desc string) *mcp.Tool {
@@ -213,7 +217,7 @@ func newServer(store *memory.Store) *mcp.Server {
 		if in.ID == "" {
 			return nil, memory.ItemDetail{}, fmt.Errorf("id is required")
 		}
-		r, e := store.GetItem(ctx, in.ID)
+		r, e := store.GetItem(ctx, in.ID, in.IncludeStale)
 		return nil, r, e
 	})
 	mcp.AddTool(s, read("list_topics", "List the topics available in the local memory database, optionally scoped to one conversation."), func(ctx context.Context, _ *mcp.CallToolRequest, in TopicsInput) (*mcp.CallToolResult, memory.TopicList, error) {
@@ -223,16 +227,18 @@ func newServer(store *memory.Store) *mcp.Server {
 	write := func(name, desc string) *mcp.Tool {
 		return &mcp.Tool{Name: name, Description: "EXPERIMENTAL: " + desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false, IdempotentHint: true, OpenWorldHint: &no}}
 	}
-	mcp.AddTool(s, write("ingest_transcript", "Store one provider-neutral final ASR segment snapshot. Replaying identical input is safe; no audio is fetched or transcribed."), func(ctx context.Context, req *mcp.CallToolRequest, _ IngestInput) (*mcp.CallToolResult, memory.IngestReport, error) {
-		// Decode the original wire JSON: schema DTO any fields would round large
-		// provider integers through float64 and change immutable source evidence.
-		var normalized asrinput.Result
-		if e := json.Unmarshal(req.Params.Arguments, &normalized); e != nil {
-			return nil, memory.IngestReport{}, e
-		}
-		r, e := store.IngestTranscript(ctx, normalized)
-		return nil, r, e
-	})
+	if !readOnly {
+		mcp.AddTool(s, write("ingest_transcript", "Store one provider-neutral final ASR segment snapshot. Replaying identical input is safe; no audio is fetched or transcribed."), func(ctx context.Context, req *mcp.CallToolRequest, _ IngestInput) (*mcp.CallToolResult, memory.IngestReport, error) {
+			// Decode the original wire JSON: schema DTO any fields would round large
+			// provider integers through float64 and change immutable source evidence.
+			var normalized asrinput.Result
+			if e := json.Unmarshal(req.Params.Arguments, &normalized); e != nil {
+				return nil, memory.IngestReport{}, e
+			}
+			r, e := store.IngestTranscript(ctx, normalized)
+			return nil, r, e
+		})
+	}
 	mcp.AddTool(s, read("get_processing_status", "Report received transcript coverage, topic-linked and unclassified turns. Pending means analysis has not been completed."), func(ctx context.Context, _ *mcp.CallToolRequest, in StatusInput) (*mcp.CallToolResult, memory.ProcessingStatus, error) {
 		if in.ConversationID == "" {
 			return nil, memory.ProcessingStatus{}, fmt.Errorf("conversation_id is required")
@@ -240,11 +246,13 @@ func newServer(store *memory.Store) *mcp.Server {
 		r, e := store.GetProcessingStatus(ctx, in.ConversationID)
 		return nil, r, e
 	})
-	mcp.AddTool(s, write("apply_annotations", "Apply a new interpretation revision to a conversation. Supply expected_version for optimistic concurrency; evidence accepts exact full turn IDs or original transcript turn IDs."), func(ctx context.Context, _ *mcp.CallToolRequest, in ApplyAnnotationsInput) (*mcp.CallToolResult, map[string]any, error) {
-		a := memory.Annotations{ConversationID: in.ConversationID, AnnotationVersion: in.AnnotationVersion, AnnotationBasis: in.AnnotationBasis, Summary: in.Summary, Title: in.Title, RecordingID: in.RecordingID, Topics: in.Topics, Notes: in.Notes, TurnTopics: in.TurnTopics}
-		e := store.ApplyAnnotations(ctx, in.ConversationID, in.ExpectedVersion, a)
-		return nil, map[string]any{"conversation_id": in.ConversationID, "annotation_version": in.AnnotationVersion, "applied": e == nil}, e
-	})
+	if !readOnly {
+		mcp.AddTool(s, write("apply_annotations", "Apply a new interpretation revision to a conversation. Supply expected_version for optimistic concurrency; evidence accepts exact full turn IDs or original transcript turn IDs."), func(ctx context.Context, _ *mcp.CallToolRequest, in ApplyAnnotationsInput) (*mcp.CallToolResult, map[string]any, error) {
+			a := memory.Annotations{ConversationID: in.ConversationID, AnnotationVersion: in.AnnotationVersion, AnnotationBasis: in.AnnotationBasis, Summary: in.Summary, Title: in.Title, RecordingID: in.RecordingID, Topics: in.Topics, Notes: in.Notes, TurnTopics: in.TurnTopics}
+			e := store.ApplyAnnotations(ctx, in.ConversationID, in.ExpectedVersion, a)
+			return nil, map[string]any{"conversation_id": in.ConversationID, "annotation_version": in.AnnotationVersion, "applied": e == nil}, e
+		})
+	}
 	mcp.AddTool(s, read("get_annotation_history", "List current and archived annotation revisions for a conversation."), func(ctx context.Context, _ *mcp.CallToolRequest, in HistoryInput) (*mcp.CallToolResult, HistoryResult, error) {
 		if in.ConversationID == "" {
 			return nil, HistoryResult{}, fmt.Errorf("conversation_id is required")
@@ -283,8 +291,12 @@ func newServer(store *memory.Store) *mcp.Server {
 		if e != nil {
 			return nil, memory.SearchPage{}, e
 		}
-		r, e := store.SearchMemory(ctx, memory.MemorySearch{Text: in.Text, Scope: in.Scope, Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, StartedAfter: after, StartedBefore: before})
+		r, e := store.SearchMemory(ctx, memory.MemorySearch{Text: in.Text, Scope: in.Scope, Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, StartedAfter: after, StartedBefore: before, IncludeStale: in.IncludeStale})
 		return nil, r, e
+	})
+	mcp.AddTool(s, read("build_context", "实验性：为任务组装带预算与来源的上下文包（items / evidence / coverage / gaps / trace）。默认排除已失效的派生记忆；未配置决策引擎时不做重排并返回 degraded=true，确定性结果仍完整返回。"), func(ctx context.Context, _ *mcp.CallToolRequest, in contextbuild.Request) (*mcp.CallToolResult, contextbuild.Package, error) {
+		pkg, e := contextbuild.Build(ctx, store, store.DB(), rerank, in)
+		return nil, pkg, e
 	})
 	mcp.AddTool(s, read("list_memory_links", "列出话题之间的记忆关联（proposed 建议 / confirmed 已确认 / rejected 已拒绝），可按状态与话题过滤；返回端点标题、理由、证据轮次与置信度，用于人工复核和避免重复提议。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ListMemoryLinksInput) (*mcp.CallToolResult, MemoryLinkList, error) {
 		switch in.Status {
@@ -309,21 +321,26 @@ func newServer(store *memory.Store) *mcp.Server {
 		}
 		return nil, MemoryLinkList{Links: views}, nil
 	})
-	mcp.AddTool(s, write("review_memory_link", "复核一条记忆关联建议。confirm 把 proposed 变为 confirmed；reject 把 proposed 或 confirmed 变为 rejected；reopen 把 confirmed 或 rejected 退回 proposed 以便重新考虑；重复提交同一动作是幂等的，复核只改状态、不删除记录，也不合并话题。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ReviewMemoryLinkInput) (*mcp.CallToolResult, MemoryLinkView, error) {
-		if strings.TrimSpace(in.LinkID) == "" {
-			return nil, MemoryLinkView{}, fmt.Errorf("link_id is required")
-		}
-		l, e := pipeline.ReviewLink(ctx, store.DB(), in.LinkID, in.Action)
-		if e != nil {
-			return nil, MemoryLinkView{}, e
-		}
-		return nil, memoryLinkView(l), nil
-	})
+	if !readOnly {
+		mcp.AddTool(s, write("review_memory_link", "复核一条记忆关联建议。confirm 把 proposed 变为 confirmed；reject 把 proposed 或 confirmed 变为 rejected；reopen 把 confirmed 或 rejected 退回 proposed 以便重新考虑；重复提交同一动作是幂等的，复核只改状态、不删除记录，也不合并话题。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ReviewMemoryLinkInput) (*mcp.CallToolResult, MemoryLinkView, error) {
+			if strings.TrimSpace(in.LinkID) == "" {
+				return nil, MemoryLinkView{}, fmt.Errorf("link_id is required")
+			}
+			l, e := pipeline.ReviewLink(ctx, store.DB(), in.LinkID, in.Action)
+			if e != nil {
+				return nil, MemoryLinkView{}, e
+			}
+			return nil, memoryLinkView(l), nil
+		})
+	}
 	return s
 }
 func main() {
 	log.SetOutput(os.Stderr)
 	db := flag.String("db", "data/context-memory.db", "experimental SQLite memory database")
+	readOnly := flag.Bool("read-only", false, "register only the read tools; ingest_transcript, apply_annotations and review_memory_link are not exposed")
+	decisionURL := flag.String("decision-url", "", "optional Decision engine endpoint used to rerank build_context items (empty disables reranking)")
+	decisionModel := flag.String("decision-model", "jev-style-2b-v2", "model name sent to the Decision engine for build_context reranking")
 	flag.Parse()
 	if flag.NArg() != 0 {
 		log.Fatalf("unexpected arguments: %v", flag.Args())
@@ -340,7 +357,11 @@ func main() {
 	defer store.Close()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	if e = newServer(store).Run(ctx, &mcp.StdioTransport{}); e != nil && ctx.Err() == nil {
+	var rerank contextbuild.Reranker
+	if strings.TrimSpace(*decisionURL) != "" {
+		rerank = &contextbuild.DecisionReranker{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*decisionURL), Model: *decisionModel}}
+	}
+	if e = newServer(store, *readOnly, rerank).Run(ctx, &mcp.StdioTransport{}); e != nil && ctx.Err() == nil {
 		log.Fatal(e)
 	}
 }

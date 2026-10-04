@@ -210,28 +210,6 @@ func TestIngestUsesUnknownTimesAndAnonymousSpeaker(t *testing.T) {
 	}
 }
 
-func TestSupersessionIsRejected(t *testing.T) {
-	s := openTempStore(t)
-	ctx := context.Background()
-	first := sampleResult("seg-a", "rev-1", 0)
-	report, err := s.IngestTranscript(ctx, first)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second := sampleResult("seg-a", "rev-2", 0)
-	second.Source.SupersedesRevision = "rev-1"
-	if _, err = s.IngestTranscript(ctx, second); err == nil {
-		t.Fatal("revision replacement accepted")
-	}
-	status, err := s.GetProcessingStatus(ctx, report.ConversationID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status.ReceivedSegments != 1 || status.OriginalTurns != 1 {
-		t.Fatalf("rejected replacement changed snapshot: %+v", status)
-	}
-}
-
 func countExtractJobs(t *testing.T, s *Store) (int, string) {
 	t.Helper()
 	var n int

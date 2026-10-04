@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -81,6 +82,55 @@ func insertValidated(t *testing.T, db *sql.DB, conversationID, runID string) []s
 	}
 	if len(ids) != 2 {
 		t.Fatalf("insert candidates: got %d ids", len(ids))
+	}
+	return ids
+}
+
+// insertSourceAttachment writes one source_attachments row for a conversation's
+// recording. active=false models a revision that a newer transcript revision
+// has superseded.
+func insertSourceAttachment(t *testing.T, db *sql.DB, conversationID, attachmentID string, segmentIndex int, revision string, active bool) {
+	t.Helper()
+	activeInt := 0
+	if active {
+		activeInt = 1
+	}
+	if _, err := db.Exec(
+		`INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active,supersedes_revision)
+		 VALUES(?,?,?,?,?,?,'{}','{}','sha',?,NULL)`,
+		attachmentID, conversationID, "rec-"+conversationID, segmentIndex, "seg-"+attachmentID, revision, activeInt); err != nil {
+		t.Fatalf("insert attachment %s: %v", attachmentID, err)
+	}
+}
+
+// linkAttachmentTurn records that an attachment materialized a turn.
+func linkAttachmentTurn(t *testing.T, db *sql.DB, attachmentID, turnID string) {
+	t.Helper()
+	if _, err := db.Exec(`INSERT INTO attachment_turns(attachment_id,turn_id) VALUES(?,?)`, attachmentID, turnID); err != nil {
+		t.Fatalf("link attachment %s turn %s: %v", attachmentID, turnID, err)
+	}
+}
+
+// countPublicationRuns counts publication_runs rows for one conversation and status.
+func countPublicationRuns(t *testing.T, db *sql.DB, conversationID, status string) int {
+	t.Helper()
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM publication_runs WHERE conversation_id=? AND status=?`, conversationID, status).Scan(&n); err != nil {
+		t.Fatalf("count publication runs: %v", err)
+	}
+	return n
+}
+
+// publicationRunCandidateIDs reads candidate_ids_json of one publication run.
+func publicationRunCandidateIDs(t *testing.T, db *sql.DB, conversationID, status string) []string {
+	t.Helper()
+	var raw string
+	if err := db.QueryRow(`SELECT candidate_ids_json FROM publication_runs WHERE conversation_id=? AND status=?`, conversationID, status).Scan(&raw); err != nil {
+		t.Fatalf("read %s publication run: %v", status, err)
+	}
+	var ids []string
+	if err := json.Unmarshal([]byte(raw), &ids); err != nil {
+		t.Fatalf("decode candidate_ids_json %q: %v", raw, err)
 	}
 	return ids
 }
@@ -304,5 +354,266 @@ func TestPublishHandlerRequiresStoreAndConversation(t *testing.T) {
 	}
 	if _, err := (&PublishHandler{DB: db, Store: store}).Execute(ctx, process.Job{PayloadJSON: `{"conversation_id":""}`}); err == nil {
 		t.Fatalf("expected conversation_id requirement error")
+	}
+}
+
+// TestPublishExcludesStaleCandidates proves a candidate whose evidence was
+// materialized by a superseded attachment never re-enters the published view:
+// only the current-revision candidate's note is written and only its id keys
+// the committed publication run.
+func TestPublishExcludesStaleCandidates(t *testing.T) {
+	ctx := context.Background()
+	db, store := openTestDBAndStore(t)
+	conv := "conv-publish-stale"
+	seedTwoTurns(t, db, conv)
+
+	// A's evidence turn (t1) comes from an attachment that a newer transcript
+	// revision superseded (active=0); B's turn (t2) comes from the live one.
+	insertSourceAttachment(t, db, conv, "att-a", 0, "v1", false)
+	linkAttachmentTurn(t, db, "att-a", "t1")
+	insertSourceAttachment(t, db, conv, "att-b", 1, "v2", true)
+	linkAttachmentTurn(t, db, "att-b", "t2")
+
+	ids, err := InsertCandidates(ctx, db, conv, "run-1", "job-1", "synthetic", []ValidatedDraft{
+		{
+			CandidateDraft: CandidateDraft{
+				Kind: "observation", Summary: "已废弃修订的候选", TopicTitle: "旧修订",
+				EvidenceTurnIDs: []string{"t1"},
+			},
+			Status: "validated",
+		},
+		{
+			CandidateDraft: CandidateDraft{
+				Kind: "request", Summary: "当前修订的候选", TopicTitle: "当前修订",
+				EvidenceTurnIDs: []string{"t2"},
+			},
+			Status: "validated",
+		},
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("insert candidates: %v", err)
+	}
+	aID, bID := ids[0], ids[1]
+
+	// InsertCandidates records the staleness itself: A lands stale because its
+	// attachment is already inactive, B stays current.
+	stale, err := staleArtifactIDs(ctx, db, "candidate", []string{aID, bID})
+	if err != nil {
+		t.Fatalf("read candidate staleness: %v", err)
+	}
+	if !stale[aID] {
+		t.Fatalf("candidate A should be stale, got %v", stale)
+	}
+	if stale[bID] {
+		t.Fatalf("candidate B should be current, got %v", stale)
+	}
+
+	job := claimPublishJob(t, db, conv, "run-1")
+	h := &PublishHandler{DB: db, Store: store, ProcessorVersion: "publish-v1"}
+	result, err := h.Execute(ctx, job)
+	if err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	wantVersion := "auto-" + sha256Hex(bID, 12)
+	if result != "publish:"+wantVersion {
+		t.Fatalf("result %q, want %q", result, "publish:"+wantVersion)
+	}
+
+	annotations, version, err := store.CurrentAnnotations(ctx, conv)
+	if err != nil {
+		t.Fatalf("current annotations: %v", err)
+	}
+	if version != wantVersion {
+		t.Fatalf("stored version %q, want %q", version, wantVersion)
+	}
+	wantNoteID := autoNotePrefix + sha256Hex(bID, 16)
+	if len(annotations.Notes) != 1 {
+		t.Fatalf("want exactly 1 published note, got %+v", annotations.Notes)
+	}
+	if got := annotations.Notes[0]; got.ID != wantNoteID || got.Summary != "当前修订的候选" {
+		t.Fatalf("published note %+v, want id %q summary %q", got, wantNoteID, "当前修订的候选")
+	}
+	for _, n := range annotations.Notes {
+		if n.ID == autoNotePrefix+sha256Hex(aID, 16) {
+			t.Fatalf("stale candidate A was published: %+v", annotations.Notes)
+		}
+	}
+
+	if n := countPublicationRuns(t, db, conv, "committed"); n != 1 {
+		t.Fatalf("want 1 committed run, got %d", n)
+	}
+	if got := publicationRunCandidateIDs(t, db, conv, "committed"); len(got) != 1 || got[0] != bID {
+		t.Fatalf("committed candidate ids %v, want [%s]", got, bID)
+	}
+}
+
+// TestPublishRetryDoesNotDuplicateNotes replays the whole publish stage over
+// the same candidate set, as a retried job after a worker crash would: the
+// note set, the committed run and the curate job must all be deduplicated.
+func TestPublishRetryDoesNotDuplicateNotes(t *testing.T) {
+	ctx := context.Background()
+	db, store := openTestDBAndStore(t)
+	conv := "conv-publish-retry"
+	seedTwoTurns(t, db, conv)
+
+	ids, err := InsertCandidates(ctx, db, conv, "run-1", "job-1", "synthetic", []ValidatedDraft{
+		{
+			CandidateDraft: CandidateDraft{
+				Kind: "observation", Summary: "重试候选", TopicTitle: "重试",
+				EvidenceTurnIDs: []string{"t1"},
+			},
+			Status: "validated",
+		},
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("insert candidates: %v", err)
+	}
+	wantVersion := "auto-" + sha256Hex(ids[0], 12)
+
+	job := claimPublishJob(t, db, conv, "run-1")
+	h := &PublishHandler{DB: db, Store: store, ProcessorVersion: "publish-v1"}
+
+	first, err := h.Execute(ctx, job)
+	if err != nil {
+		t.Fatalf("first publish: %v", err)
+	}
+	second, err := h.Execute(ctx, job)
+	if err != nil {
+		t.Fatalf("retry publish: %v", err)
+	}
+	if first != "publish:"+wantVersion || second != first {
+		t.Fatalf("publish results = %q, %q; want %q twice", first, second, "publish:"+wantVersion)
+	}
+
+	annotations, _, err := store.CurrentAnnotations(ctx, conv)
+	if err != nil {
+		t.Fatalf("current annotations: %v", err)
+	}
+	if len(annotations.Notes) != 1 {
+		t.Fatalf("want exactly 1 note after retry, got %+v", annotations.Notes)
+	}
+
+	var noteRows int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM notes WHERE conversation_id=?`, conv).Scan(&noteRows); err != nil {
+		t.Fatalf("count notes: %v", err)
+	}
+	if noteRows != 1 {
+		t.Fatalf("notes table has %d rows after retry, want 1", noteRows)
+	}
+	if n := countPublicationRuns(t, db, conv, "committed"); n != 1 {
+		t.Fatalf("want 1 committed run after retry, got %d", n)
+	}
+	var curateJobs int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM processing_jobs WHERE stage='curate'`, conv).Scan(&curateJobs); err != nil {
+		t.Fatalf("count curate jobs: %v", err)
+	}
+	if curateJobs != 1 {
+		t.Fatalf("curate jobs = %d after retry, want 1", curateJobs)
+	}
+}
+
+// TestPublicationConflictRespectsStaleInput checks that a conflict is recorded
+// without writing annotations, and that once one candidate's attachment is
+// superseded the retry republishes from the surviving candidate alone.
+func TestPublicationConflictRespectsStaleInput(t *testing.T) {
+	ctx := context.Background()
+	db, store := openTestDBAndStore(t)
+	conv := "conv-publish-conflict-stale"
+	seedTwoTurns(t, db, conv)
+
+	insertSourceAttachment(t, db, conv, "att-a", 0, "v1", true)
+	linkAttachmentTurn(t, db, "att-a", "t1")
+	insertSourceAttachment(t, db, conv, "att-b", 1, "v1", true)
+	linkAttachmentTurn(t, db, "att-b", "t2")
+
+	ids, err := InsertCandidates(ctx, db, conv, "run-1", "job-1", "synthetic", []ValidatedDraft{
+		{
+			CandidateDraft: CandidateDraft{
+				Kind: "observation", Summary: "将被废弃的候选", TopicTitle: "废弃",
+				EvidenceTurnIDs: []string{"t1"},
+			},
+			Status: "validated",
+		},
+		{
+			CandidateDraft: CandidateDraft{
+				Kind: "request", Summary: "幸存的候选", TopicTitle: "幸存",
+				EvidenceTurnIDs: []string{"t2"},
+			},
+			Status: "validated",
+		},
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("insert candidates: %v", err)
+	}
+	aID, bID := ids[0], ids[1]
+
+	h := &PublishHandler{DB: db, Store: store, ProcessorVersion: "publish-v1"}
+
+	// A caller holding a stale expected version must be rejected and recorded
+	// as a conflict, leaving the annotations untouched.
+	if _, err := h.publish(ctx, conv, "expected-that-does-not-match"); err == nil {
+		t.Fatalf("expected an annotation version conflict")
+	} else if !strings.Contains(err.Error(), "annotation version conflict") {
+		t.Fatalf("unexpected conflict error: %v", err)
+	}
+	if n := countPublicationRuns(t, db, conv, "conflict"); n != 1 {
+		t.Fatalf("want 1 conflict run, got %d", n)
+	}
+	if got := publicationRunCandidateIDs(t, db, conv, "conflict"); len(got) != 2 {
+		t.Fatalf("conflict run should have considered both candidates, got %v", got)
+	}
+	current, version, err := store.CurrentAnnotations(ctx, conv)
+	if err != nil {
+		t.Fatalf("current annotations after conflict: %v", err)
+	}
+	if len(current.Notes) != 0 || version != "v1" {
+		t.Fatalf("conflict must not write annotations, got version %q notes %+v", version, current.Notes)
+	}
+
+	// Supersede A's revision: deactivating its attachment and invalidating the
+	// derived artifacts sourced from it is what the ingest path does together,
+	// and what makes A's candidate stale input for the next publish.
+	if _, err := db.ExecContext(ctx, `UPDATE source_attachments SET active=0 WHERE id='att-a'`); err != nil {
+		t.Fatalf("deactivate attachment: %v", err)
+	}
+	if n, err := store.InvalidateDerivedArtifacts(ctx, "att-a", "transcript_revision_superseded"); err != nil {
+		t.Fatalf("invalidate derived artifacts: %v", err)
+	} else if n != 1 {
+		t.Fatalf("invalidated %d artifacts, want 1 (candidate A)", n)
+	}
+	stale, err := staleArtifactIDs(ctx, db, "candidate", []string{aID, bID})
+	if err != nil {
+		t.Fatalf("read candidate staleness: %v", err)
+	}
+	if !stale[aID] || stale[bID] {
+		t.Fatalf("staleness after supersede = %v, want A stale and B current", stale)
+	}
+
+	result, err := h.publish(ctx, conv, "")
+	if err != nil {
+		t.Fatalf("retry publish: %v", err)
+	}
+	wantVersion := "auto-" + sha256Hex(bID, 12)
+	if result != "publish:"+wantVersion {
+		t.Fatalf("retry result %q, want %q", result, "publish:"+wantVersion)
+	}
+
+	annotations, version, err := store.CurrentAnnotations(ctx, conv)
+	if err != nil {
+		t.Fatalf("current annotations after retry: %v", err)
+	}
+	if version != wantVersion {
+		t.Fatalf("stored version %q, want %q", version, wantVersion)
+	}
+	wantNoteID := autoNotePrefix + sha256Hex(bID, 16)
+	if len(annotations.Notes) != 1 || annotations.Notes[0].ID != wantNoteID {
+		t.Fatalf("published notes %+v, want only %q", annotations.Notes, wantNoteID)
+	}
+	if n := countPublicationRuns(t, db, conv, "committed"); n != 1 {
+		t.Fatalf("want 1 committed run, got %d", n)
+	}
+	if got := publicationRunCandidateIDs(t, db, conv, "committed"); len(got) != 1 || got[0] != bID {
+		t.Fatalf("committed candidate ids %v, want [%s]", got, bID)
 	}
 }

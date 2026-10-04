@@ -64,6 +64,37 @@ const memoryLinksDDL = `CREATE TABLE IF NOT EXISTS memory_links(id TEXT PRIMARY 
 CREATE INDEX IF NOT EXISTS memory_links_from ON memory_links(from_kind, from_id);
 CREATE INDEX IF NOT EXISTS memory_links_to ON memory_links(to_kind, to_id);`
 
+// annotationHistoryDDL promotes the lazily created annotation_history table to
+// a tracked migration so every database (including ones created by an older
+// build that created it on demand) ends up with the same schema. CREATE TABLE
+// IF NOT EXISTS keeps this a no-op where the table already exists.
+const annotationHistoryDDL = `CREATE TABLE IF NOT EXISTS annotation_history(conversation_id TEXT NOT NULL REFERENCES conversations(id), annotation_version TEXT NOT NULL, annotation_basis TEXT NOT NULL, summary TEXT NOT NULL, annotations_json TEXT NOT NULL, PRIMARY KEY(conversation_id,annotation_version));`
+
+// derivedArtifactsDDL adds per-artifact staleness state plus the source
+// attachment links needed to propagate a transcript revision supersede to
+// every derived artifact (note or candidate) that was built from the
+// superseded attachment. The backfill derives the same state for rows that
+// predate the migration; artifacts whose evidence has no attachment rows
+// (legacy store.Import data) stay current with zero source rows.
+const derivedArtifactsDDL = `CREATE TABLE IF NOT EXISTS derived_artifacts(kind TEXT NOT NULL, artifact_id TEXT NOT NULL, conversation_id TEXT NOT NULL, stale INTEGER NOT NULL DEFAULT 0, stale_reason TEXT NOT NULL DEFAULT '', stale_at INTEGER NULL, PRIMARY KEY(kind, artifact_id));
+CREATE INDEX IF NOT EXISTS derived_artifact_conv ON derived_artifacts(conversation_id, kind);
+CREATE TABLE IF NOT EXISTS derived_artifact_sources(kind TEXT NOT NULL, artifact_id TEXT NOT NULL, attachment_id TEXT NOT NULL REFERENCES source_attachments(id), PRIMARY KEY(kind, artifact_id, attachment_id));
+CREATE INDEX IF NOT EXISTS derived_artifact_sources_attachment ON derived_artifact_sources(attachment_id);
+INSERT OR IGNORE INTO derived_artifacts(kind, artifact_id, conversation_id, stale, stale_reason, stale_at) SELECT 'note', n.id, n.conversation_id, COALESCE(MAX(CASE WHEN a.active=0 THEN 1 ELSE 0 END),0), '', NULL FROM notes n LEFT JOIN note_evidence ne ON ne.note_id=n.id LEFT JOIN attachment_turns at ON at.turn_id=ne.turn_id LEFT JOIN source_attachments a ON a.id=at.attachment_id GROUP BY n.id, n.conversation_id;
+INSERT OR IGNORE INTO derived_artifact_sources(kind, artifact_id, attachment_id) SELECT DISTINCT 'note', n.id, a.id FROM notes n JOIN note_evidence ne ON ne.note_id=n.id JOIN attachment_turns at ON at.turn_id=ne.turn_id JOIN source_attachments a ON a.id=at.attachment_id;
+INSERT OR IGNORE INTO derived_artifacts(kind, artifact_id, conversation_id, stale, stale_reason, stale_at) SELECT 'candidate', c.id, c.conversation_id, COALESCE(MAX(CASE WHEN a.active=0 THEN 1 ELSE 0 END),0), '', NULL FROM memory_candidates c LEFT JOIN json_each(c.evidence_turn_ids_json) je LEFT JOIN attachment_turns at ON at.turn_id=je.value LEFT JOIN source_attachments a ON a.id=at.attachment_id GROUP BY c.id, c.conversation_id;
+INSERT OR IGNORE INTO derived_artifact_sources(kind, artifact_id, attachment_id) SELECT DISTINCT 'candidate', c.id, a.id FROM memory_candidates c JOIN json_each(c.evidence_turn_ids_json) je JOIN attachment_turns at ON at.turn_id=je.value JOIN source_attachments a ON a.id=at.attachment_id;`
+
+// speakerBindingDDL adds the speaker-identity curation tables: one
+// speaker_bindings row records the reviewed identity of a speaker label inside
+// one recording (a label is only meaningful within its recording), and one
+// append-only speaker_binding_events row records every proposal and review
+// action against a binding. The UNIQUE key on (recording_id,
+// speaker_scoped_id, version) leaves room for versioned bindings of the same
+// label; version is bumped when a proposal is confirmed.
+const speakerBindingDDL = `CREATE TABLE IF NOT EXISTS speaker_bindings(id TEXT PRIMARY KEY, recording_id TEXT NOT NULL REFERENCES recordings(id), transcript_revision TEXT NOT NULL DEFAULT '', speaker_scoped_id TEXT NOT NULL, person_id TEXT NULL, status TEXT NOT NULL CHECK(status IN ('proposed','confirmed','rejected','revoked')), evidence_json TEXT NOT NULL DEFAULT '[]', reviewer TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(recording_id, speaker_scoped_id, version));
+CREATE TABLE IF NOT EXISTS speaker_binding_events(id TEXT PRIMARY KEY, binding_id TEXT NOT NULL REFERENCES speaker_bindings(id), action TEXT NOT NULL CHECK(action IN ('propose','confirm','reject','revoke')), actor TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);`
+
 type migration struct {
 	version    int
 	name       string
@@ -92,6 +123,9 @@ var migrations = []migration{
 	{version: 4, name: "memory-candidates", statements: statements(memoryCandidatesDDL)},
 	{version: 5, name: "analysis-coverage", statements: statements(analysisCoverageDDL)},
 	{version: 6, name: "memory-links", statements: statements(memoryLinksDDL)},
+	{version: 7, name: "annotation-history", statements: statements(annotationHistoryDDL)},
+	{version: 8, name: "derived-artifact-staleness", statements: statements(derivedArtifactsDDL)},
+	{version: 9, name: "speaker-binding", statements: statements(speakerBindingDDL)},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`

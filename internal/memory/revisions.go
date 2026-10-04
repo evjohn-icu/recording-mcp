@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 )
 
 // AnnotationSnapshot is an immutable annotation revision. The current snapshot
@@ -106,12 +107,6 @@ func (s *Store) ApplyAnnotations(ctx context.Context, conversationID, expectedVe
 		return err
 	}
 	defer tx.Rollback()
-	if _, err = tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS annotation_history (
-		conversation_id TEXT NOT NULL REFERENCES conversations(id), annotation_version TEXT NOT NULL,
-		annotation_basis TEXT NOT NULL, summary TEXT NOT NULL, annotations_json TEXT NOT NULL,
-		PRIMARY KEY(conversation_id,annotation_version))`); err != nil {
-		return err
-	}
 	var current, oldBasis, oldSummary, oldRaw string
 	err = tx.QueryRowContext(ctx, `SELECT annotation_version,annotation_basis,summary,annotations_json FROM conversations WHERE id=?`, conversationID).Scan(&current, &oldBasis, &oldSummary, &oldRaw)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -241,6 +236,9 @@ func (s *Store) ApplyAnnotations(ctx context.Context, conversationID, expectedVe
 			}
 		}
 	}
+	if err = replaceNoteDerivedState(ctx, tx, conversationID, time.Now()); err != nil {
+		return err
+	}
 	for original, topicIDs := range links {
 		for _, topic := range topicIDs {
 			if _, err = tx.ExecContext(ctx, "INSERT INTO turn_topics VALUES(?,?)", resolved[original], topic); err != nil {
@@ -262,14 +260,74 @@ func validNoteKind(kind string) error {
 	return fmt.Errorf("unsupported note kind %q", kind)
 }
 
+// replaceNoteDerivedState rebuilds the derived_artifacts staleness state for
+// the live notes of one conversation after ApplyAnnotations replaced them
+// wholesale. A note is stale exactly when any attachment backing its evidence
+// turns is no longer active; legacy evidence without attachment rows keeps the
+// note current with zero source rows. Runs inside the caller's transaction, so
+// republishing a conversation leaves a state consistent with the new notes.
+func replaceNoteDerivedState(ctx context.Context, tx *sql.Tx, conversationID string, now time.Time) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM derived_artifact_sources WHERE kind='note' AND artifact_id IN (SELECT artifact_id FROM derived_artifacts WHERE kind='note' AND conversation_id=?)`, conversationID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM derived_artifacts WHERE kind='note' AND conversation_id=?`, conversationID); err != nil {
+		return err
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT n.id, COALESCE(MAX(CASE WHEN a.active=0 THEN 1 ELSE 0 END),0)
+		FROM notes n
+		LEFT JOIN note_evidence ne ON ne.note_id=n.id
+		LEFT JOIN attachment_turns at ON at.turn_id=ne.turn_id
+		LEFT JOIN source_attachments a ON a.id=at.attachment_id
+		WHERE n.conversation_id=?
+		GROUP BY n.id`, conversationID)
+	if err != nil {
+		return err
+	}
+	noteIDs := map[string]bool{}
+	staleIDs := map[string]bool{}
+	for rows.Next() {
+		var id string
+		var stale int
+		if err := rows.Scan(&id, &stale); err != nil {
+			rows.Close()
+			return err
+		}
+		noteIDs[id] = true
+		if stale == 1 {
+			staleIDs[id] = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for id := range noteIDs {
+		reason := ""
+		var staleAt any
+		stale := 0
+		if staleIDs[id] {
+			stale, reason, staleAt = 1, staleReasonSuperseded, now.UnixMilli()
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO derived_artifacts(kind, artifact_id, conversation_id, stale, stale_reason, stale_at) VALUES('note', ?, ?, ?, ?, ?)`, id, conversationID, stale, reason, staleAt); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO derived_artifact_sources(kind, artifact_id, attachment_id)
+		SELECT DISTINCT 'note', ne.note_id, at.attachment_id
+		FROM note_evidence ne
+		JOIN attachment_turns at ON at.turn_id=ne.turn_id
+		JOIN notes n ON n.id=ne.note_id
+		WHERE n.conversation_id=?`, conversationID); err != nil {
+		return err
+	}
+	return nil
+}
+
 // GetAnnotationHistory returns archived revisions followed by the current one.
 func (s *Store) GetAnnotationHistory(ctx context.Context, conversationID string) ([]AnnotationSnapshot, error) {
-	if _, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS annotation_history (
-		conversation_id TEXT NOT NULL REFERENCES conversations(id), annotation_version TEXT NOT NULL,
-		annotation_basis TEXT NOT NULL, summary TEXT NOT NULL, annotations_json TEXT NOT NULL,
-		PRIMARY KEY(conversation_id,annotation_version))`); err != nil {
-		return nil, err
-	}
 	var exists int
 	if err := s.db.QueryRowContext(ctx, "SELECT count(*) FROM conversations WHERE id=?", conversationID).Scan(&exists); err != nil {
 		return nil, err

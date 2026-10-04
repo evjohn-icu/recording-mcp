@@ -83,7 +83,7 @@
 
 ## 表结构摘要
 
-迁移集中在 `internal/migrations`（当前版本 5），时间列为 unix 毫秒 INTEGER。
+迁移集中在 `internal/migrations`（当前版本 9：v1–v5 为处理链路，v6 `memory_links`，v7 `annotation_history`，v8 `derived_artifacts` / `derived_artifact_sources`，v9 `speaker_bindings` / `speaker_binding_events`），时间列为 unix 毫秒 INTEGER。
 
 ### processing_jobs（迁移 v2 processing-queue）
 
@@ -158,6 +158,23 @@
 
 主键 `(conversation_id, turn_id, processor_version)` 配合 `INSERT OR IGNORE`：同一会话的同一轮次在同一处理器版本下重复记录时保留首行，重放不会产生重复行。`pipeline.RecordCoverage` 每个窗口一次写入，`pipeline.UncoveredTurnIDs`（LEFT JOIN 反查）与 `pipeline.ListCoverage` 提供读取。
 
+### annotation_history / derived_artifacts / derived_artifact_sources（迁移 v7–v8）
+
+`annotation_history` 记录被替换的注释快照（主键 `(conversation_id, annotation_version)`），由 `ApplyAnnotations` 在每次完整替换前归档；v7 之前该表由旧版本在运行时惰性创建，迁移用 `CREATE TABLE IF NOT EXISTS` 接管，两者兼容。
+
+失效传播账本：
+
+| 表 | 列 |
+| --- | --- |
+| `derived_artifacts` | `kind`（`note` / `candidate`）、`artifact_id`、`conversation_id`、`stale`、`stale_reason`、`stale_at`；主键 `(kind, artifact_id)` |
+| `derived_artifact_sources` | `kind`、`artifact_id`、`attachment_id`；把派生记录连接到构建它的转录附件，主键三者联合 |
+
+写入路径直接落账（候选入库与 `ApplyAnnotations` 都会重建自己的行），转录修订替换时 `markStaleForAttachment` 把旧附件的派生记录一次性标记为 stale；`Store.InvalidateDerivedArtifacts` 是对外的幂等失效入口，`WHERE stale=0` 使重复调用不产生额外变化。当前检索默认排除 stale 笔记与来自非活动附件的原话，`include_stale` 是显式审计开关；发布器在合并候选时同样跳过 stale 候选，stale 内容从不出现在新版本哈希中。v8 迁移的 backfill 为存量笔记与候选推导同样的初始状态。
+
+### speaker_bindings / speaker_binding_events（迁移 v9 speaker-binding）
+
+局部分说话人标签到真实人物的绑定契约（本实现不含声学识别，只存人工/模型确认的绑定）：`speaker_bindings` 以 `(recording_id, speaker_scoped_id)` 为作用域，状态 `proposed / confirmed / rejected / revoked`，`version` 在确认时递增；`speaker_binding_events` 每次动作追加一行（`propose` / `confirm` / `reject` / `revoke`，actor 与备注）。`Store.SpeakerProjection` 只返回 `confirmed` 行，撤销立即生效；未确认身份仍是未知。同一标签在另一录音中不受影响。
+
 ## 状态机与租约语义
 
 ```text
@@ -215,11 +232,11 @@ make build
 
 | 工作包 | 已完成 | 未完成 |
 | --- | --- | --- |
-| A 存储与任务 | `internal/migrations` v1–v5（含 `analysis_coverage` 覆盖账本）；`IngestTranscript` 与 `process.EnqueueTx` 原子提交；`Claim/Renew/Complete/Fail` 租约与幂等；重复导入幂等 | outbox 形式的跨命令任务、`processing_windows` 落表 |
+| A 存储与任务 | `internal/migrations` v1–v9（含 `analysis_coverage` 覆盖账本、`memory_links` 关联表、`derived_artifacts` 失效状态与 `speaker_bindings` 绑定契约）；`IngestTranscript` 与 `process.EnqueueTx` 原子提交；`Claim/Renew/Complete/Fail` 租约与幂等；重复导入幂等 | outbox 形式的跨命令任务、`processing_windows` 落表 |
 | B 决策服务与执行器 | `internal/decision` Engine 契约（choice/noul/score，完整分布校验，非法结果整体拒绝）；Synthetic 与本地 `SystemOneClient` 两个 Adapter；`worker.Run/RunOnce`；`pipeline.ExtractHandler` shadow 记录 | 本地权重实际部署与加载、三个小模型对比、TypeSafe 托管 Adapter、路由启用 |
 | C 提炼与发布 | `internal/generate`（Synthetic 与 OpenAI 兼容生成器）；候选校验（kind 枚举、summary 长度、证据⊆窗口）与 `memory_candidates` 入库；`pipeline.PublishHandler` 会话级发布、`publication_runs` 冲突/提交记录；`process.Enqueue` 包装 | 发布内容的人工复核与精化（合并/去重策略）、候选质量评测 |
-| D 层级检索与 MCP | `list_conversations` / `get_evidence_context` / `search_memory`（`internal/memory` 检索接口 + `cmd/context-memory` 注册，游标分页） | `build_context` 与完整层级视图 |
-| E/F | 话题关联建议层：`memory_links`（内容寻址、proposed/confirmed/rejected）、`context-associate` 校验入库、MCP `list_memory_links` / `review_memory_link` 复核、publish 提交后自动触发 `pipeline.CurateHandler` | 人物绑定、修订失效、模型评测、确认后的话题合并视图 |
+| D 层级检索与 MCP | `list_conversations` / `get_evidence_context` / `search_memory`（`internal/memory` 检索接口 + `cmd/context-memory` 注册，游标分页）；实验性 `build_context`（`internal/contextbuild`：预算受限的任务上下文包，来源证据、覆盖缺口、确定性 trace，可选决策重排） | 完整层级视图、快照分页与双时间查询 |
+| E/F | 话题关联建议层：`memory_links`（内容寻址、proposed/confirmed/rejected）、`context-associate` 校验入库、MCP `list_memory_links` / `review_memory_link` 复核、publish 提交后自动触发 `pipeline.CurateHandler`；转写修订替换（`supersedes_revision`）与派生记忆失效传播（migration v7–v8：`derived_artifacts` / `derived_artifact_sources`，stale 过滤与 `include_stale` 审计，自动重析）；说话人绑定契约（migration v9：`speaker_bindings` / `speaker_binding_events`） | 模型评测、确认后的话题合并视图 |
 
 计划中的 Processing 层判断记录（`decision_runs` / `decision_answers`）已按拟议接口落地；窗口表尚未独立建表，窗口构建在 `internal/pipeline` 内存中完成（v1：默认单窗口，超过 200 轮按顺序切块；渲染超过 8000 字符截断并标注）。确定性保证：原话顺序为"有 `global_start_ms` 的按升序在前，再按 `segment_index`，再按 `original_turn_id`"，缺失时间仍有确定的来源序；输入哈希由 Decision 契约对 state 与问题集计算，缓存键与运行 ID 都可复现。候选与发布链路同样以确定性 ID 为基础：候选 ID、topic/note ID 与 publication run ID 都由内容哈希派生，重放不会产生重复行。
 

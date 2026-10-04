@@ -2,7 +2,7 @@
 
 ## 背景
 
-Context Layer 开发计划的 E 切片是“关联与失效”。当前先落地其中的**建议层**：由 agent（记忆策展人）以只读方式调查本地记忆库，发现话题之间的关联并产出提议；`context-associate` CLI 负责校验与写入。提议保存在 `memory_links` 表中，状态固定为 `proposed`（建议）。本层不会自动合并话题，也不修改任何已有记忆；后续的人工确认与自动触发见文末“后续”一节。
+Context Layer 开发计划的 E 切片是“关联与失效”。当前先落地其中的**建议层**：由 agent（记忆策展人）以只读方式调查本地记忆库，发现话题之间的关联并产出提议；`context-associate` CLI 负责校验与写入；publish 提交后由 worker 自动入队 curate 任务触发这一流程（见下文“自动触发”）。提议保存在 `memory_links` 表中，状态为 `proposed`（建议）。人工复核通过 MCP 工具 `list_memory_links` / `review_memory_link` 执行：`confirm` / `reject` / `reopen` 只改变状态，任何状态都不会触发话题合并，也不修改任何已有记忆（见“复核”一节）。
 
 ## 工作流
 

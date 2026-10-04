@@ -1,0 +1,35 @@
+{
+  "description": "Curated topic links for the context-eval harness. Endpoints are authored as human turn refs and resolved by the harness to the topic the derived memory attached to that turn, so no hash-derived topic id is hard-coded. Confirmed links may steer assembly; the proposed link must not.",
+  "links": [
+    {
+      "id": "venue-to-travel",
+      "from_turn_ref": {"segment_id": "seg-venue-a", "transcript_revision": "rev-1", "turn_id": "utt-1"},
+      "to_turn_ref": {"segment_id": "seg-travel", "transcript_revision": "rev-1", "turn_id": "utt-2"},
+      "relation": "follow_up",
+      "reason": "场地彩排之后紧接着确定出差住宿安排",
+      "evidence_turn_refs": [{"segment_id": "seg-venue-a", "transcript_revision": "rev-1", "turn_id": "utt-1"}],
+      "confidence": 0.9,
+      "confirm": true
+    },
+    {
+      "id": "ship-to-insurance",
+      "from_turn_ref": {"segment_id": "seg-ship", "transcript_revision": "rev-1", "turn_id": "utt-1"},
+      "to_turn_ref": {"segment_id": "seg-insurance", "transcript_revision": "rev-1", "turn_id": "utt-1"},
+      "relation": "update",
+      "reason": "货物运输方式变更牵涉到货运险理赔材料要求",
+      "evidence_turn_refs": [{"segment_id": "seg-ship", "transcript_revision": "rev-1", "turn_id": "utt-1"}],
+      "confidence": 0.8,
+      "confirm": true
+    },
+    {
+      "id": "training-to-patent",
+      "from_turn_ref": {"segment_id": "seg-training", "transcript_revision": "rev-1", "turn_id": "utt-2"},
+      "to_turn_ref": {"segment_id": "seg-patent", "transcript_revision": "rev-1", "turn_id": "utt-2"},
+      "relation": "contradiction",
+      "reason": "提案：培训安排与专利模板要求可能互相牵扯，等待人工确认",
+      "evidence_turn_refs": [{"segment_id": "seg-training", "transcript_revision": "rev-1", "turn_id": "utt-2"}],
+      "confidence": 0.4,
+      "confirm": false
+    }
+  ]
+}

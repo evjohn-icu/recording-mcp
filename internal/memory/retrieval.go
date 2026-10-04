@@ -74,6 +74,10 @@ type EvidenceContext struct {
 	RecordingID string         `json:"recording_id"`
 	Turns       []TurnEvidence `json:"turns"`
 	Truncated   bool           `json:"truncated"`
+	// Stale reports that the target turn derives from a superseded transcript
+	// attachment (active=0). This lookup is an explicit audit path and returns
+	// any turn by id; legacy turns with no attachment rows are never stale.
+	Stale bool `json:"stale"`
 }
 
 // MemorySearch bounds SearchMemory. Text is matched as a case-insensitive
@@ -86,6 +90,9 @@ type MemorySearch struct {
 	TopicID       string
 	StartedAfter  *time.Time
 	StartedBefore *time.Time
+	// IncludeStale opts into superseded notes and turns, which are excluded
+	// from current-state results by default.
+	IncludeStale bool
 }
 
 // SearchHit is one matched note or turn.
@@ -98,6 +105,12 @@ type SearchHit struct {
 	Score           float64  `json:"score"`
 	EvidenceTurnIDs []string `json:"evidence_turn_ids,omitempty"`
 	GlobalStartMS   *int64   `json:"global_start_ms"`
+	// Stale reports that the hit derives from a superseded transcript
+	// attachment; it is only ever true when IncludeStale was requested.
+	Stale bool `json:"stale,omitempty"`
+	// DerivedFrom lists the transcript_revision values of the hit's source
+	// attachments, sorted ascending; empty for legacy hits.
+	DerivedFrom []string `json:"derived_from,omitempty"`
 }
 
 // SearchPage is one cursor page of search hits. Degraded is reserved for future
@@ -254,9 +267,9 @@ func (s *Store) ListConversations(ctx context.Context, f ConversationFilter) (Co
 	rows, err := s.db.QueryContext(ctx, `SELECT c.id,c.title,c.recording_id,c.annotation_version,r.recording_started_at,
  (SELECT COUNT(*) FROM source_attachments a WHERE a.conversation_id=c.id AND a.active=1) +
  (SELECT COUNT(*) FROM recordings r2 WHERE r2.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM source_attachments a WHERE a.recording_id=r2.id)),
- (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=c.id),
- (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=c.id AND EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id)),
- (SELECT COUNT(*) FROM notes n WHERE n.conversation_id=c.id)
+ (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM attachment_turns at JOIN source_attachments a ON a.id=at.attachment_id WHERE at.turn_id=t.id AND a.active=0)),
+ (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM attachment_turns at JOIN source_attachments a ON a.id=at.attachment_id WHERE at.turn_id=t.id AND a.active=0) AND EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id)),
+ (SELECT COUNT(*) FROM notes n WHERE n.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM derived_artifacts d WHERE d.kind='note' AND d.artifact_id=n.id AND d.stale=1))
  FROM conversations c LEFT JOIN recordings r ON r.id=c.recording_id
  WHERE (?='' OR EXISTS(SELECT 1 FROM topic_conversations tc WHERE tc.topic_id=? AND tc.conversation_id=c.id))`,
 		f.TopicID, f.TopicID)
@@ -332,6 +345,10 @@ func (s *Store) GetEvidenceContext(ctx context.Context, turnID string, radius, m
 	if err != nil {
 		return EvidenceContext{}, err
 	}
+	stale, err := s.turnStale(ctx, turnID)
+	if err != nil {
+		return EvidenceContext{}, err
+	}
 
 	rows, err := s.db.QueryContext(ctx, `SELECT id,content,speaker_scoped_id,global_start_ms,global_end_ms,segment_index
  FROM turns WHERE recording_id=?
@@ -396,7 +413,7 @@ func (s *Store) GetEvidenceContext(ctx context.Context, turnID string, radius, m
 		used += size
 		out = append(out, ev)
 	}
-	return EvidenceContext{RecordingID: recordingID, Turns: out, Truncated: truncated}, nil
+	return EvidenceContext{RecordingID: recordingID, Turns: out, Truncated: truncated, Stale: stale}, nil
 }
 
 func decodeSearchCursor(raw string) (*searchCursor, error) {
@@ -510,11 +527,15 @@ func (s *Store) SearchMemory(ctx context.Context, q MemorySearch) (SearchPage, e
 }
 
 func (s *Store) searchNotes(ctx context.Context, q MemorySearch, lower string) ([]SearchHit, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT n.id,n.conversation_id,n.summary,r.recording_started_at
+	noteSQL := `SELECT n.id,n.conversation_id,n.summary,r.recording_started_at
  FROM notes n JOIN conversations c ON c.id=n.conversation_id
  LEFT JOIN recordings r ON r.id=c.recording_id
- WHERE (?='' OR EXISTS(SELECT 1 FROM json_each(n.topic_ids_json) WHERE value=?))
- ORDER BY n.id`, q.TopicID, q.TopicID)
+ WHERE (?='' OR EXISTS(SELECT 1 FROM json_each(n.topic_ids_json) WHERE value=?))`
+	if !q.IncludeStale {
+		noteSQL += ` AND NOT EXISTS(SELECT 1 FROM derived_artifacts d WHERE d.kind='note' AND d.artifact_id=n.id AND d.stale=1)`
+	}
+	noteSQL += ` ORDER BY n.id`
+	rows, err := s.db.QueryContext(ctx, noteSQL, q.TopicID, q.TopicID)
 	if err != nil {
 		return nil, err
 	}
@@ -553,25 +574,44 @@ func (s *Store) searchNotes(ctx context.Context, q MemorySearch, lower string) (
 		if err != nil {
 			return nil, err
 		}
+		stale, err := s.noteStale(ctx, note.id)
+		if err != nil {
+			return nil, err
+		}
+		derivedFrom, err := s.noteDerivedFrom(ctx, note.id)
+		if err != nil {
+			return nil, err
+		}
 		out = append(out, SearchHit{
 			Kind: "note", ID: note.id, Text: note.summary, ConversationID: note.conv,
 			Why: "note summary contains text", Score: 1.0, EvidenceTurnIDs: evidence,
+			Stale: stale, DerivedFrom: derivedFrom,
 		})
 	}
 	return out, nil
 }
 
 func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) ([]SearchHit, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT t.id,t.conversation_id,t.content,t.global_start_ms,r.recording_started_at
+	turnSQL := `SELECT t.id,t.conversation_id,t.content,t.global_start_ms,r.recording_started_at
  FROM turns t JOIN recordings r ON r.id=t.recording_id
- WHERE (?='' OR EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id AND tt.topic_id=?))
- ORDER BY t.id`, q.TopicID, q.TopicID)
+ WHERE (?='' OR EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id AND tt.topic_id=?))`
+	if !q.IncludeStale {
+		turnSQL += ` AND NOT EXISTS(SELECT 1 FROM attachment_turns at JOIN source_attachments a ON a.id=at.attachment_id WHERE at.turn_id=t.id AND a.active=0)`
+	}
+	turnSQL += ` ORDER BY t.id`
+	rows, err := s.db.QueryContext(ctx, turnSQL, q.TopicID, q.TopicID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	out := []SearchHit{}
+	// Collect matches first and close the cursor: the store uses a single open
+	// connection, so a nested marker query while rows are open would deadlock.
+	type matchedTurn struct {
+		id, conv, content string
+		globalStart       *int64
+	}
+	matched := []matchedTurn{}
 	for rows.Next() {
 		var id, conv, content string
 		var start sql.NullInt64
@@ -594,12 +634,30 @@ func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) (
 			v := start.Int64
 			globalStart = &v
 		}
+		matched = append(matched, matchedTurn{id: id, conv: conv, content: content, globalStart: globalStart})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+
+	out := []SearchHit{}
+	for _, turn := range matched {
+		stale, err := s.turnStale(ctx, turn.id)
+		if err != nil {
+			return nil, err
+		}
+		derivedFrom, err := s.turnDerivedFrom(ctx, turn.id)
+		if err != nil {
+			return nil, err
+		}
 		out = append(out, SearchHit{
-			Kind: "turn", ID: id, Text: content, ConversationID: conv,
-			Why: "transcript turn contains text", Score: 0.5, GlobalStartMS: globalStart,
+			Kind: "turn", ID: turn.id, Text: turn.content, ConversationID: turn.conv,
+			Why: "transcript turn contains text", Score: 0.5, GlobalStartMS: turn.globalStart,
+			Stale: stale, DerivedFrom: derivedFrom,
 		})
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s *Store) noteEvidenceTurnIDs(ctx context.Context, noteID string) ([]string, error) {

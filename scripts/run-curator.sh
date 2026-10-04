@@ -17,7 +17,7 @@ cd "$REPO"
 
 # The project-local config keeps the worker's database and the MCP server in
 # sync; the file is gitignored.
-pi mcp add context-memory -l -- "$REPO/bin/context-memory" --db "$CONTEXT_DB" >/dev/null
+pi mcp add context-memory -l -- "$REPO/bin/context-memory" --db "$CONTEXT_DB" --read-only >/dev/null
 
 exec pi -p --approve --mode text --model "$MODEL" \
   --exclude-tools "bash,edit,subagent,fusion_investigate,fusion_research,fusion_reason,fusion_validate,record_advisor_outcome" \

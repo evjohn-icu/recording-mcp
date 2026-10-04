@@ -372,3 +372,131 @@ func TestSearchMemoryScopesCaseEscapesAndCursor(t *testing.T) {
 		t.Fatal("malformed cursor must error")
 	}
 }
+
+// TestRetrievalExcludesStaleDerivedMemory proves every current-state retrieval
+// surface hides memory derived from a superseded transcript revision, while
+// the explicit audit switches surface it with honest stale markers and
+// derived_from provenance.
+func TestRetrievalExcludesStaleDerivedMemory(t *testing.T) {
+	ctx := context.Background()
+	s := openTempStore(t)
+
+	v1 := sampleResult("seg-a", "rev-1", 0)
+	v1.Turns[0].Text = "superseded phrase alpha"
+	if _, err := s.IngestTranscript(ctx, v1); err != nil {
+		t.Fatal(err)
+	}
+	var conv, v1TurnID string
+	if err := s.db.QueryRow(`SELECT conversation_id, id FROM turns`).Scan(&conv, &v1TurnID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ApplyAnnotations(ctx, conv, "", Annotations{
+		ConversationID: conv, AnnotationVersion: "rev-1", Title: "stale conversation",
+		Topics: []TopicAnnotation{{ID: "topic:stale", Title: "stale topic"}},
+		Notes: []NoteAnnotation{{
+			ID: "note:stale", Kind: "observation", TopicIDs: []string{"topic:stale"},
+			Summary: "stale summary phrase", EvidenceTurnIDs: []string{v1TurnID},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var noteID string
+	if err := s.db.QueryRow(`SELECT id FROM notes`).Scan(&noteID); err != nil {
+		t.Fatal(err)
+	}
+
+	// While rev-1 is active the note is current.
+	if page, err := s.SearchMemory(ctx, MemorySearch{Text: "stale summary", Scope: "both"}); err != nil || len(page.Hits) != 1 || page.Hits[0].Stale {
+		t.Fatalf("current note not visible before supersede: %+v %v", page, err)
+	}
+
+	v2 := sampleResult("seg-a", "rev-2", 0)
+	v2.Turns[0].Text = "current phrase beta"
+	v2.Source.SupersedesRevision = "rev-1"
+	if _, err := s.IngestTranscript(ctx, v2); err != nil {
+		t.Fatal(err)
+	}
+
+	// SearchMemory: stale note and stale turn are gone by default.
+	if page, err := s.SearchMemory(ctx, MemorySearch{Text: "stale summary", Scope: "both"}); err != nil || len(page.Hits) != 0 {
+		t.Fatalf("stale note surfaced by default: %+v %v", page, err)
+	}
+	if page, err := s.SearchMemory(ctx, MemorySearch{Text: "superseded phrase", Scope: "raw"}); err != nil || len(page.Hits) != 0 {
+		t.Fatalf("stale turn surfaced by default: %+v %v", page, err)
+	}
+	// include_stale surfaces them with stale + derived_from.
+	page, err := s.SearchMemory(ctx, MemorySearch{Text: "stale summary", Scope: "both", IncludeStale: true})
+	if err != nil || len(page.Hits) != 1 {
+		t.Fatalf("include_stale note hits = %+v %v, want the stale note", page, err)
+	}
+	if h := page.Hits[0]; !h.Stale || h.ID != noteID || len(h.DerivedFrom) != 1 || h.DerivedFrom[0] != "rev-1" {
+		t.Fatalf("stale note marker/provenance wrong: %+v", h)
+	}
+	turnPage, err := s.SearchMemory(ctx, MemorySearch{Text: "superseded phrase", Scope: "raw", IncludeStale: true})
+	if err != nil || len(turnPage.Hits) != 1 {
+		t.Fatalf("include_stale turn hits = %+v %v, want the stale turn", turnPage, err)
+	}
+	if h := turnPage.Hits[0]; !h.Stale || h.ID != v1TurnID {
+		t.Fatalf("stale turn marker wrong: %+v", h)
+	}
+
+	// store.Query hides both rows; IncludeStale exposes them.
+	qp, err := s.Query(ctx, Query{ConversationID: conv, IncludeTurns: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range qp.Items {
+		if it.ID == v1TurnID || it.ID == noteID {
+			t.Fatalf("stale item %s surfaced by Query: %+v", it.ID, qp.Items)
+		}
+	}
+	if len(qp.Items) != 2 { // conversation + rev-2 turn
+		t.Fatalf("Query items = %d, want conversation + current turn: %+v", len(qp.Items), qp.Items)
+	}
+	qpStale, err := s.Query(ctx, Query{ConversationID: conv, IncludeTurns: true, IncludeStale: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, it := range qpStale.Items {
+		seen[it.ID] = true
+	}
+	if !seen[v1TurnID] || !seen[noteID] {
+		t.Fatalf("IncludeStale query missing audit rows: %+v", qpStale.Items)
+	}
+
+	// GetItem: default hides the stale note, includeStale returns its marker.
+	if _, err := s.GetItem(ctx, noteID, false); err == nil {
+		t.Fatal("stale note resolved without includeStale")
+	}
+	detail, err := s.GetItem(ctx, noteID, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !detail.Item.Stale || len(detail.Item.DerivedFrom) != 1 || detail.Item.DerivedFrom[0] != "rev-1" {
+		t.Fatalf("stale note detail wrong: %+v", detail.Item)
+	}
+	if _, err := s.GetItem(ctx, v1TurnID, false); err == nil {
+		t.Fatal("stale turn resolved without includeStale")
+	}
+	turnDetail, err := s.GetItem(ctx, v1TurnID, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !turnDetail.Item.Stale {
+		t.Fatalf("stale turn detail not marked: %+v", turnDetail.Item)
+	}
+
+	// ListConversations counts only the active revision and no stale notes.
+	list, err := s.ListConversations(ctx, ConversationFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("conversations = %d, want 1", len(list.Items))
+	}
+	sum := list.Items[0]
+	if sum.ReceivedSegments != 1 || sum.OriginalTurns != 1 || sum.TopicLinkedTurns != 0 || sum.AnalysisStatus != "pending" {
+		t.Fatalf("summary not active-scoped: %+v", sum)
+	}
+}

@@ -148,13 +148,44 @@ func (s *Store) IngestTranscript(ctx context.Context, result asrinput.Result) (I
 	if !errors.Is(err, sql.ErrNoRows) {
 		return IngestReport{}, err
 	}
-	var activeRevision string
-	err = tx.QueryRowContext(ctx, "SELECT transcript_revision FROM source_attachments WHERE recording_id=? AND segment_id=? AND active=1", recordingID, src.SegmentID).Scan(&activeRevision)
-	if err == nil {
-		return IngestReport{}, fmt.Errorf("segment already has active revision %q; revision replacement is not supported", activeRevision)
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
+	var activeID, activeRevision string
+	err = tx.QueryRowContext(ctx, "SELECT id, transcript_revision FROM source_attachments WHERE recording_id=? AND segment_id=? AND active=1", recordingID, src.SegmentID).Scan(&activeID, &activeRevision)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return IngestReport{}, err
+	}
+	if err == nil && src.SupersedesRevision == "" {
+		return IngestReport{}, fmt.Errorf("segment already has active revision %q; supersedes_revision is required to replace it", activeRevision)
+	}
+	// supersededID is the attachment the new revision replaces; only set for a
+	// valid supersede request. The old row keeps its result_json and turns: it
+	// stays as immutable audit history with active=0.
+	supersededID := ""
+	if src.SupersedesRevision != "" {
+		if src.SupersedesRevision == src.TranscriptRevision {
+			return IngestReport{}, errors.New("supersedes_revision must differ from transcript_revision")
+		}
+		if src.SupersedesRevision == activeRevision {
+			supersededID = activeID
+		} else {
+			var targetID string
+			var targetSegmentIndex int
+			e := tx.QueryRowContext(ctx, "SELECT id, segment_index FROM source_attachments WHERE recording_id=? AND transcript_revision=? AND segment_id=?", recordingID, src.SupersedesRevision, src.SegmentID).Scan(&targetID, &targetSegmentIndex)
+			if e == nil {
+				return IngestReport{}, fmt.Errorf("supersedes target %q is not the active revision for segment %q (active %q)", src.SupersedesRevision, src.SegmentID, activeRevision)
+			}
+			if !errors.Is(e, sql.ErrNoRows) {
+				return IngestReport{}, e
+			}
+			var otherSegmentID string
+			e = tx.QueryRowContext(ctx, "SELECT segment_id FROM source_attachments WHERE recording_id=? AND transcript_revision=? LIMIT 1", recordingID, src.SupersedesRevision).Scan(&otherSegmentID)
+			if e == nil {
+				return IngestReport{}, fmt.Errorf("supersedes target %q belongs to segment %q; cross-segment supersede is not allowed", src.SupersedesRevision, otherSegmentID)
+			}
+			if !errors.Is(e, sql.ErrNoRows) {
+				return IngestReport{}, e
+			}
+			return IngestReport{}, fmt.Errorf("supersedes target %q not found for segment %q", src.SupersedesRevision, src.SegmentID)
+		}
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO conversations(id,title,summary,annotation_version,annotation_basis,recording_id,source_sha256,transcript_version,duration_ms,transcript_json,annotations_json) VALUES(?, ?, '', '', '', ?, ?, ?, ?, '{}', '{}')`, conversationID, "Recording "+src.RecordingID, recordingID, deref(src.SourceAudioSHA256), transcriptVersion, src.SegmentOffsetMS+src.SegmentDurationMS); err != nil {
 		return IngestReport{}, err
@@ -177,7 +208,16 @@ func (s *Store) IngestTranscript(ctx context.Context, result asrinput.Result) (I
 		return IngestReport{}, err
 	}
 	attachmentID := stableKey("attachment", recordingID, src.SegmentID, src.TranscriptRevision)
-	if _, err = tx.ExecContext(ctx, `INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active,supersedes_revision) VALUES(?,?,?,?,?,?,?,?,?,1,NULL)`, attachmentID, conversationID, recordingID, segmentIndex, src.SegmentID, src.TranscriptRevision, string(sourceJSON), resultJSON, digest); err != nil {
+	if supersededID != "" {
+		if _, err = tx.ExecContext(ctx, `UPDATE source_attachments SET active=0 WHERE id=? AND active=1`, supersededID); err != nil {
+			return IngestReport{}, err
+		}
+	}
+	var supersedes any
+	if src.SupersedesRevision != "" {
+		supersedes = src.SupersedesRevision
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active,supersedes_revision) VALUES(?,?,?,?,?,?,?,?,?,1,?)`, attachmentID, conversationID, recordingID, segmentIndex, src.SegmentID, src.TranscriptRevision, string(sourceJSON), resultJSON, digest, supersedes); err != nil {
 		return IngestReport{}, err
 	}
 	// Retained turns only: blank text is skipped below and never enters turns.
@@ -209,6 +249,11 @@ func (s *Store) IngestTranscript(ctx context.Context, result asrinput.Result) (I
 			return IngestReport{}, err
 		}
 		if _, err = tx.ExecContext(ctx, "INSERT INTO attachment_turns(attachment_id,turn_id) VALUES(?,?)", attachmentID, turnID); err != nil {
+			return IngestReport{}, err
+		}
+	}
+	if supersededID != "" {
+		if _, err = markStaleForAttachment(ctx, tx, supersededID, staleReasonSuperseded, time.Now()); err != nil {
 			return IngestReport{}, err
 		}
 	}
