@@ -167,7 +167,7 @@ func asValidationError(err error, out **decision.ValidationError) bool {
 
 func main() {
 	log.SetOutput(os.Stderr)
-	addr := flag.String("addr", "127.0.0.1:8765", "listen address")
+	addr := flag.String("addr", "127.0.0.1:8799", "listen address")
 	model := flag.String("model", "jev-style-2b-v2", "model name reported to clients")
 	weights := flag.String("weights-version", "sandbox-synthetic-v1", "weights version reported to clients")
 	flag.Parse()

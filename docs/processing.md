@@ -213,9 +213,10 @@ make build
 # 合成执行器处理一次（默认 --executor synthetic）
 ./bin/context-worker --db ./data/context-memory.db --once
 
-# 判断服务（二选一）：真实 Decision 2.0 服务已可本机运行；
-# 离线/CI 可用同契约的确定性沙盒参考实现（weights_version 如实标注为 sandbox）
-./bin/context-decision --addr 127.0.0.1:8765
+# 判断服务（二选一）：真实 Decision 2.0 服务（本机默认 127.0.0.1:8765）已可运行；
+# 离线/CI 可用同契约的确定性沙盒参考实现（默认 127.0.0.1:8799，避开真服务端口；
+# weights_version 如实标注为 sandbox）
+./bin/context-decision --addr 127.0.0.1:8799
 
 # shadow 决策执行器：调用本地 Decision 服务并记录判断，
 # 同时用默认合成生成器产出候选并入队 publish 任务
