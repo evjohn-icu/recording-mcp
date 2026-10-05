@@ -160,6 +160,39 @@ type MemoryLinkList struct {
 	Links []MemoryLinkView `json:"links"`
 }
 
+type ProposeSpeakerBindingInput struct {
+	RecordingID        string   `json:"recording_id"`
+	SpeakerScopedID    string   `json:"speaker_scoped_id"`
+	TranscriptRevision string   `json:"transcript_revision"`
+	EvidenceTurnIDs    []string `json:"evidence_turn_ids,omitempty"`
+	Model              string   `json:"model,omitempty"`
+}
+type ReviewSpeakerBindingInput struct {
+	BindingID string `json:"binding_id"`
+	Action    string `json:"action"`
+	PersonID  string `json:"person_id,omitempty"`
+	Reviewer  string `json:"reviewer"`
+	Note      string `json:"note,omitempty"`
+}
+type GetSpeakerProjectionInput struct {
+	RecordingID        string `json:"recording_id"`
+	TranscriptRevision string `json:"transcript_revision"`
+}
+type SpeakerProjectionResult struct {
+	Experimental       bool              `json:"experimental"`
+	RecordingID        string            `json:"recording_id"`
+	TranscriptRevision string            `json:"transcript_revision"`
+	Projection         map[string]string `json:"projection"`
+}
+type ListSpeakerBindingsInput struct {
+	RecordingID     string `json:"recording_id"`
+	SpeakerScopedID string `json:"speaker_scoped_id,omitempty"`
+}
+type SpeakerBindingList struct {
+	Experimental bool                    `json:"experimental"`
+	Bindings     []memory.SpeakerBinding `json:"bindings"`
+}
+
 func memoryLinkView(l pipeline.MemoryLink) MemoryLinkView {
 	return MemoryLinkView{
 		LinkID: l.ID, FromKind: l.FromKind, FromID: l.FromID, FromTitle: l.FromTitle,
@@ -334,12 +367,93 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker)
 			return nil, memoryLinkView(l), nil
 		})
 	}
+	mcp.AddTool(s, read("get_speaker_projection", "解析某次转录修订中一个录音已确认的说话人标签到 person id 的映射。只有 confirmed 绑定参与解析，proposed/rejected/revoked 一律不解析，因此身份不会跨修订泄漏。"), func(ctx context.Context, _ *mcp.CallToolRequest, in GetSpeakerProjectionInput) (*mcp.CallToolResult, SpeakerProjectionResult, error) {
+		recordingID := strings.TrimSpace(in.RecordingID)
+		revision := strings.TrimSpace(in.TranscriptRevision)
+		if recordingID == "" {
+			return nil, SpeakerProjectionResult{}, fmt.Errorf("recording_id is required")
+		}
+		if revision == "" {
+			return nil, SpeakerProjectionResult{}, fmt.Errorf("transcript_revision is required")
+		}
+		proj, e := store.SpeakerProjection(ctx, recordingID, revision)
+		if e != nil {
+			return nil, SpeakerProjectionResult{}, e
+		}
+		if proj == nil {
+			proj = map[string]string{}
+		}
+		return nil, SpeakerProjectionResult{Experimental: true, RecordingID: recordingID, TranscriptRevision: revision, Projection: proj}, nil
+	})
+	mcp.AddTool(s, read("list_speaker_bindings", "列出某个录音的全部说话人绑定（所有版本与状态，含 proposed/rejected/revoked 历史），按 speaker_scoped_id 再按 version 升序，可用 speaker_scoped_id 收窄到单个标签。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ListSpeakerBindingsInput) (*mcp.CallToolResult, SpeakerBindingList, error) {
+		recordingID := strings.TrimSpace(in.RecordingID)
+		if recordingID == "" {
+			return nil, SpeakerBindingList{}, fmt.Errorf("recording_id is required")
+		}
+		bindings, e := store.ListSpeakerBindings(ctx, recordingID, strings.TrimSpace(in.SpeakerScopedID))
+		if e != nil {
+			return nil, SpeakerBindingList{}, e
+		}
+		if bindings == nil {
+			bindings = []memory.SpeakerBinding{}
+		}
+		return nil, SpeakerBindingList{Experimental: true, Bindings: bindings}, nil
+	})
+	if !readOnly {
+		mcp.AddTool(s, write("propose_speaker_binding", "为某个录音的某个 diarization 说话人标签提出身份假设，并记录支撑该假设的证据轮次。绑定按转录修订隔离：身份绝不跨修订沿用；重放会就地刷新仍为 proposed 的草稿，同一修订已 confirmed 时重放幂等。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ProposeSpeakerBindingInput) (*mcp.CallToolResult, memory.SpeakerBinding, error) {
+			recordingID := strings.TrimSpace(in.RecordingID)
+			speakerScopedID := strings.TrimSpace(in.SpeakerScopedID)
+			revision := strings.TrimSpace(in.TranscriptRevision)
+			if recordingID == "" {
+				return nil, memory.SpeakerBinding{}, fmt.Errorf("recording_id is required")
+			}
+			if speakerScopedID == "" {
+				return nil, memory.SpeakerBinding{}, fmt.Errorf("speaker_scoped_id is required")
+			}
+			if revision == "" {
+				return nil, memory.SpeakerBinding{}, fmt.Errorf("transcript_revision is required")
+			}
+			b, e := store.ProposeSpeakerBinding(ctx, recordingID, speakerScopedID, revision, in.EvidenceTurnIDs, in.Model)
+			return nil, b, e
+		})
+		mcp.AddTool(s, write("review_speaker_binding", "复核一条说话人绑定。confirm 需要 person_id，接受 proposed 绑定；reject 拒绝 proposed 或 confirmed 绑定；revoke 撤回已 confirmed 绑定。动作大小写不敏感，对同一目标状态幂等，且只改状态、不删除历史。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ReviewSpeakerBindingInput) (*mcp.CallToolResult, memory.SpeakerBinding, error) {
+			bindingID := strings.TrimSpace(in.BindingID)
+			action := strings.ToLower(strings.TrimSpace(in.Action))
+			reviewer := strings.TrimSpace(in.Reviewer)
+			if bindingID == "" {
+				return nil, memory.SpeakerBinding{}, fmt.Errorf("binding_id is required")
+			}
+			if action == "" {
+				return nil, memory.SpeakerBinding{}, fmt.Errorf("action is required")
+			}
+			if reviewer == "" {
+				return nil, memory.SpeakerBinding{}, fmt.Errorf("reviewer is required")
+			}
+			switch action {
+			case "confirm":
+				personID := strings.TrimSpace(in.PersonID)
+				if personID == "" {
+					return nil, memory.SpeakerBinding{}, fmt.Errorf("person_id is required for confirm")
+				}
+				b, e := store.ConfirmSpeakerBinding(ctx, bindingID, personID, reviewer)
+				return nil, b, e
+			case "reject":
+				b, e := store.RejectSpeakerBinding(ctx, bindingID, reviewer, in.Note)
+				return nil, b, e
+			case "revoke":
+				b, e := store.RevokeSpeakerBinding(ctx, bindingID, reviewer, in.Note)
+				return nil, b, e
+			default:
+				return nil, memory.SpeakerBinding{}, fmt.Errorf("action must be confirm, reject or revoke")
+			}
+		})
+	}
 	return s
 }
 func main() {
 	log.SetOutput(os.Stderr)
 	db := flag.String("db", "data/context-memory.db", "experimental SQLite memory database")
-	readOnly := flag.Bool("read-only", false, "register only the read tools; ingest_transcript, apply_annotations and review_memory_link are not exposed")
+	readOnly := flag.Bool("read-only", false, "register only the read tools; ingest_transcript, apply_annotations, review_memory_link, propose_speaker_binding and review_speaker_binding are not exposed")
 	decisionURL := flag.String("decision-url", "", "optional Decision engine endpoint used to rerank build_context items (empty disables reranking)")
 	decisionModel := flag.String("decision-model", "jev-style-2b-v2", "model name sent to the Decision engine for build_context reranking")
 	flag.Parse()

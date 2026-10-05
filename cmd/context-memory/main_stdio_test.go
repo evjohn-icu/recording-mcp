@@ -69,7 +69,9 @@ func TestExecutableStdioRoundTrip(t *testing.T) {
 		"query_context", "get_conversation_context", "get_context_item", "list_topics",
 		"get_processing_status", "get_annotation_history", "list_conversations",
 		"get_evidence_context", "search_memory", "build_context", "list_memory_links",
+		"get_speaker_projection", "list_speaker_bindings",
 		"ingest_transcript", "apply_annotations", "review_memory_link",
+		"propose_speaker_binding", "review_speaker_binding",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("tool surface = %v, want %d tools", got, len(want))

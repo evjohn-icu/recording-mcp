@@ -417,6 +417,9 @@ func (s *Store) Query(ctx context.Context, q Query) (Page, error) {
 		turnItems[i].DerivedFrom, _ = s.turnDerivedFrom(ctx, turnItems[i].ID)
 	}
 	if q.IncludeTurns {
+		if err := s.resolveSpeakerIdentities(ctx, turnItems); err != nil {
+			return Page{}, err
+		}
 		items = append(items, turnItems...)
 	}
 	// Conversation and notes appear by default; turns only when explicitly requested.
@@ -550,6 +553,40 @@ func (s *Store) turnDerivedFrom(ctx context.Context, id string) ([]string, error
 	return s.transcriptRevisions(ctx, `SELECT DISTINCT a.transcript_revision FROM attachment_turns at JOIN source_attachments a ON a.id=at.attachment_id WHERE at.turn_id=? ORDER BY a.transcript_revision`, id)
 }
 
+// resolveSpeakerIdentities fills SpeakerPersonID on turn items from the
+// confirmed speaker bindings of each turn's own transcript revision. Identity
+// is revision-scoped, so a turn resolves only when it carries exactly one
+// source revision and a speaker label: legacy turns without attachment rows
+// have no revision and stay nil, and a label whose binding is proposed,
+// rejected or revoked has no confirmed identity and also stays nil. The
+// SpeakerProjection lookup is cached per call keyed by (recording, revision),
+// so a page of turns costs one query per distinct pair and no query at all
+// when no turn carries a speaker label.
+func (s *Store) resolveSpeakerIdentities(ctx context.Context, items []Item) error {
+	cache := map[string]map[string]string{}
+	for i := range items {
+		it := &items[i]
+		if it.Kind != "turn" || it.SpeakerScopedID == nil || len(it.DerivedFrom) != 1 {
+			continue
+		}
+		key := it.RecordingID + "\x00" + it.DerivedFrom[0]
+		proj, ok := cache[key]
+		if !ok {
+			var err error
+			proj, err = s.SpeakerProjection(ctx, it.RecordingID, it.DerivedFrom[0])
+			if err != nil {
+				return err
+			}
+			cache[key] = proj
+		}
+		if person, found := proj[*it.SpeakerScopedID]; found && person != "" {
+			v := person
+			it.SpeakerPersonID = &v
+		}
+	}
+	return nil
+}
+
 // noteDerivedFrom returns the transcript_revision values of the attachments a
 // note was derived from, sorted ascending. Legacy notes yield an empty slice.
 func (s *Store) noteDerivedFrom(ctx context.Context, id string) ([]string, error) {
@@ -619,6 +656,11 @@ func (s *Store) GetItem(ctx context.Context, id string, includeStale bool) (Item
 		it.TopicIDs, _ = s.turnTopics(ctx, id)
 		it.Stale, _ = s.turnStale(ctx, id)
 		it.DerivedFrom, _ = s.turnDerivedFrom(ctx, id)
+		resolved := []Item{it}
+		if err := s.resolveSpeakerIdentities(ctx, resolved); err != nil {
+			return ItemDetail{}, err
+		}
+		it = resolved[0]
 		return ItemDetail{Experimental: true, Item: it}, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {

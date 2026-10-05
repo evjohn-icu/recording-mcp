@@ -141,6 +141,59 @@ func getSpeakerBinding(ctx context.Context, tx *sql.Tx, id string) (SpeakerBindi
 	return b, nil
 }
 
+// ListSpeakerBindings returns every binding row of one recording in a
+// deterministic order: by speaker_scoped_id then by version ascending, so a
+// label's history reads oldest first and labels are grouped. A non-empty
+// speakerScopedID narrows the result to that one diarization label; an empty
+// label returns every label of the recording. All statuses are included so
+// callers can audit proposals and terminal verdicts, not only the confirmed
+// identity that SpeakerProjection resolves.
+func (s *Store) ListSpeakerBindings(ctx context.Context, recordingID, speakerScopedID string) ([]SpeakerBinding, error) {
+	if !validID(recordingID) {
+		return nil, fmt.Errorf("memory: list speaker bindings: recording id is required")
+	}
+	query := `SELECT id, recording_id, transcript_revision, speaker_scoped_id, person_id, status, evidence_json, reviewer, version, created_at, updated_at
+		FROM speaker_bindings WHERE recording_id=?`
+	args := []any{recordingID}
+	if speakerScopedID != "" {
+		query += ` AND speaker_scoped_id=?`
+		args = append(args, speakerScopedID)
+	}
+	query += ` ORDER BY speaker_scoped_id, version`
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("memory: list speaker bindings: query: %w", err)
+	}
+	defer rows.Close()
+	out := []SpeakerBinding{}
+	for rows.Next() {
+		var (
+			b        SpeakerBinding
+			person   sql.NullString
+			evidence string
+		)
+		if err := rows.Scan(&b.ID, &b.RecordingID, &b.TranscriptRevision, &b.SpeakerScopedID, &person, &b.Status,
+			&evidence, &b.Reviewer, &b.Version, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("memory: list speaker bindings: scan: %w", err)
+		}
+		if person.Valid {
+			b.PersonID = person.String
+		}
+		if err := json.Unmarshal([]byte(evidence), &b.EvidenceTurnIDs); err != nil {
+			return nil, fmt.Errorf("memory: list speaker bindings: decode evidence: %w", err)
+		}
+		if b.EvidenceTurnIDs == nil {
+			b.EvidenceTurnIDs = []string{}
+		}
+		out = append(out, b)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("memory: list speaker bindings: read: %w", err)
+	}
+	return out, nil
+}
+
 // insertSpeakerBindingEvent appends one append-only event row. The id is
 // derived from (binding, action, version), so replaying the same transition
 // would reuse the id rather than duplicate the log entry.

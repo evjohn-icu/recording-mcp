@@ -482,6 +482,7 @@ func TestReadOnlyServerExposesOnlyReadTools(t *testing.T) {
 		"query_context", "get_conversation_context", "get_context_item", "list_topics",
 		"get_processing_status", "get_annotation_history", "list_conversations",
 		"get_evidence_context", "search_memory", "build_context", "list_memory_links",
+		"get_speaker_projection", "list_speaker_bindings",
 	}
 	if len(got) != len(wantRead) {
 		t.Fatalf("read-only server exposes %d tools %v, want %d", len(got), got, len(wantRead))
@@ -491,7 +492,7 @@ func TestReadOnlyServerExposesOnlyReadTools(t *testing.T) {
 			t.Fatalf("read-only server missing read tool %s", name)
 		}
 	}
-	for _, name := range []string{"ingest_transcript", "apply_annotations", "review_memory_link"} {
+	for _, name := range []string{"ingest_transcript", "apply_annotations", "review_memory_link", "propose_speaker_binding", "review_speaker_binding"} {
 		if got[name] {
 			t.Fatalf("read-only server exposed write tool %s", name)
 		}
@@ -599,5 +600,182 @@ func TestBuildContextToolSmoke(t *testing.T) {
 	}
 	if pkg.Trace.DecisionRerank {
 		t.Fatal("build_context reported a decision rerank without an engine")
+	}
+}
+
+// TestSpeakerBindingToolsOverMCP exercises the speaker identity contract over
+// the MCP surface: propose a label, confirm it for one transcript revision,
+// observe the revision-scoped projection, list the row, then reject and revoke,
+// plus the validation errors for unknown actions and missing required fields.
+func TestSpeakerBindingToolsOverMCP(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	store, err := memory.Open(filepath.Join(t.TempDir(), "speakers.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if _, err := store.DB().Exec(`INSERT INTO conversations(id,title,summary,annotation_version,annotation_basis,recording_id,source_sha256,transcript_version,duration_ms,transcript_json,annotations_json)
+		VALUES('conv:spk','title','','v1','','rec:spk','sha','v1',1000,'{}','{}')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.DB().Exec(`INSERT INTO recordings(id,conversation_id,source_file,source_sha256,duration_ms,recording_started_at,absolute_time_known)
+		VALUES('rec:spk','conv:spk','file','sha',1000,NULL,0)`); err != nil {
+		t.Fatal(err)
+	}
+
+	st, ct := mcp.NewInMemoryTransports()
+	ss, err := newServer(store, false, nil).Connect(ctx, st, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ss.Close()
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+
+	call := func(t *testing.T, name string, args map[string]any) *mcp.CallToolResult {
+		t.Helper()
+		res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: args})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+	decode := func(t *testing.T, res *mcp.CallToolResult, out any) {
+		t.Helper()
+		if res.IsError {
+			t.Fatalf("tool rejected valid input: %+v", res.Content)
+		}
+		b, err := json.Marshal(res.StructuredContent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(b, out); err != nil {
+			t.Fatal(err)
+		}
+	}
+	projection := func(t *testing.T, recordingID, revision string) map[string]string {
+		t.Helper()
+		var out SpeakerProjectionResult
+		decode(t, call(t, "get_speaker_projection", map[string]any{"recording_id": recordingID, "transcript_revision": revision}), &out)
+		if out.Projection == nil {
+			t.Fatal("projection is null, want an empty map")
+		}
+		if !out.Experimental || out.RecordingID != recordingID || out.TranscriptRevision != revision {
+			t.Fatalf("projection envelope = %+v", out)
+		}
+		return out.Projection
+	}
+
+	// Propose: a proposal is not an accepted identity yet, so the projection
+	// stays empty.
+	var proposed memory.SpeakerBinding
+	decode(t, call(t, "propose_speaker_binding", map[string]any{
+		"recording_id": "rec:spk", "speaker_scoped_id": "speaker_0",
+		"transcript_revision": "rev-1", "evidence_turn_ids": []string{"turn-1", "turn-2"}, "model": "curator",
+	}), &proposed)
+	if proposed.Status != "proposed" || proposed.Version != 1 || proposed.PersonID != "" {
+		t.Fatalf("proposal = %+v", proposed)
+	}
+	if proposed.RecordingID != "rec:spk" || proposed.SpeakerScopedID != "speaker_0" || proposed.TranscriptRevision != "rev-1" {
+		t.Fatalf("proposal scoping = %+v", proposed)
+	}
+	if len(proposed.EvidenceTurnIDs) != 2 || proposed.EvidenceTurnIDs[0] != "turn-1" {
+		t.Fatalf("proposal evidence = %+v", proposed.EvidenceTurnIDs)
+	}
+	if got := projection(t, "rec:spk", "rev-1"); len(got) != 0 {
+		t.Fatalf("proposed binding leaked into projection: %v", got)
+	}
+
+	// Confirm with a case-insensitive action resolves the label for rev-1 only.
+	var confirmed memory.SpeakerBinding
+	decode(t, call(t, "review_speaker_binding", map[string]any{
+		"binding_id": proposed.ID, "action": "Confirm", "person_id": "person:alice", "reviewer": "reviewer-a",
+	}), &confirmed)
+	if confirmed.Status != "confirmed" || confirmed.PersonID != "person:alice" || confirmed.ID != proposed.ID {
+		t.Fatalf("confirmation = %+v", confirmed)
+	}
+	if got := projection(t, "rec:spk", "rev-1"); len(got) != 1 || got["speaker_0"] != "person:alice" {
+		t.Fatalf("rev-1 projection = %v, want speaker_0 -> person:alice", got)
+	}
+	if other := projection(t, "rec:spk", "rev-2"); len(other) != 0 {
+		t.Fatalf("identity leaked into another revision: %v", other)
+	}
+
+	// list_speaker_bindings returns the row under an experimental envelope.
+	var list SpeakerBindingList
+	decode(t, call(t, "list_speaker_bindings", map[string]any{"recording_id": "rec:spk"}), &list)
+	if !list.Experimental || len(list.Bindings) != 1 || list.Bindings[0].ID != proposed.ID || list.Bindings[0].Status != "confirmed" {
+		t.Fatalf("binding list = %+v", list)
+	}
+	var narrowed SpeakerBindingList
+	decode(t, call(t, "list_speaker_bindings", map[string]any{"recording_id": "rec:spk", "speaker_scoped_id": "speaker_0"}), &narrowed)
+	if len(narrowed.Bindings) != 1 {
+		t.Fatalf("narrowed list = %+v", narrowed.Bindings)
+	}
+	var none SpeakerBindingList
+	decode(t, call(t, "list_speaker_bindings", map[string]any{"recording_id": "rec:spk", "speaker_scoped_id": "speaker_9"}), &none)
+	if none.Bindings == nil || len(none.Bindings) != 0 {
+		t.Fatalf("unknown label list = %+v, want empty non-nil", none.Bindings)
+	}
+
+	// Reject a second label: the verdict is recorded, the projection unchanged.
+	var second memory.SpeakerBinding
+	decode(t, call(t, "propose_speaker_binding", map[string]any{
+		"recording_id": "rec:spk", "speaker_scoped_id": "speaker_1", "transcript_revision": "rev-1",
+	}), &second)
+	if len(second.EvidenceTurnIDs) != 0 {
+		t.Fatalf("omitted evidence = %+v, want empty", second.EvidenceTurnIDs)
+	}
+	var rejected memory.SpeakerBinding
+	decode(t, call(t, "review_speaker_binding", map[string]any{
+		"binding_id": second.ID, "action": "reject", "reviewer": "reviewer-b", "note": "not the same speaker",
+	}), &rejected)
+	if rejected.Status != "rejected" || rejected.ID != second.ID {
+		t.Fatalf("rejection = %+v", rejected)
+	}
+	if got := projection(t, "rec:spk", "rev-1"); len(got) != 1 || got["speaker_0"] != "person:alice" {
+		t.Fatalf("reject disturbed projection: %v", got)
+	}
+
+	// Revoke the confirmed identity: it disappears from the projection while the
+	// row keeps its audit history.
+	var revoked memory.SpeakerBinding
+	decode(t, call(t, "review_speaker_binding", map[string]any{
+		"binding_id": proposed.ID, "action": "revoke", "reviewer": "reviewer-a", "note": "misidentified",
+	}), &revoked)
+	if revoked.Status != "revoked" || revoked.ID != proposed.ID {
+		t.Fatalf("revocation = %+v", revoked)
+	}
+	if got := projection(t, "rec:spk", "rev-1"); len(got) != 0 {
+		t.Fatalf("revoked binding still resolves: %v", got)
+	}
+	decode(t, call(t, "list_speaker_bindings", map[string]any{"recording_id": "rec:spk"}), &list)
+	if len(list.Bindings) != 2 {
+		t.Fatalf("history after revoke = %+v, want both rows", list.Bindings)
+	}
+
+	// Unknown actions and missing required fields are refused with errors.
+	for _, bad := range []struct {
+		name string
+		args map[string]any
+	}{
+		{"review_speaker_binding", map[string]any{"binding_id": proposed.ID, "action": "merge", "reviewer": "r"}},
+		{"review_speaker_binding", map[string]any{"action": "confirm", "person_id": "person:x", "reviewer": "r"}},
+		{"review_speaker_binding", map[string]any{"binding_id": proposed.ID, "action": "confirm", "reviewer": "r"}},
+		{"review_speaker_binding", map[string]any{"binding_id": proposed.ID, "action": "confirm", "person_id": "person:x"}},
+		{"propose_speaker_binding", map[string]any{"speaker_scoped_id": "speaker_0", "transcript_revision": "rev-1"}},
+		{"propose_speaker_binding", map[string]any{"recording_id": "rec:spk", "transcript_revision": "rev-1"}},
+		{"propose_speaker_binding", map[string]any{"recording_id": "rec:spk", "speaker_scoped_id": "speaker_0"}},
+		{"get_speaker_projection", map[string]any{"transcript_revision": "rev-1"}},
+		{"get_speaker_projection", map[string]any{"recording_id": "rec:spk"}},
+		{"list_speaker_bindings", map[string]any{}},
+	} {
+		if res := call(t, bad.name, bad.args); !res.IsError {
+			t.Fatalf("%s accepted invalid input %v", bad.name, bad.args)
+		}
 	}
 }

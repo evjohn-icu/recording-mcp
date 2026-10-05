@@ -44,6 +44,10 @@ make build
 | `build_context` | 实验性：为任务组装带预算与来源的上下文包，返回 `items` / `evidence` / `coverage` / `gaps` / `truncated` / `degraded` / `degrade_reason` / `trace`。`query`、`conversation_id`、`topic_ids` 至少一项必填；`max_bytes` 默认 16000、`max_items` 默认 12；`include_raw_evidence` 纳入原始轮次证据。默认排除 stale 派生记忆；仅在服务端配置 `--decision-url` 时做决策重排，否则 `degraded=true` 但确定性结果仍完整返回 |
 | `list_memory_links` | 列出话题之间的记忆关联（`proposed` / `confirmed` / `rejected`）。`status` 与 `topic_id` 可选；`limit` 缺省 50、上限 200，按 `created_at, id` 返回端点标题、理由、证据轮次与置信度 |
 | `review_memory_link` | 复核一条关联建议。`link_id` 与 `action` 必填：`confirm` 把 `proposed` 变为 `confirmed`；`reject` 把 `proposed` 或 `confirmed` 变为 `rejected`；`reopen` 把 `confirmed` 或 `rejected` 退回 `proposed`。重复同一动作幂等，记录不删除 |
+| `propose_speaker_binding` | 提议某个录音内某说话人标签在指定 transcript 修订下代表某个人物（写入）。`recording_id`、`speaker_scoped_id`、`transcript_revision` 必填；`evidence_turn_ids` 与 `model` 记录提议依据。绑定按修订作用域，标签跨修订不继承身份 |
+| `review_speaker_binding` | 复核一条说话人绑定（写入）。`binding_id` 与 `action` 必填：`confirm`（需 `person_id`）/ `reject` / `revoke`；终态行是不可变历史，撤销后可基于新证据重新提议 |
+| `get_speaker_projection` | 返回某个录音在指定 transcript 修订下、经人工确认的 `speaker_scoped_id → person_id` 投影；未确认身份不返回 |
+| `list_speaker_bindings` | 列出一个录音（可限定某个标签）的全部说话人绑定行，含状态、版本与修订，供审计 |
 
 上表中的 `list_conversations`、`get_evidence_context` 与 `search_memory` 是与既有工具不同的检索契约：它们不走 `query_context` / `get_conversation_context` 的 offset 分页，而是返回游标（`next_cursor`），下一页请求把游标原样带回 `cursor` 字段。时间过滤字段（`started_after` / `started_before`）为 RFC 3339 字符串，且只对录音开始时间已知的会话生效；有界查询会排除开始时间未知的会话。`list_conversations` 的 `status` 只接受 `pending` / `partial`（大小写不敏感），语义与 `get_processing_status` 的 `analysis_status` 一致；`limit` 缺省 20、上限 100。`search_memory` 的 `limit` 同理，多读一条记录判断是否有下一页。
 

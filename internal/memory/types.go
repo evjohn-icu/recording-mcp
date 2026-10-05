@@ -83,6 +83,13 @@ type Item struct {
 	Content            string   `json:"content,omitempty"`
 	SpeakerScopedID    *string  `json:"speaker_scoped_id,omitempty"`
 	SpeakerEntityID    *string  `json:"speaker_entity_id"`
+	// SpeakerPersonID is the confirmed identity of the turn's speaker label
+	// within its own transcript revision, projected from speaker_bindings at
+	// retrieval time. It is nil for notes and conversations, for turns without
+	// a speaker label or source revision (legacy rows), and for labels whose
+	// binding is still proposed, rejected or revoked. It is never a fabricated
+	// value; turns.speaker_entity_id stays NULL.
+	SpeakerPersonID *string `json:"speaker_person_id,omitempty"`
 	GlobalStartMS      *int64   `json:"global_start_ms"`
 	GlobalEndMS        *int64   `json:"global_end_ms"`
 	SourceSHA256       string   `json:"source_sha256,omitempty"`

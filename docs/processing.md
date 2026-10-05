@@ -184,6 +184,8 @@ transcript 被 supersede 后,系统对“历史”与“当前”做如下划分
 
 局部分说话人标签到真实人物的绑定契约（本实现不含声学识别，只存人工/模型确认的绑定）：`speaker_bindings` 以 `(recording_id, speaker_scoped_id)` 为标签作用域、`transcript_revision` 为修订作用域——同一个 diarization 标签在不同转写修订间可能被复用，身份绝不跨修订继承。状态 `proposed / confirmed / rejected / revoked`，`version` 是行在标签组内的稳定序号（复核不改写）；`speaker_binding_events` 每次动作追加一行（`propose` / `confirm` / `reject` / `revoke`，actor 与备注）。`Store.SpeakerProjection(recordingID, transcriptRevision)` 只返回该修订下 `confirmed` 的行，撤销立即生效；未确认身份仍是未知。生命周期策略（文档化并有测试）：proposed 行是可刷新草稿；confirmed 同修订重放幂等；其他终态行（不同修订的 confirmed、rejected、revoked）是不可变历史，新提议创建下一个版本行，因此撤销后可基于新证据重新提议，被拒绝也不阻塞未来的新主张。同一标签在另一录音中不受影响。
 
+MCP 面已暴露（`context-memory`）：写入 `propose_speaker_binding` / `review_speaker_binding`，只读 `get_speaker_projection` / `list_speaker_bindings`；current 检索返回的原话条目带 `speaker_person_id`（confirmed 投影解析结果，`turns.speaker_entity_id` 始终保持 NULL——身份永远是投影，不是行内实名）。
+
 ## 状态机与租约语义
 
 ```text

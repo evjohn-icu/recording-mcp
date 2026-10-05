@@ -495,3 +495,85 @@ func TestSpeakerBindingReproposeAfterRevokeAndReject(t *testing.T) {
 		t.Fatalf("rejected row history damaged: %+v", again)
 	}
 }
+
+// TestListSpeakerBindingsOrderAndFilter proves the read path returns every
+// version of a recording's bindings grouped by label and ordered oldest first,
+// includes terminal verdicts, narrows to one label on request and never leaks
+// a binding across recording ids.
+func TestListSpeakerBindingsOrderAndFilter(t *testing.T) {
+	ctx := context.Background()
+	s := openSpeakerStore(t)
+	seedRecording(t, s, "conv-1", "rec-1")
+	seedRecording(t, s, "conv-2", "rec-2")
+
+	// A binding on another recording must not appear in rec-1's list.
+	if _, err := s.ProposeSpeakerBinding(ctx, "rec-2", "speaker_0", "rev-1", nil, "model-x"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Propose out of label order, then add a second version of speaker_0 so the
+	// version tiebreak inside one label is exercised.
+	if _, err := s.ProposeSpeakerBinding(ctx, "rec-1", "speaker_1", "rev-1", []string{"t1"}, "model-x"); err != nil {
+		t.Fatal(err)
+	}
+	speaker0v1, err := s.ProposeSpeakerBinding(ctx, "rec-1", "speaker_0", "rev-1", []string{"t2"}, "model-x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RejectSpeakerBinding(ctx, speaker0v1.ID, "reviewer-b", "wrong speaker"); err != nil {
+		t.Fatal(err)
+	}
+	speaker0v2, err := s.ProposeSpeakerBinding(ctx, "rec-1", "speaker_0", "rev-1", []string{"t2", "t3"}, "model-y")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if speaker0v2.Version != 2 {
+		t.Fatalf("expected a second version of speaker_0, got %+v", speaker0v2)
+	}
+
+	all, err := s.ListSpeakerBindings(ctx, "rec-1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 3 {
+		t.Fatalf("bindings = %d, want 3: %+v", len(all), all)
+	}
+	wantIDs := []string{speaker0v1.ID, speaker0v2.ID, speakerBindingID("rec-1", "speaker_1", 1)}
+	for i, want := range wantIDs {
+		if all[i].ID != want {
+			t.Fatalf("binding %d id = %q, want %q (order: speaker_0 v1, speaker_0 v2, speaker_1 v1)", i, all[i].ID, want)
+		}
+	}
+	// Terminal verdicts are part of the audit surface, not filtered out.
+	if all[0].Status != speakerBindingRejected || all[1].Status != speakerBindingProposed {
+		t.Fatalf("statuses = %q, %q; want rejected then proposed", all[0].Status, all[1].Status)
+	}
+	if all[1].TranscriptRevision != "rev-1" || len(all[1].EvidenceTurnIDs) != 2 {
+		t.Fatalf("second version lost its fields: %+v", all[1])
+	}
+
+	narrowed, err := s.ListSpeakerBindings(ctx, "rec-1", "speaker_0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(narrowed) != 2 || narrowed[0].ID != speaker0v1.ID || narrowed[1].ID != speaker0v2.ID {
+		t.Fatalf("narrowed list = %+v, want both speaker_0 versions", narrowed)
+	}
+
+	none, err := s.ListSpeakerBindings(ctx, "rec-1", "speaker_9")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if none == nil || len(none) != 0 {
+		t.Fatalf("unknown label = %+v, want empty non-nil slice", none)
+	}
+
+	// rec-2 only has its own label; the filter is recording-scoped.
+	other, err := s.ListSpeakerBindings(ctx, "rec-2", "speaker_0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(other) != 1 || other[0].RecordingID != "rec-2" {
+		t.Fatalf("rec-2 list = %+v, want its own single binding", other)
+	}
+}
