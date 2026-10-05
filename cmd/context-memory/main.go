@@ -29,7 +29,7 @@ type ConversationInput struct {
 }
 type ItemInput struct {
 	ID           string `json:"id"`
-	IncludeStale bool   `json:"include_stale"`
+	IncludeStale bool   `json:"include_stale,omitempty"`
 }
 type TopicsInput struct {
 	ConversationID string `json:"conversation_id,omitempty"`
@@ -128,7 +128,7 @@ type SearchMemoryInput struct {
 	StartedBefore string `json:"started_before,omitempty"`
 	Limit         int    `json:"limit,omitempty"`
 	Cursor        string `json:"cursor,omitempty"`
-	IncludeStale  bool   `json:"include_stale"`
+	IncludeStale  bool   `json:"include_stale,omitempty"`
 }
 type ListMemoryLinksInput struct {
 	Status  string `json:"status,omitempty"`

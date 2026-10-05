@@ -55,8 +55,8 @@ const (
 // Request describes one context build. At least one of Purpose-adjacent
 // selectors (Query, ConversationID, TopicIDs) must be non-empty.
 type Request struct {
-	Purpose            string     `json:"purpose"`
-	Query              string     `json:"query"`
+	Purpose            string     `json:"purpose,omitempty"`
+	Query              string     `json:"query,omitempty"`
 	ConversationID     string     `json:"conversation_id,omitempty"`
 	TopicIDs           []string   `json:"topic_ids,omitempty"`
 	StartedAfter       *time.Time `json:"started_after,omitempty"`
