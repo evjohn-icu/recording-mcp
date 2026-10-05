@@ -19,6 +19,17 @@ func turnPerson(page Page, turnID string) (bool, *string) {
 	return false, nil
 }
 
+// searchHitPerson returns the SpeakerPersonID of one search hit, and whether
+// the hit was present at all.
+func searchHitPerson(page SearchPage, id string) (bool, *string) {
+	for _, hit := range page.Hits {
+		if hit.ID == id {
+			return true, hit.SpeakerPersonID
+		}
+	}
+	return false, nil
+}
+
 // assertTurnEntityNull pins that retrieval resolves identity as a projection
 // and never writes the legacy turns.speaker_entity_id column.
 func assertTurnEntityNull(t *testing.T, s *Store, turnID string) {
@@ -237,4 +248,88 @@ func TestRetrievalLegacyTurnWithoutRevisionHasNoIdentity(t *testing.T) {
 		t.Fatalf("legacy turn derived_from = %v, want empty", item.Item.DerivedFrom)
 	}
 	assertTurnEntityNull(t, s, legacyID)
+}
+
+// TestSearchHitsCarryConfirmedSpeakerIdentity seeds two revisions of one
+// segment (rev-1 superseded by rev-2), confirms the shared diarization label as
+// a different person in each revision, and pins that SearchMemory projects the
+// identity of each turn's own revision exactly like Query/GetItem: the stale
+// rev-1 turn keeps alice while the current rev-2 turn resolves bob. A turn with
+// an unbound label in the current revision stays nil, and the default
+// (current-only) search never surfaces the superseded rev-1 hit.
+func TestSearchHitsCarryConfirmedSpeakerIdentity(t *testing.T) {
+	s := openTempStore(t)
+	ctx := context.Background()
+
+	first, err := s.IngestTranscript(ctx, sampleResult("seg-a", "rev-1", 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2 := sampleResult("seg-a", "rev-2", 0)
+	v2.Source.SupersedesRevision = "rev-1"
+	unbound := "spk:unbound"
+	unboundStart, unboundEnd := int64(900), int64(1000)
+	v2.Turns = append(v2.Turns, asrinput.Turn{
+		ID: "utt-2", OriginalIndex: 2, Text: "hello seg-a unbound",
+		LocalStartMS: &unboundStart, LocalEndMS: &unboundEnd,
+		GlobalStartMS: &unboundStart, GlobalEndMS: &unboundEnd,
+		SpeakerScopedID: &unbound,
+	})
+	if _, err := s.IngestTranscript(ctx, v2); err != nil {
+		t.Fatal(err)
+	}
+
+	recordingID := first.RecordingID
+	v1TurnID := stableKey("turn", recordingID, "seg-a/rev-1/utt-1")
+	v2TurnID := stableKey("turn", recordingID, "seg-a/rev-2/utt-1")
+	v2UnboundID := stableKey("turn", recordingID, "seg-a/rev-2/utt-2")
+
+	label := "spk:device-1:1"
+	v1Binding, err := s.ProposeSpeakerBinding(ctx, recordingID, label, "rev-1", []string{v1TurnID}, "model-x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ConfirmSpeakerBinding(ctx, v1Binding.ID, "person:alice", "reviewer-a"); err != nil {
+		t.Fatal(err)
+	}
+	v2Binding, err := s.ProposeSpeakerBinding(ctx, recordingID, label, "rev-2", []string{v2TurnID}, "model-x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ConfirmSpeakerBinding(ctx, v2Binding.ID, "person:bob", "reviewer-a"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Audit search: both revisions, each turn resolves against its own revision.
+	audit, err := s.SearchMemory(ctx, MemorySearch{Text: "hello seg-a", Scope: "raw", IncludeStale: true, Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found, person := searchHitPerson(audit, v1TurnID); !found || person == nil || *person != "person:alice" {
+		t.Fatalf("rev-1 hit identity = %v (found=%v), want person:alice", person, found)
+	}
+	if found, person := searchHitPerson(audit, v2TurnID); !found || person == nil || *person != "person:bob" {
+		t.Fatalf("rev-2 hit identity = %v (found=%v), want person:bob", person, found)
+	}
+	if found, person := searchHitPerson(audit, v2UnboundID); !found || person != nil {
+		t.Fatalf("unbound hit identity = %v (found=%v), want nil", person, found)
+	}
+
+	// Current search: the superseded rev-1 hit is gone, rev-2 still resolves bob.
+	current, err := s.SearchMemory(ctx, MemorySearch{Text: "hello seg-a", Scope: "raw", Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found, _ := searchHitPerson(current, v1TurnID); found {
+		t.Fatalf("superseded hit %s appeared in the current search", v1TurnID)
+	}
+	if found, person := searchHitPerson(current, v2TurnID); !found || person == nil || *person != "person:bob" {
+		t.Fatalf("current rev-2 hit identity = %v (found=%v), want person:bob", person, found)
+	}
+	if found, person := searchHitPerson(current, v2UnboundID); !found || person != nil {
+		t.Fatalf("current unbound hit identity = %v (found=%v), want nil", person, found)
+	}
+
+	assertTurnEntityNull(t, s, v1TurnID)
+	assertTurnEntityNull(t, s, v2TurnID)
 }

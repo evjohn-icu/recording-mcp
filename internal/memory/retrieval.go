@@ -109,6 +109,14 @@ type SearchHit struct {
 	Score           float64  `json:"score"`
 	EvidenceTurnIDs []string `json:"evidence_turn_ids,omitempty"`
 	GlobalStartMS   *int64   `json:"global_start_ms"`
+	// SpeakerPersonID is the confirmed identity of a turn hit's speaker label
+	// within its own transcript revision, projected from speaker_bindings at
+	// retrieval time. It carries the same semantics as Item.SpeakerPersonID: it
+	// is nil for note hits, for turns without a speaker label or source
+	// revision (legacy rows), and for labels whose binding is still proposed,
+	// rejected or revoked. It is never a fabricated value; turns.speaker_entity_id
+	// stays NULL.
+	SpeakerPersonID *string `json:"speaker_person_id,omitempty"`
 	// Stale reports that the hit derives from a superseded transcript
 	// attachment; it is only ever true when IncludeStale was requested.
 	Stale bool `json:"stale,omitempty"`
@@ -622,7 +630,7 @@ func (s *Store) searchNotes(ctx context.Context, q MemorySearch, lower string) (
 }
 
 func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) ([]SearchHit, error) {
-	turnSQL := `SELECT t.id,t.conversation_id,t.content,t.global_start_ms,r.recording_started_at
+	turnSQL := `SELECT t.id,t.conversation_id,t.content,t.global_start_ms,r.recording_started_at,t.recording_id,t.speaker_scoped_id
  FROM turns t JOIN recordings r ON r.id=t.recording_id
  WHERE (?='' OR EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id AND tt.topic_id=?))`
 	if !q.IncludeStale {
@@ -638,15 +646,17 @@ func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) (
 	// Collect matches first and close the cursor: the store uses a single open
 	// connection, so a nested marker query while rows are open would deadlock.
 	type matchedTurn struct {
-		id, conv, content string
-		globalStart       *int64
+		id, conv, content, recordingID string
+		globalStart                    *int64
+		speaker                        *string
 	}
 	matched := []matchedTurn{}
 	for rows.Next() {
-		var id, conv, content string
+		var id, conv, content, recordingID string
 		var start sql.NullInt64
 		var started sql.NullString
-		if err := rows.Scan(&id, &conv, &content, &start, &started); err != nil {
+		var speaker sql.NullString
+		if err := rows.Scan(&id, &conv, &content, &start, &started, &recordingID, &speaker); err != nil {
 			return nil, err
 		}
 		if !strings.Contains(strings.ToLower(content), lower) {
@@ -664,13 +674,19 @@ func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) (
 			v := start.Int64
 			globalStart = &v
 		}
-		matched = append(matched, matchedTurn{id: id, conv: conv, content: content, globalStart: globalStart})
+		var label *string
+		if speaker.Valid {
+			v := speaker.String
+			label = &v
+		}
+		matched = append(matched, matchedTurn{id: id, conv: conv, content: content, recordingID: recordingID, globalStart: globalStart, speaker: label})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	rows.Close()
 
+	cache := newSpeakerProjectionCache(s)
 	out := []SearchHit{}
 	for _, turn := range matched {
 		stale, err := s.turnStale(ctx, turn.id)
@@ -681,10 +697,17 @@ func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) (
 		if err != nil {
 			return nil, err
 		}
+		var person *string
+		if turn.speaker != nil {
+			person, err = cache.person(ctx, turn.recordingID, derivedFrom, *turn.speaker)
+			if err != nil {
+				return nil, err
+			}
+		}
 		out = append(out, SearchHit{
 			Kind: "turn", ID: turn.id, Text: turn.content, ConversationID: turn.conv,
 			Why: "transcript turn contains text", Score: 0.5, GlobalStartMS: turn.globalStart,
-			Stale: stale, DerivedFrom: derivedFrom,
+			Stale: stale, DerivedFrom: derivedFrom, SpeakerPersonID: person,
 		})
 	}
 	return out, nil

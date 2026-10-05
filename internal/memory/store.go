@@ -563,28 +563,60 @@ func (s *Store) turnDerivedFrom(ctx context.Context, id string) ([]string, error
 // so a page of turns costs one query per distinct pair and no query at all
 // when no turn carries a speaker label.
 func (s *Store) resolveSpeakerIdentities(ctx context.Context, items []Item) error {
-	cache := map[string]map[string]string{}
+	cache := newSpeakerProjectionCache(s)
 	for i := range items {
 		it := &items[i]
-		if it.Kind != "turn" || it.SpeakerScopedID == nil || len(it.DerivedFrom) != 1 {
+		if it.Kind != "turn" || it.SpeakerScopedID == nil {
 			continue
 		}
-		key := it.RecordingID + "\x00" + it.DerivedFrom[0]
-		proj, ok := cache[key]
-		if !ok {
-			var err error
-			proj, err = s.SpeakerProjection(ctx, it.RecordingID, it.DerivedFrom[0])
-			if err != nil {
-				return err
-			}
-			cache[key] = proj
+		person, err := cache.person(ctx, it.RecordingID, it.DerivedFrom, *it.SpeakerScopedID)
+		if err != nil {
+			return err
 		}
-		if person, found := proj[*it.SpeakerScopedID]; found && person != "" {
-			v := person
-			it.SpeakerPersonID = &v
-		}
+		it.SpeakerPersonID = person
 	}
 	return nil
+}
+
+// speakerProjectionCache memoizes confirmed speaker projections for one
+// retrieval call, keyed by (recording_id, transcript_revision). It is shared by
+// the Item and SearchHit turn paths so a page of turns costs one
+// SpeakerProjection query per distinct pair and no query at all when no turn
+// carries a speaker label.
+type speakerProjectionCache struct {
+	store *Store
+	cache map[string]map[string]string
+}
+
+func newSpeakerProjectionCache(s *Store) *speakerProjectionCache {
+	return &speakerProjectionCache{store: s, cache: map[string]map[string]string{}}
+}
+
+// person returns the confirmed person id for a speaker label on one transcript
+// revision, or nil when the label is empty or unresolved. Identity is
+// revision-scoped, so a label only resolves when it has exactly one source
+// revision: legacy turns without attachment rows (no revision) and turns
+// spanning multiple revisions are never projected, and a label whose binding is
+// proposed, rejected or revoked has no confirmed identity either.
+func (c *speakerProjectionCache) person(ctx context.Context, recordingID string, revisions []string, label string) (*string, error) {
+	if label == "" || len(revisions) != 1 {
+		return nil, nil
+	}
+	key := recordingID + "\x00" + revisions[0]
+	proj, ok := c.cache[key]
+	if !ok {
+		var err error
+		proj, err = c.store.SpeakerProjection(ctx, recordingID, revisions[0])
+		if err != nil {
+			return nil, err
+		}
+		c.cache[key] = proj
+	}
+	if person, found := proj[label]; found && person != "" {
+		v := person
+		return &v, nil
+	}
+	return nil, nil
 }
 
 // noteDerivedFrom returns the transcript_revision values of the attachments a
