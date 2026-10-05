@@ -304,3 +304,113 @@ func TestRepeatedInvalidationDoesNotDuplicateJobs(t *testing.T) {
 		t.Fatalf("invalidation changed extract job count: %d -> %d", before, after)
 	}
 }
+
+// TestProcessingStatusCountsCurrentRevisionsOnly pins that GetProcessingStatus
+// reports only the active transcript revision: after rev-2 supersedes rev-1 the
+// turn counts drop to rev-2's, the stale rev-1 note no longer counts toward the
+// analysis status, and identity/unclassified turn counts are scoped to current
+// turns. The superseded revision stays in the audit tables, and annotating the
+// current turn returns the status to partial.
+func TestProcessingStatusCountsCurrentRevisionsOnly(t *testing.T) {
+	ctx := context.Background()
+	s := openTempStore(t)
+
+	report, err := s.IngestTranscript(ctx, revisionResult("seg-a", "rev-1", 0, "one", "two", "three"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	conv := report.ConversationID
+
+	if err := s.ApplyAnnotations(ctx, conv, "", Annotations{
+		ConversationID:    conv,
+		Title:             "rev-1 notes",
+		AnnotationVersion: "ann-v1",
+		Topics:            []TopicAnnotation{{ID: "topic:rev", Title: "Revision"}},
+		Notes: []NoteAnnotation{{
+			ID:              "note:v1",
+			Kind:            "observation",
+			TopicIDs:        []string{"topic:rev"},
+			Summary:         "note backed by the first revision",
+			EvidenceTurnIDs: []string{"seg-a/rev-1/utt-1"},
+		}},
+	}); err != nil {
+		t.Fatalf("apply v1 annotations: %v", err)
+	}
+
+	before, err := s.GetProcessingStatus(ctx, conv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.ReceivedSegments != 1 || before.OriginalTurns != 3 || before.TopicLinkedTurns != 1 {
+		t.Fatalf("v1 turn counts = %+v, want one segment, three turns and the note's turn classified", before)
+	}
+	if before.IdentityUnconfirmedTurns != 3 || before.UnclassifiedTurns != 2 {
+		t.Fatalf("v1 turn scoping = %+v, want three unconfirmed turns and two without a topic", before)
+	}
+	if before.AnalysisStatus != "partial" {
+		t.Fatalf("v1 analysis status = %q, want partial with a live note", before.AnalysisStatus)
+	}
+
+	v2 := revisionResult("seg-a", "rev-2", 0, "three", "four")
+	v2.Source.SupersedesRevision = "rev-1"
+	if _, err := s.IngestTranscript(ctx, v2); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := s.GetProcessingStatus(ctx, conv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.ReceivedSegments != 1 || after.OriginalTurns != 2 {
+		t.Fatalf("post-supersede segment/turn counts = %+v, want one active segment and two current turns", after)
+	}
+	if after.IdentityUnconfirmedTurns != 2 || after.UnclassifiedTurns != 2 || after.TopicLinkedTurns != 0 {
+		t.Fatalf("post-supersede turn scoping = %+v, want only the two current turns", after)
+	}
+	if after.AnalysisStatus != "pending" {
+		t.Fatalf("post-supersede analysis status = %q, want pending once the v1 note is stale", after.AnalysisStatus)
+	}
+
+	// The superseded revision remains auditable even though it no longer counts.
+	var totalTurns int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM turns WHERE conversation_id=?`, conv).Scan(&totalTurns); err != nil {
+		t.Fatal(err)
+	}
+	if totalTurns != 5 {
+		t.Fatalf("stored turns = %d, want all five revisions retained for audit", totalTurns)
+	}
+	ev, err := s.GetEvidenceContext(ctx, ingestedTurnID("seg-a", "rev-1", "utt-1"), 1, 1<<20)
+	if err != nil {
+		t.Fatalf("audit evidence for superseded turn: %v", err)
+	}
+	if !ev.Stale {
+		t.Fatalf("superseded turn not flagged stale in audit: %+v", ev)
+	}
+
+	// Annotating the current turn brings the status back to partial.
+	if err := s.ApplyAnnotations(ctx, conv, "ann-v1", Annotations{
+		ConversationID:    conv,
+		Title:             "rev-2 notes",
+		AnnotationVersion: "ann-v2",
+		Topics:            []TopicAnnotation{{ID: "topic:rev", Title: "Revision"}},
+		Notes: []NoteAnnotation{{
+			ID:              "note:v2",
+			Kind:            "observation",
+			TopicIDs:        []string{"topic:rev"},
+			Summary:         "note backed by the current revision",
+			EvidenceTurnIDs: []string{"seg-a/rev-2/utt-1"},
+		}},
+	}); err != nil {
+		t.Fatalf("apply v2 annotations: %v", err)
+	}
+	partial, err := s.GetProcessingStatus(ctx, conv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if partial.AnalysisStatus != "partial" {
+		t.Fatalf("status after annotating the current turn = %q, want partial", partial.AnalysisStatus)
+	}
+	if partial.OriginalTurns != 2 {
+		t.Fatalf("status after re-annotation = %+v, want current turn count preserved", partial)
+	}
+}

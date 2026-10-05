@@ -95,6 +95,13 @@ INSERT OR IGNORE INTO derived_artifact_sources(kind, artifact_id, attachment_id)
 const speakerBindingDDL = `CREATE TABLE IF NOT EXISTS speaker_bindings(id TEXT PRIMARY KEY, recording_id TEXT NOT NULL REFERENCES recordings(id), transcript_revision TEXT NOT NULL DEFAULT '', speaker_scoped_id TEXT NOT NULL, person_id TEXT NULL, status TEXT NOT NULL CHECK(status IN ('proposed','confirmed','rejected','revoked')), evidence_json TEXT NOT NULL DEFAULT '[]', reviewer TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(recording_id, speaker_scoped_id, version));
 CREATE TABLE IF NOT EXISTS speaker_binding_events(id TEXT PRIMARY KEY, binding_id TEXT NOT NULL REFERENCES speaker_bindings(id), action TEXT NOT NULL CHECK(action IN ('propose','confirm','reject','revoke')), actor TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);`
 
+// activeHeadIndexDDL makes the single-active-revision invariant a database
+// guarantee instead of an application convention: per recording and segment
+// only one source attachment may be active at a time. Supersede keeps working
+// because it deactivates the old head before activating the new one in the
+// same transaction.
+const activeHeadIndexDDL = `CREATE UNIQUE INDEX IF NOT EXISTS source_attachments_active_head ON source_attachments(recording_id, segment_id) WHERE active = 1;`
+
 type migration struct {
 	version    int
 	name       string
@@ -126,6 +133,7 @@ var migrations = []migration{
 	{version: 7, name: "annotation-history", statements: statements(annotationHistoryDDL)},
 	{version: 8, name: "derived-artifact-staleness", statements: statements(derivedArtifactsDDL)},
 	{version: 9, name: "speaker-binding", statements: statements(speakerBindingDDL)},
+	{version: 10, name: "active-head-invariant", statements: statements(activeHeadIndexDDL)},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`

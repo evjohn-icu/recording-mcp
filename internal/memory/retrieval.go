@@ -67,6 +67,10 @@ type TurnEvidence struct {
 	GlobalEndMS     *int64  `json:"global_end_ms"`
 	SegmentIndex    int     `json:"segment_index"`
 	IsTarget        bool    `json:"is_target"`
+	// Stale reports that the turn derives from a superseded transcript
+	// attachment. Audit windows can mix stale and current turns; current-state
+	// windows never contain stale turns at all.
+	Stale bool `json:"stale"`
 }
 
 // EvidenceContext is the ordered neighborhood around one target turn.
@@ -267,9 +271,9 @@ func (s *Store) ListConversations(ctx context.Context, f ConversationFilter) (Co
 	rows, err := s.db.QueryContext(ctx, `SELECT c.id,c.title,c.recording_id,c.annotation_version,r.recording_started_at,
  (SELECT COUNT(*) FROM source_attachments a WHERE a.conversation_id=c.id AND a.active=1) +
  (SELECT COUNT(*) FROM recordings r2 WHERE r2.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM source_attachments a WHERE a.recording_id=r2.id)),
- (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM attachment_turns at JOIN source_attachments a ON a.id=at.attachment_id WHERE at.turn_id=t.id AND a.active=0)),
- (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM attachment_turns at JOIN source_attachments a ON a.id=at.attachment_id WHERE at.turn_id=t.id AND a.active=0) AND EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id)),
- (SELECT COUNT(*) FROM notes n WHERE n.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM derived_artifacts d WHERE d.kind='note' AND d.artifact_id=n.id AND d.stale=1))
+ (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=c.id AND `+CurrentTurnPredicate("t")+`),
+ (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=c.id AND `+CurrentTurnPredicate("t")+` AND EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id)),
+ (SELECT COUNT(*) FROM notes n WHERE n.conversation_id=c.id AND NOT `+NoteStalePredicate("n")+`)
  FROM conversations c LEFT JOIN recordings r ON r.id=c.recording_id
  WHERE (?='' OR EXISTS(SELECT 1 FROM topic_conversations tc WHERE tc.topic_id=? AND tc.conversation_id=c.id))`,
 		f.TopicID, f.TopicID)
@@ -319,9 +323,25 @@ func (s *Store) ListConversations(ctx context.Context, f ConversationFilter) (Co
 	return page, nil
 }
 
-// GetEvidenceContext returns the target turn together with up to radius turns
-// before and after it within the same recording, in transcript order.
+// GetEvidenceContext is the explicit audit lookup: it returns the target turn
+// together with up to radius turns before and after it within the same
+// recording, in transcript order, including superseded revisions. Every turn
+// carries a Stale marker so audit callers can see which rows belong to a
+// superseded revision.
 func (s *Store) GetEvidenceContext(ctx context.Context, turnID string, radius, maxBytes int) (EvidenceContext, error) {
+	return s.evidenceContext(ctx, turnID, radius, maxBytes, false)
+}
+
+// GetCurrentEvidenceContext is the current-state lookup for derived consumers
+// such as build_context: the window only contains turns of the active
+// transcript revision (plus legacy turns without attachment rows) and the
+// target itself must be current. Superseded history is reachable only through
+// GetEvidenceContext.
+func (s *Store) GetCurrentEvidenceContext(ctx context.Context, turnID string, radius, maxBytes int) (EvidenceContext, error) {
+	return s.evidenceContext(ctx, turnID, radius, maxBytes, true)
+}
+
+func (s *Store) evidenceContext(ctx context.Context, turnID string, radius, maxBytes int, currentOnly bool) (EvidenceContext, error) {
 	if err := ctx.Err(); err != nil {
 		return EvidenceContext{}, err
 	}
@@ -337,21 +357,27 @@ func (s *Store) GetEvidenceContext(ctx context.Context, turnID string, radius, m
 		maxBytes = defaultEvidenceMaxByte
 	}
 
+	targetLookup := `SELECT recording_id FROM turns WHERE id=?`
+	if currentOnly {
+		targetLookup += ` AND ` + CurrentTurnPredicate("turns")
+	}
 	var recordingID string
-	err := s.db.QueryRowContext(ctx, `SELECT recording_id FROM turns WHERE id=?`, turnID).Scan(&recordingID)
+	err := s.db.QueryRowContext(ctx, targetLookup, turnID).Scan(&recordingID)
 	if errors.Is(err, sql.ErrNoRows) {
+		if currentOnly {
+			return EvidenceContext{}, fmt.Errorf("turn not found in current revision: %s: %w", turnID, ErrNotFound)
+		}
 		return EvidenceContext{}, fmt.Errorf("turn not found: %s: %w", turnID, ErrNotFound)
 	}
 	if err != nil {
 		return EvidenceContext{}, err
 	}
-	stale, err := s.turnStale(ctx, turnID)
-	if err != nil {
-		return EvidenceContext{}, err
+	windowFilter := ""
+	if currentOnly {
+		windowFilter = ` AND ` + CurrentTurnPredicate("turns")
 	}
-
-	rows, err := s.db.QueryContext(ctx, `SELECT id,content,speaker_scoped_id,global_start_ms,global_end_ms,segment_index
- FROM turns WHERE recording_id=?
+	rows, err := s.db.QueryContext(ctx, `SELECT id,content,speaker_scoped_id,global_start_ms,global_end_ms,segment_index,`+turnStalePredicate("turns")+` AS stale
+ FROM turns WHERE recording_id=?`+windowFilter+`
  ORDER BY (global_start_ms IS NULL),global_start_ms,segment_index,original_turn_id`, recordingID)
 	if err != nil {
 		return EvidenceContext{}, err
@@ -360,13 +386,16 @@ func (s *Store) GetEvidenceContext(ctx context.Context, turnID string, radius, m
 
 	all := []TurnEvidence{}
 	target := -1
+	targetStale := false
 	for rows.Next() {
 		var ev TurnEvidence
 		var speaker sql.NullString
 		var start, end sql.NullInt64
-		if err = rows.Scan(&ev.ID, &ev.Text, &speaker, &start, &end, &ev.SegmentIndex); err != nil {
+		var isStale int
+		if err = rows.Scan(&ev.ID, &ev.Text, &speaker, &start, &end, &ev.SegmentIndex, &isStale); err != nil {
 			return EvidenceContext{}, err
 		}
+		ev.Stale = isStale == 1
 		if speaker.Valid {
 			v := speaker.String
 			ev.SpeakerScopedID = &v
@@ -381,6 +410,7 @@ func (s *Store) GetEvidenceContext(ctx context.Context, turnID string, radius, m
 		}
 		if ev.ID == turnID {
 			target = len(all)
+			targetStale = ev.Stale
 		}
 		all = append(all, ev)
 	}
@@ -413,7 +443,7 @@ func (s *Store) GetEvidenceContext(ctx context.Context, turnID string, radius, m
 		used += size
 		out = append(out, ev)
 	}
-	return EvidenceContext{RecordingID: recordingID, Turns: out, Truncated: truncated, Stale: stale}, nil
+	return EvidenceContext{RecordingID: recordingID, Turns: out, Truncated: truncated, Stale: targetStale}, nil
 }
 
 func decodeSearchCursor(raw string) (*searchCursor, error) {
@@ -532,7 +562,7 @@ func (s *Store) searchNotes(ctx context.Context, q MemorySearch, lower string) (
  LEFT JOIN recordings r ON r.id=c.recording_id
  WHERE (?='' OR EXISTS(SELECT 1 FROM json_each(n.topic_ids_json) WHERE value=?))`
 	if !q.IncludeStale {
-		noteSQL += ` AND NOT EXISTS(SELECT 1 FROM derived_artifacts d WHERE d.kind='note' AND d.artifact_id=n.id AND d.stale=1)`
+		noteSQL += ` AND NOT ` + NoteStalePredicate("n")
 	}
 	noteSQL += ` ORDER BY n.id`
 	rows, err := s.db.QueryContext(ctx, noteSQL, q.TopicID, q.TopicID)
@@ -596,7 +626,7 @@ func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) (
  FROM turns t JOIN recordings r ON r.id=t.recording_id
  WHERE (?='' OR EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id AND tt.topic_id=?))`
 	if !q.IncludeStale {
-		turnSQL += ` AND NOT EXISTS(SELECT 1 FROM attachment_turns at JOIN source_attachments a ON a.id=at.attachment_id WHERE at.turn_id=t.id AND a.active=0)`
+		turnSQL += ` AND ` + CurrentTurnPredicate("t")
 	}
 	turnSQL += ` ORDER BY t.id`
 	rows, err := s.db.QueryContext(ctx, turnSQL, q.TopicID, q.TopicID)

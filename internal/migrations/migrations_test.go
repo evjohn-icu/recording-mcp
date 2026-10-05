@@ -68,8 +68,8 @@ func TestApplyFreshDatabase(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 9 {
-		t.Fatalf("Version() = %d, want 9", got)
+	if got := mustVersion(t, ctx, db); got != 10 {
+		t.Fatalf("Version() = %d, want 10", got)
 	}
 	names := tableNames(t, db)
 	for _, want := range []string{
@@ -105,7 +105,7 @@ func TestApplyFreshDatabase(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"turns_conv_order", "notes_conv", "source_attachments_conversation", "processing_jobs_claim", "memory_candidates_conv", "memory_links_from", "memory_links_to", "derived_artifact_conv", "derived_artifact_sources_attachment"} {
+	for _, want := range []string{"turns_conv_order", "notes_conv", "source_attachments_conversation", "processing_jobs_claim", "memory_candidates_conv", "memory_links_from", "memory_links_to", "derived_artifact_conv", "derived_artifact_sources_attachment", "source_attachments_active_head"} {
 		if !indexes[want] {
 			t.Errorf("missing index %q", want)
 		}
@@ -121,15 +121,15 @@ func TestApplyIdempotent(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("second Apply: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 9 {
-		t.Fatalf("Version() = %d, want 9 after repeated Apply", got)
+	if got := mustVersion(t, ctx, db); got != 10 {
+		t.Fatalf("Version() = %d, want 10 after repeated Apply", got)
 	}
 	var applied int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&applied); err != nil {
 		t.Fatal(err)
 	}
-	if applied != 9 {
-		t.Fatalf("schema_migrations rows = %d, want 9", applied)
+	if applied != 10 {
+		t.Fatalf("schema_migrations rows = %d, want 10", applied)
 	}
 }
 
@@ -149,8 +149,8 @@ func TestApplyOnLegacyDatabasePreservesData(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply on legacy database: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 9 {
-		t.Fatalf("Version() = %d, want 9", got)
+	if got := mustVersion(t, ctx, db); got != 10 {
+		t.Fatalf("Version() = %d, want 10", got)
 	}
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM conversations WHERE id='conv-1'`).Scan(&count); err != nil {
@@ -175,10 +175,10 @@ func TestApplyOnSingleVersionDatabaseOnlyAppliesLater(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (3,4,5,6,7,8,9)`); err != nil {
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (3,4,5,6,7,8,9,10)`); err != nil {
 		t.Fatal(err)
 	}
-	// Re-running Apply must re-create the (dropped) v3..v9 objects only.
+	// Re-running Apply must re-create the (dropped) v3..v10 objects only.
 	// annotation_history is deliberately kept: v7 must be a no-op on a
 	// database that already has the table (it was created lazily by older
 	// builds of memory.Store before v7 existed).
@@ -193,6 +193,7 @@ func TestApplyOnSingleVersionDatabaseOnlyAppliesLater(t *testing.T) {
 		`DROP TABLE derived_artifacts`,
 		`DROP TABLE speaker_binding_events`,
 		`DROP TABLE speaker_bindings`,
+		`DROP INDEX source_attachments_active_head`,
 	} {
 		if _, err := db.Exec(stmt); err != nil {
 			t.Fatal(err)
@@ -201,8 +202,8 @@ func TestApplyOnSingleVersionDatabaseOnlyAppliesLater(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("re-Apply after partial rollback: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 9 {
-		t.Fatalf("Version() = %d, want 9", got)
+	if got := mustVersion(t, ctx, db); got != 10 {
+		t.Fatalf("Version() = %d, want 10", got)
 	}
 	names := tableNames(t, db)
 	for _, want := range []string{"decision_runs", "decision_answers", "memory_candidates", "publication_runs", "analysis_coverage", "memory_links", "annotation_history", "derived_artifacts", "derived_artifact_sources", "speaker_bindings", "speaker_binding_events"} {
@@ -226,8 +227,8 @@ func TestApplySucceedsWithPreexistingLazyAnnotationHistory(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply with preexisting annotation_history: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 9 {
-		t.Fatalf("Version() = %d, want 9", got)
+	if got := mustVersion(t, ctx, db); got != 10 {
+		t.Fatalf("Version() = %d, want 10", got)
 	}
 	// annotation_history references conversations, so seed the parent row the
 	// adopted table points at; without it the foreign key rejects the insert
@@ -273,7 +274,7 @@ func TestDerivedArtifactBackfillMarksSupersededEvidence(t *testing.T) {
 	}
 	// Roll back only the derived-artifact migration so the backfill runs over
 	// pre-existing rows, like a database upgraded from an older build.
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (8,9)`); err != nil {
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (8,9,10)`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`DROP TABLE derived_artifact_sources`); err != nil {
@@ -303,8 +304,8 @@ func TestDerivedArtifactBackfillMarksSupersededEvidence(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("re-Apply for backfill: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 9 {
-		t.Fatalf("Version() = %d, want 9", got)
+	if got := mustVersion(t, ctx, db); got != 10 {
+		t.Fatalf("Version() = %d, want 10", got)
 	}
 	for _, want := range []struct {
 		kind, id string
@@ -336,5 +337,48 @@ func TestDerivedArtifactBackfillMarksSupersededEvidence(t *testing.T) {
 		if n != 1 {
 			t.Errorf("missing source link %s/%s -> %s", want.kind, want.id, want.attachment)
 		}
+	}
+}
+
+// TestActiveHeadEnforcedByDatabase proves the single-active-revision invariant
+// is a database guarantee: a second active head for the same recording and
+// segment is rejected by the partial unique index, while the sanctioned
+// supersede transition (deactivate old, then activate new) still works.
+func TestActiveHeadEnforcedByDatabase(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	if err := Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		`INSERT INTO conversations(id,title,summary,annotation_version,annotation_basis,recording_id,source_sha256,transcript_version,duration_ms,transcript_json,annotations_json) VALUES('conv-1','t','s','v1','basis','rec-1','sha','v1',1000,'{}','{}')`,
+		`INSERT INTO recordings(id,conversation_id,source_file,source_sha256,duration_ms,recording_started_at,absolute_time_known) VALUES('rec-1','conv-1','f','sha',1000,NULL,0)`,
+		`INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active,supersedes_revision) VALUES('att-1','conv-1','rec-1',1,'seg-1','rev-1','{}','{}','sha1',1,NULL)`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("seed %q: %v", stmt, err)
+		}
+	}
+	// A second active head for the same (recording, segment) must fail.
+	if _, err := db.Exec(`INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active,supersedes_revision) VALUES('att-2','conv-1','rec-1',2,'seg-1','rev-2','{}','{}','sha2',1,'rev-1')`); err == nil {
+		t.Fatal("database accepted two active revisions for one recording+segment")
+	}
+	// The sanctioned supersede transition keeps exactly one active head.
+	if _, err := db.Exec(`UPDATE source_attachments SET active=0 WHERE id='att-1'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active,supersedes_revision) VALUES('att-2','conv-1','rec-1',2,'seg-1','rev-2','{}','{}','sha2',1,'rev-1')`); err != nil {
+		t.Fatalf("supersede transition rejected: %v", err)
+	}
+	// Two heads for different segments are independent and allowed.
+	if _, err := db.Exec(`INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active,supersedes_revision) VALUES('att-3','conv-1','rec-1',3,'seg-2','rev-1','{}','{}','sha3',1,NULL)`); err != nil {
+		t.Fatalf("second segment head rejected: %v", err)
+	}
+	var active int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM source_attachments WHERE active=1 AND segment_id='seg-1'`).Scan(&active); err != nil {
+		t.Fatal(err)
+	}
+	if active != 1 {
+		t.Fatalf("active heads for seg-1 = %d, want 1", active)
 	}
 }

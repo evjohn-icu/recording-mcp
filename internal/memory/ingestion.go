@@ -324,15 +324,15 @@ func (s *Store) GetProcessingStatus(ctx context.Context, conversationID string) 
 	err := s.db.QueryRowContext(ctx, `SELECT
  (SELECT COUNT(*) FROM source_attachments a WHERE a.conversation_id=? AND a.active=1) +
  (SELECT COUNT(*) FROM recordings r WHERE r.conversation_id=? AND NOT EXISTS(SELECT 1 FROM source_attachments a WHERE a.recording_id=r.id)),
- (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=?),
- (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id)),
- (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND NOT EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id)),
- (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND t.speaker_entity_id IS NULL)`, conversationID, conversationID, conversationID, conversationID, conversationID, conversationID).Scan(&out.ReceivedSegments, &out.OriginalTurns, &out.TopicLinkedTurns, &out.UnclassifiedTurns, &out.IdentityUnconfirmedTurns)
+ (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND `+CurrentTurnPredicate("t")+`),
+ (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND `+CurrentTurnPredicate("t")+` AND EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id)),
+ (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND `+CurrentTurnPredicate("t")+` AND NOT EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id)),
+ (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND `+CurrentTurnPredicate("t")+` AND t.speaker_entity_id IS NULL)`, conversationID, conversationID, conversationID, conversationID, conversationID, conversationID).Scan(&out.ReceivedSegments, &out.OriginalTurns, &out.TopicLinkedTurns, &out.UnclassifiedTurns, &out.IdentityUnconfirmedTurns)
 	if err != nil {
 		return ProcessingStatus{}, err
 	}
 	var analyzed int
-	if err = s.db.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM notes WHERE conversation_id=?) + (SELECT COUNT(*) FROM turn_topics tt JOIN turns t ON t.id=tt.turn_id WHERE t.conversation_id=?)`, conversationID, conversationID).Scan(&analyzed); err != nil {
+	if err = s.db.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM notes n WHERE n.conversation_id=? AND NOT `+NoteStalePredicate("n")+`) + (SELECT COUNT(*) FROM turn_topics tt JOIN turns t ON t.id=tt.turn_id WHERE t.conversation_id=? AND `+CurrentTurnPredicate("t")+`)`, conversationID, conversationID).Scan(&analyzed); err != nil {
 		return ProcessingStatus{}, err
 	}
 	out.AnalysisStatus = "pending"

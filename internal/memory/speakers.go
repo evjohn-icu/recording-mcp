@@ -49,14 +49,14 @@ type SpeakerBinding struct {
 	UpdatedAt          int64    `json:"updated_at"`
 }
 
-// speakerBindingID derives the deterministic id of the binding for one
-// (recording, speaker label) pair, following the repository's "kind:hash"
-// convention. There is exactly one binding identity per label in a recording,
-// so re-proposing a label refreshes that row instead of creating a parallel
-// one; a new transcript revision updates TranscriptRevision and the evidence on
-// the same row.
-func speakerBindingID(recordingID, speakerScopedID string) string {
-	sum := sha256.Sum256([]byte(strings.Join([]string{recordingID, speakerScopedID}, "|")))
+// speakerBindingID derives the deterministic id of one binding attempt for a
+// (recording, speaker label, version) triple, following the repository's
+// "kind:hash" convention. Version is the row's sequence number inside its
+// (recording, label) group, so every new claim (for example after a revoke or
+// for a different transcript revision) is a new immutable row while a
+// refreshed draft keeps its id.
+func speakerBindingID(recordingID, speakerScopedID string, version int) string {
+	sum := sha256.Sum256([]byte(strings.Join([]string{recordingID, speakerScopedID, strconv.Itoa(version)}, "|")))
 	return "sb:" + hex.EncodeToString(sum[:])[:32]
 }
 
@@ -66,6 +66,52 @@ func speakerBindingID(recordingID, speakerScopedID string) string {
 func speakerBindingEventID(bindingID, action string, version int) string {
 	sum := sha256.Sum256([]byte(strings.Join([]string{bindingID, action, strconv.Itoa(version)}, "|")))
 	return "sbe:" + hex.EncodeToString(sum[:])[:32]
+}
+
+// latestSpeakerBinding returns the highest-version row of one (recording,
+// speaker label) group, or sql.ErrNoRows when the label has no binding yet.
+func latestSpeakerBinding(ctx context.Context, tx *sql.Tx, recordingID, speakerScopedID string) (SpeakerBinding, error) {
+	var (
+		b        SpeakerBinding
+		person   sql.NullString
+		evidence string
+	)
+	err := tx.QueryRowContext(ctx, `SELECT id, recording_id, transcript_revision, speaker_scoped_id, person_id, status, evidence_json, reviewer, version, created_at, updated_at
+		FROM speaker_bindings WHERE recording_id=? AND speaker_scoped_id=? ORDER BY version DESC LIMIT 1`, recordingID, speakerScopedID).Scan(
+		&b.ID, &b.RecordingID, &b.TranscriptRevision, &b.SpeakerScopedID, &person, &b.Status,
+		&evidence, &b.Reviewer, &b.Version, &b.CreatedAt, &b.UpdatedAt)
+	if err != nil {
+		return SpeakerBinding{}, err
+	}
+	if person.Valid {
+		b.PersonID = person.String
+	}
+	if err := json.Unmarshal([]byte(evidence), &b.EvidenceTurnIDs); err != nil {
+		return SpeakerBinding{}, fmt.Errorf("memory: decode speaker binding evidence: %w", err)
+	}
+	if b.EvidenceTurnIDs == nil {
+		b.EvidenceTurnIDs = []string{}
+	}
+	return b, nil
+}
+
+// insertSpeakerBinding writes one new versioned binding row together with its
+// "propose" event in the caller's transaction.
+func insertSpeakerBinding(ctx context.Context, tx *sql.Tx, recordingID, speakerScopedID, transcriptRevision string, evidence []string, model string, version int, now int64) (SpeakerBinding, error) {
+	raw, err := json.Marshal(evidence)
+	if err != nil {
+		return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: encode evidence: %w", err)
+	}
+	id := speakerBindingID(recordingID, speakerScopedID, version)
+	if _, err := tx.ExecContext(ctx, `INSERT INTO speaker_bindings(id, recording_id, transcript_revision, speaker_scoped_id, person_id, status, evidence_json, reviewer, version, created_at, updated_at)
+		VALUES(?, ?, ?, ?, NULL, ?, ?, '', ?, ?, ?)`,
+		id, recordingID, transcriptRevision, speakerScopedID, speakerBindingProposed, string(raw), version, now, now); err != nil {
+		return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: insert: %w", err)
+	}
+	if err := insertSpeakerBindingEvent(ctx, tx, id, speakerActionPropose, version, model, "", now); err != nil {
+		return SpeakerBinding{}, err
+	}
+	return getSpeakerBinding(ctx, tx, id)
 }
 
 // getSpeakerBinding loads one binding by id using the caller's transaction so a
@@ -106,15 +152,22 @@ func insertSpeakerBindingEvent(ctx context.Context, tx *sql.Tx, bindingID, actio
 	return nil
 }
 
-// ProposeSpeakerBinding records a model's proposal that the speaker label
-// speakerScopedID in recordingID denotes a person, backed by evidenceTurnIDs,
-// and returns the stored row. The proposal is linked to the transcript
-// revision it was read from. The binding id is derived from the (recording,
-// label) pair, so re-proposing refreshes the transcript revision and evidence
-// of a still-proposed row without creating a second binding; a row a reviewer
-// already confirmed, rejected or revoked keeps that verdict and is returned
-// unchanged. The binding and its "propose" event are written in one
-// transaction.
+// ProposeSpeakerBinding records a proposal that the speaker label
+// speakerScopedID in recordingID denotes a person in transcript revision
+// transcriptRevision, backed by evidenceTurnIDs. Bindings are revision-scoped:
+// a diarization label may be reused across transcript revisions, so identity
+// never carries over a revision boundary.
+//
+// Lifecycle policy (documented and tested):
+//   - a still-proposed row is a reviewable draft and is refreshed in place;
+//   - a confirmed row for the same recording, label and revision is returned
+//     unchanged: the claim is already resolved, a replay is idempotent;
+//   - every other verdict row (confirmed for a different revision, rejected,
+//     revoked) is immutable history: a new proposal creates the next versioned
+//     row. A revoked identity can therefore be re-proposed with new evidence,
+//     and a rejection never blocks future claims while keeping its own verdict.
+//
+// The binding and its "propose" event are written in one transaction.
 func (s *Store) ProposeSpeakerBinding(ctx context.Context, recordingID, speakerScopedID, transcriptRevision string, evidenceTurnIDs []string, model string) (SpeakerBinding, error) {
 	if !validID(recordingID) || !validID(speakerScopedID) {
 		return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: recording id and speaker scoped id are required")
@@ -123,11 +176,6 @@ func (s *Store) ProposeSpeakerBinding(ctx context.Context, recordingID, speakerS
 	if evidence == nil {
 		evidence = []string{}
 	}
-	raw, err := json.Marshal(evidence)
-	if err != nil {
-		return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: encode evidence: %w", err)
-	}
-	id := speakerBindingID(recordingID, speakerScopedID)
 	now := time.Now().UnixMilli()
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -136,27 +184,45 @@ func (s *Store) ProposeSpeakerBinding(ctx context.Context, recordingID, speakerS
 	}
 	defer tx.Rollback()
 
-	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO speaker_bindings(id, recording_id, transcript_revision, speaker_scoped_id, person_id, status, evidence_json, reviewer, version, created_at, updated_at)
-		VALUES(?, ?, ?, ?, NULL, ?, ?, '', 1, ?, ?)`,
-		id, recordingID, transcriptRevision, speakerScopedID, speakerBindingProposed, string(raw), now, now)
-	if err != nil {
-		return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: insert: %w", err)
-	}
-	inserted, err := res.RowsAffected()
-	if err != nil {
-		return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: rows affected: %w", err)
-	}
-	if inserted > 0 {
-		if err := insertSpeakerBindingEvent(ctx, tx, id, speakerActionPropose, 1, model, "", now); err != nil {
+	latest, err := latestSpeakerBinding(ctx, tx, recordingID, speakerScopedID)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		b, err := insertSpeakerBinding(ctx, tx, recordingID, speakerScopedID, transcriptRevision, evidence, model, 1, now)
+		if err != nil {
 			return SpeakerBinding{}, err
 		}
-	} else if _, err := tx.ExecContext(ctx, `UPDATE speaker_bindings SET transcript_revision=?, evidence_json=?, updated_at=? WHERE id=? AND status=?`,
-		transcriptRevision, string(raw), now, id, speakerBindingProposed); err != nil {
-		return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: refresh: %w", err)
+		if err := tx.Commit(); err != nil {
+			return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: commit: %w", err)
+		}
+		return b, nil
+	case err != nil:
+		return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: read: %w", err)
 	}
-	b, err := getSpeakerBinding(ctx, tx, id)
+
+	if latest.Status == speakerBindingProposed {
+		raw, err := json.Marshal(evidence)
+		if err != nil {
+			return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: encode evidence: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE speaker_bindings SET transcript_revision=?, evidence_json=?, updated_at=? WHERE id=? AND status=?`,
+			transcriptRevision, string(raw), now, latest.ID, speakerBindingProposed); err != nil {
+			return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: refresh: %w", err)
+		}
+		b, err := getSpeakerBinding(ctx, tx, latest.ID)
+		if err != nil {
+			return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: read back: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: commit: %w", err)
+		}
+		return b, nil
+	}
+	if latest.Status == speakerBindingConfirmed && latest.TranscriptRevision == transcriptRevision {
+		return latest, nil
+	}
+	b, err := insertSpeakerBinding(ctx, tx, recordingID, speakerScopedID, transcriptRevision, evidence, model, latest.Version+1, now)
 	if err != nil {
-		return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: read back: %w", err)
+		return SpeakerBinding{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return SpeakerBinding{}, fmt.Errorf("memory: propose speaker binding: commit: %w", err)
@@ -165,9 +231,10 @@ func (s *Store) ProposeSpeakerBinding(ctx context.Context, recordingID, speakerS
 }
 
 // ConfirmSpeakerBinding accepts a proposal: personID becomes the identity of
-// the binding's speaker label and the row moves to "confirmed" with its
-// version bumped, so only the accepted revision of the label resolves in
-// SpeakerProjection. Confirming an already-confirmed binding with the same
+// the binding's speaker label for its transcript revision and the row moves to
+// "confirmed", so only the accepted revision of the label resolves in
+// SpeakerProjection. Version is the row's stable sequence number and is not
+// changed by review. Confirming an already-confirmed binding with the same
 // person is a no-op; any other source status is rejected. The update and its
 // "confirm" event are written in one transaction.
 func (s *Store) ConfirmSpeakerBinding(ctx context.Context, bindingID, personID, reviewer string) (SpeakerBinding, error) {
@@ -199,12 +266,11 @@ func (s *Store) ConfirmSpeakerBinding(ctx context.Context, bindingID, personID, 
 	}
 
 	now := time.Now().UnixMilli()
-	version := cur.Version + 1
-	if _, err := tx.ExecContext(ctx, `UPDATE speaker_bindings SET person_id=?, status=?, reviewer=?, version=?, updated_at=? WHERE id=?`,
-		personID, speakerBindingConfirmed, reviewer, version, now, bindingID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE speaker_bindings SET person_id=?, status=?, reviewer=?, updated_at=? WHERE id=?`,
+		personID, speakerBindingConfirmed, reviewer, now, bindingID); err != nil {
 		return SpeakerBinding{}, fmt.Errorf("memory: confirm speaker binding: update: %w", err)
 	}
-	if err := insertSpeakerBindingEvent(ctx, tx, bindingID, speakerActionConfirm, version, reviewer, "", now); err != nil {
+	if err := insertSpeakerBindingEvent(ctx, tx, bindingID, speakerActionConfirm, cur.Version, reviewer, "", now); err != nil {
 		return SpeakerBinding{}, err
 	}
 	b, err := getSpeakerBinding(ctx, tx, bindingID)
@@ -290,15 +356,18 @@ func (s *Store) reviewSpeakerBinding(ctx context.Context, bindingID, reviewer, n
 	return b, nil
 }
 
-// SpeakerProjection resolves the confirmed speaker labels of one recording to
-// person ids. Only status='confirmed' rows contribute, so proposed, rejected
-// and revoked bindings yield nothing and a revocation updates the projection
-// immediately. Bindings are scoped by recording id, so an identical label in
-// another recording is unaffected.
-func (s *Store) SpeakerProjection(ctx context.Context, recordingID string) (map[string]string, error) {
+// SpeakerProjection resolves the confirmed speaker labels of one recording
+// for one transcript revision to person ids. Bindings are revision-scoped: a
+// diarization label may be reused across revisions, so a confirmed binding
+// only resolves for the transcript revision it was reviewed against and never
+// leaks identity into another revision. Only status='confirmed' rows
+// contribute, so proposed, rejected and revoked bindings yield nothing and a
+// revocation updates the projection immediately. Bindings are also scoped by
+// recording id, so an identical label in another recording is unaffected.
+func (s *Store) SpeakerProjection(ctx context.Context, recordingID, transcriptRevision string) (map[string]string, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT speaker_scoped_id, person_id, version FROM speaker_bindings
-		WHERE recording_id=? AND status=? AND person_id IS NOT NULL AND person_id<>''
-		ORDER BY speaker_scoped_id, version`, recordingID, speakerBindingConfirmed)
+		WHERE recording_id=? AND transcript_revision=? AND status=? AND person_id IS NOT NULL AND person_id<>''
+		ORDER BY speaker_scoped_id, version`, recordingID, transcriptRevision, speakerBindingConfirmed)
 	if err != nil {
 		return nil, fmt.Errorf("memory: speaker projection: query: %w", err)
 	}

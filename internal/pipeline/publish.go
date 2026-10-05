@@ -156,6 +156,12 @@ func (h *PublishHandler) publish(ctx context.Context, conversationID, expectedVe
 // are appended in candidate order and deterministic ids that already exist are
 // skipped, so replaying a publish is idempotent. It returns the merged view and
 // the sorted candidate ids that key the derived annotation version.
+//
+// TODO(revision-aware topics): topic_conversations membership is historical
+// taxonomy here — a superseded revision's topic links survive in the merged
+// view. Current-state retrieval is still safe because topic membership is
+// evaluated over current turns only (memory.CurrentTurnPredicate); a full fix
+// would rebuild topic membership per active revision at publish time.
 func mergeCandidates(current memory.Annotations, candidates []Candidate) (memory.Annotations, []string) {
 	merged := current
 	topicIDs := make(map[string]bool, len(merged.Topics))

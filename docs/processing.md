@@ -171,9 +171,18 @@
 
 写入路径直接落账（候选入库与 `ApplyAnnotations` 都会重建自己的行），转录修订替换时 `markStaleForAttachment` 把旧附件的派生记录一次性标记为 stale；`Store.InvalidateDerivedArtifacts` 是对外的幂等失效入口，`WHERE stale=0` 使重复调用不产生额外变化。当前检索默认排除 stale 笔记与来自非活动附件的原话，`include_stale` 是显式审计开关；发布器在合并候选时同样跳过 stale 候选，stale 内容从不出现在新版本哈希中。v8 迁移的 backfill 为存量笔记与候选推导同样的初始状态。
 
+### 修订失效后的 current projection 语义
+
+transcript 被 supersede 后,系统对“历史”与“当前”做如下划分:
+
+- **A. 历史 taxonomy / 审计**:`topics`、`topic_conversations`、`turn_topics` 行、`annotation_history` 快照、旧 `source_attachments`/`turns` 行都保留不删。`list_topics` 与 `get_annotation_history` 是审计视图,会如实显示这些历史映射。
+- **B. current source-derived projection**:所有 current-state 检索与统计(`query_context` / `get_context_item` / `search_memory` / `list_conversations` / `get_processing_status` / `build_context`)只统计 active revision 的原话与未标记 stale 的派生记忆;`include_stale` 是显式审计开关。话题成员判定只认 current 轮次(`CurrentTurnPredicate`),因此一个只剩 superseded 成员的 stale 话题映射不会把 current 检索绕回历史内容。
+
+剩余工作(TODO):话题 taxonomy 本身尚未做 revision-aware 重建——publish 替换注释时 `topic_conversations` 的成员关系会保留历史痕迹,`list_topics` 仍会列出只有 stale 成员的话题。这不影响 current 内容隔离(成员查询已按 current 轮次过滤),完整方案需要在注释替换时重建话题成员或为 topic 建立 derived 状态。
+
 ### speaker_bindings / speaker_binding_events（迁移 v9 speaker-binding）
 
-局部分说话人标签到真实人物的绑定契约（本实现不含声学识别，只存人工/模型确认的绑定）：`speaker_bindings` 以 `(recording_id, speaker_scoped_id)` 为作用域，状态 `proposed / confirmed / rejected / revoked`，`version` 在确认时递增；`speaker_binding_events` 每次动作追加一行（`propose` / `confirm` / `reject` / `revoke`，actor 与备注）。`Store.SpeakerProjection` 只返回 `confirmed` 行，撤销立即生效；未确认身份仍是未知。同一标签在另一录音中不受影响。
+局部分说话人标签到真实人物的绑定契约（本实现不含声学识别，只存人工/模型确认的绑定）：`speaker_bindings` 以 `(recording_id, speaker_scoped_id)` 为标签作用域、`transcript_revision` 为修订作用域——同一个 diarization 标签在不同转写修订间可能被复用，身份绝不跨修订继承。状态 `proposed / confirmed / rejected / revoked`，`version` 是行在标签组内的稳定序号（复核不改写）；`speaker_binding_events` 每次动作追加一行（`propose` / `confirm` / `reject` / `revoke`，actor 与备注）。`Store.SpeakerProjection(recordingID, transcriptRevision)` 只返回该修订下 `confirmed` 的行，撤销立即生效；未确认身份仍是未知。生命周期策略（文档化并有测试）：proposed 行是可刷新草稿；confirmed 同修订重放幂等；其他终态行（不同修订的 confirmed、rejected、revoked）是不可变历史，新提议创建下一个版本行，因此撤销后可基于新证据重新提议，被拒绝也不阻塞未来的新主张。同一标签在另一录音中不受影响。
 
 ## 状态机与租约语义
 

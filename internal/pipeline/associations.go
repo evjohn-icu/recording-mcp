@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"recordingmcp/internal/memory"
 )
 
 // LinkStatus values recorded by ValidateTopicLinks and stored in memory_links.
@@ -106,7 +108,10 @@ type ValidatedLink struct {
 // ToKind/ToID identify the two endpoints, EvidenceTurnIDs is the decoded
 // evidence list and CreatedAt is derived from the unix-millisecond column.
 // FromTitle/ToTitle carry the topic title when the endpoint is a topic and are
-// empty otherwise.
+// empty otherwise. Stale reports that at least one evidence turn derives from
+// a superseded transcript revision: the review verdict (Status) is history and
+// never changes, but a stale link is not usable for current retrieval or
+// navigation. It is computed at read time from the stored evidence.
 type MemoryLink struct {
 	ID              string
 	FromKind        string
@@ -122,6 +127,7 @@ type MemoryLink struct {
 	Status          string
 	Model           string
 	CreatedAt       time.Time
+	Stale           bool
 }
 
 // LinkFilter narrows ListLinks. Zero values match every link.
@@ -161,7 +167,7 @@ func ValidateTopicLinks(ctx context.Context, db *sql.DB, proposals []LinkProposa
 	if err != nil {
 		return nil, err
 	}
-	turns, err := existingIDs(ctx, db, "turns", turnIDs)
+	turns, currentTurns, err := turnExistence(ctx, db, turnIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +175,7 @@ func ValidateTopicLinks(ctx context.Context, db *sql.DB, proposals []LinkProposa
 	out := make([]ValidatedLink, 0, len(proposals))
 	for _, p := range proposals {
 		link := ValidatedLink{LinkProposal: p}
-		switch reason := rejectionReason(p, topics, turns); {
+		switch reason := rejectionReason(p, topics, turns, currentTurns); {
 		case reason != "":
 			link.Status = LinkStatusRejected
 			link.RejectionReason = reason
@@ -182,8 +188,10 @@ func ValidateTopicLinks(ctx context.Context, db *sql.DB, proposals []LinkProposa
 }
 
 // rejectionReason returns the first rule a proposal violates, or "" when the
-// proposal is valid.
-func rejectionReason(p LinkProposal, topics, turns map[string]bool) string {
+// proposal is valid. New proposals must cite turns of the current transcript
+// revision: a superseded turn can support an audit record but never a new
+// current relation.
+func rejectionReason(p LinkProposal, topics, turns, currentTurns map[string]bool) string {
 	if p.Kind != "topic_link" {
 		return fmt.Sprintf("kind must be topic_link, got %q", p.Kind)
 	}
@@ -211,6 +219,9 @@ func rejectionReason(p LinkProposal, topics, turns map[string]bool) string {
 	for _, id := range p.EvidenceTurnIDs {
 		if !turns[id] {
 			return fmt.Sprintf("evidence turn %q not found", id)
+		}
+		if !currentTurns[id] {
+			return fmt.Sprintf("evidence turn %q is not from the current transcript revision", id)
 		}
 	}
 	if math.IsNaN(p.Confidence) || p.Confidence < 0 || p.Confidence > 1 {
@@ -259,6 +270,51 @@ func existingIDs(ctx context.Context, db *sql.DB, table string, ids []string) (m
 		return nil, fmt.Errorf("pipeline: check %s existence: read: %w", table, err)
 	}
 	return found, nil
+}
+
+// turnExistence resolves which turn ids exist and which of those belong to
+// the current transcript revision (legacy turns without attachment rows are
+// current). A superseded turn exists but is not current.
+func turnExistence(ctx context.Context, db *sql.DB, ids []string) (map[string]bool, map[string]bool, error) {
+	existing := map[string]bool{}
+	current := map[string]bool{}
+	unique := make([]string, 0, len(ids))
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return existing, current, nil
+	}
+	query := fmt.Sprintf(`SELECT id, %s FROM turns WHERE id IN (%s)`, memory.CurrentTurnPredicate("turns"), placeholders(len(unique)))
+	args := make([]any, len(unique))
+	for i, id := range unique {
+		args[i] = id
+	}
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("pipeline: check turn currency: read: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var isCurrent int
+		if err := rows.Scan(&id, &isCurrent); err != nil {
+			return nil, nil, err
+		}
+		existing[id] = true
+		if isCurrent == 1 {
+			current[id] = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("pipeline: check turn currency: read: %w", err)
+	}
+	return existing, current, nil
 }
 
 // linkID derives the deterministic id of a memory link from its endpoint and
@@ -386,7 +442,11 @@ func InsertLinks(ctx context.Context, db *sql.DB, model string, links []Validate
 func ListLinks(ctx context.Context, db *sql.DB, filter LinkFilter) ([]MemoryLink, error) {
 	query := `SELECT l.id, l.from_kind, l.from_id, l.to_kind, l.to_id, l.relation, l.reason,
 	                 l.evidence_turn_ids_json, l.confidence, l.status, l.model, l.created_at,
-	                 COALESCE(tf.title, ''), COALESCE(tt.title, '')
+	                 COALESCE(tf.title, ''), COALESCE(tt.title, ''),
+	                 EXISTS(SELECT 1 FROM json_each(l.evidence_turn_ids_json) je
+	                        JOIN attachment_turns at ON at.turn_id=je.value
+	                        JOIN source_attachments a ON a.id=at.attachment_id
+	                        WHERE a.active=0)
 	          FROM memory_links l
 	          LEFT JOIN topics tf ON l.from_kind = 'topic' AND tf.id = l.from_id
 	          LEFT JOIN topics tt ON l.to_kind = 'topic' AND tt.id = l.to_id`
@@ -421,12 +481,14 @@ func ListLinks(ctx context.Context, db *sql.DB, filter LinkFilter) ([]MemoryLink
 			l              MemoryLink
 			evidenceJSON   string
 			createdAtMilli int64
+			isStale        int
 		)
 		if err := rows.Scan(&l.ID, &l.FromKind, &l.FromID, &l.ToKind, &l.ToID,
 			&l.Relation, &l.Reason, &evidenceJSON, &l.Confidence, &l.Status, &l.Model,
-			&createdAtMilli, &l.FromTitle, &l.ToTitle); err != nil {
+			&createdAtMilli, &l.FromTitle, &l.ToTitle, &isStale); err != nil {
 			return nil, fmt.Errorf("pipeline: list links: scan: %w", err)
 		}
+		l.Stale = isStale == 1
 		l.CreatedAt = time.UnixMilli(createdAtMilli)
 		if err := json.Unmarshal([]byte(evidenceJSON), &l.EvidenceTurnIDs); err != nil {
 			return nil, fmt.Errorf("pipeline: list links %s: unmarshal evidence: %w", l.ID, err)

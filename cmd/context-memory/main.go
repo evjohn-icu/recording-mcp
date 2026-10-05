@@ -152,6 +152,7 @@ type MemoryLinkView struct {
 	EvidenceTurnIDs []string `json:"evidence_turn_ids"`
 	Confidence      float64  `json:"confidence"`
 	Status          string   `json:"status"`
+	Stale           bool     `json:"stale"`
 	Model           string   `json:"model,omitempty"`
 	CreatedAtMS     int64    `json:"created_at_ms"`
 }
@@ -164,7 +165,7 @@ func memoryLinkView(l pipeline.MemoryLink) MemoryLinkView {
 		LinkID: l.ID, FromKind: l.FromKind, FromID: l.FromID, FromTitle: l.FromTitle,
 		ToKind: l.ToKind, ToID: l.ToID, ToTitle: l.ToTitle, Relation: l.Relation,
 		Reason: l.Reason, EvidenceTurnIDs: l.EvidenceTurnIDs, Confidence: l.Confidence,
-		Status: l.Status, Model: l.Model, CreatedAtMS: l.CreatedAt.UnixMilli(),
+		Status: l.Status, Stale: l.Stale, Model: l.Model, CreatedAtMS: l.CreatedAt.UnixMilli(),
 	}
 }
 

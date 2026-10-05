@@ -549,3 +549,211 @@ func TestInsertLinksReproposalSemantics(t *testing.T) {
 		t.Fatalf("reopen after reject = %q, %v", got.Status, err)
 	}
 }
+
+// seedAttachment inserts one source attachment row. active=1 marks the current
+// revision; active=0 marks a superseded one. The seeded conversation/recording
+// match seedTurn's fixed identifiers.
+func seedAttachment(t *testing.T, db *sql.DB, id, segmentID, revision string, active int, supersedes string) {
+	t.Helper()
+	var sup any
+	if supersedes != "" {
+		sup = supersedes
+	}
+	if _, err := db.Exec(
+		`INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active,supersedes_revision)
+		 VALUES(?,'conv','rec',0,?,?,'{}','{}','sha',?,?)`,
+		id, segmentID, revision, active, sup); err != nil {
+		t.Fatalf("insert attachment %s: %v", id, err)
+	}
+}
+
+// seedAttachedTurn inserts a turn and links it to one attachment so the
+// current-state predicate can classify it.
+func seedAttachedTurn(t *testing.T, db *sql.DB, turnID, attachmentID string) {
+	t.Helper()
+	seedTurn(t, db, turnID)
+	if _, err := db.Exec(`INSERT INTO attachment_turns(attachment_id,turn_id) VALUES(?,?)`, attachmentID, turnID); err != nil {
+		t.Fatalf("link turn %s to attachment %s: %v", turnID, attachmentID, err)
+	}
+}
+
+// TestValidateTopicLinksRejectsSupersededEvidence pins that a proposal citing a
+// turn of a superseded transcript revision is rejected with the exact reason,
+// while the same proposal citing the current revision's turn validates.
+func TestValidateTopicLinksRejectsSupersededEvidence(t *testing.T) {
+	db := newAssociationDB(t)
+	seedTopic(t, db, "topic-1")
+	seedTopic(t, db, "topic-2")
+	seedAttachment(t, db, "att-v1", "seg-1", "rev-1", 0, "")
+	seedAttachment(t, db, "att-v2", "seg-1", "rev-2", 1, "rev-1")
+	seedAttachedTurn(t, db, "turn-old", "att-v1")
+	seedAttachedTurn(t, db, "turn-new", "att-v2")
+
+	want := `evidence turn "turn-old" is not from the current transcript revision`
+
+	stale := baseLinkProposal()
+	stale.EvidenceTurnIDs = []string{"turn-old"}
+	if got := validateOne(t, db, stale); got.Status != LinkStatusRejected || got.RejectionReason != want {
+		t.Fatalf("stale-evidence proposal = %q (%s), want rejected with %q", got.Status, got.RejectionReason, want)
+	}
+
+	mixed := baseLinkProposal()
+	mixed.EvidenceTurnIDs = []string{"turn-new", "turn-old"}
+	if got := validateOne(t, db, mixed); got.Status != LinkStatusRejected || got.RejectionReason != want {
+		t.Fatalf("mixed-evidence proposal = %q (%s), want rejected with %q", got.Status, got.RejectionReason, want)
+	}
+
+	current := baseLinkProposal()
+	current.EvidenceTurnIDs = []string{"turn-new"}
+	if got := validateOne(t, db, current); got.Status != linkStatusValidated {
+		t.Fatalf("current-evidence proposal = %q (%s), want validated", got.Status, got.RejectionReason)
+	}
+}
+
+// TestMemoryLinkStaleAfterEvidenceSuperseded pins that a confirmed link is
+// eligible while its evidence is current, and that superseding the evidence's
+// revision flips the read-time Stale marker without touching the stored review
+// verdict or the evidence list: the review history is immutable.
+func TestMemoryLinkStaleAfterEvidenceSuperseded(t *testing.T) {
+	db := newAssociationDB(t)
+	ctx := context.Background()
+	seedTopic(t, db, "topic-1")
+	seedTopic(t, db, "topic-2")
+	seedAttachment(t, db, "att-v1", "seg-1", "rev-1", 1, "")
+	seedAttachedTurn(t, db, "turn-v1", "att-v1")
+
+	p := baseLinkProposal()
+	p.EvidenceTurnIDs = []string{"turn-v1"}
+	validated, err := ValidateTopicLinks(ctx, db, []LinkProposal{p})
+	if err != nil || len(validated) != 1 || validated[0].Status != linkStatusValidated {
+		t.Fatalf("validate current-evidence proposal = %+v, %v", validated, err)
+	}
+	inserted, err := InsertLinks(ctx, db, "curator", validated, time.UnixMilli(1_700_000_000_000))
+	if err != nil || len(inserted) != 1 || inserted[0].Outcome != LinkInserted {
+		t.Fatalf("InsertLinks = %+v, %v", inserted, err)
+	}
+	id := inserted[0].ID
+	if _, err := ReviewLink(ctx, db, id, ReviewConfirm); err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+
+	before, err := ListLinks(ctx, db, LinkFilter{})
+	if err != nil || len(before) != 1 {
+		t.Fatalf("ListLinks before supersede = %+v, %v", before, err)
+	}
+	if before[0].Stale {
+		t.Fatalf("link reported stale while its evidence is current: %+v", before[0])
+	}
+	if before[0].Status != LinkStatusConfirmed || !reflect.DeepEqual(before[0].EvidenceTurnIDs, []string{"turn-v1"}) {
+		t.Fatalf("link before supersede = %+v, want a confirmed link on turn-v1", before[0])
+	}
+
+	if _, err := db.Exec(`UPDATE source_attachments SET active=0 WHERE id='att-v1'`); err != nil {
+		t.Fatal(err)
+	}
+	seedAttachment(t, db, "att-v2", "seg-1", "rev-2", 1, "rev-1")
+	seedAttachedTurn(t, db, "turn-v2", "att-v2")
+
+	after, err := ListLinks(ctx, db, LinkFilter{})
+	if err != nil || len(after) != 1 {
+		t.Fatalf("ListLinks after supersede = %+v, %v", after, err)
+	}
+	got := after[0]
+	if !got.Stale {
+		t.Fatalf("link still reported current after its evidence was superseded: %+v", got)
+	}
+	if got.Status != LinkStatusConfirmed {
+		t.Fatalf("review verdict changed on supersede: status=%q, want confirmed", got.Status)
+	}
+	if !reflect.DeepEqual(got.EvidenceTurnIDs, []string{"turn-v1"}) {
+		t.Fatalf("evidence list rewritten on supersede: %v, want [turn-v1]", got.EvidenceTurnIDs)
+	}
+	if got.ID != id || !got.CreatedAt.Equal(before[0].CreatedAt) {
+		t.Fatalf("row identity changed: id=%q created_at=%v", got.ID, got.CreatedAt)
+	}
+}
+
+// TestLinkReproposalAfterSupersedeKeepsHistory pins that after evidence is
+// superseded the stale confirmed row is untouched, a new proposal with a
+// different relation and current evidence inserts a distinct row, and
+// re-proposing the old tuple is rejected by validation rather than silently
+// refreshing a stale row.
+func TestLinkReproposalAfterSupersedeKeepsHistory(t *testing.T) {
+	db := newAssociationDB(t)
+	ctx := context.Background()
+	t0 := time.UnixMilli(1_700_000_000_000)
+	seedTopic(t, db, "topic-1")
+	seedTopic(t, db, "topic-2")
+	seedAttachment(t, db, "att-v1", "seg-1", "rev-1", 1, "")
+	seedAttachedTurn(t, db, "turn-v1", "att-v1")
+
+	old := baseLinkProposal()
+	old.EvidenceTurnIDs = []string{"turn-v1"}
+	validatedOld, err := ValidateTopicLinks(ctx, db, []LinkProposal{old})
+	if err != nil || len(validatedOld) != 1 || validatedOld[0].Status != linkStatusValidated {
+		t.Fatalf("validate old proposal = %+v, %v", validatedOld, err)
+	}
+	insertedOld, err := InsertLinks(ctx, db, "curator-a", validatedOld, t0)
+	if err != nil || len(insertedOld) != 1 || insertedOld[0].Outcome != LinkInserted {
+		t.Fatalf("insert old link = %+v, %v", insertedOld, err)
+	}
+	oldID := insertedOld[0].ID
+	if _, err := ReviewLink(ctx, db, oldID, ReviewConfirm); err != nil {
+		t.Fatalf("confirm old link: %v", err)
+	}
+
+	if _, err := db.Exec(`UPDATE source_attachments SET active=0 WHERE id='att-v1'`); err != nil {
+		t.Fatal(err)
+	}
+	seedAttachment(t, db, "att-v2", "seg-1", "rev-2", 1, "rev-1")
+	seedAttachedTurn(t, db, "turn-v2", "att-v2")
+
+	// Re-proposing the stale-evidence tuple is rejected by validation.
+	want := `evidence turn "turn-v1" is not from the current transcript revision`
+	if got := validateOne(t, db, old); got.Status != LinkStatusRejected || got.RejectionReason != want {
+		t.Fatalf("re-proposal of stale tuple = %q (%s), want rejected with %q", got.Status, got.RejectionReason, want)
+	}
+
+	// A new relation with current evidence is a genuinely new row.
+	fresh := baseLinkProposal()
+	fresh.Relation = "follow_up"
+	fresh.EvidenceTurnIDs = []string{"turn-v2"}
+	fresh.Reason = "follow-up recorded after the transcript revision was replaced"
+	validatedFresh, err := ValidateTopicLinks(ctx, db, []LinkProposal{fresh})
+	if err != nil || len(validatedFresh) != 1 || validatedFresh[0].Status != linkStatusValidated {
+		t.Fatalf("validate fresh proposal = %+v, %v", validatedFresh, err)
+	}
+	insertedFresh, err := InsertLinks(ctx, db, "curator-b", validatedFresh, t0.Add(time.Hour))
+	if err != nil || len(insertedFresh) != 1 || insertedFresh[0].Outcome != LinkInserted {
+		t.Fatalf("insert fresh link = %+v, %v", insertedFresh, err)
+	}
+	freshID := insertedFresh[0].ID
+	if freshID == oldID {
+		t.Fatalf("different relation produced the same link id %s", freshID)
+	}
+
+	rows, err := ListLinks(ctx, db, LinkFilter{})
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("ListLinks = %+v, %v, want two rows", rows, err)
+	}
+	byID := map[string]MemoryLink{}
+	for _, row := range rows {
+		byID[row.ID] = row
+	}
+	oldRow, ok := byID[oldID]
+	if !ok {
+		t.Fatalf("stale confirmed row missing after reproposal: %+v", rows)
+	}
+	if oldRow.Status != LinkStatusConfirmed || !oldRow.Stale || oldRow.Relation != "same_topic" ||
+		!reflect.DeepEqual(oldRow.EvidenceTurnIDs, []string{"turn-v1"}) {
+		t.Fatalf("stale confirmed row was mutated: %+v", oldRow)
+	}
+	newRow, ok := byID[freshID]
+	if !ok {
+		t.Fatalf("fresh row missing: %+v", rows)
+	}
+	if newRow.Status != LinkStatusProposed || newRow.Stale || newRow.Relation != "follow_up" ||
+		!reflect.DeepEqual(newRow.EvidenceTurnIDs, []string{"turn-v2"}) {
+		t.Fatalf("fresh row = %+v, want a proposed, current link on turn-v2", newRow)
+	}
+}

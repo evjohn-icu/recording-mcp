@@ -368,7 +368,7 @@ func (s *Store) Query(ctx context.Context, q Query) (Page, error) {
 	items := []Item{}
 	turnSQL := `SELECT t.id,t.conversation_id,t.recording_id,t.content,t.speaker_scoped_id,t.global_start_ms,t.global_end_ms,t.source_sha256,t.original_turn_id,t.transcript_version,c.title FROM turns t JOIN conversations c ON c.id=t.conversation_id WHERE (?='' OR t.conversation_id=?) AND (?='' OR t.recording_id=?) AND (?='' OR t.speaker_scoped_id=?) AND (?='' OR EXISTS(SELECT 1 FROM turn_topics z WHERE z.turn_id=t.id AND z.topic_id=?))`
 	if !q.IncludeStale {
-		turnSQL += ` AND NOT EXISTS(SELECT 1 FROM attachment_turns at JOIN source_attachments a ON a.id=at.attachment_id WHERE at.turn_id=t.id AND a.active=0)`
+		turnSQL += ` AND ` + CurrentTurnPredicate("t")
 	}
 	turnSQL += ` ORDER BY CASE WHEN t.global_start_ms IS NULL THEN 1 ELSE 0 END,t.global_start_ms,t.id`
 	rows, err := s.db.QueryContext(ctx, turnSQL, convo, convo, q.RecordingID, q.RecordingID, q.SpeakerScopedID, q.SpeakerScopedID, q.TopicID, q.TopicID)
@@ -422,7 +422,7 @@ func (s *Store) Query(ctx context.Context, q Query) (Page, error) {
 	// Conversation and notes appear by default; turns only when explicitly requested.
 	noteSQL := `SELECT n.id,n.conversation_id,n.kind,n.summary,n.topic_ids_json,n.claim_mode,n.interpretation_note,n.annotation_version,c.title FROM notes n JOIN conversations c ON c.id=n.conversation_id WHERE (?='' OR n.conversation_id=?) AND (?='' OR EXISTS(SELECT 1 FROM json_each(n.topic_ids_json) WHERE value=?)) AND (?='' OR EXISTS(SELECT 1 FROM note_evidence e JOIN turns t ON t.id=e.turn_id WHERE e.note_id=n.id AND t.speaker_scoped_id=? AND t.recording_id=?)) AND (?='' OR EXISTS(SELECT 1 FROM note_evidence e JOIN turns t ON t.id=e.turn_id WHERE e.note_id=n.id AND t.recording_id=?))`
 	if !q.IncludeStale {
-		noteSQL += ` AND NOT EXISTS(SELECT 1 FROM derived_artifacts d WHERE d.kind='note' AND d.artifact_id=n.id AND d.stale=1)`
+		noteSQL += ` AND NOT ` + NoteStalePredicate("n")
 	}
 	noteSQL += ` ORDER BY n.id`
 	nrows, err := s.db.QueryContext(ctx, noteSQL, convo, convo, q.TopicID, q.TopicID, q.SpeakerScopedID, q.SpeakerScopedID, q.RecordingID, q.RecordingID, q.RecordingID)
@@ -594,7 +594,7 @@ func (s *Store) GetItem(ctx context.Context, id string, includeStale bool) (Item
 	var st, en sql.NullInt64
 	turnSQL := `SELECT id,conversation_id,recording_id,content,speaker_scoped_id,global_start_ms,global_end_ms,source_sha256,original_turn_id,transcript_version FROM turns WHERE id=?`
 	if !includeStale {
-		turnSQL += ` AND NOT EXISTS(SELECT 1 FROM attachment_turns at JOIN source_attachments a ON a.id=at.attachment_id WHERE at.turn_id=turns.id AND a.active=0)`
+		turnSQL += ` AND ` + CurrentTurnPredicate("turns")
 	}
 	err := s.db.QueryRowContext(ctx, turnSQL, id).Scan(&it.ID, &it.ConversationID, &record, &content, &sp, &st, &en, &source, &it.TurnID, &version)
 	if err == nil {
@@ -627,7 +627,7 @@ func (s *Store) GetItem(ctx context.Context, id string, includeStale bool) (Item
 	var topics string
 	noteSQL := "SELECT id,conversation_id,kind,summary,topic_ids_json,claim_mode,interpretation_note,annotation_version FROM notes WHERE id=?"
 	if !includeStale {
-		noteSQL += ` AND NOT EXISTS(SELECT 1 FROM derived_artifacts d WHERE d.kind='note' AND d.artifact_id=notes.id AND d.stale=1)`
+		noteSQL += ` AND NOT ` + NoteStalePredicate("notes")
 	}
 	err = s.db.QueryRowContext(ctx, noteSQL, id).Scan(&it.ID, &it.ConversationID, &it.Kind, &it.Summary, &topics, &it.ClaimMode, &it.InterpretationNote, &it.AnnotationVersion)
 	if err == nil {

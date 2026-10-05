@@ -280,6 +280,22 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 	pkg.Trace.Lexical.HitIDs = []string{}
 
 	candidates := newCandidateSet()
+	scope := newRequestScope(convID, topics, req.StartedAfter, req.StartedBefore)
+
+	// addItem applies the hard scope and staleness guards before one item can
+	// enter the candidate set. Every branch funnels through it, so no branch
+	// can leak out-of-scope or superseded content into the package.
+	addItem := func(item memory.Item, score float64, evidence []string) (bool, error) {
+		if item.Stale {
+			return false, nil
+		}
+		ok, err := scope.allows(ctx, db, item)
+		if err != nil || !ok {
+			return false, err
+		}
+		candidates.add(item, score, evidence)
+		return true, nil
+	}
 
 	// addQueryPage folds one store.Query page into the candidate set. The
 	// query view does not populate note evidence, so it is hydrated from
@@ -291,9 +307,6 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 			return err
 		}
 		for _, item := range page.Items {
-			if item.Stale {
-				continue
-			}
 			ev := evMap[item.ID]
 			if len(ev) == 0 {
 				ev = evidenceOf(item)
@@ -301,14 +314,34 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 			if len(item.EvidenceTurnIDs) == 0 && isNoteKind(item.Kind) {
 				item.EvidenceTurnIDs = ev
 			}
-			candidates.add(item, 0, ev)
+			if _, err := addItem(item, 0, ev); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
 
 	// Step 1: recall. Lexical search first so its higher-confidence hits win
-	// the (kind, id) dedupe over filter-only navigation.
-	if query != "" {
+	// the (kind, id) dedupe over filter-only navigation. An explicit topic
+	// scope narrows the lexical recall itself (query AND topic); the global
+	// search only runs when the request leaves topics unconstrained.
+	addHits := func(page memory.SearchPage) error {
+		for _, hit := range page.Hits {
+			item, evidence, err := itemFromHit(ctx, store, hit)
+			if err != nil {
+				return err
+			}
+			added, err := addItem(item, hit.Score, evidence)
+			if err != nil {
+				return err
+			}
+			if added {
+				pkg.Trace.Lexical.HitIDs = append(pkg.Trace.Lexical.HitIDs, hit.ID)
+			}
+		}
+		return nil
+	}
+	if query != "" && !scope.topicScoped() {
 		limit := maxOf(lexicalLimitFactor*maxItems, lexicalLimitFloor)
 		page, err := store.SearchMemory(ctx, memory.MemorySearch{
 			Text:          query,
@@ -320,38 +353,25 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 		if err != nil {
 			return Package{}, err
 		}
-		for _, hit := range page.Hits {
-			pkg.Trace.Lexical.HitIDs = append(pkg.Trace.Lexical.HitIDs, hit.ID)
-			item, evidence, err := itemFromHit(ctx, store, hit)
-			if err != nil {
-				return Package{}, err
-			}
-			if item.Stale {
-				continue
-			}
-			candidates.add(item, hit.Score, evidence)
+		if err := addHits(page); err != nil {
+			return Package{}, err
 		}
 	}
 	for _, tid := range firstN(topics, maxRequestTopics) {
 		if query != "" {
 			page, err := store.SearchMemory(ctx, memory.MemorySearch{
-				Text:    query,
-				Scope:   "both",
-				TopicID: tid,
-				Limit:   maxItems,
+				Text:          query,
+				Scope:         "both",
+				TopicID:       tid,
+				Limit:         maxItems,
+				StartedAfter:  req.StartedAfter,
+				StartedBefore: req.StartedBefore,
 			})
 			if err != nil {
 				return Package{}, err
 			}
-			for _, hit := range page.Hits {
-				item, evidence, err := itemFromHit(ctx, store, hit)
-				if err != nil {
-					return Package{}, err
-				}
-				if item.Stale {
-					continue
-				}
-				candidates.add(item, hit.Score, evidence)
+			if err := addHits(page); err != nil {
+				return Package{}, err
 			}
 		} else {
 			page, err := store.Query(ctx, memory.Query{TopicID: tid, IncludeTurns: true, Limit: maxItems})
@@ -381,7 +401,7 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 	}
 	navTopics := []string{}
 	for _, tid := range candidates.topicIDs() {
-		if requestTopics[tid] {
+		if requestTopics[tid] || !scope.topicAllowed(tid) {
 			continue
 		}
 		navTopics = append(navTopics, tid)
@@ -397,7 +417,7 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 	}
 	navConversations := []string{}
 	for _, cid := range candidates.conversationIDs() {
-		if cid == convID {
+		if cid == convID || !scope.conversationAllowed(cid) {
 			continue
 		}
 		navConversations = append(navConversations, cid)
@@ -428,8 +448,20 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 			if seenLinks[link.ID] {
 				continue
 			}
+			// A confirmed link is a review verdict, not current truth: when any
+			// of its evidence turns has been superseded the link is audit-only
+			// and must not navigate current retrieval.
+			if link.Stale {
+				continue
+			}
 			other := otherTopic(link, tid)
 			if other == "" {
+				continue
+			}
+			// A link can never pull the package out of the requested scope:
+			// a target topic outside an explicit topic scope is not traversed,
+			// and the target query is narrowed to the requested conversation.
+			if !scope.topicAllowed(other) {
 				continue
 			}
 			seenLinks[link.ID] = true
@@ -439,7 +471,11 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 				FromID:   link.FromID,
 				ToID:     link.ToID,
 			})
-			page, err := store.Query(ctx, memory.Query{TopicID: other, Limit: maxItems})
+			q := memory.Query{TopicID: other, Limit: maxItems}
+			if convID != "" {
+				q.ConversationID = convID
+			}
+			page, err := store.Query(ctx, q)
 			if err != nil {
 				return Package{}, err
 			}
@@ -489,12 +525,13 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 			continue
 		}
 		evidenceFetched++
-		window, err := store.GetEvidenceContext(ctx, turnID, evidenceRadius, remaining)
+		// Current-state evidence only: the window comes from the current-only
+		// lookup, so a superseded neighbour can never enter the package. Scope
+		// is inherited from the citing item (it already passed the hard scope,
+		// and the window is the same recording as that item).
+		window, err := store.GetCurrentEvidenceContext(ctx, turnID, evidenceRadius, remaining)
 		if err != nil {
 			return Package{}, err
-		}
-		if window.Stale {
-			continue
 		}
 		for _, turn := range window.Turns {
 			if idx, ok := evidenceIndex[turn.ID]; ok {
@@ -551,6 +588,22 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 	}
 	pkg.Coverage.Conversations = coveredConversations(items, convID)
 	pkg.Coverage.TopicIDs = coveredTopics(items)
+	if scope.topicScoped() || scope.conversationID != "" {
+		inScope := make([]string, 0, len(pkg.Coverage.Conversations))
+		for _, cid := range pkg.Coverage.Conversations {
+			if scope.conversationAllowed(cid) {
+				inScope = append(inScope, cid)
+			}
+		}
+		pkg.Coverage.Conversations = inScope
+		topicScope := make([]string, 0, len(pkg.Coverage.TopicIDs))
+		for _, tid := range pkg.Coverage.TopicIDs {
+			if scope.topicAllowed(tid) {
+				topicScope = append(topicScope, tid)
+			}
+		}
+		pkg.Coverage.TopicIDs = topicScope
+	}
 	pkg.Coverage.TimeRange = TimeRange{
 		StartedAfter:  req.StartedAfter,
 		StartedBefore: req.StartedBefore,
@@ -894,7 +947,7 @@ func staleArtifactIDs(ctx context.Context, db *sql.DB, conversations []string) (
 }
 
 func unanalysedTurnCount(ctx context.Context, db *sql.DB, conversations []string) (int, error) {
-	query := fmt.Sprintf(`SELECT COUNT(*) FROM turns t WHERE t.conversation_id IN (%s) AND NOT EXISTS(SELECT 1 FROM analysis_coverage ac WHERE ac.turn_id=t.id AND ac.processor_version=?)`, placeholders(len(conversations)))
+	query := fmt.Sprintf(`SELECT COUNT(*) FROM turns t WHERE t.conversation_id IN (%s) AND `+memory.CurrentTurnPredicate("t")+` AND NOT EXISTS(SELECT 1 FROM analysis_coverage ac WHERE ac.turn_id=t.id AND ac.processor_version=?)`, placeholders(len(conversations)))
 	args := append(stringsToAny(conversations), analysisProcessorVersion)
 	var count int
 	if err := db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {

@@ -2,6 +2,8 @@ package memory
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -57,6 +59,29 @@ func openSpeakerStore(t *testing.T) *Store {
 	return s
 }
 
+// loadSpeakerBinding reads one binding row straight from the store handle so
+// tests can assert that review history is immutable.
+func loadSpeakerBinding(t *testing.T, s *Store, id string) SpeakerBinding {
+	t.Helper()
+	var (
+		b        SpeakerBinding
+		person   sql.NullString
+		evidence string
+	)
+	if err := s.db.QueryRow(`SELECT id, recording_id, transcript_revision, speaker_scoped_id, person_id, status, evidence_json, reviewer, version, created_at, updated_at
+		FROM speaker_bindings WHERE id=?`, id).Scan(&b.ID, &b.RecordingID, &b.TranscriptRevision, &b.SpeakerScopedID, &person, &b.Status,
+		&evidence, &b.Reviewer, &b.Version, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		t.Fatal(err)
+	}
+	if person.Valid {
+		b.PersonID = person.String
+	}
+	if err := json.Unmarshal([]byte(evidence), &b.EvidenceTurnIDs); err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
 func TestSpeakerBindingLifecycle(t *testing.T) {
 	ctx := context.Background()
 	s := openSpeakerStore(t)
@@ -69,7 +94,7 @@ func TestSpeakerBindingLifecycle(t *testing.T) {
 	if b.Status != "proposed" || b.Version != 1 || b.PersonID != "" || b.TranscriptRevision != "rev-1" {
 		t.Fatalf("bad proposal: %+v", b)
 	}
-	if b.ID != speakerBindingID("rec-1", "SPK_00") || !strings.HasPrefix(b.ID, "sb:") {
+	if b.ID != speakerBindingID("rec-1", "SPK_00", 1) || !strings.HasPrefix(b.ID, "sb:") {
 		t.Fatalf("unexpected deterministic id %q", b.ID)
 	}
 	if len(b.EvidenceTurnIDs) != 2 || b.EvidenceTurnIDs[0] != "t1" || b.EvidenceTurnIDs[1] != "t2" {
@@ -80,7 +105,7 @@ func TestSpeakerBindingLifecycle(t *testing.T) {
 	}
 
 	// A proposed binding is not an accepted identity yet.
-	proj, err := s.SpeakerProjection(ctx, "rec-1")
+	proj, err := s.SpeakerProjection(ctx, "rec-1", "rev-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,11 +117,12 @@ func TestSpeakerBindingLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if confirmed.Status != "confirmed" || confirmed.PersonID != "person:alice" || confirmed.Reviewer != "reviewer-a" || confirmed.Version != 2 {
+	// Version is the stable row ordinal; review never rewrites it.
+	if confirmed.Status != "confirmed" || confirmed.PersonID != "person:alice" || confirmed.Reviewer != "reviewer-a" || confirmed.Version != 1 {
 		t.Fatalf("bad confirmation: %+v", confirmed)
 	}
 
-	proj, err = s.SpeakerProjection(ctx, "rec-1")
+	proj, err = s.SpeakerProjection(ctx, "rec-1", "rev-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +159,7 @@ func TestSpeakerBindingRejectKeepsProjectionEmpty(t *testing.T) {
 		t.Fatalf("bad rejection: %+v", rejected)
 	}
 
-	proj, err := s.SpeakerProjection(ctx, "rec-1")
+	proj, err := s.SpeakerProjection(ctx, "rec-1", "rev-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +191,7 @@ func TestSpeakerBindingRevokeClearsProjection(t *testing.T) {
 	if _, err := s.ConfirmSpeakerBinding(ctx, b.ID, "person:carol", "reviewer-a"); err != nil {
 		t.Fatal(err)
 	}
-	proj, err := s.SpeakerProjection(ctx, "rec-1")
+	proj, err := s.SpeakerProjection(ctx, "rec-1", "rev-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,10 +203,10 @@ func TestSpeakerBindingRevokeClearsProjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if revoked.Status != "revoked" || revoked.Reviewer != "reviewer-c" || revoked.Version != 2 {
+	if revoked.Status != "revoked" || revoked.Reviewer != "reviewer-c" || revoked.Version != 1 {
 		t.Fatalf("bad revocation: %+v", revoked)
 	}
-	proj, err = s.SpeakerProjection(ctx, "rec-1")
+	proj, err = s.SpeakerProjection(ctx, "rec-1", "rev-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +241,7 @@ func TestSpeakerBindingScopedToRecording(t *testing.T) {
 	}
 	// The same label in another recording is an unrelated speaker and must not
 	// inherit the confirmed identity.
-	proj2, err := s.SpeakerProjection(ctx, "rec-2")
+	proj2, err := s.SpeakerProjection(ctx, "rec-2", "rev-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,11 +260,11 @@ func TestSpeakerBindingScopedToRecording(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	proj1, err := s.SpeakerProjection(ctx, "rec-1")
+	proj1, err := s.SpeakerProjection(ctx, "rec-1", "rev-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	proj2, err = s.SpeakerProjection(ctx, "rec-2")
+	proj2, err = s.SpeakerProjection(ctx, "rec-2", "rev-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,5 +362,136 @@ func TestSpeakerBindingReviewTransitions(t *testing.T) {
 		if events[i] != want[i] {
 			t.Fatalf("event %d = %+v, want %+v", i, events[i], want[i])
 		}
+	}
+}
+
+// TestSpeakerBindingRevisionScopedIdentity proves that a diarization label is
+// never resolved across transcript revisions: the same speaker_0 in two
+// revisions does not inherit identity, and a confirmed binding resolves only
+// in the revision it was reviewed against.
+func TestSpeakerBindingRevisionScopedIdentity(t *testing.T) {
+	ctx := context.Background()
+	s := openSpeakerStore(t)
+	seedRecording(t, s, "conv-1", "rec-1")
+
+	v1, err := s.ProposeSpeakerBinding(ctx, "rec-1", "speaker_0", "rev-1", []string{"t1"}, "model-x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ConfirmSpeakerBinding(ctx, v1.ID, "person:alice", "reviewer-a"); err != nil {
+		t.Fatal(err)
+	}
+	// The label resolved for rev-1; the same label in rev-2 is unknown.
+	projV1, err := s.SpeakerProjection(ctx, "rec-1", "rev-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projV1["speaker_0"] != "person:alice" {
+		t.Fatalf("rev-1 projection = %v, want speaker_0 -> person:alice", projV1)
+	}
+	projV2, err := s.SpeakerProjection(ctx, "rec-1", "rev-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projV2) != 0 {
+		t.Fatalf("rev-2 inherited identity from rev-1: %v", projV2)
+	}
+
+	// rev-2 reuses the label for a different person: a new claim, not a
+	// mutation of the rev-1 verdict.
+	v2, err := s.ProposeSpeakerBinding(ctx, "rec-1", "speaker_0", "rev-2", []string{"t9"}, "model-x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v2.ID == v1.ID || v2.Version != 2 {
+		t.Fatalf("rev-2 claim did not create a new versioned row: %+v", v2)
+	}
+	if _, err := s.ConfirmSpeakerBinding(ctx, v2.ID, "person:bob", "reviewer-b"); err != nil {
+		t.Fatal(err)
+	}
+	projV1, err = s.SpeakerProjection(ctx, "rec-1", "rev-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	projV2, err = s.SpeakerProjection(ctx, "rec-1", "rev-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projV1["speaker_0"] != "person:alice" || projV2["speaker_0"] != "person:bob" {
+		t.Fatalf("revision scoping broken: rev-1=%v rev-2=%v", projV1, projV2)
+	}
+	// The rev-1 verdict is untouched history.
+	if v1again := loadSpeakerBinding(t, s, v1.ID); v1again.Status != "confirmed" || v1again.PersonID != "person:alice" {
+		t.Fatalf("rev-1 binding mutated: %+v", v1again)
+	}
+}
+
+// TestSpeakerBindingReproposeAfterRevokeAndReject proves the lifecycle allows
+// fresh claims after a terminal verdict while keeping full history: proposal
+// v1 -> confirm Alice -> revoke -> proposal v2 -> confirm Bob works, and a
+// rejection is terminal history for its own row but never blocks a new
+// proposal (documented policy).
+func TestSpeakerBindingReproposeAfterRevokeAndReject(t *testing.T) {
+	ctx := context.Background()
+	s := openSpeakerStore(t)
+	seedRecording(t, s, "conv-1", "rec-1")
+
+	v1, err := s.ProposeSpeakerBinding(ctx, "rec-1", "speaker_0", "rev-1", []string{"t1"}, "model-x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ConfirmSpeakerBinding(ctx, v1.ID, "person:alice", "reviewer-a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RevokeSpeakerBinding(ctx, v1.ID, "reviewer-a", "wrong person"); err != nil {
+		t.Fatal(err)
+	}
+	// Re-propose after revoke: a new claim on new evidence/revision.
+	v2, err := s.ProposeSpeakerBinding(ctx, "rec-1", "speaker_0", "rev-2", []string{"t2"}, "model-x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v2.Version != 2 || v2.Status != "proposed" {
+		t.Fatalf("re-propose after revoke did not create a new claim: %+v", v2)
+	}
+	if _, err := s.ConfirmSpeakerBinding(ctx, v2.ID, "person:bob", "reviewer-b"); err != nil {
+		t.Fatal(err)
+	}
+	proj, err := s.SpeakerProjection(ctx, "rec-1", "rev-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proj["speaker_0"] != "person:bob" {
+		t.Fatalf("rev-2 projection = %v, want person:bob", proj)
+	}
+	// History: row 1 keeps its verdict and its events.
+	if row1 := loadSpeakerBinding(t, s, v1.ID); row1.Status != "revoked" {
+		t.Fatalf("revoked row mutated: %+v", row1)
+	}
+	if events := speakerBindingEvents(t, s, v1.ID); len(events) != 3 {
+		t.Fatalf("row 1 history incomplete: %+v", events)
+	}
+
+	// Documented reject policy: the rejected row is immutable history and a
+	// later claim with fresh evidence creates the next version.
+	v3, err := s.ProposeSpeakerBinding(ctx, "rec-1", "speaker_0", "rev-3", []string{"t3"}, "model-x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RejectSpeakerBinding(ctx, v3.ID, "reviewer-c", "insufficient evidence"); err != nil {
+		t.Fatal(err)
+	}
+	if rejectedRow := loadSpeakerBinding(t, s, v3.ID); rejectedRow.Status != "rejected" {
+		t.Fatalf("rejected row mutated: %+v", rejectedRow)
+	}
+	v4, err := s.ProposeSpeakerBinding(ctx, "rec-1", "speaker_0", "rev-3", []string{"t3", "t4"}, "model-y")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v4.ID == v3.ID || v4.Version != 4 || v4.Status != "proposed" {
+		t.Fatalf("re-propose after reject did not create a fresh claim: %+v", v4)
+	}
+	if again := loadSpeakerBinding(t, s, v3.ID); again.Status != "rejected" || len(again.EvidenceTurnIDs) != 1 {
+		t.Fatalf("rejected row history damaged: %+v", again)
 	}
 }
