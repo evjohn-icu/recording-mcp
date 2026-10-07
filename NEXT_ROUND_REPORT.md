@@ -79,7 +79,7 @@ End-to-end stdio smoke (outside the harness): `context-eval --db /tmp/smoke.db` 
 ## 9. Known limitations
 
 - Semantic default is the offline hashing embedder (`hash-ngram-v1`, 256 dims), not a real embedding endpoint. Switching the default to a real endpoint is only `--semantic-provider` + an indexed corpus.
-- No FTS5 this round (documented rationale in `docs/hybrid-retrieval.md` §4): the lexical branch keeps the literal scan; FTS5 remains a listed future option.
+- No FTS5 this round (documented rationale in `docs/hybrid-retrieval.md` §4): the lexical branch keeps the literal scan **and its original hit scoring** (notes 1.0, turns 0.5); the planned token/n-gram coverage term for the lexical branch was **not** implemented and moved to the planned list alongside FTS5.
 - Projection is read-time, has no projection table, reserves the `project` kind, and uses no LLM. `StatusConflicting` is reserved for a future truth engine.
 - Provenance ships as `Package.Ranking`, not by changing `Package.Items`' element type.
 - Indexing is a CLI (`bin/context-embed`), not an MCP write tool; nothing re-indexes automatically after publish — until then, hybrid recall only covers what the last index run saw.
