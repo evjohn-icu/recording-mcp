@@ -111,6 +111,7 @@ func markdownReport(report eval.Report) string {
 	p := m.Projection
 	fmt.Fprintf(&b, "\n## projection\n\n")
 	fmt.Fprintf(&b, "| metric | value |\n|---|---|\n")
+	fmt.Fprintf(&b, "| ran | %t |\n", p.Ran)
 	fmt.Fprintf(&b, "| evidence_valid | %.4f |\n", p.EvidenceValid)
 	fmt.Fprintf(&b, "| stale_not_current | %.4f |\n", p.StaleNotCurrent)
 	fmt.Fprintf(&b, "| superseded_not_current | %.4f |\n", p.SupersededNotCurrent)

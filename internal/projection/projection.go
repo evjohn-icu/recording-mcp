@@ -706,11 +706,14 @@ LIMIT 5`, b.recordingID, b.recordingID, b.speaker, b.revision)
 			statusReason = "evidence_superseded"
 		}
 		out = append(out, Object{
-			ID:              personID,
-			Kind:            KindPerson,
-			Subject:         personID,
-			Title:           personID,
-			Summary:         strings.Join(sortedUnique(acc.summaries), "; "),
+			ID:      personID,
+			Kind:    KindPerson,
+			Subject: personID,
+			Title:   personID,
+			// Bindings load ordered by (recording, speaker, id), so the merged
+			// summary keeps that provenance order instead of alphabetizing the
+			// sentences.
+			Summary:         strings.Join(dedupePreservingOrder(acc.summaries), "; "),
 			Status:          status,
 			StatusReason:    statusReason,
 			Confidence:      1.0,
@@ -721,6 +724,20 @@ LIMIT 5`, b.recordingID, b.recordingID, b.speaker, b.revision)
 		})
 	}
 	return out, nil
+}
+
+// dedupePreservingOrder removes duplicates without reordering the input.
+func dedupePreservingOrder(in []string) []string {
+	seen := make(map[string]bool, len(in))
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if s == "" || seen[s] {
+			continue
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	return out
 }
 
 // applyScope applies the any-of hard filters and the time bounds. An object

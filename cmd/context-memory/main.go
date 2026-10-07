@@ -384,16 +384,25 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker,
 			req.Kinds = append(req.Kinds, projection.Kind(strings.TrimSpace(k)))
 		}
 		// With a query, one small hybrid retrieval narrows the projection to
-		// the conversations/topics the query actually reaches. An unavailable
-		// semantic backend only makes this path lexical; the projection itself
-		// still runs.
+		// the conversations/topics the query actually reaches. The retrieval
+		// runs INSIDE the caller's explicit scope, so the resulting coverage can
+		// only narrow a pinned conversation/topic, never widen or replace it.
+		// An unavailable semantic backend only makes this path lexical; the
+		// projection itself still runs.
 		if strings.TrimSpace(in.Query) != "" {
-			pkg, e := contextbuild.Build(ctx, contextbuild.Deps{Store: store, DB: store.DB(), Reranker: rerank, Semantic: semantic}, contextbuild.Request{
+			buildReq := contextbuild.Request{
 				Purpose:  "current_context",
 				Query:    in.Query,
 				MaxItems: 12,
 				MaxBytes: 16000,
-			})
+			}
+			if in.ConversationID != "" {
+				buildReq.ConversationID = in.ConversationID
+			}
+			if in.TopicID != "" {
+				buildReq.TopicIDs = []string{in.TopicID}
+			}
+			pkg, e := contextbuild.Build(ctx, contextbuild.Deps{Store: store, DB: store.DB(), Reranker: rerank, Semantic: semantic}, buildReq)
 			if e != nil {
 				return nil, projection.Result{}, e
 			}

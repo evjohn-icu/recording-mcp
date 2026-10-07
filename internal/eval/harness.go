@@ -90,10 +90,13 @@ type Metrics struct {
 	Projection ProjectionMetrics `json:"projection"`
 }
 
-// ProjectionMetrics scores the projection pass. The honesty metrics are
-// fractions in [0,1] where 1 means the projection behaved; Deterministic
-// reports two identical builds.
+// ProjectionMetrics scores the projection pass. Ran reports whether the pass
+// executed at all (a disabled pass leaves the other fields at their zero value
+// rather than claiming the projection is nondeterministic). The honesty
+// metrics are fractions in [0,1] where 1 means the projection behaved;
+// Deterministic reports two identical builds.
 type ProjectionMetrics struct {
+	Ran                  bool    `json:"ran"`
 	EvidenceValid        float64 `json:"evidence_valid"`
 	StaleNotCurrent      float64 `json:"stale_not_current"`
 	SupersededNotCurrent float64 `json:"superseded_not_current"`
@@ -192,7 +195,8 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 	}
 
 	// Semantic backend for the hybrid pass. The default is the offline hashing
-	// embedder; LexicalOnly skips indexing and the hybrid pass entirely.
+	// embedder; LexicalOnly skips indexing and the hybrid pass entirely, so an
+	// injected provider is ignored rather than half-wired.
 	// The projection fixture is seeded first (through the real write paths) so
 	// its notes are part of the same current state the retrieval passes see.
 	projectionFixture, err := loadProjectionFixture(opts.ProjectionPath)
@@ -205,7 +209,9 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 		}
 	}
 	provider := opts.SemanticProvider
-	if provider == nil && !opts.LexicalOnly {
+	if opts.LexicalOnly {
+		provider = nil
+	} else if provider == nil {
 		provider = semantic.NewHashProvider(semantic.DefaultHashDims)
 	}
 	var retriever semantic.SemanticRetriever
@@ -235,6 +241,12 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 			total++
 			if isAmbientItem(item, noteEvidence, ambientTurns, ambientNotes) {
 				ambient++
+			}
+			// A turn item IS its own evidence, so only notes contribute a
+			// separate evidence set; counting turns twice would inflate the
+			// denominator and understate the ratio.
+			if item.Kind == "turn" {
+				continue
 			}
 			for _, ev := range evidenceIDs(item, noteEvidence) {
 				total++

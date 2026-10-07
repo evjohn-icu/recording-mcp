@@ -69,6 +69,7 @@
 | ambient_leakage | — | — | **0** |
 | scope_escape_count | — | — | **0** |
 | projection.evidence_valid | — | — | **1.0** |
+| projection.ran | — | — | **true**（`--projection ""` 时为 false，此时其余字段为零值而非断言"不确定"） |
 | projection.stale_not_current | — | — | **1.0** |
 | projection.superseded_not_current | — | — | **1.0** |
 | projection.conflicting_honest | — | — | **1.0** |
@@ -93,3 +94,14 @@ End-to-end stdio smoke (outside the harness): `context-eval --db /tmp/smoke.db` 
 ## 10. Single most recommended next step
 
 **Auto-index on publish.** Wire a semantic-index refresh into the end of the publish stage (or enqueue a small `embed` job from `PublishHandler`), so `memory_embeddings` tracks the current state without an operator running `bin/context-embed`. That removes the only operational gap between "memory updated" and "semantic recall current", and it unlocks honest end-to-end latency/recall numbers for hybrid retrieval in the next eval round.
+
+## 11. Post-review fixes (same round, after the first commit)
+
+A self-review after the initial commit found six defects; all are fixed and verified (classic + retrieval + projection metrics unchanged, `go vet` / `go test -race -count=1 ./...` / `make build` green):
+
+1. **`get_current_context` widened a pinned scope.** With a `query`, the narrowing retrieval ran unscoped and its coverage then *replaced* the caller's explicit `conversation_id` / `topic_id`, contradicting the documented hard-filter contract. The retrieval now runs inside the caller's scope (coverage can only narrow), and `TestGetCurrentContextPinnedScopeIsNotWidened` pins it.
+2. **Projection-disabled runs looked nondeterministic.** `metrics.projection` printed `deterministic: false` when `--projection ""` skipped the pass. `ProjectionMetrics.ran` now distinguishes "not run" from "ran and deterministic"; the markdown report prints it.
+3. **Ambient metric double-counted turn evidence.** A turn item *is* its own evidence, so the leakage denominator counted every turn twice, understating the ratio. Only notes contribute a separate evidence set now.
+4. **Ambiguous conversation reference resolved silently.** `resolveConversationID` took an arbitrary row when a human conversation id matched several devices; it now fails loudly, telling the author to pin a stored id.
+5. **Person-object summaries were alphabetized.** Merged binding summaries are now deduplicated in provenance order (recordings/speakers as loaded) instead of being re-sorted.
+6. **`LexicalOnly` half-wired an injected provider.** A provider passed with `LexicalOnly: true` still built an index; it is now ignored, so the option means exactly "no semantic path".

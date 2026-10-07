@@ -183,7 +183,7 @@ func ensureTopic(ctx context.Context, db *sql.DB, title, conversationID string) 
 // use the maximum limit so every derived object is scored, not just the first
 // page a consumer would see.
 func runProjectionPass(ctx context.Context, db *sql.DB, store *memory.Store, fixture *projectionFixture) (ProjectionMetrics, error) {
-	var metrics ProjectionMetrics
+	metrics := ProjectionMetrics{Ran: true}
 	first, err := projection.Build(ctx, store, db, projection.Request{Limit: 200})
 	if err != nil {
 		return metrics, fmt.Errorf("projection build: %w", err)

@@ -158,6 +158,87 @@ func TestGetCurrentContextProjectsSeededMemory(t *testing.T) {
 	}
 }
 
+// TestGetCurrentContextPinnedScopeIsNotWidened proves the query pass narrows
+// inside the caller's explicit conversation scope instead of replacing it: a
+// query that also matches another conversation must not pull that
+// conversation's objects into the answer.
+func TestGetCurrentContextPinnedScopeIsNotWidened(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	store, err := memory.Open(filepath.Join(t.TempDir(), "scope.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.DB()
+	seed := []string{
+		`INSERT INTO conversations(id,title,summary,annotation_version,annotation_basis,recording_id,source_sha256,transcript_version,duration_ms,transcript_json,annotations_json) VALUES('conv:in','In','','v1','','rec:in','sha','tv',1000,'{}','{}')`,
+		`INSERT INTO conversations(id,title,summary,annotation_version,annotation_basis,recording_id,source_sha256,transcript_version,duration_ms,transcript_json,annotations_json) VALUES('conv:out','Out','','v1','','rec:out','sha','tv',1000,'{}','{}')`,
+		`INSERT INTO recordings(id,conversation_id,source_file,source_sha256,duration_ms,recording_started_at,absolute_time_known) VALUES('rec:in','conv:in','f','sha',1000,'2026-03-01T09:00:00+08:00',1)`,
+		`INSERT INTO recordings(id,conversation_id,source_file,source_sha256,duration_ms,recording_started_at,absolute_time_known) VALUES('rec:out','conv:out','f','sha',1000,'2026-03-01T09:00:00+08:00',1)`,
+		`INSERT INTO turns(id,conversation_id,recording_id,segment_index,global_start_ms,global_end_ms,speaker_scoped_id,speaker_entity_id,content,source_sha256,transcript_version,original_turn_id,turn_json) VALUES('turn:in','conv:in','rec:in',0,1000,2000,NULL,NULL,'氛围灯方案讨论','sha','rev-1','turn:in','{}')`,
+		`INSERT INTO turns(id,conversation_id,recording_id,segment_index,global_start_ms,global_end_ms,speaker_scoped_id,speaker_entity_id,content,source_sha256,transcript_version,original_turn_id,turn_json) VALUES('turn:out','conv:out','rec:out',0,1000,2000,NULL,NULL,'氛围灯方案讨论','sha','rev-1','turn:out','{}')`,
+		`INSERT INTO topics(id,title) VALUES('topic:in','灯')`,
+		`INSERT INTO topics(id,title) VALUES('topic:out','灯')`,
+		`INSERT INTO notes(id,conversation_id,kind,summary,topic_ids_json,claim_mode,interpretation_note,annotation_version) VALUES('note:in','conv:in','intention','计划装氛围灯','["topic:in"]','inference','','v1')`,
+		`INSERT INTO notes(id,conversation_id,kind,summary,topic_ids_json,claim_mode,interpretation_note,annotation_version) VALUES('note:out','conv:out','intention','计划装氛围灯','["topic:out"]','inference','','v1')`,
+		`INSERT INTO note_evidence(note_id,turn_id,ordinal) VALUES('note:in','turn:in',0)`,
+		`INSERT INTO note_evidence(note_id,turn_id,ordinal) VALUES('note:out','turn:out',0)`,
+	}
+	for _, stmt := range seed {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("seed: %v: %v", stmt, err)
+		}
+	}
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := newServer(store, false, nil, nil).Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1"}, nil)
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	res, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "get_current_context", Arguments: map[string]any{
+		"query":           "氛围灯方案讨论",
+		"conversation_id": "conv:in",
+		"kinds":           []string{"commitment"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.IsError {
+		t.Fatalf("get_current_context rejected input: %+v", res.Content)
+	}
+	b, _ := json.Marshal(res.StructuredContent)
+	var result struct {
+		Objects []struct {
+			ID              string   `json:"id"`
+			ConversationIDs []string `json:"conversation_ids"`
+		} `json:"objects"`
+	}
+	if err := json.Unmarshal(b, &result); err != nil {
+		t.Fatalf("decode %s: %v", b, err)
+	}
+	if len(result.Objects) == 0 {
+		t.Fatalf("no objects returned: %s", b)
+	}
+	for _, obj := range result.Objects {
+		for _, cid := range obj.ConversationIDs {
+			if cid != "conv:in" {
+				t.Fatalf("pinned conversation scope widened to %q: %s", cid, b)
+			}
+		}
+		if obj.ID == "note:out" {
+			t.Fatalf("out-of-scope object returned under a pinned conversation: %s", b)
+		}
+	}
+}
+
 func TestNeutralIngestAnnotateAndTrackCoverageOverMCP(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

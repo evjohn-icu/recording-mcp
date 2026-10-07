@@ -157,7 +157,8 @@ func LoadRetrievalQuestions(ctx context.Context, db *sql.DB, path string) ([]Ret
 // conversation id. The corpus and fixtures author human source ids
 // ("conv-venue-rehearsal"); stored ids are stableKey hashes, so a reference
 // that is not itself a stored id is resolved through the ingested source
-// snapshots.
+// snapshots. A human id is only unique per device, so an ambiguous reference
+// fails loudly instead of silently scoping to an arbitrary recording.
 func resolveConversationID(ctx context.Context, db *sql.DB, ref string) (string, error) {
 	var id string
 	err := db.QueryRowContext(ctx, `SELECT id FROM conversations WHERE id=?`, ref).Scan(&id)
@@ -167,11 +168,29 @@ func resolveConversationID(ctx context.Context, db *sql.DB, ref string) (string,
 	if !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}
-	err = db.QueryRowContext(ctx,
-		`SELECT DISTINCT conversation_id FROM source_attachments WHERE json_extract(source_json,'$.conversation_id')=?`, ref,
-	).Scan(&id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf("scope conversation %q not found", ref)
+	rows, err := db.QueryContext(ctx,
+		`SELECT DISTINCT conversation_id FROM source_attachments WHERE json_extract(source_json,'$.conversation_id')=? ORDER BY conversation_id`, ref)
+	if err != nil {
+		return "", err
 	}
-	return id, err
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var candidate string
+		if err := rows.Scan(&candidate); err != nil {
+			return "", err
+		}
+		ids = append(ids, candidate)
+	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+	switch len(ids) {
+	case 0:
+		return "", fmt.Errorf("scope conversation %q not found", ref)
+	case 1:
+		return ids[0], nil
+	default:
+		return "", fmt.Errorf("scope conversation %q matched %d conversations; pin a stored id instead", ref, len(ids))
+	}
 }
