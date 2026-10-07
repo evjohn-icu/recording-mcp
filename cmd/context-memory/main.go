@@ -26,6 +26,7 @@ import (
 type ConversationInput struct {
 	ConversationID string `json:"conversation_id"`
 	IncludeTurns   bool   `json:"include_turns,omitempty"`
+	IncludeAmbient bool   `json:"include_ambient,omitempty"`
 	Limit          int    `json:"limit,omitempty"`
 	Offset         int    `json:"offset,omitempty"`
 }
@@ -123,14 +124,15 @@ type GetEvidenceContextInput struct {
 	MaxBytes int    `json:"max_bytes,omitempty"`
 }
 type SearchMemoryInput struct {
-	Text          string `json:"text"`
-	Scope         string `json:"scope,omitempty"`
-	TopicID       string `json:"topic_id,omitempty"`
-	StartedAfter  string `json:"started_after,omitempty"`
-	StartedBefore string `json:"started_before,omitempty"`
-	Limit         int    `json:"limit,omitempty"`
-	Cursor        string `json:"cursor,omitempty"`
-	IncludeStale  bool   `json:"include_stale,omitempty"`
+	Text           string `json:"text"`
+	Scope          string `json:"scope,omitempty"`
+	TopicID        string `json:"topic_id,omitempty"`
+	StartedAfter   string `json:"started_after,omitempty"`
+	StartedBefore  string `json:"started_before,omitempty"`
+	Limit          int    `json:"limit,omitempty"`
+	Cursor         string `json:"cursor,omitempty"`
+	IncludeStale   bool   `json:"include_stale,omitempty"`
+	IncludeAmbient bool   `json:"include_ambient,omitempty"`
 }
 type ListMemoryLinksInput struct {
 	Status  string `json:"status,omitempty"`
@@ -223,11 +225,11 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker)
 	read := func(name, desc string) *mcp.Tool {
 		return &mcp.Tool{Name: name, Description: "EXPERIMENTAL: " + desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &no}}
 	}
-	mcp.AddTool(s, read("query_context", "Find annotated discussion notes and optionally stored transcript turns. query is literal Unicode lowercase substring matching. Filters are ANDed. A speaker filter requires recording_id. Turns are excluded unless include_turns=true."), func(ctx context.Context, _ *mcp.CallToolRequest, in memory.Query) (*mcp.CallToolResult, memory.Page, error) {
+	mcp.AddTool(s, read("query_context", "Find annotated discussion notes and optionally stored transcript turns. query is literal Unicode lowercase substring matching. Filters are ANDed. A speaker filter requires recording_id. Turns are excluded unless include_turns=true. Ambient sound is excluded by default; include_ambient=true opts in and marks such hits with ambient."), func(ctx context.Context, _ *mcp.CallToolRequest, in memory.Query) (*mcp.CallToolResult, memory.Page, error) {
 		p, e := store.Query(ctx, in)
 		return nil, p, e
 	})
-	mcp.AddTool(s, read("get_conversation_context", "Read one conversation summary, topics and annotated notes; include_turns explicitly includes transcript text. Offset pagination applies to the combined context page."), func(ctx context.Context, _ *mcp.CallToolRequest, in ConversationInput) (*mcp.CallToolResult, ConversationResult, error) {
+	mcp.AddTool(s, read("get_conversation_context", "Read one conversation summary, topics and annotated notes; include_turns explicitly includes transcript text. Offset pagination applies to the combined context page. Ambient sound is excluded by default; include_ambient=true opts in and marks such items with ambient."), func(ctx context.Context, _ *mcp.CallToolRequest, in ConversationInput) (*mcp.CallToolResult, ConversationResult, error) {
 		if in.ConversationID == "" {
 			return nil, ConversationResult{}, fmt.Errorf("conversation_id is required")
 		}
@@ -239,7 +241,7 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker)
 		if e != nil {
 			return nil, ConversationResult{}, e
 		}
-		page, e := store.Query(ctx, memory.Query{ConversationID: in.ConversationID, IncludeTurns: in.IncludeTurns, Limit: in.Limit, Offset: in.Offset})
+		page, e := store.Query(ctx, memory.Query{ConversationID: in.ConversationID, IncludeTurns: in.IncludeTurns, IncludeAmbient: in.IncludeAmbient, Limit: in.Limit, Offset: in.Offset})
 		if e != nil {
 			return nil, ConversationResult{}, e
 		}
@@ -315,7 +317,7 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker)
 		r, e := store.GetEvidenceContext(ctx, in.TurnID, in.Radius, in.MaxBytes)
 		return nil, r, e
 	})
-	mcp.AddTool(s, read("search_memory", "在原始转录与派生笔记中执行大小写不敏感的子串检索；scope 可选 raw（仅转录）、derived（仅笔记）或 both（全部），并可按主题与录音开始时间过滤。"), func(ctx context.Context, _ *mcp.CallToolRequest, in SearchMemoryInput) (*mcp.CallToolResult, memory.SearchPage, error) {
+	mcp.AddTool(s, read("search_memory", "在原始转录与派生笔记中执行大小写不敏感的子串检索；scope 可选 raw（仅转录）、derived（仅笔记）或 both（全部），并可按主题与录音开始时间过滤。环境音（广播、设备指令、媒体播放）默认不混入结果；include_ambient=true 时显式纳入并以 ambient 标记。"), func(ctx context.Context, _ *mcp.CallToolRequest, in SearchMemoryInput) (*mcp.CallToolResult, memory.SearchPage, error) {
 		if strings.TrimSpace(in.Text) == "" {
 			return nil, memory.SearchPage{}, fmt.Errorf("text is required")
 		}
@@ -327,7 +329,7 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker)
 		if e != nil {
 			return nil, memory.SearchPage{}, e
 		}
-		r, e := store.SearchMemory(ctx, memory.MemorySearch{Text: in.Text, Scope: in.Scope, Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, StartedAfter: after, StartedBefore: before, IncludeStale: in.IncludeStale})
+		r, e := store.SearchMemory(ctx, memory.MemorySearch{Text: in.Text, Scope: in.Scope, Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, StartedAfter: after, StartedBefore: before, IncludeStale: in.IncludeStale, IncludeAmbient: in.IncludeAmbient})
 		return nil, r, e
 	})
 	mcp.AddTool(s, read("build_context", "实验性：为任务组装带预算与来源的上下文包（items / evidence / coverage / gaps / trace）。默认排除已失效的派生记忆；未配置决策引擎时不做重排并返回 degraded=true，确定性结果仍完整返回。"), func(ctx context.Context, _ *mcp.CallToolRequest, in contextbuild.Request) (*mcp.CallToolResult, contextbuild.Package, error) {

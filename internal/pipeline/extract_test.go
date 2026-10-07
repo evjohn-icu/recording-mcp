@@ -504,6 +504,66 @@ func TestExtractHandlerGeneratesAndPublishesCandidates(t *testing.T) {
 	}
 }
 
+func TestExtractHandlerExcludesAmbientTurns(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(100)
+	speaker := "speaker-1"
+	seedConversation(t, db, "conv-amb", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "a1", seg: 0, start: &start, orig: 1, speaker: &speaker},
+		{id: "a2", seg: 1, start: nil, orig: 2, speaker: nil},
+		{id: "a3", seg: 2, start: nil, orig: 3, speaker: &speaker},
+	})
+	turns, err := LoadConversationTurns(ctx, db, "conv-amb")
+	if err != nil {
+		t.Fatalf("load turns: %v", err)
+	}
+	if len(turns) != 3 {
+		t.Fatalf("turns = %d, want 3", len(turns))
+	}
+	ambientID := turns[1].ID
+	if _, err := db.Exec(`INSERT INTO turn_classes(turn_id,class,subtype,method,created_at) VALUES(?,?,?,?,?)`,
+		ambientID, "ambient", "voice_assistant", "rule", 0); err != nil {
+		t.Fatalf("seed turn class: %v", err)
+	}
+
+	handler := &ExtractHandler{DB: db, Engine: decision.Synthetic{}, Endpoint: "http://test/v1", ProcessorVersion: "extract-v1", Generator: generate.Synthetic{}}
+	if _, err := handler.Execute(ctx, enqueueExtract(t, db, "conv-amb")); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+
+	all, err := ListCandidates(ctx, db, "conv-amb", "")
+	if err != nil {
+		t.Fatalf("list candidates: %v", err)
+	}
+	if len(all) == 0 {
+		t.Fatal("no candidates; seed is not meaningful")
+	}
+	for _, c := range all {
+		for _, id := range c.EvidenceTurnIDs {
+			if id == ambientID {
+				t.Fatalf("candidate %s derives from ambient turn %s", c.ID, id)
+			}
+		}
+	}
+	// The ambient turn is processed work: its coverage is recorded so the
+	// status view does not report it as an unanalyzed gap.
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM analysis_coverage WHERE turn_id=? AND processor_version='extract-v1'`,
+		ambientID).Scan(&n); err != nil {
+		t.Fatalf("read coverage: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("ambient coverage rows = %d, want 1", n)
+	}
+}
+
 func TestExtractHandlerRejectsInvalidCandidates(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()

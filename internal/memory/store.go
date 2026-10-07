@@ -370,6 +370,9 @@ func (s *Store) Query(ctx context.Context, q Query) (Page, error) {
 	if !q.IncludeStale {
 		turnSQL += ` AND ` + CurrentTurnPredicate("t")
 	}
+	if !q.IncludeAmbient {
+		turnSQL += ` AND NOT EXISTS(SELECT 1 FROM turn_classes tc WHERE tc.turn_id=t.id AND tc.class='ambient')`
+	}
 	turnSQL += ` ORDER BY CASE WHEN t.global_start_ms IS NULL THEN 1 ELSE 0 END,t.global_start_ms,t.id`
 	rows, err := s.db.QueryContext(ctx, turnSQL, convo, convo, q.RecordingID, q.RecordingID, q.SpeakerScopedID, q.SpeakerScopedID, q.TopicID, q.TopicID)
 	if err != nil {
@@ -415,6 +418,9 @@ func (s *Store) Query(ctx context.Context, q Query) (Page, error) {
 		turnItems[i].TopicIDs, _ = s.turnTopics(ctx, turnItems[i].ID)
 		turnItems[i].Stale, _ = s.turnStale(ctx, turnItems[i].ID)
 		turnItems[i].DerivedFrom, _ = s.turnDerivedFrom(ctx, turnItems[i].ID)
+		if q.IncludeAmbient {
+			turnItems[i].Ambient, _ = s.turnAmbient(ctx, turnItems[i].ID)
+		}
 	}
 	if q.IncludeTurns {
 		if err := s.resolveSpeakerIdentities(ctx, turnItems); err != nil {
@@ -426,6 +432,12 @@ func (s *Store) Query(ctx context.Context, q Query) (Page, error) {
 	noteSQL := `SELECT n.id,n.conversation_id,n.kind,n.summary,n.topic_ids_json,n.claim_mode,n.interpretation_note,n.annotation_version,c.title FROM notes n JOIN conversations c ON c.id=n.conversation_id WHERE (?='' OR n.conversation_id=?) AND (?='' OR EXISTS(SELECT 1 FROM json_each(n.topic_ids_json) WHERE value=?)) AND (?='' OR EXISTS(SELECT 1 FROM note_evidence e JOIN turns t ON t.id=e.turn_id WHERE e.note_id=n.id AND t.speaker_scoped_id=? AND t.recording_id=?)) AND (?='' OR EXISTS(SELECT 1 FROM note_evidence e JOIN turns t ON t.id=e.turn_id WHERE e.note_id=n.id AND t.recording_id=?))`
 	if !q.IncludeStale {
 		noteSQL += ` AND NOT ` + NoteStalePredicate("n")
+	}
+	if !q.IncludeAmbient {
+		// A note is ambient when its primary evidence turn (ordinal 0) is
+		// classified ambient; unclassified turns never hide a note. Matches
+		// SearchMemory exactly.
+		noteSQL += ` AND NOT EXISTS(SELECT 1 FROM note_evidence ne JOIN turn_classes tc ON tc.turn_id=ne.turn_id WHERE ne.note_id=n.id AND ne.ordinal=0 AND tc.class='ambient')`
 	}
 	noteSQL += ` ORDER BY n.id`
 	nrows, err := s.db.QueryContext(ctx, noteSQL, convo, convo, q.TopicID, q.TopicID, q.SpeakerScopedID, q.SpeakerScopedID, q.RecordingID, q.RecordingID, q.RecordingID)
@@ -455,6 +467,12 @@ func (s *Store) Query(ctx context.Context, q Query) (Page, error) {
 	for i := range noteItems {
 		noteItems[i].Stale, _ = s.noteStale(ctx, noteItems[i].ID)
 		noteItems[i].DerivedFrom, _ = s.noteDerivedFrom(ctx, noteItems[i].ID)
+		if q.IncludeAmbient {
+			ev, _ := s.noteEvidenceTurnIDs(ctx, noteItems[i].ID)
+			if len(ev) > 0 {
+				noteItems[i].Ambient, _ = s.turnAmbient(ctx, ev[0])
+			}
+		}
 	}
 	items = append(items, noteItems...)
 	if q.ConversationID != "" && q.TopicID == "" && q.SpeakerScopedID == "" && q.RecordingID == "" {

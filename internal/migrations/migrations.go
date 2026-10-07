@@ -102,6 +102,15 @@ CREATE TABLE IF NOT EXISTS speaker_binding_events(id TEXT PRIMARY KEY, binding_i
 // same transaction.
 const activeHeadIndexDDL = `CREATE UNIQUE INDEX IF NOT EXISTS source_attachments_active_head ON source_attachments(recording_id, segment_id) WHERE active = 1;`
 
+// turnClassesDDL records whether a turn is spoken conversation or ambient
+// sound. The table is keyed by turn id and content-derived classifications
+// survive transcript re-publication as long as the turn content is unchanged;
+// a corrected turn gets a new id and is classified again. Rows exist only for
+// turns a classifier actually ruled on; a missing row means "not classified
+// yet", never "ambient".
+const turnClassesDDL = `CREATE TABLE IF NOT EXISTS turn_classes(turn_id TEXT PRIMARY KEY REFERENCES turns(id), class TEXT NOT NULL CHECK(class IN ('speech','ambient')), subtype TEXT NOT NULL DEFAULT '', method TEXT NOT NULL CHECK(method IN ('rule','model','derived')), created_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS turn_classes_class ON turn_classes(class);`
+
 type migration struct {
 	version    int
 	name       string
@@ -134,6 +143,7 @@ var migrations = []migration{
 	{version: 8, name: "derived-artifact-staleness", statements: statements(derivedArtifactsDDL)},
 	{version: 9, name: "speaker-binding", statements: statements(speakerBindingDDL)},
 	{version: 10, name: "active-head-invariant", statements: statements(activeHeadIndexDDL)},
+	{version: 11, name: "turn-classes", statements: statements(turnClassesDDL)},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`

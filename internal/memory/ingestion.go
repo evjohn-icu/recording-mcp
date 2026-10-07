@@ -13,6 +13,7 @@ import (
 
 	"recordingmcp/internal/asrinput"
 	"recordingmcp/internal/process"
+	"recordingmcp/internal/turnclass"
 )
 
 // extractProcessorVersion versions the extract-stage job identity so that a
@@ -34,12 +35,16 @@ type IngestReport struct {
 }
 
 // ProcessingStatus is calculated from persisted source turns and topic links.
+// Ambient-sound turns are processed work: they are never topic-linked, so
+// they are excluded from the unclassified gap count and reported in their
+// own AmbientTurns bucket instead.
 type ProcessingStatus struct {
 	ConversationID           string `json:"conversation_id"`
 	ReceivedSegments         int    `json:"received_segments"`
 	OriginalTurns            int    `json:"original_turns"`
 	TopicLinkedTurns         int    `json:"topic_linked_turns"`
 	UnclassifiedTurns        int    `json:"unclassified_turns"`
+	AmbientTurns             int    `json:"ambient_turns"`
 	IdentityUnconfirmedTurns int    `json:"identity_unconfirmed_turns"`
 	AnalysisStatus           string `json:"analysis_status"`
 }
@@ -251,6 +256,16 @@ func (s *Store) IngestTranscript(ctx context.Context, result asrinput.Result) (I
 		if _, err = tx.ExecContext(ctx, "INSERT INTO attachment_turns(attachment_id,turn_id) VALUES(?,?)", attachmentID, turnID); err != nil {
 			return IngestReport{}, err
 		}
+		// Ambient classification is content-derived and deterministic, so it
+		// is recorded at ingest: a re-ingested identical turn is the same row,
+		// and a corrected turn gets a new id and is classified again. Only
+		// rule matches are recorded here; unmatched turns stay unclassified
+		// until the model pass rules on them.
+		if class, subtype, matched := turnclass.Classify(turn.Text); matched {
+			if _, err = tx.ExecContext(ctx, "INSERT OR IGNORE INTO turn_classes(turn_id,class,subtype,method,created_at) VALUES(?,?,?,?,?)", turnID, class, subtype, turnclass.MethodRule, time.Now().UnixMilli()); err != nil {
+				return IngestReport{}, err
+			}
+		}
 	}
 	if supersededID != "" {
 		if _, err = markStaleForAttachment(ctx, tx, supersededID, staleReasonSuperseded, time.Now()); err != nil {
@@ -326,8 +341,9 @@ func (s *Store) GetProcessingStatus(ctx context.Context, conversationID string) 
  (SELECT COUNT(*) FROM recordings r WHERE r.conversation_id=? AND NOT EXISTS(SELECT 1 FROM source_attachments a WHERE a.recording_id=r.id)),
  (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND `+CurrentTurnPredicate("t")+`),
  (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND `+CurrentTurnPredicate("t")+` AND EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id)),
- (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND `+CurrentTurnPredicate("t")+` AND NOT EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id)),
- (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND `+CurrentTurnPredicate("t")+` AND t.speaker_entity_id IS NULL)`, conversationID, conversationID, conversationID, conversationID, conversationID, conversationID).Scan(&out.ReceivedSegments, &out.OriginalTurns, &out.TopicLinkedTurns, &out.UnclassifiedTurns, &out.IdentityUnconfirmedTurns)
+ (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND `+CurrentTurnPredicate("t")+` AND NOT EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id) AND NOT EXISTS(SELECT 1 FROM turn_classes tc WHERE tc.turn_id=t.id AND tc.class='ambient')),
+ (SELECT COUNT(*) FROM turns t JOIN turn_classes tc ON tc.turn_id=t.id WHERE t.conversation_id=? AND `+CurrentTurnPredicate("t")+` AND tc.class='ambient'),
+ (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=? AND `+CurrentTurnPredicate("t")+` AND t.speaker_entity_id IS NULL)`, conversationID, conversationID, conversationID, conversationID, conversationID, conversationID, conversationID).Scan(&out.ReceivedSegments, &out.OriginalTurns, &out.TopicLinkedTurns, &out.UnclassifiedTurns, &out.AmbientTurns, &out.IdentityUnconfirmedTurns)
 	if err != nil {
 		return ProcessingStatus{}, err
 	}

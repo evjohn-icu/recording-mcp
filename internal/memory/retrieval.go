@@ -97,6 +97,10 @@ type MemorySearch struct {
 	// IncludeStale opts into superseded notes and turns, which are excluded
 	// from current-state results by default.
 	IncludeStale bool
+	// IncludeAmbient opts into ambient-sound hits (broadcasts, device
+	// commands, media playback), which are excluded from conversation search
+	// by default so environmental audio never mixes with spoken content.
+	IncludeAmbient bool
 }
 
 // SearchHit is one matched note or turn.
@@ -120,6 +124,11 @@ type SearchHit struct {
 	// Stale reports that the hit derives from a superseded transcript
 	// attachment; it is only ever true when IncludeStale was requested.
 	Stale bool `json:"stale,omitempty"`
+	// Ambient reports that the hit is environmental audio rather than spoken
+	// conversation: a turn classified ambient, or a note whose primary
+	// evidence turn is. It is only ever true when IncludeAmbient was
+	// requested, mirroring Stale.
+	Ambient bool `json:"ambient,omitempty"`
 	// DerivedFrom lists the transcript_revision values of the hit's source
 	// attachments, sorted ascending; empty for legacy hits.
 	DerivedFrom []string `json:"derived_from,omitempty"`
@@ -572,6 +581,11 @@ func (s *Store) searchNotes(ctx context.Context, q MemorySearch, lower string) (
 	if !q.IncludeStale {
 		noteSQL += ` AND NOT ` + NoteStalePredicate("n")
 	}
+	if !q.IncludeAmbient {
+		// A note is ambient when its primary evidence turn (ordinal 0) is
+		// classified ambient; unclassified turns never hide a note.
+		noteSQL += ` AND NOT EXISTS(SELECT 1 FROM note_evidence ne JOIN turn_classes tc ON tc.turn_id=ne.turn_id WHERE ne.note_id=n.id AND ne.ordinal=0 AND tc.class='ambient')`
+	}
 	noteSQL += ` ORDER BY n.id`
 	rows, err := s.db.QueryContext(ctx, noteSQL, q.TopicID, q.TopicID)
 	if err != nil {
@@ -620,10 +634,17 @@ func (s *Store) searchNotes(ctx context.Context, q MemorySearch, lower string) (
 		if err != nil {
 			return nil, err
 		}
+		ambient := false
+		if q.IncludeAmbient && len(evidence) > 0 {
+			ambient, err = s.turnAmbient(ctx, evidence[0])
+			if err != nil {
+				return nil, err
+			}
+		}
 		out = append(out, SearchHit{
 			Kind: "note", ID: note.id, Text: note.summary, ConversationID: note.conv,
 			Why: "note summary contains text", Score: 1.0, EvidenceTurnIDs: evidence,
-			Stale: stale, DerivedFrom: derivedFrom,
+			Stale: stale, DerivedFrom: derivedFrom, Ambient: ambient,
 		})
 	}
 	return out, nil
@@ -635,6 +656,9 @@ func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) (
  WHERE (?='' OR EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id AND tt.topic_id=?))`
 	if !q.IncludeStale {
 		turnSQL += ` AND ` + CurrentTurnPredicate("t")
+	}
+	if !q.IncludeAmbient {
+		turnSQL += ` AND NOT EXISTS(SELECT 1 FROM turn_classes tc WHERE tc.turn_id=t.id AND tc.class='ambient')`
 	}
 	turnSQL += ` ORDER BY t.id`
 	rows, err := s.db.QueryContext(ctx, turnSQL, q.TopicID, q.TopicID)
@@ -697,6 +721,13 @@ func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) (
 		if err != nil {
 			return nil, err
 		}
+		ambient := false
+		if q.IncludeAmbient {
+			ambient, err = s.turnAmbient(ctx, turn.id)
+			if err != nil {
+				return nil, err
+			}
+		}
 		var person *string
 		if turn.speaker != nil {
 			person, err = cache.person(ctx, turn.recordingID, derivedFrom, *turn.speaker)
@@ -707,7 +738,7 @@ func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) (
 		out = append(out, SearchHit{
 			Kind: "turn", ID: turn.id, Text: turn.content, ConversationID: turn.conv,
 			Why: "transcript turn contains text", Score: 0.5, GlobalStartMS: turn.globalStart,
-			Stale: stale, DerivedFrom: derivedFrom, SpeakerPersonID: person,
+			Stale: stale, DerivedFrom: derivedFrom, SpeakerPersonID: person, Ambient: ambient,
 		})
 	}
 	return out, nil
@@ -728,4 +759,15 @@ func (s *Store) noteEvidenceTurnIDs(ctx context.Context, noteID string) ([]strin
 		out = append(out, id)
 	}
 	return out, rows.Err()
+}
+
+// turnAmbient reports whether a turn is classified as ambient sound. A turn
+// without a turn_classes row is unclassified and therefore never ambient.
+func (s *Store) turnAmbient(ctx context.Context, turnID string) (bool, error) {
+	var n int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM turn_classes WHERE turn_id=? AND class='ambient'`, turnID).Scan(&n); err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }

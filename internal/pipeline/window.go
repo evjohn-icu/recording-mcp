@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -78,6 +79,49 @@ func LoadTurnsByIDs(ctx context.Context, db *sql.DB, conversationID string, turn
 	}
 	defer rows.Close()
 	return scanTurns(rows)
+}
+
+// ambientTurnIDs returns the subset of turn ids explicitly classified as
+// ambient sound. A turn without a turn_classes row is unclassified, never
+// ambient: only a real classification ruling removes a turn from derivation.
+func ambientTurnIDs(ctx context.Context, db *sql.DB, turnIDs []string) (map[string]bool, error) {
+	ambient := make(map[string]bool)
+	seen := make(map[string]bool, len(turnIDs))
+	unique := make([]string, 0, len(turnIDs))
+	for _, id := range turnIDs {
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		unique = append(unique, id)
+	}
+	for start := 0; start < len(unique); start += idQueryChunk {
+		end := min(start+idQueryChunk, len(unique))
+		chunk := unique[start:end]
+		args := make([]any, len(chunk))
+		for i, id := range chunk {
+			args[i] = id
+		}
+		rows, err := db.QueryContext(ctx,
+			`SELECT turn_id FROM turn_classes WHERE class='ambient' AND turn_id IN (`+placeholders(len(chunk))+`)`, args...)
+		if err != nil {
+			return nil, fmt.Errorf("pipeline: read turn classes: %w", err)
+		}
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("pipeline: read turn classes: %w", err)
+			}
+			ambient[id] = true
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("pipeline: read turn classes: %w", err)
+		}
+		rows.Close()
+	}
+	return ambient, nil
 }
 
 // scanTurns consumes turn rows and applies the canonical ordering shared by

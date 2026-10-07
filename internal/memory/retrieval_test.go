@@ -500,3 +500,127 @@ func TestRetrievalExcludesStaleDerivedMemory(t *testing.T) {
 		t.Fatalf("summary not active-scoped: %+v", sum)
 	}
 }
+
+func TestRetrievalSeparatesAmbient(t *testing.T) {
+	ctx := context.Background()
+	s := openTempStore(t)
+
+	spoken := sampleResult("seg-a", "rev-1", 0)
+	spoken.Turns[0].Text = "spoken business phrase one"
+	if _, err := s.IngestTranscript(ctx, spoken); err != nil {
+		t.Fatal(err)
+	}
+	ambient := sampleResult("seg-b", "rev-1", 0)
+	ambient.Turns[0].Text = "ambient lyric phrase two"
+	if _, err := s.IngestTranscript(ctx, ambient); err != nil {
+		t.Fatal(err)
+	}
+	var conv, spokenTurnID, ambientTurnID string
+	if err := s.db.QueryRow(`SELECT conversation_id FROM turns LIMIT 1`).Scan(&conv); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.QueryRow(`SELECT id FROM turns WHERE content LIKE 'spoken%'`).Scan(&spokenTurnID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.QueryRow(`SELECT id FROM turns WHERE content LIKE 'ambient%'`).Scan(&ambientTurnID); err != nil {
+		t.Fatal(err)
+	}
+	// The classifier rules do not fire on lyric-like text; the model pass
+	// rules on it and records the ambient class explicitly.
+	if _, err := s.db.Exec(`INSERT INTO turn_classes(turn_id,class,subtype,method,created_at) VALUES(?,?,?,?,?)`,
+		ambientTurnID, "ambient", "music_lyrics", "model", 0); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.ApplyAnnotations(ctx, conv, "", Annotations{
+		ConversationID: conv, AnnotationVersion: "rev-1", Title: "ambient conversation",
+		Topics: []TopicAnnotation{{ID: "topic:amb", Title: "ambient topic"}},
+		Notes: []NoteAnnotation{
+			{ID: "note:spoken", Kind: "observation", TopicIDs: []string{"topic:amb"},
+				Summary: "spoken note phrase", EvidenceTurnIDs: []string{spokenTurnID}},
+			{ID: "note:ambient", Kind: "observation", TopicIDs: []string{"topic:amb"},
+				Summary: "ambient note phrase", EvidenceTurnIDs: []string{ambientTurnID}},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// ApplyAnnotations assigns content-addressed note ids; the annotation ids
+	// are inputs, not storage keys.
+	var spokenNoteID, ambientNoteID string
+	if err := s.db.QueryRow(`SELECT id FROM notes WHERE summary='spoken note phrase'`).Scan(&spokenNoteID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.QueryRow(`SELECT id FROM notes WHERE summary='ambient note phrase'`).Scan(&ambientNoteID); err != nil {
+		t.Fatal(err)
+	}
+
+	// Default search separates: ambient turn and ambient-derived note never
+	// mix into conversation results.
+	page, err := s.SearchMemory(ctx, MemorySearch{Text: "phrase", Scope: "both"})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(page.Hits) != 2 {
+		t.Fatalf("default hits = %+v, want the spoken turn and note only", page.Hits)
+	}
+	for _, h := range page.Hits {
+		if h.Ambient {
+			t.Fatalf("default search marked a hit ambient but returned it: %+v", h)
+		}
+	}
+
+	// include_ambient surfaces them, explicitly marked.
+	page, err = s.SearchMemory(ctx, MemorySearch{Text: "phrase", Scope: "both", IncludeAmbient: true})
+	if err != nil {
+		t.Fatalf("search include_ambient: %v", err)
+	}
+	if len(page.Hits) != 4 {
+		t.Fatalf("include_ambient hits = %d, want 4", len(page.Hits))
+	}
+	byID := map[string]SearchHit{}
+	for _, h := range page.Hits {
+		byID[h.ID] = h
+	}
+	for _, id := range []string{ambientTurnID, ambientNoteID} {
+		if h, ok := byID[id]; !ok || !h.Ambient {
+			t.Fatalf("hit %s not marked ambient: %+v", id, h)
+		}
+	}
+	for _, id := range []string{spokenTurnID, spokenNoteID} {
+		if h, ok := byID[id]; !ok || h.Ambient {
+			t.Fatalf("spoken hit %s wrongly ambient or missing: %+v", id, h)
+		}
+	}
+
+	// Store.Query (query_context / get_conversation_context path) separates
+	// the same way; build_context inherits this because it reads through
+	// Query. get_evidence_context stays a full audit path by design.
+	qp, err := s.Query(ctx, Query{ConversationID: conv, IncludeTurns: true})
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	seen := map[string]bool{}
+	for _, it := range qp.Items {
+		seen[it.ID] = true
+		if it.Ambient {
+			t.Fatalf("default query returned and marked ambient item: %+v", it)
+		}
+	}
+	if !seen[spokenTurnID] || !seen[spokenNoteID] || seen[ambientTurnID] || seen[ambientNoteID] {
+		t.Fatalf("default query separation wrong: %v", seen)
+	}
+
+	qp2, err := s.Query(ctx, Query{ConversationID: conv, IncludeTurns: true, IncludeAmbient: true})
+	if err != nil {
+		t.Fatalf("query include_ambient: %v", err)
+	}
+	ambientMarked := 0
+	for _, it := range qp2.Items {
+		if it.Ambient {
+			ambientMarked++
+		}
+	}
+	if ambientMarked != 2 {
+		t.Fatalf("include_ambient query marked %d items, want 2 (turn + note): %+v", ambientMarked, qp2.Items)
+	}
+}

@@ -6,7 +6,7 @@ Context Layer 开发计划的 E 切片是“关联与失效”。当前先落地
 
 ## 工作流
 
-1. **只读调查**：agent 通过 MCP 工具 `list_conversations` / `list_topics` / `search_memory` / `get_evidence_context` 查看现有会话、话题、原话和证据上下文，不修改记忆库。这一步可以由人工触发的 agent 会话完成，也可以由 publish 之后的 curate 任务自动触发（见下文“自动触发”）。
+1. **只读调查**：agent 通过 MCP 工具 `list_conversations` / `list_topics` / `search_memory` / `get_evidence_context` 查看现有会话、话题、原话和证据上下文，不修改记忆库。这一步可以由人工触发的 agent 会话完成，也可以由 publish 之后的 curate 任务自动触发（见下文“自动触发”）。环境音轮次（广播、设备指令、歌词、媒体播放，见 [processing.md](processing.md) 的环境音分离）不参与关联提议：线索链只建在真人对话之上。
 2. **产出提议 JSON**：只在有真实原话证据时写出一个提议文件（模式见下文“提议 JSON”）。可直接使用的策展人提示词见 [curator-prompt.md](curator-prompt.md)。
 3. **校验与写入**：运行 `context-associate`，程序解析提议并执行 `ValidateTopicLinks` 校验；非 `--dry-run` 时通过校验的条目由 `InsertLinks` 写入 `memory_links`，`status=proposed`。
 4. **不自动合并**：校验只是挡住证据不足或字段非法的条目，通过校验也仅代表“形式合格”，语义是否成立仍需人工确认。任何条目都不会触发话题合并。
@@ -173,7 +173,10 @@ publish 提交后 `context-worker` 会自动入队一个 curate 任务（幂等�
 
 命令结束后由 worker 读取该文件，并执行与 `context-associate` 完全相同的校验与写入，结果引用形如 `curate:<version>+proposals:3+rejected:0+written:2`（`written` 只计新建或刷新的行，重放为 0，被拒过的行保持原判）。命令失败、超时（`--curator-timeout`，默认 15 分钟）、没有写出文件或 JSON 非法，都按可重试错误交回队列；未配置 `--curator-command` 时任务以 `curate:<version>+skipped:no-command` 成功结束，不写任何记录。
 
-本仓库自带 `scripts/run-curator.sh`：它按 `CONTEXT_DB` 配置项目本地 MCP、以无头模式运行策展提示词，并把提议写到 `CONTEXT_PROPOSALS`。它与上一节手工配方的唯一区别是“谁把提议文件写出来”；两条路径的校验、状态与复核规则完全一致。
+本仓库自带两条策展命令，与上一节手工配方的唯一区别是“谁把提议文件写出来”；校验、状态与复核规则完全一致：
+
+- `scripts/curator.py`：模型驱动的策展命令（默认 `doubao-seed-2.0-mini`——非推理、输出有界；推理型模型如 glm-5.3-flash 在此判断形态下思考不封顶、会烧光输出预算，除非调大 `CURATOR_MAX_TOKENS` 否则不要用）。可用 `CURATOR_MODEL_URL` / `CURATOR_MODEL` / `CURATOR_API_KEY` / `CURATOR_MAX_TOKENS` 覆盖。它读取目标会话的候选与证据、按逐对包含度与稀有词加权预筛其他会话的话题、让模型判定关联，且只允许引用输入集内的真实轮次 ID；模型调用失败即非零退出，交回队列重试，绝不以空提案冒充成功。环境音轮次不进入提议依据。用法：`context-worker --stages curate --curator-command 'python3 scripts/curator.py'`。
+- `scripts/run-curator.sh`：按 `CONTEXT_DB` 配置项目本地 MCP、以无头模式运行策展提示词（agent 会话式策展），并把提议写到 `CONTEXT_PROPOSALS`。
 
 ## 后续（尚未实现）
 

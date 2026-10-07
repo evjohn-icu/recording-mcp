@@ -182,6 +182,10 @@ transcript 被 supersede 后,系统对“历史”与“当前”做如下划分
 - **A. 历史 taxonomy / 审计**:`topics`、`topic_conversations`、`turn_topics` 行、`annotation_history` 快照、旧 `source_attachments`/`turns` 行都保留不删。`list_topics` 与 `get_annotation_history` 是审计视图,会如实显示这些历史映射。
 - **B. current source-derived projection**:所有 current-state 检索与统计(`query_context` / `get_context_item` / `search_memory` / `list_conversations` / `get_processing_status` / `build_context`)只统计 active revision 的原话与未标记 stale 的派生记忆;`include_stale` 是显式审计开关。话题成员判定只认 current 轮次(`CurrentTurnPredicate`),因此一个只剩 superseded 成员的 stale 话题映射不会把 current 检索绕回历史内容。
 
+### 环境音分离（migration v11：`turn_classes`）
+
+转写轮次按内容分为真人对话与环境音（语音助手指令、交通/商超广播、歌词、媒体播放）。分类是内容寻址的确定性判定：`internal/turnclass` 的规则在 ingest 时对命中轮次立即落 `turn_classes`（method=rule）；规则无法判定的轮次（歌词、有声剧等）由 `bin/turnclass-refill` 批量交模型判定（method=model），缺失分类行始终表示"未判定"而非环境音。语义派生只看对话内容：extract 窗口排除环境音轮次（但为其记录 analysis 覆盖，状态视图不误报缺口）；读面分离覆盖 `search_memory`、`query_context`、`get_conversation_context` 与 `build_context`（后三者经 `Store.Query` 自动继承），默认不混入环境音、`include_ambient=true` 显式纳入并带 `ambient` 标记（笔记按其首要证据轮次归类），`get_processing_status` 把环境音计入独立 `ambient_turns` 桶而不算未归类缺口。`get_evidence_context` 是唯一的全量审计例外：按 turn_id 展开原话证据时保留环境音，供核对转写事实。环境音保留可查可审计，只是不进业务语义层。
+
 剩余工作(TODO):话题 taxonomy 本身尚未做 revision-aware 重建——publish 替换注释时 `topic_conversations` 的成员关系会保留历史痕迹,`list_topics` 仍会列出只有 stale 成员的话题。这不影响 current 内容隔离(成员查询已按 current 轮次过滤),完整方案需要在注释替换时重建话题成员或为 topic 建立 derived 状态。
 
 ### speaker_bindings / speaker_binding_events（迁移 v9 speaker-binding）

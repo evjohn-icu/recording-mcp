@@ -101,6 +101,11 @@ type Item struct {
 	// Stale reports that the item derives from a superseded transcript
 	// attachment. Legacy items with no attachment rows are never stale.
 	Stale bool `json:"stale,omitempty"`
+	// Ambient reports that the item is environmental audio rather than
+	// spoken conversation: a turn classified ambient, or a note whose primary
+	// evidence turn is. It is only ever true when IncludeAmbient was
+	// requested, mirroring Stale.
+	Ambient bool `json:"ambient,omitempty"`
 	// DerivedFrom lists the transcript_revision values of the source
 	// attachments the item was built from, sorted ascending; empty for legacy
 	// items.
@@ -114,6 +119,7 @@ type Query struct {
 	SpeakerScopedID string `json:"speaker_scoped_id,omitempty"`
 	IncludeTurns    bool   `json:"include_turns,omitempty"`
 	IncludeStale    bool   `json:"include_stale,omitempty"`
+	IncludeAmbient  bool   `json:"include_ambient,omitempty"`
 	Limit           int    `json:"limit,omitempty"`
 	Offset          int    `json:"offset,omitempty"`
 }

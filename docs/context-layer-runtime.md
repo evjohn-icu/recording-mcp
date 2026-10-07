@@ -45,7 +45,7 @@ make build
 | `list_topics` | 发现已保存的话题 |
 | `list_conversations` | 列出本地记忆库中的会话：可按主题、分析状态与录音开始时间过滤，并按录音开始时间倒序游标分页返回摘要 |
 | `get_evidence_context` | 读取某个转录轮次及其同一录音内相邻轮次的上下文，用于核对原始证据。`turn_id` 必填；`radius`（默认 3，负数按 0 处理）取目标前后各若干条；`max_bytes`（默认 16000）是逐条累加的文本字节预算，超出时停止并置 `truncated` |
-| `search_memory` | 在原始转录与派生笔记中执行大小写不敏感的子串检索。`text` 必填（trim 后非空）；scope 可选 `raw`（仅转录）、`derived`（仅笔记）或 `both`（默认全部），并可用 `topic_id`、`started_after`、`started_before` 过滤 |
+| `search_memory` | 在原始转录与派生笔记中执行大小写不敏感的子串检索。`text` 必填（trim 后非空）；scope 可选 `raw`（仅转录）、`derived`（仅笔记）或 `both`（默认全部），并可用 `topic_id`、`started_after`、`started_before` 过滤。环境音（广播、设备指令、歌词、媒体播放）默认不混入结果；`include_ambient=true` 显式纳入，命中带 `ambient` 标记 |
 | `build_context` | 实验性：为任务组装带预算与来源的上下文包，返回 `items` / `evidence` / `coverage` / `gaps` / `truncated` / `degraded` / `degrade_reason` / `trace`。`query`、`conversation_id`、`topic_ids` 至少一项必填；`max_bytes` 默认 16000、`max_items` 默认 12；`include_raw_evidence` 纳入原始轮次证据。默认排除 stale 派生记忆；仅在服务端配置 `--decision-url` 时做决策重排，否则 `degraded=true` 但确定性结果仍完整返回 |
 | `list_memory_links` | 列出话题之间的记忆关联（`proposed` / `confirmed` / `rejected`）。`status` 与 `topic_id` 可选；`limit` 缺省 50、上限 200，按 `created_at, id` 返回端点标题、理由、证据轮次与置信度 |
 | `review_memory_link` | 复核一条关联建议。`link_id` 与 `action` 必填：`confirm` 把 `proposed` 变为 `confirmed`；`reject` 把 `proposed` 或 `confirmed` 变为 `rejected`；`reopen` 把 `confirmed` 或 `rejected` 退回 `proposed`。重复同一动作幂等，记录不删除 |

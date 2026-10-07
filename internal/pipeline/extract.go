@@ -90,6 +90,34 @@ func (h *ExtractHandler) Execute(ctx context.Context, job process.Job) (string, 
 		return "", nil
 	}
 
+	// Ambient turns are classified at ingest and excluded from derivation:
+	// broadcasts, device commands and media playback must not generate
+	// business candidates. They are still processed work, so their coverage
+	// is recorded — the status view must not report them as unanalyzed gaps.
+	loadedIDs := make([]string, len(turns))
+	for i, t := range turns {
+		loadedIDs[i] = t.ID
+	}
+	ambient, err := ambientTurnIDs(ctx, h.DB, loadedIDs)
+	if err != nil {
+		return "", err
+	}
+	speech := make([]Turn, 0, len(turns))
+	ambientIDs := make([]string, 0, len(turns)-len(speech))
+	for _, t := range turns {
+		if ambient[t.ID] {
+			ambientIDs = append(ambientIDs, t.ID)
+			continue
+		}
+		speech = append(speech, t)
+	}
+	if len(ambientIDs) > 0 {
+		if err := RecordCoverage(ctx, h.DB, payload.ConversationID, "", h.ProcessorVersion, ambientIDs, time.Now()); err != nil {
+			return "", fmt.Errorf("pipeline: record ambient coverage: %w", err)
+		}
+	}
+	turns = speech
+
 	questions := BuildQuestions()
 	questionsJSON, err := json.Marshal(questions)
 	if err != nil {
