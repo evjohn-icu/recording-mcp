@@ -30,7 +30,7 @@ func TestMCPToolsExposeQueryAndConversationMemory(t *testing.T) {
 		t.Fatal(err)
 	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, false, nil).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, false, nil, nil).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,6 +74,90 @@ func TestMCPToolsExposeQueryAndConversationMemory(t *testing.T) {
 	}
 }
 
+// TestGetCurrentContextProjectsSeededMemory seeds one note and one topic
+// directly and asserts the projected object kind/status over MCP, so the
+// tool's input contract and the projection output shape are exercised at the
+// wire level.
+func TestGetCurrentContextProjectsSeededMemory(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	store, err := memory.Open(filepath.Join(t.TempDir(), "current.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.DB()
+	seed := []string{
+		`INSERT INTO conversations(id,title,summary,annotation_version,annotation_basis,recording_id,source_sha256,transcript_version,duration_ms,transcript_json,annotations_json) VALUES('conv:cc','计划','','v1','', 'rec:cc','sha','tv',1000,'{}','{}')`,
+		`INSERT INTO recordings(id,conversation_id,source_file,source_sha256,duration_ms,recording_started_at,absolute_time_known) VALUES('rec:cc','conv:cc','f','sha',1000,'2026-03-01T09:00:00+08:00',1)`,
+		`INSERT INTO turns(id,conversation_id,recording_id,segment_index,global_start_ms,global_end_ms,speaker_scoped_id,speaker_entity_id,content,source_sha256,transcript_version,original_turn_id,turn_json) VALUES('turn:cc','conv:cc','rec:cc',0,1000,2000,NULL,NULL,'讨论搬家计划','sha','rev-1','turn:cc','{}')`,
+		`INSERT INTO topics(id,title) VALUES('topic:cc','搬家')`,
+		`INSERT INTO topic_conversations(topic_id,conversation_id) VALUES('topic:cc','conv:cc')`,
+		`INSERT INTO notes(id,conversation_id,kind,summary,topic_ids_json,claim_mode,interpretation_note,annotation_version) VALUES('note:cc','conv:cc','intention','计划搬去珠海定居','["topic:cc"]','inference','','v1')`,
+		`INSERT INTO note_evidence(note_id,turn_id,ordinal) VALUES('note:cc','turn:cc',0)`,
+	}
+	for _, stmt := range seed {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("seed: %v: %v", stmt, err)
+		}
+	}
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := newServer(store, false, nil, nil).Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1"}, nil)
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	res, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "get_current_context", Arguments: map[string]any{"kinds": []string{"commitment"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.IsError {
+		t.Fatalf("get_current_context rejected input: %+v", res.Content)
+	}
+	b, _ := json.Marshal(res.StructuredContent)
+	var result struct {
+		Experimental bool `json:"experimental"`
+		Objects      []struct {
+			ID              string   `json:"id"`
+			Kind            string   `json:"kind"`
+			Status          string   `json:"status"`
+			Summary         string   `json:"summary"`
+			Confidence      float64  `json:"confidence"`
+			EvidenceTurnIDs []string `json:"evidence_turn_ids"`
+		} `json:"objects"`
+		Conflicts []map[string]any `json:"conflicts"`
+	}
+	if err := json.Unmarshal(b, &result); err != nil {
+		t.Fatalf("decode result %s: %v", b, err)
+	}
+	if !result.Experimental || len(result.Objects) != 1 {
+		t.Fatalf("objects = %s", b)
+	}
+	obj := result.Objects[0]
+	if obj.ID != "note:cc" || obj.Kind != "commitment" || obj.Status != "current" {
+		t.Fatalf("object = %+v", obj)
+	}
+	if len(obj.EvidenceTurnIDs) != 1 || obj.EvidenceTurnIDs[0] != "turn:cc" {
+		t.Fatalf("evidence = %v", obj.EvidenceTurnIDs)
+	}
+
+	// An unknown kind must be rejected with the documented error.
+	bad, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "get_current_context", Arguments: map[string]any{"kinds": []string{"truth"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bad.IsError {
+		t.Fatalf("unknown kind accepted: %+v", bad.StructuredContent)
+	}
+}
+
 func TestNeutralIngestAnnotateAndTrackCoverageOverMCP(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -83,7 +167,7 @@ func TestNeutralIngestAnnotateAndTrackCoverageOverMCP(t *testing.T) {
 	}
 	defer store.Close()
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, false, nil).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, false, nil, nil).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +313,7 @@ func TestRetrievalToolsOverMCP(t *testing.T) {
 	}
 	defer store.Close()
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, false, nil).Connect(ctx, st, nil)
+	ss, err := newServer(store, false, nil, nil).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +377,7 @@ func TestMCPReplayPreservesRawProviderNumbers(t *testing.T) {
 		t.Fatal(err)
 	}
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, false, nil).Connect(ctx, st, nil)
+	ss, err := newServer(store, false, nil, nil).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +432,7 @@ func TestMemoryLinkToolsOverMCP(t *testing.T) {
 	}
 
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, false, nil).Connect(ctx, st, nil)
+	ss, err := newServer(store, false, nil, nil).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -459,7 +543,7 @@ func TestReadOnlyServerExposesOnlyReadTools(t *testing.T) {
 	}
 	defer store.Close()
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, true, nil).Connect(ctx, st, nil)
+	ss, err := newServer(store, true, nil, nil).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -481,8 +565,8 @@ func TestReadOnlyServerExposesOnlyReadTools(t *testing.T) {
 	wantRead := []string{
 		"query_context", "get_conversation_context", "get_context_item", "list_topics",
 		"get_processing_status", "get_annotation_history", "list_conversations",
-		"get_evidence_context", "search_memory", "build_context", "list_memory_links",
-		"get_speaker_projection", "list_speaker_bindings",
+		"get_evidence_context", "search_memory", "build_context", "get_current_context",
+		"list_memory_links", "get_speaker_projection", "list_speaker_bindings",
 	}
 	if len(got) != len(wantRead) {
 		t.Fatalf("read-only server exposes %d tools %v, want %d", len(got), got, len(wantRead))
@@ -547,7 +631,7 @@ func TestBuildContextToolSmoke(t *testing.T) {
 	}
 
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, false, nil).Connect(ctx, st, nil)
+	ss, err := newServer(store, false, nil, nil).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -625,7 +709,7 @@ func TestSpeakerBindingToolsOverMCP(t *testing.T) {
 	}
 
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, false, nil).Connect(ctx, st, nil)
+	ss, err := newServer(store, false, nil, nil).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

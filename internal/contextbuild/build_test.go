@@ -137,7 +137,7 @@ func (f *fixture) topicLink(from, to, relation string, evidenceTurnIDs []string,
 
 func (f *fixture) build(rerank Reranker, req Request) Package {
 	f.t.Helper()
-	pkg, err := Build(context.Background(), f.store, f.db, rerank, req)
+	pkg, err := Build(context.Background(), Deps{Store: f.store, DB: f.db, Reranker: rerank}, req)
 	if err != nil {
 		f.t.Fatalf("Build: %v", err)
 	}

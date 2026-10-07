@@ -16,6 +16,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"recordingmcp/internal/decision"
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/pipeline"
+	"recordingmcp/internal/semantic"
 )
 
 const (
@@ -52,6 +54,41 @@ const (
 	degradeNoReranker = "decision rerank not configured; deterministic assembly"
 )
 
+// RetrievalSource values reported per returned item. They name the branch that
+// produced a candidate; an item reached by several branches carries several.
+const (
+	SourceLexical  = "lexical"
+	SourceSemantic = "semantic"
+	SourceLink     = "confirmed_link"
+	SourceNav      = "navigation"
+)
+
+// branchWeights are the fixed, documented fusion weights. Changing them is a
+// retrieval-semantics change and must be recorded in docs/hybrid-retrieval.md.
+var branchWeights = map[string]float64{
+	SourceLexical:  1.0,
+	SourceSemantic: 0.8,
+	SourceLink:     0.45,
+	SourceNav:      0.30,
+}
+
+// branchOrder fixes the summation order of the fused score so floating-point
+// addition stays associative and the result is deterministic.
+var branchOrder = []string{SourceLexical, SourceSemantic, SourceLink, SourceNav}
+
+// recencyWeight bounds the optional recency bonus; it is only applied when the
+// request carries a Now value, so runs without a clock stay deterministic.
+const recencyWeight = 0.10
+
+const recencyHalfLifeDays = 30.0
+
+// build modes accepted by Request.Mode. ModeHybrid is the zero value: hybrid
+// runs every branch, ModeLexical disables the semantic branch only.
+const (
+	ModeHybrid  = ""
+	ModeLexical = "lexical"
+)
+
 // Request describes one context build. At least one of Purpose-adjacent
 // selectors (Query, ConversationID, TopicIDs) must be non-empty.
 type Request struct {
@@ -64,6 +101,13 @@ type Request struct {
 	MaxBytes           int        `json:"max_bytes,omitempty"`
 	MaxItems           int        `json:"max_items,omitempty"`
 	IncludeRawEvidence bool       `json:"include_raw_evidence,omitempty"`
+	// Mode selects the assembly branches: "" or "hybrid" run every branch,
+	// "lexical" disables the semantic branch only (navigation and confirmed
+	// links stay on). Anything else is an error.
+	Mode string `json:"mode,omitempty"`
+	// Now enables the optional recency bonus. When nil the bonus is skipped so
+	// runs without a clock stay byte-identical.
+	Now *time.Time `json:"now,omitempty"`
 }
 
 // EvidenceRef is one raw transcript turn exposed as supporting evidence.
@@ -93,6 +137,9 @@ type Package struct {
 	Degraded      bool          `json:"degraded"`
 	DegradeReason string        `json:"degrade_reason"`
 	Trace         Trace         `json:"trace"`
+	// Ranking reports, per returned item, why it was retrieved: which branches
+	// produced it, the per-branch raw scores and the fused retrieval score.
+	Ranking []ItemRanking `json:"ranking"`
 }
 
 // TimeRange echoes the requested bounds and reports whether the returned
@@ -108,6 +155,7 @@ type Branches struct {
 	Lexical  bool `json:"lexical"`
 	Links    bool `json:"links"`
 	Evidence bool `json:"evidence"`
+	Semantic bool `json:"semantic"`
 }
 
 // Scanned counts the distinct candidates examined before the budget.
@@ -149,10 +197,35 @@ type BudgetTrace struct {
 // Trace is the assembly audit trail. It contains no model reasoning.
 type Trace struct {
 	Lexical        LexicalTrace    `json:"lexical"`
+	Semantic       SemanticTrace   `json:"semantic"`
 	LinksExpanded  []LinkExpansion `json:"links_expanded"`
 	StaleFiltered  []string        `json:"stale_filtered"`
 	DecisionRerank bool            `json:"decision_rerank"`
 	Budget         BudgetTrace     `json:"budget"`
+}
+
+// SemanticTrace records the semantic recall branch. Indexed counts the hits the
+// backend returned; HitIDs lists the ones that entered the package;
+// RejectedStale/RejectedScope count the ones the hard guards refused.
+type SemanticTrace struct {
+	Query         string   `json:"query,omitempty"`
+	Backend       string   `json:"backend,omitempty"`
+	Indexed       int      `json:"indexed"`
+	HitIDs        []string `json:"hit_ids"`
+	RejectedStale int      `json:"rejected_stale"`
+	RejectedScope int      `json:"rejected_scope"`
+}
+
+// ItemRanking is the per-item retrieval provenance. It is emitted alongside the
+// items so a consumer can see why an item is in the package without changing
+// the item schema.
+type ItemRanking struct {
+	ItemID   string             `json:"item_id"`
+	Kind     string             `json:"kind"`
+	Sources  []string           `json:"retrieval_sources"`
+	Score    float64            `json:"retrieval_score"`
+	Branches map[string]float64 `json:"retrieval_branches,omitempty"`
+	LinkIDs  []string           `json:"retrieval_link_ids,omitempty"`
 }
 
 // Reranker optionally reorders the deterministically assembled items. It must
@@ -239,15 +312,42 @@ func rerankState(query string, items []memory.Item) string {
 	return b.String()
 }
 
-// candidate is one recalled item plus the signal that produced it.
+// candidate is one recalled item plus the retrieval branches that produced it.
 type candidate struct {
 	item     memory.Item
 	score    float64
 	evidence []string
+	// sources maps branch -> raw branch score (max per branch).
+	sources map[string]float64
+	// linkIDs lists the confirmed links whose expansion contributed this item.
+	linkIDs []string
+}
+
+// fusedScore sums weight*raw over the branches that touched the candidate, in
+// the fixed branchOrder so floating-point addition is deterministic.
+func fusedScore(sources map[string]float64) float64 {
+	var score float64
+	for _, branch := range branchOrder {
+		if raw, ok := sources[branch]; ok {
+			score += branchWeights[branch] * raw
+		}
+	}
+	return score
+}
+
+// Deps are the build dependencies. Semantic may be nil, in which case hybrid
+// mode degrades to lexical retrieval and the package records why.
+type Deps struct {
+	Store    *memory.Store
+	DB       *sql.DB
+	Reranker Reranker
+	Semantic semantic.SemanticRetriever
 }
 
 // Build assembles a deterministic context package.
-func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker, req Request) (Package, error) {
+func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
+	store, db := deps.Store, deps.DB
+	rerank := deps.Reranker
 	if err := ctx.Err(); err != nil {
 		return Package{}, err
 	}
@@ -256,6 +356,14 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 	}
 	if db == nil {
 		return Package{}, errors.New("build_context: db is required")
+	}
+	switch req.Mode {
+	case ModeHybrid, ModeLexical, "hybrid":
+	default:
+		return Package{}, fmt.Errorf("build_context: mode must be hybrid or lexical")
+	}
+	if req.Mode == "hybrid" {
+		req.Mode = ModeHybrid
 	}
 
 	query := strings.TrimSpace(req.Query)
@@ -271,6 +379,7 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 		Items:    []memory.Item{},
 		Evidence: []EvidenceRef{},
 		Gaps:     []Gap{},
+		Ranking:  []ItemRanking{},
 		Trace: Trace{
 			LinksExpanded: []LinkExpansion{},
 			StaleFiltered: []string{},
@@ -278,30 +387,36 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 	}
 	pkg.Trace.Lexical.Query = query
 	pkg.Trace.Lexical.HitIDs = []string{}
+	pkg.Trace.Semantic.HitIDs = []string{}
+
+	degradeReasons := []string{}
 
 	candidates := newCandidateSet()
-	scope := newRequestScope(convID, topics, req.StartedAfter, req.StartedBefore)
+	scope := newRequestScope(store, convID, topics, req.StartedAfter, req.StartedBefore)
 
 	// addItem applies the hard scope and staleness guards before one item can
 	// enter the candidate set. Every branch funnels through it, so no branch
 	// can leak out-of-scope or superseded content into the package.
-	addItem := func(item memory.Item, score float64, evidence []string) (bool, error) {
+	addItem := func(item memory.Item, branch string, raw float64, evidence []string, linkIDs []string) (accepted bool, reason string, err error) {
 		if item.Stale {
-			return false, nil
+			return false, "stale", nil
 		}
 		ok, err := scope.allows(ctx, db, item)
-		if err != nil || !ok {
-			return false, err
+		if err != nil {
+			return false, "scope", err
 		}
-		candidates.add(item, score, evidence)
-		return true, nil
+		if !ok {
+			return false, "scope", nil
+		}
+		candidates.add(item, branch, raw, evidence, linkIDs)
+		return true, "accepted", nil
 	}
 
 	// addQueryPage folds one store.Query page into the candidate set. The
 	// query view does not populate note evidence, so it is hydrated from
 	// note_evidence first: items discovered through navigation or confirmed
 	// links must stay citable and take part in the source-evidence dedupe.
-	addQueryPage := func(page memory.Page) error {
+	addQueryPage := func(page memory.Page, branch string, linkIDs []string) error {
 		evMap, err := hydrateEvidence(ctx, db, page.Items)
 		if err != nil {
 			return err
@@ -314,24 +429,21 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 			if len(item.EvidenceTurnIDs) == 0 && isNoteKind(item.Kind) {
 				item.EvidenceTurnIDs = ev
 			}
-			if _, err := addItem(item, 0, ev); err != nil {
+			if _, _, err := addItem(item, branch, 1.0, ev, linkIDs); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
 
-	// Step 1: recall. Lexical search first so its higher-confidence hits win
-	// the (kind, id) dedupe over filter-only navigation. An explicit topic
-	// scope narrows the lexical recall itself (query AND topic); the global
-	// search only runs when the request leaves topics unconstrained.
+	// addHits folds one lexical recall page into the candidate set.
 	addHits := func(page memory.SearchPage) error {
 		for _, hit := range page.Hits {
 			item, evidence, err := itemFromHit(ctx, store, hit)
 			if err != nil {
 				return err
 			}
-			added, err := addItem(item, hit.Score, evidence)
+			added, _, err := addItem(item, SourceLexical, hit.Score, evidence, nil)
 			if err != nil {
 				return err
 			}
@@ -378,7 +490,7 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 			if err != nil {
 				return Package{}, err
 			}
-			if err := addQueryPage(page); err != nil {
+			if err := addQueryPage(page, SourceNav, nil); err != nil {
 				return Package{}, err
 			}
 		}
@@ -388,8 +500,84 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 		if err != nil {
 			return Package{}, err
 		}
-		if err := addQueryPage(page); err != nil {
+		if err := addQueryPage(page, SourceNav, nil); err != nil {
 			return Package{}, err
+		}
+	}
+
+	// Step 1b: semantic recall. The branch is optional and degrades instead of
+	// failing: no backend, an empty index or an empty query yields lexical
+	// retrieval only, and the package records why. The backend's own SQL
+	// already excludes stale and ambient rows; resolving the hit through
+	// GetItem keeps the same hard guards behind every other branch.
+	if req.Mode != ModeLexical {
+		switch {
+		case deps.Semantic == nil:
+			pkg.Degraded = true
+			degradeReasons = append(degradeReasons, "semantic backend not configured")
+			pkg.Gaps = append(pkg.Gaps, Gap{Kind: "semantic_unavailable", Detail: "no semantic backend configured; lexical retrieval only"})
+		case !deps.Semantic.Ready():
+			pkg.Degraded = true
+			degradeReasons = append(degradeReasons, "semantic index empty")
+			pkg.Gaps = append(pkg.Gaps, Gap{Kind: "semantic_index_empty", Detail: "semantic index has no rows for the configured provider/model"})
+			pkg.Trace.Semantic.Backend = deps.Semantic.Describe()
+		default:
+			pkg.Trace.Semantic.Backend = deps.Semantic.Describe()
+			if query != "" {
+				limit := maxOf(lexicalLimitFactor*maxItems, lexicalLimitFloor)
+				hits, err := deps.Semantic.Search(ctx, query, semantic.SearchOptions{ConversationID: convID, Limit: limit})
+				if err != nil {
+					return Package{}, err
+				}
+				pkg.Trace.Semantic.Query = query
+				pkg.Trace.Semantic.Indexed = len(hits)
+				for _, hit := range hits {
+					detail, err := store.GetItem(ctx, hit.ArtifactID, true)
+					if errors.Is(err, memory.ErrNotFound) {
+						continue // orphan index row
+					}
+					if err != nil {
+						return Package{}, err
+					}
+					item := detail.Item
+					evidence := evidenceOf(item)
+					if len(evidence) == 0 {
+						ids := make([]string, 0, len(detail.Evidence))
+						for _, ev := range detail.Evidence {
+							if ev.ID != "" {
+								ids = append(ids, ev.ID)
+							}
+						}
+						evidence = ids
+					}
+					if len(item.EvidenceTurnIDs) == 0 && isNoteKind(item.Kind) {
+						item.EvidenceTurnIDs = evidence
+					}
+					if item.Stale {
+						pkg.Trace.Semantic.RejectedStale++
+						continue
+					}
+					if ambient, err := store.ItemAmbient(ctx, item); err != nil {
+						return Package{}, err
+					} else if ambient {
+						continue
+					}
+					accepted, reason, err := addItem(item, SourceSemantic, hit.Score, evidence, nil)
+					if err != nil {
+						return Package{}, err
+					}
+					if accepted {
+						pkg.Trace.Semantic.HitIDs = append(pkg.Trace.Semantic.HitIDs, item.ID)
+						continue
+					}
+					switch reason {
+					case "stale":
+						pkg.Trace.Semantic.RejectedStale++
+					case "scope":
+						pkg.Trace.Semantic.RejectedScope++
+					}
+				}
+			}
 		}
 	}
 
@@ -411,7 +599,7 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 		if err != nil {
 			return Package{}, err
 		}
-		if err := addQueryPage(page); err != nil {
+		if err := addQueryPage(page, SourceNav, nil); err != nil {
 			return Package{}, err
 		}
 	}
@@ -427,7 +615,7 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 		if err != nil {
 			return Package{}, err
 		}
-		if err := addQueryPage(page); err != nil {
+		if err := addQueryPage(page, SourceNav, nil); err != nil {
 			return Package{}, err
 		}
 	}
@@ -479,9 +667,28 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 			if err != nil {
 				return Package{}, err
 			}
-			if err := addQueryPage(page); err != nil {
+			if err := addQueryPage(page, SourceLink, []string{link.ID}); err != nil {
 				return Package{}, err
 			}
+		}
+	}
+
+	// Recency bonus. Only applied when the caller hands in a clock, so the
+	// same request without a Now value stays byte-identical.
+	if req.Now != nil {
+		for _, cand := range candidates.order {
+			started, err := scope.conversationStartedAt(ctx, db, cand.item.ConversationID)
+			if err != nil {
+				return Package{}, err
+			}
+			if started == nil {
+				continue
+			}
+			ageDays := req.Now.Sub(*started).Hours() / 24
+			if ageDays < 0 {
+				ageDays = 0
+			}
+			cand.score += recencyWeight * math.Exp(-ageDays/recencyHalfLifeDays)
 		}
 	}
 
@@ -563,12 +770,12 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 	}
 	if rerank == nil {
 		pkg.Degraded = true
-		pkg.DegradeReason = degradeNoReranker
+		degradeReasons = append([]string{degradeNoReranker}, degradeReasons...)
 	} else if len(items) > 0 {
 		reordered, err := rerank.Rerank(ctx, query, items)
 		if err != nil {
 			pkg.Degraded = true
-			pkg.DegradeReason = "decision rerank failed: " + err.Error()
+			degradeReasons = append(degradeReasons, "decision rerank failed: "+err.Error())
 		} else {
 			pkg.Trace.DecisionRerank = true
 			items = reordered
@@ -577,6 +784,7 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 			}
 		}
 	}
+	pkg.DegradeReason = strings.Join(degradeReasons, "; ")
 
 	pkg.Items = items
 	pkg.Evidence = evidence
@@ -612,6 +820,7 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 		Lexical:  query != "",
 		Links:    len(pkg.Trace.LinksExpanded) > 0,
 		Evidence: len(evidence) > 0,
+		Semantic: len(pkg.Trace.Semantic.HitIDs) > 0,
 	}
 
 	if unknown, err := hasUnknownTimeConversation(ctx, db, pkg.Coverage.Conversations); err != nil {
@@ -623,7 +832,45 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, rerank Reranker
 	if err := collectGaps(ctx, db, &pkg, truncated); err != nil {
 		return Package{}, err
 	}
+	pkg.Ranking = rankingFor(items, candidates)
 	return pkg, nil
+}
+
+// rankingFor reports the retrieval provenance of every returned item, in item
+// order. Items that somehow lost their candidate entry still carry an identity
+// entry so ranking[i] always describes items[i].
+func rankingFor(items []memory.Item, candidates *candidateSet) []ItemRanking {
+	byKey := make(map[string]ItemRanking, len(candidates.order))
+	for _, cand := range candidates.order {
+		byKey[candidateKey(cand.item)] = ItemRanking{
+			ItemID:   cand.item.ID,
+			Kind:     cand.item.Kind,
+			Sources:  sortedSources(cand.sources),
+			Score:    cand.score,
+			Branches: cand.sources,
+			LinkIDs:  append([]string(nil), cand.linkIDs...),
+		}
+	}
+	out := make([]ItemRanking, 0, len(items))
+	for _, item := range items {
+		if rank, ok := byKey[candidateKey(item)]; ok {
+			out = append(out, rank)
+			continue
+		}
+		out = append(out, ItemRanking{ItemID: item.ID, Kind: item.Kind, Sources: []string{}, Branches: map[string]float64{}})
+	}
+	return out
+}
+
+// sortedSources returns the branch names in the fixed branchOrder.
+func sortedSources(sources map[string]float64) []string {
+	out := make([]string, 0, len(sources))
+	for _, branch := range branchOrder {
+		if _, ok := sources[branch]; ok {
+			out = append(out, branch)
+		}
+	}
+	return out
 }
 
 // candidateSet accumulates deduplicated candidates in first-seen order.
@@ -638,19 +885,47 @@ func newCandidateSet() *candidateSet {
 
 func candidateKey(item memory.Item) string { return item.Kind + "\x00" + item.ID }
 
-func (c *candidateSet) add(item memory.Item, score float64, evidence []string) {
+func (c *candidateSet) add(item memory.Item, branch string, raw float64, evidence []string, linkIDs []string) {
 	key := candidateKey(item)
 	if idx, ok := c.index[key]; ok {
-		if score > c.order[idx].score {
-			c.order[idx].score = score
+		cand := c.order[idx]
+		if cand.sources == nil {
+			cand.sources = map[string]float64{}
 		}
-		if len(c.order[idx].evidence) == 0 && len(evidence) > 0 {
-			c.order[idx].evidence = evidence
+		if raw > cand.sources[branch] {
+			cand.sources[branch] = raw
 		}
+		cand.score = fusedScore(cand.sources)
+		if len(cand.evidence) == 0 && len(evidence) > 0 {
+			cand.evidence = evidence
+		}
+		cand.linkIDs = mergeSortedUnique(cand.linkIDs, linkIDs)
 		return
 	}
+	sources := map[string]float64{branch: raw}
 	c.index[key] = len(c.order)
-	c.order = append(c.order, &candidate{item: item, score: score, evidence: evidence})
+	c.order = append(c.order, &candidate{
+		item:     item,
+		score:    fusedScore(sources),
+		evidence: evidence,
+		sources:  sources,
+		linkIDs:  mergeSortedUnique(nil, linkIDs),
+	})
+}
+
+// mergeSortedUnique unions two sorted, deduplicated string slices.
+func mergeSortedUnique(a, b []string) []string {
+	if len(b) == 0 {
+		return a
+	}
+	set := make(map[string]bool, len(a)+len(b))
+	for _, s := range a {
+		set[s] = true
+	}
+	for _, s := range b {
+		set[s] = true
+	}
+	return sortedKeys(set)
 }
 
 func (c *candidateSet) topicIDs() []string {

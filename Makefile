@@ -11,6 +11,7 @@ build:
 	go build -o bin/context-associate ./cmd/context-associate
 	go build -o bin/context-decision ./cmd/context-decision
 	go build -o bin/context-eval ./cmd/context-eval
+	go build -o bin/context-embed ./cmd/context-embed
 
 test:
 	go test -race ./...

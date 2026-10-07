@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	_ "modernc.org/sqlite"
@@ -532,6 +533,21 @@ func (s *Store) Query(ctx context.Context, q Query) (Page, error) {
 func literalMatch(s, q string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(strings.TrimSpace(q)))
 }
+
+// ConversationStartedAt returns the recording start of one conversation, or
+// nil when the conversation has no known recording start. It is the shared
+// time-lookup the scope and projection layers use.
+func (s *Store) ConversationStartedAt(ctx context.Context, conversationID string) (*time.Time, error) {
+	var raw sql.NullString
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT r.recording_started_at FROM conversations c LEFT JOIN recordings r ON r.id=c.recording_id WHERE c.id=?`,
+		conversationID,
+	).Scan(&raw); err != nil {
+		return nil, err
+	}
+	return parseStartedAt(raw)
+}
+
 func (s *Store) turnTopics(ctx context.Context, id string) ([]string, error) {
 	rows, e := s.db.QueryContext(ctx, "SELECT topic_id FROM turn_topics WHERE turn_id=? ORDER BY topic_id", id)
 	if e != nil {
@@ -739,7 +755,7 @@ func (s *Store) GetItem(ctx context.Context, id string, includeStale bool) (Item
 	var title, summary, recording string
 	err = s.db.QueryRowContext(ctx, "SELECT title,summary,recording_id FROM conversations WHERE id=?", id).Scan(&title, &summary, &recording)
 	if errors.Is(err, sql.ErrNoRows) {
-		return ItemDetail{}, fmt.Errorf("context item not found: %s", id)
+		return ItemDetail{}, fmt.Errorf("context item not found: %s: %w", id, ErrNotFound)
 	}
 	it = Item{ID: id, Kind: "conversation", ConversationID: id, Title: title, Summary: summary, RecordingID: recording, SpeakerEntityID: nil}
 	return ItemDetail{Experimental: true, Item: it}, err

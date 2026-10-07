@@ -42,7 +42,7 @@ make build
 | `get_conversation_context` | 查看一场沟通的记录，可显式包含原话并分页 |
 | `get_context_item` | 展开一条记录及其引用的原话证据 |
 
-各工具的精确输入由 MCP `tools/list` 公布。本实验使用 `limit` 和 `offset` 分页，不支持草案要求的快照游标、统一字节预算、双时间查询或状态推导。关键词检索是字面匹配；同义词推断、话题合并和人物身份确认尚未实现。
+各工具的精确输入由 MCP `tools/list` 公布。本实验使用 `limit` 和 `offset` 分页，不支持草案要求的快照游标、统一字节预算、双时间查询或状态推导。关键词检索是字面匹配；`build_context` 另有可选的语义召回分支（离线哈希嵌入器，默认需 `bin/context-embed` 先建索引）与读取时上下文投影（`get_current_context`）；话题合并和自动人物身份确认尚未实现（身份只来自人工确认的 speaker binding）。
 
 ## 与既有代码的关系
 

@@ -46,7 +46,8 @@ make build
 | `list_conversations` | 列出本地记忆库中的会话：可按主题、分析状态与录音开始时间过滤，并按录音开始时间倒序游标分页返回摘要 |
 | `get_evidence_context` | 读取某个转录轮次及其同一录音内相邻轮次的上下文，用于核对原始证据。`turn_id` 必填；`radius`（默认 3，负数按 0 处理）取目标前后各若干条；`max_bytes`（默认 16000）是逐条累加的文本字节预算，超出时停止并置 `truncated` |
 | `search_memory` | 在原始转录与派生笔记中执行大小写不敏感的子串检索。`text` 必填（trim 后非空）；scope 可选 `raw`（仅转录）、`derived`（仅笔记）或 `both`（默认全部），并可用 `topic_id`、`started_after`、`started_before` 过滤。环境音（广播、设备指令、歌词、媒体播放）默认不混入结果；`include_ambient=true` 显式纳入，命中带 `ambient` 标记 |
-| `build_context` | 实验性：为任务组装带预算与来源的上下文包，返回 `items` / `evidence` / `coverage` / `gaps` / `truncated` / `degraded` / `degrade_reason` / `trace`。`query`、`conversation_id`、`topic_ids` 至少一项必填；`max_bytes` 默认 16000、`max_items` 默认 12；`include_raw_evidence` 纳入原始轮次证据。默认排除 stale 派生记忆；仅在服务端配置 `--decision-url` 时做决策重排，否则 `degraded=true` 但确定性结果仍完整返回 |
+| `build_context` | 实验性：为任务组装带预算与来源的上下文包，返回 `items` / `evidence` / `coverage` / `gaps` / `truncated` / `degraded` / `degrade_reason` / `trace` / `ranking`。`query`、`conversation_id`、`topic_ids` 至少一项必填；`max_bytes` 默认 16000、`max_items` 默认 12；`include_raw_evidence` 纳入原始轮次证据；`mode` 可选 `hybrid`（默认，字面 + 语义召回 + 导航 + 已确认链接）或 `lexical`（关闭语义分支，其余保留）。默认排除 stale 与 ambient 派生记忆；`ranking` 逐条携带 `retrieval_sources`（`lexical` / `semantic` / `confirmed_link` / `navigation`）与融合后的 `retrieval_score`。仅在服务端配置 `--decision-url` 时做决策重排；未配置决策引擎、未配置语义后端（`--semantic-provider off`）或语义索引为空时 `degraded=true` 并在 `gaps` 中说明，确定性结果仍完整返回 |
+| `get_current_context` | 实验性：读取当前上下文投影，返回 person / topic / commitment / preference / event 对象，每个对象带 `evidence_turn_ids`、`derived_from`、`status`（`current` / `superseded` / `unresolved`）与 `conflicts`；全部在读取时由当前（非 stale、非 ambient）证据推导。可选 `query` 先做一次小规模检索并把命中的会话/话题作为硬范围（无命中时返回 `no_retrieval_hits` 的 unresolved 说明）；`person_id`、`topic_id`、`conversation_id`、`kinds`、`started_after`、`started_before` 是 any-of/硬过滤，`audit=true` 额外输出 stale 笔记的 superseded 对象，`limit` 默认 20、上限 200（只截断对象，冲突与 unresolved 始终完整返回）。规则与状态模型见 [context-projection.md](context-projection.md) |
 | `list_memory_links` | 列出话题之间的记忆关联（`proposed` / `confirmed` / `rejected`）。`status` 与 `topic_id` 可选；`limit` 缺省 50、上限 200，按 `created_at, id` 返回端点标题、理由、证据轮次与置信度 |
 | `review_memory_link` | 复核一条关联建议。`link_id` 与 `action` 必填：`confirm` 把 `proposed` 变为 `confirmed`；`reject` 把 `proposed` 或 `confirmed` 变为 `rejected`；`reopen` 把 `confirmed` 或 `rejected` 退回 `proposed`。重复同一动作幂等，记录不删除 |
 | `propose_speaker_binding` | 提议某个录音内某说话人标签在指定 transcript 修订下代表某个人物（写入）。`recording_id`、`speaker_scoped_id`、`transcript_revision` 必填；`evidence_turn_ids` 与 `model` 记录提议依据。绑定按修订作用域，标签跨修订不继承身份 |
@@ -56,7 +57,11 @@ make build
 
 上表中的 `list_conversations`、`get_evidence_context` 与 `search_memory` 是与既有工具不同的检索契约：它们不走 `query_context` / `get_conversation_context` 的 offset 分页，而是返回游标（`next_cursor`），下一页请求把游标原样带回 `cursor` 字段。时间过滤字段（`started_after` / `started_before`）为 RFC 3339 字符串，且只对录音开始时间已知的会话生效；有界查询会排除开始时间未知的会话。`list_conversations` 的 `status` 只接受 `pending` / `partial`（大小写不敏感），语义与 `get_processing_status` 的 `analysis_status` 一致；`limit` 缺省 20、上限 100。`search_memory` 的 `limit` 同理，多读一条记录判断是否有下一页。
 
-`list_memory_links` 与 `review_memory_link` 服务于关联建议层（见 [associations.md](associations.md)）：提议由 `context-associate` 写入并停留在 `proposed`，只有显式复核才改变状态；确认不代表合并话题，下游视图尚未实现。
+记忆家族共 19 个工具（上表 14 个只读 + 5 个写入；写入工具仅在未加 `--read-only` 时注册）。同一二进制还承载 8 个事件原型工具，见 [contract.md](contract.md)。
+
+`build_context` 与 `get_current_context` 的语义召回由服务端标志控制：`--semantic-provider`（`off|hash|openai`，默认 `hash`，离线确定性嵌入器）、`--semantic-dims`（默认 256）、`--semantic-endpoint` / `--semantic-model` / `--semantic-key-env`（openai 端点配置）。语义索引由 `bin/context-embed` 离线构建（`memory_embeddings` 表，迁移 v12）。降级模式：`off` 或索引为空时语义分支退化为仅字面检索并在 `gaps` 里给出 `semantic_unavailable` / `semantic_index_empty`；未配置决策引擎时保持原有的 rerank 降级说明。stale 与 ambient 的隔离不变量同时作用于两条路径。
+
+`list_memory_links` 与 `review_memory_link` 服务于关联建议层（见 [associations.md](associations.md)）：提议由 `context-associate` 写入并停留在 `proposed`，只有显式复核才改变状态；确认不代表合并话题。已确认且未失效的关联会作为混合检索的一个排序分支（`retrieval_sources` 含 `confirmed_link`），proposed/rejected 仍然不参与检索。
 
 `analysis_status` 为 `pending` 或 `partial`，不会自动宣称整场沟通已分析完成。空白分句留在原始附件，不计为可检索原话；不自动删除跨分片的重复文字。
 

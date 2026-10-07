@@ -191,9 +191,10 @@ func parseStartedAt(raw sql.NullString) (*time.Time, error) {
 	return &t, nil
 }
 
-// withinStartedRange reports whether started satisfies the inclusive bounds.
-// Rows with an unknown start time fail any set bound.
-func withinStartedRange(started *time.Time, after, before *time.Time) bool {
+// WithinStartedRange reports whether started satisfies the inclusive bounds.
+// Rows with an unknown start time fail any set bound. It is the shared time
+// predicate of the retrieval, scope and projection layers.
+func WithinStartedRange(started *time.Time, after, before *time.Time) bool {
 	if after == nil && before == nil {
 		return true
 	}
@@ -319,7 +320,7 @@ func (s *Store) ListConversations(ctx context.Context, f ConversationFilter) (Co
 		if status != "" && item.AnalysisStatus != status {
 			continue
 		}
-		if !withinStartedRange(item.RecordingStartedAt, f.StartedAfter, f.StartedBefore) {
+		if !WithinStartedRange(item.RecordingStartedAt, f.StartedAfter, f.StartedBefore) {
 			continue
 		}
 		if !conversationAfterCursor(item, cur) {
@@ -610,7 +611,7 @@ func (s *Store) searchNotes(ctx context.Context, q MemorySearch, lower string) (
 		if err != nil {
 			return nil, err
 		}
-		if !withinStartedRange(at, q.StartedAfter, q.StartedBefore) {
+		if !WithinStartedRange(at, q.StartedAfter, q.StartedBefore) {
 			continue
 		}
 		matched = append(matched, matchedNote{id: id, conv: conv, summary: summary})
@@ -690,7 +691,7 @@ func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) (
 		if err != nil {
 			return nil, err
 		}
-		if !withinStartedRange(at, q.StartedAfter, q.StartedBefore) {
+		if !WithinStartedRange(at, q.StartedAfter, q.StartedBefore) {
 			continue
 		}
 		var globalStart *int64

@@ -922,6 +922,118 @@
           ]
         }
       ]
+    },
+    {
+      "conversation_id": "conv-relocation",
+      "description": "搬家计划：语义检索用例（查询与金证据共享二字词但无子串重叠）",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-seg-relocation-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-relocation",
+            "conversation_id": "conv-relocation",
+            "segment_id": "seg-relocation",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/conv-relocation"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "我们打算搬去珠海定居",
+              "local_start_ms": 0,
+              "local_end_ms": 4000,
+              "global_start_ms": 0,
+              "global_end_ms": 4000,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "宿舍的事情下周给答复",
+              "local_start_ms": 4000,
+              "local_end_ms": 8000,
+              "global_start_ms": 4000,
+              "global_end_ms": 8000,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-ambient-mix",
+      "description": "环境音混入：语音助手指令与自助点餐广播必须与对话内容隔离",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-eval",
+            "provider_request_id": "req-seg-ambient-rev-1",
+            "device_id": "device-eval-1",
+            "recording_id": "rec-ambient-mix",
+            "conversation_id": "conv-ambient-mix",
+            "segment_id": "seg-ambient",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 16000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://eval/conv-ambient-mix"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "小爱同学，打开空调",
+              "local_start_ms": 0,
+              "local_end_ms": 4000,
+              "global_start_ms": 0,
+              "global_end_ms": 4000,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-2",
+              "original_index": 2,
+              "text": "欢迎光临，请扫码点餐",
+              "local_start_ms": 4000,
+              "local_end_ms": 8000,
+              "global_start_ms": 4000,
+              "global_end_ms": 8000,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            },
+            {
+              "id": "utt-3",
+              "original_index": 3,
+              "text": "空调遥控器在抽屉里，昨天说过",
+              "local_start_ms": 8000,
+              "local_end_ms": 12000,
+              "global_start_ms": 8000,
+              "global_end_ms": 12000,
+              "speaker_scoped_id": "spk:device-eval-1:1"
+            },
+            {
+              "id": "utt-4",
+              "original_index": 4,
+              "text": "会上说了，投影仪要换成激光的",
+              "local_start_ms": 12000,
+              "local_end_ms": 16000,
+              "global_start_ms": 12000,
+              "global_end_ms": 16000,
+              "speaker_scoped_id": "spk:device-eval-1:2"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

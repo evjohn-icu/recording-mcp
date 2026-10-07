@@ -111,6 +111,13 @@ const activeHeadIndexDDL = `CREATE UNIQUE INDEX IF NOT EXISTS source_attachments
 const turnClassesDDL = `CREATE TABLE IF NOT EXISTS turn_classes(turn_id TEXT PRIMARY KEY REFERENCES turns(id), class TEXT NOT NULL CHECK(class IN ('speech','ambient')), subtype TEXT NOT NULL DEFAULT '', method TEXT NOT NULL CHECK(method IN ('rule','model','derived')), created_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS turn_classes_class ON turn_classes(class);`
 
+// memoryEmbeddingsDDL stores one embedding vector per derived artifact and
+// provider/model pair. Rows are keyed by content hash so re-indexing an
+// unchanged artifact is a no-op; rows for superseded or ambient artifacts are
+// kept (the query path filters them) so the isolation invariants stay testable.
+const memoryEmbeddingsDDL = `CREATE TABLE IF NOT EXISTS memory_embeddings(kind TEXT NOT NULL CHECK(kind IN ('note','turn')), artifact_id TEXT NOT NULL, conversation_id TEXT NOT NULL, content_sha256 TEXT NOT NULL, provider_id TEXT NOT NULL, model_id TEXT NOT NULL, dims INTEGER NOT NULL, vector BLOB NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(kind, artifact_id, provider_id, model_id));
+CREATE INDEX IF NOT EXISTS memory_embeddings_conv ON memory_embeddings(conversation_id, kind);`
+
 type migration struct {
 	version    int
 	name       string
@@ -144,6 +151,7 @@ var migrations = []migration{
 	{version: 9, name: "speaker-binding", statements: statements(speakerBindingDDL)},
 	{version: 10, name: "active-head-invariant", statements: statements(activeHeadIndexDDL)},
 	{version: 11, name: "turn-classes", statements: statements(turnClassesDDL)},
+	{version: 12, name: "memory-embeddings", statements: statements(memoryEmbeddingsDDL)},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`

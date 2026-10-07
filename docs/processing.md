@@ -194,6 +194,14 @@ transcript 被 supersede 后,系统对“历史”与“当前”做如下划分
 
 MCP 面已暴露（`context-memory`）：写入 `propose_speaker_binding` / `review_speaker_binding`，只读 `get_speaker_projection` / `list_speaker_bindings`；current 检索返回的原话条目带 `speaker_person_id`（confirmed 投影解析结果，`turns.speaker_entity_id` 始终保持 NULL——身份永远是投影，不是行内实名）。
 
+### 语义索引（migration v12：`memory_embeddings`）
+
+混合检索的语义分支由离线索引支撑：`bin/context-embed --db ... --provider hash`（默认）或 `--provider openai` 接入 OpenAI 兼容嵌入端点，把当前非 stale 的笔记与轮次嵌入到 `memory_embeddings`（主键 `(kind, artifact_id, provider_id, model_id)`，`content_sha256` 使重复索引幂等）。当前环境音工件也会被索引——隔离不变量由查询路径执行（见 `internal/semantic` 的候选 SQL：轮次过 `CurrentTurnPredicate` + ambient 排除，笔记过 `NoteStalePredicate` + 主证据 ambient 排除），这样"语义检索绝不复活 stale/ambient"是可测试的性质。工件被删除后用 `--prune` 清理孤儿行。提供方边界在 `internal/semantic.Provider`，检索边界在 `SemanticRetriever`（空索引或未配置时优雅降级，绝不让检索失败）。
+
+### 读取时上下文投影（internal/projection）
+
+`get_current_context` 在读取时从当前证据推导 person / topic / commitment / preference / event 对象（状态 current / superseded / unresolved，`conflicting` 保留），带证据轮次、来源与冲突对；无投影表、无 LLM、确定性输出。规则、否定线索清单与"明确不投影的内容"见 [context-projection.md](context-projection.md)。评估用 `fixtures/eval/projection.json` 与 `internal/eval` 的投影指标（`evidence_valid`、`stale_not_current`、`superseded_not_current`、`conflicting_honest`、`deterministic`）守护。
+
 ## 状态机与租约语义
 
 ```text

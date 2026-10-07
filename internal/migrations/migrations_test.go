@@ -68,8 +68,8 @@ func TestApplyFreshDatabase(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 11 {
-		t.Fatalf("Version() = %d, want 11", got)
+	if got := mustVersion(t, ctx, db); got != 12 {
+		t.Fatalf("Version() = %d, want 12", got)
 	}
 	names := tableNames(t, db)
 	for _, want := range []string{
@@ -84,6 +84,7 @@ func TestApplyFreshDatabase(t *testing.T) {
 		"annotation_history",
 		"derived_artifacts", "derived_artifact_sources",
 		"speaker_bindings", "speaker_binding_events",
+		"memory_embeddings",
 	} {
 		if !names[want] {
 			t.Errorf("missing table %q", want)
@@ -105,7 +106,7 @@ func TestApplyFreshDatabase(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"turns_conv_order", "notes_conv", "source_attachments_conversation", "processing_jobs_claim", "memory_candidates_conv", "memory_links_from", "memory_links_to", "derived_artifact_conv", "derived_artifact_sources_attachment", "source_attachments_active_head"} {
+	for _, want := range []string{"turns_conv_order", "notes_conv", "source_attachments_conversation", "processing_jobs_claim", "memory_candidates_conv", "memory_links_from", "memory_links_to", "derived_artifact_conv", "derived_artifact_sources_attachment", "source_attachments_active_head", "memory_embeddings_conv"} {
 		if !indexes[want] {
 			t.Errorf("missing index %q", want)
 		}
@@ -121,15 +122,15 @@ func TestApplyIdempotent(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("second Apply: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 11 {
-		t.Fatalf("Version() = %d, want 11 after repeated Apply", got)
+	if got := mustVersion(t, ctx, db); got != 12 {
+		t.Fatalf("Version() = %d, want 12 after repeated Apply", got)
 	}
 	var applied int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&applied); err != nil {
 		t.Fatal(err)
 	}
-	if applied != 11 {
-		t.Fatalf("schema_migrations rows = %d, want 11", applied)
+	if applied != 12 {
+		t.Fatalf("schema_migrations rows = %d, want 12", applied)
 	}
 }
 
@@ -149,8 +150,8 @@ func TestApplyOnLegacyDatabasePreservesData(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply on legacy database: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 11 {
-		t.Fatalf("Version() = %d, want 11", got)
+	if got := mustVersion(t, ctx, db); got != 12 {
+		t.Fatalf("Version() = %d, want 12", got)
 	}
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM conversations WHERE id='conv-1'`).Scan(&count); err != nil {
@@ -175,7 +176,7 @@ func TestApplyOnSingleVersionDatabaseOnlyAppliesLater(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (3,4,5,6,7,8,9,10,11)`); err != nil {
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (3,4,5,6,7,8,9,10,11,12)`); err != nil {
 		t.Fatal(err)
 	}
 	// Re-running Apply must re-create the (dropped) v3..v11 objects only.
@@ -203,8 +204,8 @@ func TestApplyOnSingleVersionDatabaseOnlyAppliesLater(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("re-Apply after partial rollback: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 11 {
-		t.Fatalf("Version() = %d, want 11", got)
+	if got := mustVersion(t, ctx, db); got != 12 {
+		t.Fatalf("Version() = %d, want 12", got)
 	}
 	names := tableNames(t, db)
 	for _, want := range []string{"decision_runs", "decision_answers", "memory_candidates", "publication_runs", "analysis_coverage", "memory_links", "annotation_history", "derived_artifacts", "derived_artifact_sources", "speaker_bindings", "speaker_binding_events", "turn_classes"} {
@@ -228,8 +229,8 @@ func TestApplySucceedsWithPreexistingLazyAnnotationHistory(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply with preexisting annotation_history: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 11 {
-		t.Fatalf("Version() = %d, want 11", got)
+	if got := mustVersion(t, ctx, db); got != 12 {
+		t.Fatalf("Version() = %d, want 12", got)
 	}
 	// annotation_history references conversations, so seed the parent row the
 	// adopted table points at; without it the foreign key rejects the insert
@@ -274,9 +275,10 @@ func TestDerivedArtifactBackfillMarksSupersededEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Roll back only the derived-artifact migration so the backfill runs over
-	// pre-existing rows, like a database upgraded from an older build. v11 is
-	// included so the ledger maximum drops below v8; re-running it is a no-op.
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (8,9,10,11)`); err != nil {
+	// pre-existing rows, like a database upgraded from an older build. v11 and
+	// v12 are included so the ledger maximum drops below v8; re-running them is
+	// a no-op.
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (8,9,10,11,12)`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`DROP TABLE derived_artifact_sources`); err != nil {
@@ -306,8 +308,8 @@ func TestDerivedArtifactBackfillMarksSupersededEvidence(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("re-Apply for backfill: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 11 {
-		t.Fatalf("Version() = %d, want 11", got)
+	if got := mustVersion(t, ctx, db); got != 12 {
+		t.Fatalf("Version() = %d, want 12", got)
 	}
 	for _, want := range []struct {
 		kind, id string

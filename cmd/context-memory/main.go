@@ -21,6 +21,8 @@ import (
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/pipeline"
 	"recordingmcp/internal/plane"
+	"recordingmcp/internal/projection"
+	"recordingmcp/internal/semantic"
 )
 
 type ConversationInput struct {
@@ -134,6 +136,17 @@ type SearchMemoryInput struct {
 	IncludeStale   bool   `json:"include_stale,omitempty"`
 	IncludeAmbient bool   `json:"include_ambient,omitempty"`
 }
+type CurrentContextInput struct {
+	Query          string   `json:"query,omitempty"`
+	PersonID       string   `json:"person_id,omitempty"`
+	TopicID        string   `json:"topic_id,omitempty"`
+	ConversationID string   `json:"conversation_id,omitempty"`
+	Kinds          []string `json:"kinds,omitempty"`
+	StartedAfter   string   `json:"started_after,omitempty"`
+	StartedBefore  string   `json:"started_before,omitempty"`
+	Audit          bool     `json:"audit,omitempty"`
+	Limit          int      `json:"limit,omitempty"`
+}
 type ListMemoryLinksInput struct {
 	Status  string `json:"status,omitempty"`
 	TopicID string `json:"topic_id,omitempty"`
@@ -219,7 +232,7 @@ func parseRFC3339(label, value string) (*time.Time, error) {
 	return &t, nil
 }
 
-func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker) *mcp.Server {
+func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker, semantic semantic.SemanticRetriever) *mcp.Server {
 	no := false
 	s := mcp.NewServer(&mcp.Implementation{Name: "context-memory-experimental", Version: "0.1-experimental"}, &mcp.ServerOptions{Instructions: "Experimental local conversation memory for private audio transcripts. Results preserve source evidence and are not verified facts. Speaker labels are recording-scoped and never identify real people. No audio is downloaded or processed by this server."})
 	read := func(name, desc string) *mcp.Tool {
@@ -332,9 +345,75 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker)
 		r, e := store.SearchMemory(ctx, memory.MemorySearch{Text: in.Text, Scope: in.Scope, Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, StartedAfter: after, StartedBefore: before, IncludeStale: in.IncludeStale, IncludeAmbient: in.IncludeAmbient})
 		return nil, r, e
 	})
-	mcp.AddTool(s, read("build_context", "实验性：为任务组装带预算与来源的上下文包（items / evidence / coverage / gaps / trace）。默认排除已失效的派生记忆；未配置决策引擎时不做重排并返回 degraded=true，确定性结果仍完整返回。"), func(ctx context.Context, _ *mcp.CallToolRequest, in contextbuild.Request) (*mcp.CallToolResult, contextbuild.Package, error) {
-		pkg, e := contextbuild.Build(ctx, store, store.DB(), rerank, in)
+	mcp.AddTool(s, read("build_context", "实验性：为任务组装带预算与来源的上下文包（items / evidence / coverage / gaps / trace / ranking）。默认排除已失效的派生记忆；mode 可选 hybrid（默认，含语义召回）或 lexical（仅字面）；未配置决策引擎时不做重排并返回 degraded=true，确定性结果仍完整返回；未配置或未索引语义后端时同样降级并在 gaps 中说明。"), func(ctx context.Context, _ *mcp.CallToolRequest, in contextbuild.Request) (*mcp.CallToolResult, contextbuild.Package, error) {
+		pkg, e := contextbuild.Build(ctx, contextbuild.Deps{Store: store, DB: store.DB(), Reranker: rerank, Semantic: semantic}, in)
 		return nil, pkg, e
+	})
+	mcp.AddTool(s, read("get_current_context", "实验性：读取当前上下文投影（person / topic / commitment / preference / event 对象），带证据、来源、状态（current/superseded/unresolved）与冲突。全部由当前（非 stale、非 ambient）证据在读取时推导，可重复构建。提供 query 时先做一次小规模检索，把命中会话/主题作为硬性范围。"), func(ctx context.Context, _ *mcp.CallToolRequest, in CurrentContextInput) (*mcp.CallToolResult, projection.Result, error) {
+		after, e := parseRFC3339("started_after", in.StartedAfter)
+		if e != nil {
+			return nil, projection.Result{}, e
+		}
+		before, e := parseRFC3339("started_before", in.StartedBefore)
+		if e != nil {
+			return nil, projection.Result{}, e
+		}
+		req := projection.Request{
+			StartedAfter:  after,
+			StartedBefore: before,
+			Audit:         in.Audit,
+			Limit:         in.Limit,
+		}
+		if in.PersonID != "" {
+			req.PersonIDs = []string{in.PersonID}
+		}
+		if in.TopicID != "" {
+			req.TopicIDs = []string{in.TopicID}
+		}
+		if in.ConversationID != "" {
+			req.ConversationIDs = []string{in.ConversationID}
+		}
+		known := map[string]bool{}
+		for _, k := range []projection.Kind{projection.KindPerson, projection.KindTopic, projection.KindCommitment, projection.KindPreference, projection.KindEvent} {
+			known[string(k)] = true
+		}
+		for _, k := range in.Kinds {
+			if !known[strings.TrimSpace(k)] {
+				return nil, projection.Result{}, fmt.Errorf("kinds must be person, topic, commitment, preference or event")
+			}
+			req.Kinds = append(req.Kinds, projection.Kind(strings.TrimSpace(k)))
+		}
+		// With a query, one small hybrid retrieval narrows the projection to
+		// the conversations/topics the query actually reaches. An unavailable
+		// semantic backend only makes this path lexical; the projection itself
+		// still runs.
+		if strings.TrimSpace(in.Query) != "" {
+			pkg, e := contextbuild.Build(ctx, contextbuild.Deps{Store: store, DB: store.DB(), Reranker: rerank, Semantic: semantic}, contextbuild.Request{
+				Purpose:  "current_context",
+				Query:    in.Query,
+				MaxItems: 12,
+				MaxBytes: 16000,
+			})
+			if e != nil {
+				return nil, projection.Result{}, e
+			}
+			if len(pkg.Coverage.Conversations) == 0 && len(pkg.Coverage.TopicIDs) == 0 {
+				result, e := projection.Build(ctx, store, store.DB(), req)
+				if e != nil {
+					return nil, projection.Result{}, e
+				}
+				result.Unresolved = append(result.Unresolved, projection.Unresolved{
+					Subject: in.Query,
+					Reason:  "no_retrieval_hits",
+					Detail:  "the retrieval pass matched no current memory; the projection runs unconstrained and reports why",
+				})
+				return nil, result, nil
+			}
+			req.ConversationIDs = pkg.Coverage.Conversations
+			req.TopicIDs = pkg.Coverage.TopicIDs
+		}
+		result, e := projection.Build(ctx, store, store.DB(), req)
+		return nil, result, e
 	})
 	mcp.AddTool(s, read("list_memory_links", "列出话题之间的记忆关联（proposed 建议 / confirmed 已确认 / rejected 已拒绝），可按状态与话题过滤；返回端点标题、理由、证据轮次与置信度，用于人工复核和避免重复提议。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ListMemoryLinksInput) (*mcp.CallToolResult, MemoryLinkList, error) {
 		switch in.Status {
@@ -460,6 +539,11 @@ func main() {
 	readOnly := flag.Bool("read-only", false, "register only the read tools; ingest_transcript, apply_annotations, review_memory_link, propose_speaker_binding and review_speaker_binding are not exposed")
 	decisionURL := flag.String("decision-url", "", "optional Decision engine endpoint used to rerank build_context items (empty disables reranking)")
 	decisionModel := flag.String("decision-model", "jev-style-2b-v2", "model name sent to the Decision engine for build_context reranking")
+	semanticProvider := flag.String("semantic-provider", "hash", "semantic recall backend: off, hash (offline deterministic embedder) or openai")
+	semanticDims := flag.Int("semantic-dims", semantic.DefaultHashDims, "embedding dimensions (hash provider; openai provider validates the endpoint against it)")
+	semanticEndpoint := flag.String("semantic-endpoint", "", "OpenAI-compatible embeddings endpoint (required when --semantic-provider=openai)")
+	semanticModel := flag.String("semantic-model", "", "embedding model name (required when --semantic-provider=openai)")
+	semanticKeyEnv := flag.String("semantic-key-env", "", "environment variable holding the embeddings API key (openai only)")
 	flag.Parse()
 	if flag.NArg() != 0 {
 		log.Fatalf("unexpected arguments: %v", flag.Args())
@@ -488,7 +572,36 @@ func main() {
 	if strings.TrimSpace(*decisionURL) != "" {
 		rerank = &contextbuild.DecisionReranker{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*decisionURL), Model: *decisionModel}}
 	}
-	srv := newServer(store, *readOnly, rerank)
+	var semanticRetriever semantic.SemanticRetriever
+	switch strings.ToLower(strings.TrimSpace(*semanticProvider)) {
+	case "", "hash":
+		semanticRetriever = &semantic.SQLiteRetriever{DB: store.DB(), Provider: semantic.NewHashProvider(*semanticDims)}
+	case "openai":
+		endpoint := strings.TrimSpace(*semanticEndpoint)
+		model := strings.TrimSpace(*semanticModel)
+		if endpoint == "" || model == "" {
+			log.Fatal("--semantic-endpoint and --semantic-model are required when --semantic-provider=openai")
+		}
+		if *semanticDims <= 0 {
+			log.Fatal("--semantic-dims must be positive")
+		}
+		var key string
+		if env := strings.TrimSpace(*semanticKeyEnv); env != "" {
+			key = strings.TrimSpace(os.Getenv(env))
+			if key == "" {
+				log.Fatalf("environment variable %s is empty", env)
+			}
+		}
+		// Dimensions comes from --semantic-dims (not from the first response)
+		// so the memory_embeddings rows are keyed by the exact dims the server
+		// filters on; a mismatched endpoint fails loudly at embed time instead
+		// of silently poisoning the index.
+		semanticRetriever = &semantic.SQLiteRetriever{DB: store.DB(), Provider: semantic.OpenAICompatProvider{Endpoint: endpoint, APIKey: key, ModelName: model, Dimensions: *semanticDims}}
+	default:
+		// "off" and anything else: nil retriever, build_context and
+		// get_current_context degrade to lexical retrieval and record why.
+	}
+	srv := newServer(store, *readOnly, rerank, semanticRetriever)
 	mcpserver.Register(srv, events, nil, *readOnly)
 	if e = srv.Run(ctx, &mcp.StdioTransport{}); e != nil && ctx.Err() == nil {
 		log.Fatal(e)

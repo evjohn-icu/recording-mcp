@@ -10,6 +10,7 @@ Context Layer 开发计划的 E 切片是“关联与失效”。当前先落地
 2. **产出提议 JSON**：只在有真实原话证据时写出一个提议文件（模式见下文“提议 JSON”）。可直接使用的策展人提示词见 [curator-prompt.md](curator-prompt.md)。
 3. **校验与写入**：运行 `context-associate`，程序解析提议并执行 `ValidateTopicLinks` 校验；非 `--dry-run` 时通过校验的条目由 `InsertLinks` 写入 `memory_links`，`status=proposed`。
 4. **不自动合并**：校验只是挡住证据不足或字段非法的条目，通过校验也仅代表“形式合格”，语义是否成立仍需人工确认。任何条目都不会触发话题合并。
+5. **确认后的检索作用**：人工 confirm 的关联（且证据未失效）会作为混合检索的一个排序分支参与 `build_context` 组装——被关联话题的条目以 `retrieval_sources:["confirmed_link"]` 进入结果并携带 `retrieval_link_ids`；proposed / rejected 关联仍然不参与任何检索。
 
 ## 数据表 memory_links
 
@@ -127,7 +128,7 @@ accepted=1 rejected=1 written=1
 
 - 只允许上述迁移。重复执行同一动作（例如对已确认的关联再次 `confirm`）是幂等的空操作，返回当前状态；已拒绝的关联不能再 `confirm`，错误信息会指明当前状态。
 - 行永不删除：拒绝只是状态标记，保留证据与理由供审计；`reopen` 把结论退回待复核，而不是抹掉记录（撤销一次错误的确认用 `reject` 或 `reopen`）。
-- 确认不等于合并：当前没有任何下游视图消费 `confirmed`，话题合并、跨话题层级视图仍未实现。
+- 确认不等于合并：确认不会合并话题，也不改写任何行；它的下游作用是检索——confirmed 且未失效的关联作为 `build_context` 混合检索的一个排序分支（`retrieval_sources:["confirmed_link"]`），话题合并与跨话题层级视图仍未实现。
 
 ## 用 pi 运行一轮策展（实测配方）
 
@@ -180,5 +181,5 @@ publish 提交后 `context-worker` 会自动入队一个 curate 任务（幂等�
 
 ## 后续（尚未实现）
 
-- **关联的下游使用**：确认后的话题合并、跨话题层级视图等尚未实现；`confirmed` 目前只是状态标记。
+- **关联的下游使用**：确认后的话题合并、跨话题层级视图等尚未实现；`confirmed` 目前的一个下游消费方是混合检索的排序分支（见上文"工作流"），话题合并仍待实现。
 - **复核界面**：复核只能通过 MCP 工具完成，尚未提供独立界面或批量操作。

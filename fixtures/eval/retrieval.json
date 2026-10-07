@@ -1,0 +1,49 @@
+{
+  "description": "混合检索评估问题：语义可达性、环境音隔离、作用域硬过滤与过期证据排除。金证据按人工轮次引用书写。",
+  "questions": [
+    {
+      "id": "reloc-semantic-only",
+      "query": "搬迁珠海定居计划",
+      "purpose": "hybrid_semantic_recall",
+      "gold_turn_refs": [
+        {"segment_id": "seg-relocation", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "notes": "查询与金证据共享 珠海/定居 二字词但无子串重叠：字面召回为空，语义分支必须命中。"
+    },
+    {
+      "id": "ambient-isolation",
+      "query": "空调",
+      "purpose": "ambient_exclusion",
+      "gold_turn_refs": [
+        {"segment_id": "seg-ambient", "transcript_revision": "rev-1", "turn_id": "utt-3"}
+      ],
+      "expect_ambient_excluded": true,
+      "notes": "查询同时命中环境音轮次 utt-1（小爱同学）与对话轮次 utt-3；utt-1/utt-2 不得出现在任何结果里。"
+    },
+    {
+      "id": "venue-scoped",
+      "query": "彩排场地",
+      "purpose": "scope_hard_filters",
+      "gold_turn_refs": [
+        {"segment_id": "seg-venue-a", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "scope": {
+        "conversation_id": "conv-venue-rehearsal",
+        "topic_ref": {"segment_id": "seg-venue-a", "transcript_revision": "rev-1", "turn_id": "utt-1"},
+        "started_after": "2026-02-01T00:00:00+08:00",
+        "started_before": "2026-04-01T00:00:00+08:00"
+      },
+      "notes": "会话 + 主题 + 时间三重硬范围；任何越界条目都计入 scope_escape_count。"
+    },
+    {
+      "id": "budget-supersede",
+      "query": "预算还没批",
+      "purpose": "stale_exclusion",
+      "gold_turn_refs": [
+        {"segment_id": "seg-budget", "transcript_revision": "rev-2", "turn_id": "utt-1"}
+      ],
+      "expect_stale_excluded": true,
+      "notes": "v1 已被 v2 取代；rev-1 的『下周三就能打款』绝不能作为当前结果出现。"
+    }
+  ]
+}

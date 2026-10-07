@@ -24,12 +24,15 @@ type requestScope struct {
 	after          *time.Time
 	before         *time.Time
 
+	// store serves the shared conversation-start lookup.
+	store *memory.Store
+
 	// startedAt memoizes conversation -> recording start so time scoping
 	// costs one query per covered conversation.
 	startedAt map[string]*time.Time
 }
 
-func newRequestScope(convID string, topicIDs []string, after, before *time.Time) *requestScope {
+func newRequestScope(store *memory.Store, convID string, topicIDs []string, after, before *time.Time) *requestScope {
 	set := map[string]bool{}
 	for _, tid := range topicIDs {
 		set[tid] = true
@@ -42,6 +45,7 @@ func newRequestScope(convID string, topicIDs []string, after, before *time.Time)
 		topicIDs:       set,
 		after:          after,
 		before:         before,
+		store:          store,
 		startedAt:      map[string]*time.Time{},
 	}
 }
@@ -99,47 +103,19 @@ func (s *requestScope) timeAllows(ctx context.Context, db *sql.DB, conversationI
 	if err != nil {
 		return false, err
 	}
-	return withinStartedRange(started, s.after, s.before), nil
+	return memory.WithinStartedRange(started, s.after, s.before), nil
 }
 
 // conversationStartedAt reads (and memoizes) the recording start of one
-// conversation, matching the join the retrieval layer uses.
+// conversation through the store's shared lookup.
 func (s *requestScope) conversationStartedAt(ctx context.Context, db *sql.DB, conversationID string) (*time.Time, error) {
 	if started, ok := s.startedAt[conversationID]; ok {
 		return started, nil
 	}
-	var raw sql.NullString
-	if err := db.QueryRowContext(ctx,
-		`SELECT r.recording_started_at FROM conversations c LEFT JOIN recordings r ON r.id=c.recording_id WHERE c.id=?`,
-		conversationID,
-	).Scan(&raw); err != nil {
+	started, err := s.store.ConversationStartedAt(ctx, conversationID)
+	if err != nil {
 		return nil, err
-	}
-	var started *time.Time
-	if raw.Valid && raw.String != "" {
-		if t, err := time.Parse(time.RFC3339, raw.String); err == nil {
-			started = &t
-		}
 	}
 	s.startedAt[conversationID] = started
 	return started, nil
-}
-
-// withinStartedRange mirrors the retrieval layer's time semantics: no bounds
-// means everything passes; bounds exclude unknown start times and anything
-// outside [after, before].
-func withinStartedRange(started *time.Time, after, before *time.Time) bool {
-	if after == nil && before == nil {
-		return true
-	}
-	if started == nil {
-		return false
-	}
-	if after != nil && started.Before(*after) {
-		return false
-	}
-	if before != nil && started.After(*before) {
-		return false
-	}
-	return true
 }

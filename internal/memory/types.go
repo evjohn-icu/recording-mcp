@@ -72,32 +72,32 @@ type ImportReport struct {
 	TranscriptVersion         string `json:"transcript_version"`
 }
 type Item struct {
-	ID                 string   `json:"id"`
-	Kind               string   `json:"kind"`
-	ConversationID     string   `json:"conversation_id"`
-	RecordingID        string   `json:"recording_id,omitempty"`
-	Title              string   `json:"title,omitempty"`
-	Summary            string   `json:"summary,omitempty"`
-	TopicIDs           []string `json:"topic_ids,omitempty"`
-	EvidenceTurnIDs    []string `json:"evidence_turn_ids,omitempty"`
-	Content            string   `json:"content,omitempty"`
-	SpeakerScopedID    *string  `json:"speaker_scoped_id,omitempty"`
-	SpeakerEntityID    *string  `json:"speaker_entity_id"`
+	ID              string   `json:"id"`
+	Kind            string   `json:"kind"`
+	ConversationID  string   `json:"conversation_id"`
+	RecordingID     string   `json:"recording_id,omitempty"`
+	Title           string   `json:"title,omitempty"`
+	Summary         string   `json:"summary,omitempty"`
+	TopicIDs        []string `json:"topic_ids,omitempty"`
+	EvidenceTurnIDs []string `json:"evidence_turn_ids,omitempty"`
+	Content         string   `json:"content,omitempty"`
+	SpeakerScopedID *string  `json:"speaker_scoped_id,omitempty"`
+	SpeakerEntityID *string  `json:"speaker_entity_id"`
 	// SpeakerPersonID is the confirmed identity of the turn's speaker label
 	// within its own transcript revision, projected from speaker_bindings at
 	// retrieval time. It is nil for notes and conversations, for turns without
 	// a speaker label or source revision (legacy rows), and for labels whose
 	// binding is still proposed, rejected or revoked. It is never a fabricated
 	// value; turns.speaker_entity_id stays NULL.
-	SpeakerPersonID *string `json:"speaker_person_id,omitempty"`
-	GlobalStartMS      *int64   `json:"global_start_ms"`
-	GlobalEndMS        *int64   `json:"global_end_ms"`
-	SourceSHA256       string   `json:"source_sha256,omitempty"`
-	TurnID             string   `json:"turn_id,omitempty"`
-	TranscriptVersion  string   `json:"transcript_version,omitempty"`
-	ClaimMode          string   `json:"claim_mode,omitempty"`
-	InterpretationNote string   `json:"interpretation_note,omitempty"`
-	AnnotationVersion  string   `json:"annotation_version,omitempty"`
+	SpeakerPersonID    *string `json:"speaker_person_id,omitempty"`
+	GlobalStartMS      *int64  `json:"global_start_ms"`
+	GlobalEndMS        *int64  `json:"global_end_ms"`
+	SourceSHA256       string  `json:"source_sha256,omitempty"`
+	TurnID             string  `json:"turn_id,omitempty"`
+	TranscriptVersion  string  `json:"transcript_version,omitempty"`
+	ClaimMode          string  `json:"claim_mode,omitempty"`
+	InterpretationNote string  `json:"interpretation_note,omitempty"`
+	AnnotationVersion  string  `json:"annotation_version,omitempty"`
 	// Stale reports that the item derives from a superseded transcript
 	// attachment. Legacy items with no attachment rows are never stale.
 	Stale bool `json:"stale,omitempty"`

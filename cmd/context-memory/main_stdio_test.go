@@ -45,8 +45,8 @@ func TestExecutableStdioReadOnlySurface(t *testing.T) {
 		// memory family
 		"query_context", "get_conversation_context", "get_context_item", "list_topics",
 		"get_processing_status", "get_annotation_history", "list_conversations",
-		"get_evidence_context", "search_memory", "build_context", "list_memory_links",
-		"get_speaker_projection", "list_speaker_bindings",
+		"get_evidence_context", "search_memory", "build_context", "get_current_context",
+		"list_memory_links", "get_speaker_projection", "list_speaker_bindings",
 		// event archive family (read tools only)
 		"search_events", "get_timeline", "get_commitments", "get_conversation_events",
 		"get_person_context", "get_current_state",
@@ -127,8 +127,8 @@ func TestExecutableStdioRoundTrip(t *testing.T) {
 	want := []string{
 		"query_context", "get_conversation_context", "get_context_item", "list_topics",
 		"get_processing_status", "get_annotation_history", "list_conversations",
-		"get_evidence_context", "search_memory", "build_context", "list_memory_links",
-		"get_speaker_projection", "list_speaker_bindings",
+		"get_evidence_context", "search_memory", "build_context", "get_current_context",
+		"list_memory_links", "get_speaker_projection", "list_speaker_bindings",
 		"ingest_transcript", "apply_annotations", "review_memory_link",
 		"propose_speaker_binding", "review_speaker_binding",
 		// Event-archive family, co-registered on the same server (phase 1 of

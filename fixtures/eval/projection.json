@@ -1,0 +1,116 @@
+{
+  "description": "上下文投影评估：直接以 SQL 播种笔记（经真实存储路径记录绑定），再对读取时投影的推导规则、状态判定与冲突诚实度打分。证据轮次按人工轮次引用解析到已入库的语料。",
+  "notes": [
+    {
+      "id": "proj-move-1",
+      "conversation_ref": "conv-relocation",
+      "kind": "intention",
+      "summary": "计划搬去珠海定居，下周开始打包",
+      "topic_titles": ["珠海搬家"],
+      "evidence_turn_refs": [
+        {"segment_id": "seg-relocation", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ]
+    },
+    {
+      "id": "proj-move-2",
+      "conversation_ref": "conv-relocation",
+      "kind": "intention",
+      "summary": "暂时不搬珠海了，再等等看",
+      "topic_titles": ["珠海搬家"],
+      "evidence_turn_refs": [
+        {"segment_id": "seg-relocation", "transcript_revision": "rev-1", "turn_id": "utt-2"}
+      ]
+    },
+    {
+      "id": "proj-pref-1",
+      "conversation_ref": "conv-relocation",
+      "kind": "constraint",
+      "summary": "新家必须能养猫",
+      "topic_titles": ["珠海搬家"],
+      "evidence_turn_refs": [
+        {"segment_id": "seg-relocation", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ]
+    },
+    {
+      "id": "proj-event-1",
+      "conversation_ref": "conv-relocation",
+      "kind": "observation",
+      "summary": "宿舍管理员答应了改造申请",
+      "topic_titles": ["珠海搬家"],
+      "evidence_turn_refs": [
+        {"segment_id": "seg-relocation", "transcript_revision": "rev-1", "turn_id": "utt-2"}
+      ]
+    },
+    {
+      "id": "proj-sug-1",
+      "conversation_ref": "conv-relocation",
+      "kind": "suggestion",
+      "summary": "建议先租后买",
+      "topic_titles": ["珠海搬家"],
+      "evidence_turn_refs": [
+        {"segment_id": "seg-relocation", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ]
+    },
+    {
+      "id": "proj-stale-1",
+      "conversation_ref": "conv-relocation",
+      "kind": "intention",
+      "summary": "旧计划：搬去深圳",
+      "topic_titles": ["珠海搬家"],
+      "evidence_turn_refs": [
+        {"segment_id": "seg-relocation", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "stale": true
+    }
+  ],
+  "bindings": [
+    {
+      "conversation_ref": "conv-relocation",
+      "speaker_scoped_id": "spk:device-eval-1:1",
+      "transcript_revision": "rev-1",
+      "person_id": "person:curator",
+      "confirm": true,
+      "evidence_turn_refs": [
+        {"segment_id": "seg-relocation", "transcript_revision": "rev-1", "turn_id": "utt-1"},
+        {"segment_id": "seg-relocation", "transcript_revision": "rev-1", "turn_id": "utt-2"}
+      ]
+    }
+  ],
+  "expectations": [
+    {
+      "kind": "commitment",
+      "subject_note_id": "proj-move-1",
+      "status": "superseded",
+      "conflict_with_note_id": "proj-move-2"
+    },
+    {
+      "kind": "commitment",
+      "subject_note_id": "proj-move-2",
+      "status": "current",
+      "conflict_with_note_id": "proj-move-1"
+    },
+    {
+      "kind": "preference",
+      "subject_note_id": "proj-pref-1",
+      "status": "current"
+    },
+    {
+      "kind": "event",
+      "subject_note_id": "proj-event-1",
+      "status": "current"
+    },
+    {
+      "kind": "person",
+      "person_id": "person:curator",
+      "status": "current"
+    },
+    {
+      "kind": "topic",
+      "subject_topic_title": "珠海搬家",
+      "status": "current"
+    }
+  ],
+  "expect_unprojected": [
+    {"note_id": "proj-sug-1", "reason": "kind_not_projected_in_v0"}
+  ]
+}
