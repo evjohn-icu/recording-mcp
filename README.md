@@ -62,3 +62,7 @@ go build -o bin/recording-mcp ./cmd/server
 ## MCP 客户端配置
 
 可将 [`examples/mcp.json`](examples/mcp.json) 中的 server 项合并到 MCP 客户端配置。示例使用 `/absolute/path/to/recording-mcp` 占位路径，必须替换为实际二进制和数据库的绝对路径后使用。配置只供参考，本项目不会自动修改客户端的 MCP 配置。
+
+## 许可证
+
+本项目以 [GNU AGPL-3.0](LICENSE) 发布（SPDX: `AGPL-3.0-only`）。该协议允许商用；按 §13 网络条款，任何人通过网络（如 SaaS/MCP 服务）使用本软件的修改版本，必须向其使用者提供对应的完整源码。依赖均为宽松协议（BSD-3 / BSD-2），与 AGPL 无冲突。
