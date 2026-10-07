@@ -53,7 +53,7 @@
 | `search_events` | `query`（必填，可为空）、`person`、`start_time`、`end_time`、`min_confidence`、`limit`、`offset` |
 | `get_timeline` | `start_time`、`end_time`（必填）、`entity`、`limit`、`offset` |
 | `get_commitments` | `status`、`person`、`deadline_before`、`time` |
-| `get_conversation_context` | `conversation_id`（必填）、`detail_level` (`summary` 或 `full`) |
+| `get_conversation_events` | `conversation_id`（必填）、`detail_level` (`summary` 或 `full`) |
 | `get_person_context` | `person_id`（必填）、`start_time`、`end_time`、`topics`、`limit`、`offset` |
 | `get_current_state` | `dimensions`、`time` |
 | `ingest_events` | `events`（1–500 个 Event） |

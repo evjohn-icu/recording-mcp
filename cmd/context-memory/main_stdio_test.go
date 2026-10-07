@@ -11,6 +11,65 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// TestExecutableStdioReadOnlySurface runs the real executable with
+// --read-only and asserts the merged surface: the memory read tools plus the
+// event archive's read tools, and no write tool from either family. This is
+// the guarantee the curator relies on when it points its MCP client at a
+// --read-only server.
+func TestExecutableStdioReadOnlySurface(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	tmp := t.TempDir()
+	binary := filepath.Join(tmp, "context-memory")
+	build := exec.CommandContext(ctx, "go", "build", "-o", binary, ".")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build: %v\n%s", err, output)
+	}
+	command := exec.CommandContext(ctx, binary, "--db", filepath.Join(tmp, "ro.db"), "--read-only")
+	client := mcp.NewClient(&mcp.Implementation{Name: "ro-smoke", Version: "1"}, nil)
+	session, err := client.Connect(ctx, &mcp.CommandTransport{Command: command}, nil)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer session.Close()
+
+	listed, err := session.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatalf("list tools: %v", err)
+	}
+	got := map[string]bool{}
+	for _, tool := range listed.Tools {
+		got[tool.Name] = true
+	}
+	want := []string{
+		// memory family
+		"query_context", "get_conversation_context", "get_context_item", "list_topics",
+		"get_processing_status", "get_annotation_history", "list_conversations",
+		"get_evidence_context", "search_memory", "build_context", "list_memory_links",
+		"get_speaker_projection", "list_speaker_bindings",
+		// event archive family (read tools only)
+		"search_events", "get_timeline", "get_commitments", "get_conversation_events",
+		"get_person_context", "get_current_state",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("read-only surface = %v, want %d tools", got, len(want))
+	}
+	for _, name := range want {
+		if !got[name] {
+			t.Fatalf("read-only surface missing %s", name)
+		}
+	}
+	for _, name := range []string{
+		"ingest_transcript", "apply_annotations", "review_memory_link",
+		"propose_speaker_binding", "review_speaker_binding", // memory writes
+		"ingest_events", "record_feedback", // event writes
+	} {
+		if got[name] {
+			t.Fatalf("read-only surface exposes write tool %s", name)
+		}
+	}
+}
+
 // TestExecutableStdioRoundTrip runs the real context-memory executable over
 // real stdio: it ingests one segment through the write tool and reads it back
 // through the current-state tools. The read calls deliberately omit optional
@@ -72,6 +131,11 @@ func TestExecutableStdioRoundTrip(t *testing.T) {
 		"get_speaker_projection", "list_speaker_bindings",
 		"ingest_transcript", "apply_annotations", "review_memory_link",
 		"propose_speaker_binding", "review_speaker_binding",
+		// Event-archive family, co-registered on the same server (phase 1 of
+		// the unification): the prototype's conversation tool was renamed
+		// get_conversation_events so the memory layer keeps the canonical name.
+		"search_events", "get_timeline", "get_commitments", "get_person_context",
+		"get_current_state", "get_conversation_events", "ingest_events", "record_feedback",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("tool surface = %v, want %d tools", got, len(want))

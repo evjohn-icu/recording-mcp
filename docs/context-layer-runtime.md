@@ -1,26 +1,31 @@
 # Context Layer 实验运行链路
 
-本实现接收供应商无关的 ASR 分片结果，先持久保存原话与来源，再接收有原话依据的记忆注释，通过 MCP 提供查询与处理覆盖情况。ASR 调用、声学识别、自动人物匹配和自动语义提取不属于本轮实现。
+本实现接收供应商无关的 ASR 分片结果，先持久保存原话与来源，再接收有原话依据的记忆注释，通过 MCP 提供查询与处理覆盖情况。仓库自带语音接入程序 `bin/asr-ingest`：它直接调用 Agent Plan 的豆包流式语音识别（端点与 Resource-Id 见 [豆包流式语音接入](asr-ingest.md)），把录音切成窗口并发识别，产出下面的已解析响应与来源信封；声学模型训练、自动人物匹配和自动语义提取不属于本轮实现。
 
 ## 从供应商结果到记忆
 
 ```text
-豆包已解析响应 → 豆包 Adapter ─┐
-其他 ASR → 对应 Adapter ─────┼→ asr-input/0.1 → SQLite → MCP
-                            └→ 原始来源附件
+录音 → bin/asr-ingest（plan 流式 ASR）→ 已解析响应 + 来源信封 ─┐
+豆包已解析响应 → 豆包 Adapter ─────────────────────────────┼→ asr-input/0.1 → SQLite → MCP
+其他 ASR → 对应 Adapter ──────────────────────────────────┘
+                                                          └→ 原始来源附件
 ```
 
 其他适配器只需生成 `internal/asrinput` 定义的统一对象。公共记忆代码不导入豆包包，也不读取豆包特有字段。话题、摘要和真实人物身份都不是原话入库的前置条件。
 
 ```sh
 make build
+# 有真实录音时，一条命令走完接入 + 归一化 + 入库：
+./bin/asr-ingest --audio ./recording.m4a --db ./data/context-memory.db \
+  --conversation-id conversation:demo --recording-id recording:demo
+# 或者只用离线链路复现已保存的响应：
 ./bin/adapter-doubao --input ./examples/asr/doubao-final.jsonl \
   --metadata ./examples/asr/doubao-metadata.json --output ./data/normalized.json
 ./bin/import-transcript --db ./data/context-memory.db --input ./data/normalized.json
 ./bin/context-memory --db ./data/context-memory.db
 ```
 
-上述输入是可公开的合成样例；替换为自己的已解析响应与来源信息即可接入。
+上述离线输入是可公开的合成样例；替换为自己的已解析响应与来源信息即可接入。
 
 上游为每个分片提供稳定的设备、录音、分片、请求和版本标识，以及显式 `conversation_id`。当前一条录音只能归属一个会话；不同设备的同名会话不会自动合并。入库返回的会话与录音 ID 是内部稳定 ID，后续查询使用返回值。分片是接收与处理单位，不等于现实中的一次谈话。来源附件保存供应商原始结果，音频哈希与响应内容哈希用途不同，不相互替代。
 

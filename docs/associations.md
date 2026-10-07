@@ -17,10 +17,10 @@ migration `v6 "memory-links"` 创建 `memory_links` 表及 `memory_links_from`�
 
 | 列 | 说明 |
 | --- | --- |
-| `id` | 内容寻址 ID：`"link:"` + `sha256(from_kind|from_id|to_kind|to_id|relation)` 的十六进制前 32 位。同一关联重复提交不会产生重复行，处理结果按下文“重复提议与状态”一节区分。 |
+| `id` | 内容寻址 ID：`"link:"` + `sha256(from_kind|from_id|to_kind|to_id|relation)` 的十六进制前 32 位。无序关系（`same_topic`、`contradiction`）先把两端 ID 按升序排序再入哈希，因此镜像提议得到同一 ID、折叠为同一行；有向关系保留提交顺序。同一关联重复提交不会产生重复行，处理结果按下文“重复提议与状态”一节区分。 |
 | `from_kind` / `from_id` | 关联的源端。当前实现只写 `topic`，`from_id` 即话题 ID。 |
 | `to_kind` / `to_id` | 关联的目标端，同样只写 `topic` 与话题 ID。 |
-| `relation` | 关系类型：`same_topic`、`follow_up`、`contradiction`、`update`。 |
+| `relation` | 关系类型：`same_topic`、`follow_up`、`contradiction`、`update`。`same_topic`、`contradiction` 与端点顺序无关，入库时两端 ID 按升序排列；`follow_up`、`update` 是有向关系（`from` 为较早一轮，`to` 为较晚一轮），保留提交顺序。 |
 | `reason` | 提议理由，去除首尾空白后非空且不超过 500 字符（按 rune 计）。 |
 | `evidence_turn_ids_json` | 支撑该关联的 turn ID 数组（JSON 字符串），每条必须是 `turns` 表中真实存在的轮次。 |
 | `confidence` | 提议方对关联成立的把握，取值范围 [0, 1]。 |
@@ -53,10 +53,12 @@ migration `v6 "memory-links"` 创建 `memory_links` 表及 `memory_links_from`�
 | `kind` | string | 必须为 `topic_link`。 |
 | `from_topic_id` | string | 源话题 ID，必须存在于 `topics` 表。 |
 | `to_topic_id` | string | 目标话题 ID，必须存在于 `topics` 表，且不能与 `from_topic_id` 相同。 |
-| `relation` | string | `same_topic` / `follow_up` / `contradiction` / `update` 之一。 |
+| `relation` | string | `same_topic` / `follow_up` / `contradiction` / `update` 之一。`same_topic`、`contradiction` 无序，两端话题可互换；`follow_up`、`update` 有向，`from_topic_id` 是较早一轮的话题。 |
 | `reason` | string | 提议理由；去除首尾空白后必须非空，且不超过 500 字符（rune）。 |
-| `evidence_turn_ids` | []string | 至少 1 条 turn ID，每条必须存在于 `turns` 表。turn ID 形如 `turn:` 加十六进制哈希（例如 `turn:3f1a...`），以记忆库返回的原值为准。 |
+| `evidence_turn_ids` | []string | 至少 1 条、至多 100 条 turn ID，每条必须存在于 `turns` 表。turn ID 形如 `turn:` 加十六进制哈希（例如 `turn:3f1a...`），以记忆库返回的原值为准。 |
 | `confidence` | number | 取值范围 [0, 1]。 |
+
+输入整体也有上限，超出即整份文件拒绝（`DecodeProposalFile` 失败）：必须是常规文件且为合法 UTF-8（FIFO 等特殊文件直接拒绝），文件不超过 4 MiB（读取时同步限量，不信任 stat 快照），`proposals` 不超过 500 条。
 
 ## 校验规则
 
@@ -69,12 +71,12 @@ migration `v6 "memory-links"` 创建 `memory_links` 表及 `memory_links_from`�
 | 非自关联 | `from_topic_id` 与 `to_topic_id` 不能相同。 |
 | 关系类型 | `relation` 必须是四种枚举值之一。 |
 | 理由 | 去除首尾空白后非空，且不超过 500 字符（rune）。 |
-| 证据 | `evidence_turn_ids` 至少 1 条，且每条都必须存在于 `turns` 表。 |
+| 证据 | `evidence_turn_ids` 至少 1 条、至多 100 条，且每条都必须存在于 `turns` 表。 |
 | 置信度 | `confidence` 必须在 [0, 1] 范围内。 |
 
 ## 重复提议与状态
 
-`memory_links` 的行由 `(from, to, relation)` 决定，因此重新提议同一对话题不会新建行，也不会静默丢弃。`context-associate` 对每条通过的提议报告一个处理结果：
+`memory_links` 的行由 `(from, to, relation)` 决定，因此重新提议同一对话题不会新建行，也不会静默丢弃。对无序关系（`same_topic`、`contradiction`），两端互换的镜像提议视为同一关联，折叠进同一行。折叠是懒执行的：只有在规范序那行尚不存在、而反序旧行的原始 ID 被命中时，才把它原地改写为规范 ID/端点；若某个无序关系的正反两行都已存在（本次变更之前写入的镜像重复），规范序查找会直接命中，反序那行不会被自动合并，需要一次性人工清理。`context-associate` 对每条通过的提议报告一个处理结果：
 
 | 现有行 | 处理 |
 | --- | --- |

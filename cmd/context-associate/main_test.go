@@ -276,3 +276,28 @@ func TestRunReportsReproposalOutcomes(t *testing.T) {
 		t.Fatalf("rejected link changed: %+v %v", after, err)
 	}
 }
+
+// TestRunFoldsReversedSymmetricProposals folds mirrored same_topic proposals
+// onto one row: both pass validation, only one is written.
+func TestRunFoldsReversedSymmetricProposals(t *testing.T) {
+	dbPath := seededDBPath(t)
+	path := writeProposals(t, `{"proposals":[
+		{"kind":"topic_link","from_topic_id":"topic:a","to_topic_id":"topic:b","relation":"same_topic","reason":"both turns cover one deliverable","evidence_turn_ids":["turn:1"],"confidence":0.8},
+		{"kind":"topic_link","from_topic_id":"topic:b","to_topic_id":"topic:a","relation":"same_topic","reason":"both turns cover one deliverable","evidence_turn_ids":["turn:1"],"confidence":0.8}
+	]}`)
+
+	var out, errOut bytes.Buffer
+	if err := run([]string{"--db", dbPath, "--input", path, "--model", "curator"}, &out, &errOut); err != nil {
+		t.Fatalf("run: %v (stderr %q)", err, errOut.String())
+	}
+	if !strings.Contains(out.String(), "accepted=2 rejected=0 written=1") {
+		t.Fatalf("stdout: %q, want accepted=2 rejected=0 written=1", out.String())
+	}
+	links, err := pipeline.ListLinks(context.Background(), openReadDB(t, dbPath), pipeline.LinkFilter{})
+	if err != nil || len(links) != 1 {
+		t.Fatalf("stored links = %+v, %v; want one row", links, err)
+	}
+	if links[0].FromID != "topic:a" || links[0].ToID != "topic:b" {
+		t.Errorf("endpoints = %s -> %s, want canonical order", links[0].FromID, links[0].ToID)
+	}
+}

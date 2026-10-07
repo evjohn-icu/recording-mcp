@@ -46,6 +46,8 @@
 
 `context-worker` 通过 `--generator synthetic|openai`（默认 `synthetic`）选择；`openai` 模式需配合 `--generator-url`（端点地址），API key 从 `--generator-key-env` 指定的环境变量读取（默认 `GENERATOR_API_KEY`），`--generator-model` 指定模型名（默认 `glm-5.3-flash`）。
 
+本机统一走 **Agent Plan** 地址 `https://ark.cn-beijing.volces.com/api/plan/v3/chat/completions`（key 放 `VOLC_API_KEY`；`glm-5.3-flash`、`deepseek-v4.1-flash` 实测可用，`doubao-seed-2.0-mini` 亦可用但偶发超时）。不要用 `https://ark.cn-beijing.volces.com/api/v3`——那是按量计费入口；plan/coding 是订阅制路由。
+
 ### 候选校验与入库（internal/pipeline）
 
 每个窗口生成后立即校验，规则：
@@ -74,10 +76,12 @@
 
 `CurateHandler{DB, DBPath, Command, Timeout, Model, ProcessorVersion}` 执行一次策展：
 
-1. `Command` 为空时任务以 `curate:<version>+skipped:no-command` 成功结束，不写任何记录——未配置策展的部署不会陷入重试风暴，任务记录本身说明原因。
-2. 否则在临时目录里以 `sh -c` 运行命令，并注入环境变量：`CONTEXT_DB`（数据库绝对路径）、`CONTEXT_PROPOSALS`（命令必须写入的提议文件路径）、`CONTEXT_CURATE_CONVERSATION`、`CONTEXT_CURATE_VERSION`。curator 是外部 agent：它只通过 MCP 读记忆库，`CONTEXT_DB` 仅供其 MCP 客户端指向同一个库，校验与写入仍在本进程完成，agent 无法绕过证据规则。命令输出（合计上限 4 KiB）只用于错误信息。
-3. 命令失败、超时（`--curator-timeout`，默认 15 分钟）、没有写出提议文件或 JSON 非法，都作为可重试错误交回队列。
-4. 读到提议文件后依次调用 `DecodeProposalFile`（拒绝未知字段与多余内容）、`ValidateTopicLinks`、`InsertLinks`。结果引用形如 `curate:<version>+proposals:<通过数>+rejected:<被拒数>+written:<实际写入行数>`；`written` 只统计新建或刷新的行，重放同一提议为 0，被拒绝过的行保持原判不动。
+1. payload 缺少 `conversation_id` 或 `annotation_version`、或版本带前后空白时任务直接报错——publish 入队的 payload 总是携带 `auto-<hash>` 版本，这类值只能来自手工构造的坏任务。
+2. `Command` 为空时任务以 `curate:<version>+skipped:no-command` 成功结束，不写任何记录、不读数据库——未配置策展的部署不会陷入重试风暴，任务记录本身说明原因。
+3. 新鲜度检查（在 no-command 之后、运行 curator 之前）：读取 `conversations.annotation_version` 与 payload 版本逐字节比对。版本不一致说明该任务对应的注释已被后续提交取代（新的 publish 或手工 `apply_annotations` 都会改版本），任务以 `curate:<version>+skipped:superseded` 成功结束——不运行 curator、不写任何链接；会话不存在则报错。curator 运行结束后、写入前会再查一次版本，运行期间被取代同样以 `+skipped:superseded` 收尾、不写入。陈旧任务按成功收尾（而非报错）是为了不被 `max_attempts=3` 反复重试后标成 `failed`。
+4. 否则在临时目录里以 `sh -c` 运行命令，并注入环境变量：`CONTEXT_DB`（数据库绝对路径）、`CONTEXT_PROPOSALS`（命令必须写入的提议文件路径）、`CONTEXT_CURATE_CONVERSATION`、`CONTEXT_CURATE_VERSION`。curator 是外部 agent：它只通过 MCP 读记忆库，`CONTEXT_DB` 仅供其 MCP 客户端指向同一个库，校验与写入仍在本进程完成，agent 无法绕过证据规则。命令输出（合计上限 4 KiB）只用于错误信息。
+5. 命令失败、超时（`--curator-timeout`，默认 15 分钟）、没有写出提议文件或 JSON 非法，都作为可重试错误交回队列。
+6. 读到提议文件后依次调用 `DecodeProposalFile`（必须是常规文件且为合法 UTF-8；拒绝未知字段与多余内容；文件上限 4 MiB，读取时同步限量、不信任 stat 快照；`proposals` 上限 500 条；每条证据至多 100 轮——文件级超限整份失败，单条证据超限只拒该条）、`ValidateTopicLinks`、`InsertLinks`。结果引用形如 `curate:<version>+proposals:<通过数>+rejected:<被拒数>+written:<实际写入行数>`；`written` 只统计新建或刷新的行，重放同一提议为 0，被拒绝过的行保持原判不动。
 
 人工复核仍由 MCP 工具 `list_memory_links` / `review_memory_link` 执行（见 [associations.md](associations.md)），自动触发只负责产出 `status=proposed` 的建议。
 
@@ -226,11 +230,11 @@ make build
   --executor pipeline --decision-url http://127.0.0.1:8765/v1/systemone \
   --decision-model jev-style-2b-v2
 
-# openai 兼容生成器：候选由远程模型生成
+# openai 兼容生成器：候选由 Agent Plan 的远程模型生成
 ./bin/context-worker --db ./data/context-memory.db \
   --executor pipeline --decision-url http://127.0.0.1:8765/v1/systemone \
-  --generator openai --generator-url http://127.0.0.1:8000/v1/chat/completions \
-  --generator-model glm-5.3-flash --generator-key-env GENERATOR_API_KEY
+  --generator openai --generator-url https://ark.cn-beijing.volces.com/api/plan/v3/chat/completions \
+  --generator-model glm-5.3-flash --generator-key-env VOLC_API_KEY
 
 # 自动策展：publish 提交后运行 curator 命令；命令必须把提议写入 $CONTEXT_PROPOSALS，
 # 校验与入库由 worker 完成（scripts/run-curator.sh 会按 CONTEXT_DB 配置 MCP）

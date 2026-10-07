@@ -78,7 +78,7 @@ func TestStdioDatabaseRoundTrip(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	sort.Strings(names)
-	want := []string{"get_commitments", "get_conversation_context", "get_current_state", "get_person_context", "get_timeline", "ingest_events", "record_feedback", "search_events"}
+	want := []string{"get_commitments", "get_conversation_events", "get_current_state", "get_person_context", "get_timeline", "ingest_events", "record_feedback", "search_events"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("tools %v, want %v", names, want)
 	}
@@ -94,7 +94,7 @@ func TestStdioDatabaseRoundTrip(t *testing.T) {
 	if len(person.Events) == 0 {
 		t.Fatal("entity name should match person query")
 	}
-	conv := decodeResult[mcpserver.ConversationResult](t, call("get_conversation_context", map[string]any{"conversation_id": "conv-person-b-payment", "detail_level": "full"}))
+	conv := decodeResult[mcpserver.ConversationResult](t, call("get_conversation_events", map[string]any{"conversation_id": "conv-person-b-payment", "detail_level": "full"}))
 	wantConversationEvents := 0
 	for _, e := range seeded {
 		if e.ConversationID == "conv-person-b-payment" {
@@ -153,7 +153,7 @@ func TestStdioDatabaseRoundTrip(t *testing.T) {
 	if !call("get_timeline", map[string]any{"start_time": "bad", "end_time": "bad"}).IsError {
 		t.Fatal("invalid timestamp accepted")
 	}
-	if !call("get_conversation_context", map[string]any{"conversation_id": "missing"}).IsError {
+	if !call("get_conversation_events", map[string]any{"conversation_id": "missing"}).IsError {
 		t.Fatal("missing conversation accepted")
 	}
 	if !call("ingest_events", map[string]any{"events": []plane.Event{}}).IsError {

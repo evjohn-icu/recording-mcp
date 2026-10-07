@@ -493,7 +493,7 @@ consumer 与 purpose 必须为非空字符串，仅为审计与用途标签，�
 
 ## 8. 与现有原型的关系
 
-仓库当前的八工具录音原型（`search_events`、`get_timeline`、`get_commitments`、`get_conversation_context`、`get_person_context`、`get_current_state`、`ingest_events`、`record_feedback`）是早期实现接口；其同名 `get_conversation_context` 不代表已经实现本文的会话数据模型、`include_turns` 行为或通用 ContextEnvelope。它不是本规范七个工具的实现证明。尤其现有原型没有完整的通用 ContextEnvelope、UTF-8 字节预算、稳定快照游标，也不实现本文定义的 `query_context`、`get_context_item` 或 `build_context`。兼容映射应另行记录，不能把文档写成已有功能。
+仓库当前的八工具录音原型（`search_events`、`get_timeline`、`get_commitments`、`get_conversation_events`、`get_person_context`、`get_current_state`、`ingest_events`、`record_feedback`）是早期实现接口；其 `get_conversation_events`（原名 `get_conversation_context`，统一入口时改名以消除与记忆层的同名异约）不代表已经实现本文的会话数据模型、`include_turns` 行为或通用 ContextEnvelope。它不是本规范七个工具的实现证明。尤其现有原型没有完整的通用 ContextEnvelope、UTF-8 字节预算、稳定快照游标，也不实现本文定义的 `query_context`、`get_context_item` 或 `build_context`。兼容映射应另行记录，不能把文档写成已有功能。
 
 ## 9. 0.1 验收场景
 

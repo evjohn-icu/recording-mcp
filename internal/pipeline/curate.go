@@ -46,7 +46,11 @@ type CurateHandler struct {
 // Execute implements worker.Executor. It reads conversation_id and
 // annotation_version from the job payload, runs the curator and stores the
 // accepted proposals. An unconfigured command is not an error: the job
-// completes with a skipped result so operators can see why nothing ran.
+// completes with a skipped result so operators can see why nothing ran. A job
+// whose annotation_version no longer matches the conversation is stale work:
+// it completes as skipped without running the curator or writing anything, and
+// the version is re-checked after the run so a job superseded mid-run also
+// writes nothing.
 func (h *CurateHandler) Execute(ctx context.Context, job process.Job) (string, error) {
 	if h.DB == nil {
 		return "", errors.New("pipeline: CurateHandler.DB is required")
@@ -61,15 +65,29 @@ func (h *CurateHandler) Execute(ctx context.Context, job process.Job) (string, e
 	if payload.ConversationID == "" {
 		return "", errors.New("pipeline: curate payload.conversation_id is required")
 	}
+	// The version is compared verbatim, exactly as enqueueCurate emits it.
+	// Anything else is a malformed hand-built payload (publish only writes
+	// auto-<hash>), so it fails loudly instead of being mistaken for staleness
+	// or leaking a padded value into the result ref and curator environment.
 	version := payload.AnnotationVersion
-	if version == "" {
-		version = "-"
+	if strings.TrimSpace(version) == "" {
+		return "", errors.New("pipeline: curate payload.annotation_version is required")
+	}
+	if version != strings.TrimSpace(version) {
+		return "", errors.New("pipeline: curate payload.annotation_version must not carry surrounding whitespace")
 	}
 	if strings.TrimSpace(h.Command) == "" {
 		return "curate:" + version + "+skipped:no-command", nil
 	}
+	current, err := currentAnnotationVersion(ctx, h.DB, payload.ConversationID)
+	if err != nil {
+		return "", err
+	}
+	if current != version {
+		return "curate:" + version + "+skipped:superseded", nil
+	}
 
-	output, workDir, err := h.runCurator(ctx, payload.ConversationID, payload.AnnotationVersion)
+	output, workDir, err := h.runCurator(ctx, payload.ConversationID, version)
 	if workDir != "" {
 		defer os.RemoveAll(workDir)
 	}
@@ -80,6 +98,15 @@ func (h *CurateHandler) Execute(ctx context.Context, job process.Job) (string, e
 	proposals, err := DecodeProposalFile(filepath.Join(workDir, "proposals.json"))
 	if err != nil {
 		return "", fmt.Errorf("pipeline: read curator proposals: %w (command output: %s)", err, output)
+	}
+	// A publish or manual annotation commit may have landed while the curator
+	// ran: never validate or write proposals derived from a superseded version.
+	current, err = currentAnnotationVersion(ctx, h.DB, payload.ConversationID)
+	if err != nil {
+		return "", err
+	}
+	if current != version {
+		return "curate:" + version + "+skipped:superseded", nil
 	}
 	validated, err := ValidateTopicLinks(ctx, h.DB, proposals)
 	if err != nil {
@@ -107,6 +134,21 @@ func (h *CurateHandler) Execute(ctx context.Context, job process.Job) (string, e
 	rejected := len(validated) - accepted
 	return "curate:" + version + "+proposals:" + strconv.Itoa(accepted) +
 		"+rejected:" + strconv.Itoa(rejected) + "+written:" + strconv.Itoa(written), nil
+}
+
+// currentAnnotationVersion reads the annotation version currently stored for
+// a conversation. A missing conversation is an error; callers skip a job
+// only when the conversation exists under a different version.
+func currentAnnotationVersion(ctx context.Context, db *sql.DB, conversationID string) (string, error) {
+	var version string
+	err := db.QueryRowContext(ctx, `SELECT annotation_version FROM conversations WHERE id = ?`, conversationID).Scan(&version)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("pipeline: curate conversation not found: %s", conversationID)
+	}
+	if err != nil {
+		return "", fmt.Errorf("pipeline: read curate annotation version: %w", err)
+	}
+	return version, nil
 }
 
 // runCurator executes the configured command in a scratch directory with

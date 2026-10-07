@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -46,12 +47,42 @@ const (
 // maxLinkReasonRunes bounds the free-text reason of a link proposal.
 const maxLinkReasonRunes = 500
 
+// Input bounds for a curator proposal file. The only enqueuer of this
+// shape is an external agent, so an unbounded file must fail closed.
+const (
+	maxProposalFileBytes        = 4 << 20 // 4 MiB
+	maxProposalsPerFile         = 500
+	maxEvidenceTurnsPerProposal = 100
+	// idQueryChunk bounds one SQL IN (...) bind-parameter list, so an
+	// accepted file can never exceed SQLITE_MAX_VARIABLE_NUMBER (32766 in
+	// modernc.org/sqlite@v1.60.1) however the accepted ids distribute.
+	idQueryChunk = 500
+)
+
 // topicLinkRelations is the closed set of relations allowed between two topics.
 var topicLinkRelations = map[string]bool{
 	"same_topic":    true,
 	"follow_up":     true,
 	"contradiction": true,
 	"update":        true,
+}
+
+// symmetricLinkRelations are the relations whose meaning does not depend on
+// endpoint order. Their link identity is derived from the endpoints in
+// canonical (ascending id) order, so a mirrored proposal folds onto the same
+// row. follow_up and update are directed and keep their given order.
+var symmetricLinkRelations = map[string]bool{
+	"same_topic":    true,
+	"contradiction": true,
+}
+
+// canonicalLinkEndpoints returns the endpoints in canonical order for a
+// symmetric relation and the given order for a directed one.
+func canonicalLinkEndpoints(relation, fromID, toID string) (string, string) {
+	if symmetricLinkRelations[relation] && toID < fromID {
+		return toID, fromID
+	}
+	return fromID, toID
 }
 
 // LinkProposal is one association an agent proposes between two memory records.
@@ -75,14 +106,39 @@ type ProposalFile struct {
 
 // DecodeProposalFile reads a curator proposal file, rejecting unknown fields
 // and any trailing content so a malformed input fails loudly instead of
-// silently producing zero proposals.
+// silently producing zero proposals. The file must be a regular file of at
+// most maxProposalFileBytes: the bound is enforced while reading, not only by
+// the stat snapshot, and invalid UTF-8 is rejected instead of being silently
+// rewritten by the JSON decoder.
 func DecodeProposalFile(path string) ([]LinkProposal, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("proposal file %s is not a regular file", path)
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	dec := json.NewDecoder(f)
+	if info.Size() > maxProposalFileBytes {
+		return nil, fmt.Errorf("proposal file is %d bytes, exceeds the %d byte limit", info.Size(), maxProposalFileBytes)
+	}
+	// The stat size is only a snapshot, so the bound is enforced while reading:
+	// a file that grows past the limit still fails closed.
+	data, err := io.ReadAll(io.LimitReader(f, maxProposalFileBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxProposalFileBytes {
+		return nil, fmt.Errorf("proposal file exceeds the %d byte limit", maxProposalFileBytes)
+	}
+	if !utf8.Valid(data) {
+		return nil, errors.New("proposal file is not valid UTF-8")
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	var file ProposalFile
 	if err := dec.Decode(&file); err != nil {
@@ -91,6 +147,9 @@ func DecodeProposalFile(path string) ([]LinkProposal, error) {
 	var trailing any
 	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return nil, errors.New("proposal file has trailing content after the top-level object")
+	}
+	if len(file.Proposals) > maxProposalsPerFile {
+		return nil, fmt.Errorf("proposal file has %d proposals, exceeds the %d proposal limit", len(file.Proposals), maxProposalsPerFile)
 	}
 	return file.Proposals, nil
 }
@@ -157,6 +216,12 @@ func ValidateTopicLinks(ctx context.Context, db *sql.DB, proposals []LinkProposa
 		if p.ToTopicID != "" {
 			topicIDs = append(topicIDs, p.ToTopicID)
 		}
+		// A proposal over the evidence cap is rejected below before its ids are
+		// ever looked up; skipping the collection here keeps one oversized
+		// proposal from inflating the existence-query work past the caps.
+		if len(p.EvidenceTurnIDs) > maxEvidenceTurnsPerProposal {
+			continue
+		}
 		for _, id := range p.EvidenceTurnIDs {
 			if id != "" {
 				turnIDs = append(turnIDs, id)
@@ -216,6 +281,9 @@ func rejectionReason(p LinkProposal, topics, turns, currentTurns map[string]bool
 	if len(p.EvidenceTurnIDs) == 0 {
 		return "evidence must contain at least one turn"
 	}
+	if len(p.EvidenceTurnIDs) > maxEvidenceTurnsPerProposal {
+		return fmt.Sprintf("evidence must contain at most %d turns", maxEvidenceTurnsPerProposal)
+	}
 	for _, id := range p.EvidenceTurnIDs {
 		if !turns[id] {
 			return fmt.Sprintf("evidence turn %q not found", id)
@@ -249,25 +317,32 @@ func existingIDs(ctx context.Context, db *sql.DB, table string, ids []string) (m
 	if len(unique) == 0 {
 		return found, nil
 	}
-	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(unique)), ",")
-	args := make([]any, len(unique))
-	for i, id := range unique {
-		args[i] = id
-	}
-	rows, err := db.QueryContext(ctx, "SELECT id FROM "+table+" WHERE id IN ("+placeholders+")", args...)
-	if err != nil {
-		return nil, fmt.Errorf("pipeline: check %s existence: %w", table, err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("pipeline: check %s existence: scan: %w", table, err)
+	for start := 0; start < len(unique); start += idQueryChunk {
+		end := min(start+idQueryChunk, len(unique))
+		chunk := unique[start:end]
+		args := make([]any, len(chunk))
+		for i, id := range chunk {
+			args[i] = id
 		}
-		found[id] = true
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("pipeline: check %s existence: read: %w", table, err)
+		rows, err := db.QueryContext(ctx, "SELECT id FROM "+table+" WHERE id IN ("+placeholders(len(chunk))+")", args...)
+		if err != nil {
+			return nil, fmt.Errorf("pipeline: check %s existence: %w", table, err)
+		}
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("pipeline: check %s existence: scan: %w", table, err)
+			}
+			found[id] = true
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("pipeline: check %s existence: read: %w", table, err)
+		}
+		if err := rows.Close(); err != nil {
+			return nil, fmt.Errorf("pipeline: check %s existence: read: %w", table, err)
+		}
 	}
 	return found, nil
 }
@@ -290,40 +365,58 @@ func turnExistence(ctx context.Context, db *sql.DB, ids []string) (map[string]bo
 	if len(unique) == 0 {
 		return existing, current, nil
 	}
-	query := fmt.Sprintf(`SELECT id, %s FROM turns WHERE id IN (%s)`, memory.CurrentTurnPredicate("turns"), placeholders(len(unique)))
-	args := make([]any, len(unique))
-	for i, id := range unique {
-		args[i] = id
-	}
-	rows, err := db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, nil, fmt.Errorf("pipeline: check turn currency: read: %w", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var id string
-		var isCurrent int
-		if err := rows.Scan(&id, &isCurrent); err != nil {
-			return nil, nil, err
+	query := `SELECT id, ` + memory.CurrentTurnPredicate("turns") + ` FROM turns WHERE id IN (`
+	for start := 0; start < len(unique); start += idQueryChunk {
+		end := min(start+idQueryChunk, len(unique))
+		chunk := unique[start:end]
+		args := make([]any, len(chunk))
+		for i, id := range chunk {
+			args[i] = id
 		}
-		existing[id] = true
-		if isCurrent == 1 {
-			current[id] = true
+		rows, err := db.QueryContext(ctx, query+placeholders(len(chunk))+")", args...)
+		if err != nil {
+			return nil, nil, fmt.Errorf("pipeline: check turn currency: read: %w", err)
 		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, nil, fmt.Errorf("pipeline: check turn currency: read: %w", err)
+		for rows.Next() {
+			var id string
+			var isCurrent int
+			if err := rows.Scan(&id, &isCurrent); err != nil {
+				rows.Close()
+				return nil, nil, err
+			}
+			existing[id] = true
+			if isCurrent == 1 {
+				current[id] = true
+			}
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, nil, fmt.Errorf("pipeline: check turn currency: read: %w", err)
+		}
+		if err := rows.Close(); err != nil {
+			return nil, nil, fmt.Errorf("pipeline: check turn currency: read: %w", err)
+		}
 	}
 	return existing, current, nil
 }
 
-// linkID derives the deterministic id of a memory link from its endpoint and
-// relation tuple. The same tuple always yields the same id, which is what makes
-// InsertLinks idempotent.
-func linkID(fromKind, fromID, toKind, toID, relation string) string {
+// rawLinkID derives the order-sensitive id of a memory link from its endpoint
+// and relation tuple as given. Legacy rows written before symmetric relations
+// were canonicalised keep such ids.
+func rawLinkID(fromKind, fromID, toKind, toID, relation string) string {
 	sum := sha256.Sum256([]byte(strings.Join(
 		[]string{fromKind, fromID, toKind, toID, relation}, "|")))
 	return "link:" + hex.EncodeToString(sum[:])[:32]
+}
+
+// linkID derives the deterministic id of a memory link from its endpoint and
+// relation tuple. Symmetric relations canonicalise the endpoint order first,
+// so the same relation is one row whichever way a proposal names its
+// endpoints; the same tuple always yields the same id, which is what makes
+// InsertLinks idempotent.
+func linkID(fromKind, fromID, toKind, toID, relation string) string {
+	fromID, toID = canonicalLinkEndpoints(relation, fromID, toID)
+	return rawLinkID(fromKind, fromID, toKind, toID, relation)
 }
 
 // LinkOutcome describes what InsertLinks did with one accepted proposal. It is
@@ -357,8 +450,9 @@ type InsertedLink struct {
 // InsertLinks stores accepted topic-link proposals and reports the outcome of
 // each. Rejected proposals and links whose kind is not topic_link are skipped:
 // rejected evidence is never recorded, and only topic endpoints are written.
-// A proposal's id is derived from (from, to, relation), so re-proposing a tuple
-// never creates a second row and never reports success silently:
+// A proposal's id is derived from (from, to, relation) with the endpoints of
+// a symmetric relation in canonical (ascending id) order, so re-proposing a
+// tuple never creates a second row and never reports success silently:
 //
 //   - no row yet: store as proposed (inserted);
 //   - existing proposed row with new content: replace reason, evidence and
@@ -389,7 +483,8 @@ func InsertLinks(ctx context.Context, db *sql.DB, model string, links []Validate
 		if err != nil {
 			return nil, fmt.Errorf("pipeline: insert links: marshal evidence: %w", err)
 		}
-		id := linkID("topic", l.FromTopicID, "topic", l.ToTopicID, l.Relation)
+		fromID, toID := canonicalLinkEndpoints(l.Relation, l.FromTopicID, l.ToTopicID)
+		id := linkID("topic", fromID, "topic", toID, l.Relation)
 
 		var (
 			storedStatus, storedReason, storedEvidence string
@@ -398,12 +493,30 @@ func InsertLinks(ctx context.Context, db *sql.DB, model string, links []Validate
 		err = tx.QueryRowContext(ctx,
 			`SELECT status, reason, evidence_turn_ids_json, confidence FROM memory_links WHERE id = ?`, id).
 			Scan(&storedStatus, &storedReason, &storedEvidence, &storedConfidence)
+		if errors.Is(err, sql.ErrNoRows) && symmetricLinkRelations[l.Relation] {
+			// A legacy row written before symmetric relations were
+			// canonicalised keeps the reversed raw id (endpoints in
+			// descending order). Fold it onto the canonical identity on
+			// first touch, whichever order the proposal names, before the
+			// normal status logic applies.
+			legacyID := rawLinkID("topic", toID, "topic", fromID, l.Relation)
+			err = tx.QueryRowContext(ctx,
+				`SELECT status, reason, evidence_turn_ids_json, confidence FROM memory_links WHERE id = ?`, legacyID).
+				Scan(&storedStatus, &storedReason, &storedEvidence, &storedConfidence)
+			if err == nil {
+				if _, err := tx.ExecContext(ctx,
+					`UPDATE memory_links SET id=?, from_id=?, to_id=? WHERE id=?`, id, fromID, toID, legacyID,
+				); err != nil {
+					return nil, fmt.Errorf("pipeline: insert links: canonicalise %s: %w", legacyID, err)
+				}
+			}
+		}
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 			if _, err := tx.ExecContext(ctx,
 				`INSERT INTO memory_links(id, from_kind, from_id, to_kind, to_id, relation, reason, evidence_turn_ids_json, confidence, status, model, created_at)
 				 VALUES(?, 'topic', ?, 'topic', ?, ?, ?, ?, ?, ?, ?, ?)`,
-				id, l.FromTopicID, l.ToTopicID, l.Relation, l.Reason,
+				id, fromID, toID, l.Relation, l.Reason,
 				string(evidenceJSON), l.Confidence, LinkStatusProposed, model, now.UnixMilli(),
 			); err != nil {
 				return nil, fmt.Errorf("pipeline: insert links: %w", err)

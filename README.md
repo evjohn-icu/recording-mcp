@@ -47,7 +47,7 @@ go build -o bin/recording-mcp ./cmd/server
 | `search_events` | 搜索事件。`query` 必填（可为空）；可选 `person`、`start_time`、`end_time`、`min_confidence`、`limit`、`offset`。 |
 | `get_timeline` | 取时间范围内的事件。`start_time`、`end_time` 必填；可选 `entity`、`limit`、`offset`。 |
 | `get_commitments` | 查询承诺。可选 `status`、`person`、`deadline_before`、`time`。 |
-| `get_conversation_context` | 获取会话记录。`conversation_id` 必填；`detail_level` 可为 `summary` 或 `full`。 |
+| `get_conversation_events` | 获取会话记录（事件视图）。`conversation_id` 必填；`detail_level` 可为 `summary` 或 `full`。 |
 | `get_person_context` | 获取人物相关事件。`person_id` 必填；可选 `start_time`、`end_time`、`topics`、`limit`、`offset`。 |
 | `get_current_state` | 获取指定维度的当前有效状态。可选 `dimensions`、`time`。 |
 | `ingest_events` | 导入 1–500 条结构化事件；批次为原子操作，重复导入相同 ID 和内容可安全重试，冲突 ID 会失败。 |

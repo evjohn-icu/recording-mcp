@@ -3,7 +3,9 @@ package pipeline
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"math"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -755,5 +757,334 @@ func TestLinkReproposalAfterSupersedeKeepsHistory(t *testing.T) {
 	if newRow.Status != LinkStatusProposed || newRow.Stale || newRow.Relation != "follow_up" ||
 		!reflect.DeepEqual(newRow.EvidenceTurnIDs, []string{"turn-v2"}) {
 		t.Fatalf("fresh row = %+v, want a proposed, current link on turn-v2", newRow)
+	}
+}
+
+// TestLinkIDSymmetricCanonical pins link identity: a symmetric relation folds
+// mirrored endpoint orders onto one id, a directed relation keeps them apart.
+func TestLinkIDSymmetricCanonical(t *testing.T) {
+	for _, relation := range []string{"same_topic", "contradiction"} {
+		if linkID("topic", "topic-a", "topic", "topic-b", relation) != linkID("topic", "topic-b", "topic", "topic-a", relation) {
+			t.Errorf("%s: mirrored endpoints must share one id", relation)
+		}
+	}
+	for _, relation := range []string{"follow_up", "update"} {
+		if linkID("topic", "topic-a", "topic", "topic-b", relation) == linkID("topic", "topic-b", "topic", "topic-a", relation) {
+			t.Errorf("%s: directed endpoints must keep distinct ids", relation)
+		}
+	}
+}
+
+// TestInsertLinksFoldsReversedSymmetricProposal folds a mirrored same_topic
+// proposal onto the row its twin created, whichever direction arrives first,
+// and stores the endpoints in canonical (ascending id) order.
+func TestInsertLinksFoldsReversedSymmetricProposal(t *testing.T) {
+	forward := baseLinkProposal()
+	reverse := baseLinkProposal()
+	reverse.FromTopicID, reverse.ToTopicID = reverse.ToTopicID, reverse.FromTopicID
+
+	for _, tc := range []struct {
+		name        string
+		first, next LinkProposal
+	}{
+		{"forward then reverse", forward, reverse},
+		{"reverse then forward", reverse, forward},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := newAssociationDB(t)
+			seedAssociationFixtures(t, db)
+			ctx := context.Background()
+			now := time.UnixMilli(1_700_000_000_000)
+
+			first, err := InsertLinks(ctx, db, "model", []ValidatedLink{{LinkProposal: tc.first, Status: linkStatusValidated}}, now)
+			if err != nil {
+				t.Fatalf("first InsertLinks: %v", err)
+			}
+			if len(first) != 1 || first[0].Outcome != LinkInserted {
+				t.Fatalf("first outcomes = %+v, want one inserted", first)
+			}
+			second, err := InsertLinks(ctx, db, "model", []ValidatedLink{{LinkProposal: tc.next, Status: linkStatusValidated}}, now.Add(time.Hour))
+			if err != nil {
+				t.Fatalf("second InsertLinks: %v", err)
+			}
+			if len(second) != 1 || second[0].Outcome != LinkUnchanged {
+				t.Fatalf("second outcomes = %+v, want one unchanged", second)
+			}
+			if want := linkID("topic", "topic-1", "topic", "topic-2", "same_topic"); second[0].ID != want {
+				t.Errorf("id = %q, want the shared canonical id %q", second[0].ID, want)
+			}
+			links, err := ListLinks(ctx, db, LinkFilter{})
+			if err != nil || len(links) != 1 {
+				t.Fatalf("stored = %+v, %v; want one row", links, err)
+			}
+			if links[0].FromID != "topic-1" || links[0].ToID != "topic-2" {
+				t.Errorf("endpoints = %s -> %s, want canonical order", links[0].FromID, links[0].ToID)
+			}
+		})
+	}
+}
+
+// TestInsertLinksFoldsReverseWithinOneBatch folds both directions carried by
+// one InsertLinks call onto one row.
+func TestInsertLinksFoldsReverseWithinOneBatch(t *testing.T) {
+	db := newAssociationDB(t)
+	seedAssociationFixtures(t, db)
+	ctx := context.Background()
+
+	forward := baseLinkProposal()
+	reverse := baseLinkProposal()
+	reverse.FromTopicID, reverse.ToTopicID = reverse.ToTopicID, reverse.FromTopicID
+
+	out, err := InsertLinks(ctx, db, "model", []ValidatedLink{
+		{LinkProposal: forward, Status: linkStatusValidated},
+		{LinkProposal: reverse, Status: linkStatusValidated},
+	}, time.UnixMilli(1_700_000_000_000))
+	if err != nil {
+		t.Fatalf("InsertLinks: %v", err)
+	}
+	if len(out) != 2 || out[0].Outcome != LinkInserted || out[1].Outcome != LinkUnchanged {
+		t.Fatalf("outcomes = %+v, want inserted then unchanged", out)
+	}
+	if out[0].ID != out[1].ID {
+		t.Errorf("ids = %q, %q, want one shared id", out[0].ID, out[1].ID)
+	}
+	if links, err := ListLinks(ctx, db, LinkFilter{}); err != nil || len(links) != 1 {
+		t.Fatalf("stored = %+v, %v; want one row", links, err)
+	}
+}
+
+// TestInsertLinksKeepsDirectedReversal keeps reversed directed relations
+// apart: (A,B,follow_up) and (B,A,follow_up) are different links.
+func TestInsertLinksKeepsDirectedReversal(t *testing.T) {
+	db := newAssociationDB(t)
+	seedAssociationFixtures(t, db)
+	ctx := context.Background()
+
+	forward := baseLinkProposal()
+	forward.Relation = "follow_up"
+	reverse := forward
+	reverse.FromTopicID, reverse.ToTopicID = reverse.ToTopicID, reverse.FromTopicID
+
+	out, err := InsertLinks(ctx, db, "model", []ValidatedLink{
+		{LinkProposal: forward, Status: linkStatusValidated},
+		{LinkProposal: reverse, Status: linkStatusValidated},
+	}, time.UnixMilli(1_700_000_000_000))
+	if err != nil {
+		t.Fatalf("InsertLinks: %v", err)
+	}
+	if len(out) != 2 || out[0].Outcome != LinkInserted || out[1].Outcome != LinkInserted || out[0].ID == out[1].ID {
+		t.Fatalf("outcomes = %+v, want two inserted rows with distinct ids", out)
+	}
+	if links, err := ListLinks(ctx, db, LinkFilter{}); err != nil || len(links) != 2 {
+		t.Fatalf("stored = %+v, %v; want two rows", links, err)
+	}
+}
+
+// TestInsertLinksCanonicalizesLegacyReversedRow folds a row written before
+// symmetric canonicalisation (reversed endpoints, raw id) onto the canonical
+// identity on first touch instead of adding a second row, whichever order the
+// touching proposal names and whichever review status the legacy row carries.
+func TestInsertLinksCanonicalizesLegacyReversedRow(t *testing.T) {
+	p := baseLinkProposal()
+	orders := []struct {
+		name     string
+		proposal LinkProposal
+	}{
+		{"canonical order proposal", p},
+		{"reversed order proposal", func() LinkProposal {
+			rev := p
+			rev.FromTopicID, rev.ToTopicID = rev.ToTopicID, rev.FromTopicID
+			return rev
+		}()},
+	}
+	statuses := []struct {
+		seeded string
+		want   LinkOutcome
+	}{
+		{LinkStatusProposed, LinkUnchanged},
+		{LinkStatusConfirmed, LinkConfirmed},
+		{LinkStatusRejected, LinkRejectionHeld},
+	}
+	for _, order := range orders {
+		for _, status := range statuses {
+			t.Run(order.name+"/"+status.seeded, func(t *testing.T) {
+				db := newAssociationDB(t)
+				seedAssociationFixtures(t, db)
+				ctx := context.Background()
+				now := time.UnixMilli(1_700_000_000_000)
+
+				legacyID := rawLinkID("topic", p.ToTopicID, "topic", p.FromTopicID, p.Relation)
+				if _, err := db.Exec(
+					`INSERT INTO memory_links(id, from_kind, from_id, to_kind, to_id, relation, reason, evidence_turn_ids_json, confidence, status, model, created_at)
+					 VALUES(?, 'topic', ?, 'topic', ?, ?, ?, '["turn-1"]', ?, ?, 'legacy-model', ?)`,
+					legacyID, p.ToTopicID, p.FromTopicID, p.Relation, p.Reason, p.Confidence, status.seeded, now.UnixMilli()); err != nil {
+					t.Fatalf("seed legacy row: %v", err)
+				}
+
+				out, err := InsertLinks(ctx, db, "model", []ValidatedLink{{LinkProposal: order.proposal, Status: linkStatusValidated}}, now.Add(time.Hour))
+				if err != nil {
+					t.Fatalf("InsertLinks: %v", err)
+				}
+				canonical := linkID("topic", p.FromTopicID, "topic", p.ToTopicID, p.Relation)
+				if len(out) != 1 || out[0].Outcome != status.want || out[0].ID != canonical {
+					t.Fatalf("outcomes = %+v, want one %s outcome for %s", out, status.want, canonical)
+				}
+				links, err := ListLinks(ctx, db, LinkFilter{})
+				if err != nil || len(links) != 1 {
+					t.Fatalf("stored = %+v, %v; want one row", links, err)
+				}
+				got := links[0]
+				if got.ID != canonical || got.FromID != "topic-1" || got.ToID != "topic-2" {
+					t.Errorf("row = %+v, want canonical id and ascending endpoints", got)
+				}
+				if got.Status != status.seeded || got.Model != "legacy-model" || !got.CreatedAt.Equal(now) {
+					t.Errorf("row = %+v, want status %s with the legacy model and created_at preserved", got, status.seeded)
+				}
+			})
+		}
+	}
+}
+
+// TestValidateTopicLinksRejectsTooManyEvidenceTurns rejects one oversized
+// proposal instead of the whole run.
+func TestValidateTopicLinksRejectsTooManyEvidenceTurns(t *testing.T) {
+	db := newAssociationDB(t)
+	seedAssociationFixtures(t, db)
+
+	p := baseLinkProposal()
+	p.EvidenceTurnIDs = make([]string, maxEvidenceTurnsPerProposal+1)
+	for i := range p.EvidenceTurnIDs {
+		p.EvidenceTurnIDs[i] = fmt.Sprintf("turn-%d", i)
+	}
+	got := validateOne(t, db, p)
+	if got.Status != LinkStatusRejected {
+		t.Fatalf("status = %q, want rejected", got.Status)
+	}
+	if want := fmt.Sprintf("evidence must contain at most %d turns", maxEvidenceTurnsPerProposal); got.RejectionReason != want {
+		t.Errorf("reason = %q, want %q", got.RejectionReason, want)
+	}
+}
+
+// TestDecodeProposalFileRejectsOversizedFile fails closed on a proposal file
+// beyond the size bound, before any decoding happens.
+func TestDecodeProposalFileRejectsOversizedFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "big.json")
+	if err := os.WriteFile(path, make([]byte, maxProposalFileBytes+1), 0o600); err != nil {
+		t.Fatalf("write oversized file: %v", err)
+	}
+	if _, err := DecodeProposalFile(path); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("err = %v, want it to mention the size limit", err)
+	}
+}
+
+// TestDecodeProposalFileRejectsTooManyProposals fails closed on a proposal
+// count beyond the bound.
+func TestDecodeProposalFileRejectsTooManyProposals(t *testing.T) {
+	body := `{"proposals":[` + strings.Repeat(`{"kind":"topic_link"},`, maxProposalsPerFile) + `{"kind":"topic_link"}]}`
+	path := filepath.Join(t.TempDir(), "many.json")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write proposal file: %v", err)
+	}
+	if _, err := DecodeProposalFile(path); err == nil || !strings.Contains(err.Error(), "proposal limit") {
+		t.Fatalf("err = %v, want it to mention the proposal limit", err)
+	}
+}
+
+// TestProposalBoundsAcceptExactlyAtLimit pins the accepted side of every input
+// bound: an off-by-one implementation (>= instead of >) must fail here even
+// though the over-limit rejection tests still pass.
+func TestProposalBoundsAcceptExactlyAtLimit(t *testing.T) {
+	// Exactly maxProposalFileBytes: a valid file padded with whitespace.
+	empty := `{"proposals":[]}`
+	padded := empty + strings.Repeat(" ", maxProposalFileBytes-len(empty))
+	path := filepath.Join(t.TempDir(), "exact-size.json")
+	if err := os.WriteFile(path, []byte(padded), 0o600); err != nil {
+		t.Fatalf("write exact-size file: %v", err)
+	}
+	if _, err := DecodeProposalFile(path); err != nil {
+		t.Fatalf("exact-size file rejected: %v", err)
+	}
+
+	// Exactly maxProposalsPerFile proposals.
+	body := `{"proposals":[` + strings.Repeat(`{"kind":"topic_link"},`, maxProposalsPerFile-1) + `{"kind":"topic_link"}]}`
+	path = filepath.Join(t.TempDir(), "exact-count.json")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write exact-count file: %v", err)
+	}
+	if proposals, err := DecodeProposalFile(path); err != nil || len(proposals) != maxProposalsPerFile {
+		t.Fatalf("exact-count file = %d proposals, %v; want %d accepted", len(proposals), err, maxProposalsPerFile)
+	}
+
+	// Exactly maxEvidenceTurnsPerProposal evidence turns, all existing and current.
+	db := newAssociationDB(t)
+	seedAssociationFixtures(t, db)
+	p := baseLinkProposal()
+	p.EvidenceTurnIDs = make([]string, maxEvidenceTurnsPerProposal)
+	for i := range p.EvidenceTurnIDs {
+		id := fmt.Sprintf("exact-turn-%d", i)
+		seedTurn(t, db, id)
+		p.EvidenceTurnIDs[i] = id
+	}
+	if got := validateOne(t, db, p); got.Status != linkStatusValidated {
+		t.Fatalf("exact-evidence proposal rejected: %s", got.RejectionReason)
+	}
+}
+
+// TestDecodeProposalFileRejectsInvalidUTF8 fails closed on bytes the JSON
+// decoder would silently rewrite to U+FFFD and then store.
+func TestDecodeProposalFileRejectsInvalidUTF8(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bad-utf8.json")
+	body := `{"proposals":[{"kind":"topic_link","reason":"bad` + "\xff" + `byte"}]}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write invalid-utf8 file: %v", err)
+	}
+	if _, err := DecodeProposalFile(path); err == nil || !strings.Contains(err.Error(), "UTF-8") {
+		t.Fatalf("err = %v, want it to mention UTF-8", err)
+	}
+}
+
+// sqliteMaxBindParams is modernc.org/sqlite's SQLITE_MAX_VARIABLE_NUMBER: the
+// ceiling a single IN (...) bind list must stay under.
+const sqliteMaxBindParams = 32766
+
+// TestExistingIDsAndTurnExistenceChunkLargeIDLists crosses both the chunk
+// boundary and the SQLite bind-parameter ceiling: an id list longer than one
+// IN (...) bind list must resolve completely, so dropping the chunk loop fails
+// here with "too many SQL variables" instead of silently passing.
+func TestExistingIDsAndTurnExistenceChunkLargeIDLists(t *testing.T) {
+	db := newAssociationDB(t)
+	ctx := context.Background()
+
+	total := sqliteMaxBindParams + 1000
+	if _, err := db.Exec(
+		`WITH RECURSIVE seq(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM seq WHERE i < ?)
+		 INSERT INTO turns(id,conversation_id,recording_id,segment_index,content,source_sha256,transcript_version,original_turn_id,turn_json)
+		 SELECT 'chunk-turn-' || i, 'conv', 'rec', 0, 'text', 'sha', 'v1', 'chunk-turn-' || i, '{}' FROM seq`,
+		total-1); err != nil {
+		t.Fatalf("bulk seed %d turns: %v", total, err)
+	}
+	ids := make([]string, 0, total)
+	for i := range total {
+		ids = append(ids, fmt.Sprintf("chunk-turn-%d", i))
+	}
+
+	found, err := existingIDs(ctx, db, "turns", ids)
+	if err != nil {
+		t.Fatalf("existingIDs: %v", err)
+	}
+	existing, current, err := turnExistence(ctx, db, ids)
+	if err != nil {
+		t.Fatalf("turnExistence: %v", err)
+	}
+	for _, id := range ids {
+		if !found[id] {
+			t.Fatalf("existingIDs missed %s", id)
+		}
+		if !existing[id] {
+			t.Fatalf("turnExistence missed %s", id)
+		}
+		if !current[id] {
+			t.Fatalf("turnExistence marked %s as not current", id)
+		}
 	}
 }

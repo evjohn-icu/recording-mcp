@@ -12,6 +12,8 @@ set -eu
 : "${CONTEXT_PROPOSALS:?CONTEXT_PROPOSALS must be set by context-worker}"
 
 MODEL="${CURATOR_MODEL:-volces-agent-01/glm-5.3-flash}"
+# volces-agent-01 is pi's Agent Plan provider: https://ark.cn-beijing.volces.com/api/plan/v3.
+# Override with any pi model id, e.g. CURATOR_MODEL=volces-agent-01/deepseek-v4.1-flash.
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
 

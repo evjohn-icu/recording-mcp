@@ -17,8 +17,10 @@ import (
 	"recordingmcp/internal/asrinput"
 	"recordingmcp/internal/contextbuild"
 	"recordingmcp/internal/decision"
+	"recordingmcp/internal/mcpserver"
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/pipeline"
+	"recordingmcp/internal/plane"
 )
 
 type ConversationInput struct {
@@ -470,13 +472,23 @@ func main() {
 		log.Fatal(e)
 	}
 	defer store.Close()
+	// The event-archive prototype shares this database file: its immutable
+	// events table is disjoint from the memory schema, so one MCP server
+	// carries both tool families. (With --db :memory: each connection is its
+	// own database, so the event family sees an empty archive.)
+	events, e := plane.Open(*db)
+	if e != nil {
+		log.Fatal(e)
+	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	var rerank contextbuild.Reranker
 	if strings.TrimSpace(*decisionURL) != "" {
 		rerank = &contextbuild.DecisionReranker{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*decisionURL), Model: *decisionModel}}
 	}
-	if e = newServer(store, *readOnly, rerank).Run(ctx, &mcp.StdioTransport{}); e != nil && ctx.Err() == nil {
+	srv := newServer(store, *readOnly, rerank)
+	mcpserver.Register(srv, events, nil, *readOnly)
+	if e = srv.Run(ctx, &mcp.StdioTransport{}); e != nil && ctx.Err() == nil {
 		log.Fatal(e)
 	}
 }
