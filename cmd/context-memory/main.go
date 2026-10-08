@@ -349,7 +349,7 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker,
 		pkg, e := contextbuild.Build(ctx, contextbuild.Deps{Store: store, DB: store.DB(), Reranker: rerank, Semantic: semantic}, in)
 		return nil, pkg, e
 	})
-	mcp.AddTool(s, read("get_current_context", "实验性：读取当前上下文投影（person / topic / commitment / preference / event 对象），带证据、来源、状态（current/superseded/unresolved）与冲突。全部由当前（非 stale、非 ambient）证据在读取时推导，可重复构建。提供 query 时先做一次小规模检索，把命中会话/主题作为硬性范围。"), func(ctx context.Context, _ *mcp.CallToolRequest, in CurrentContextInput) (*mcp.CallToolResult, projection.Result, error) {
+	mcp.AddTool(s, read("get_current_context", "实验性：读取当前上下文投影（person / topic / commitment / preference / event 对象），带证据、来源、状态（current/superseded/unresolved）与冲突。全部由当前（非 stale、非 ambient）证据在读取时推导，可重复构建。提供 query 时先做一次小规模检索，把命中会话/主题作为硬性范围（该检索在显式 conversation_id/topic_id 之内执行，只会收窄不会放宽）；检索的 query 自身零召回（字面与语义分支都没命中）时，会在 unresolved 里追加一条 reason=no_retrieval_hits（kind 与 subject 为空，query 写在 detail 里），同时仍按请求的过滤条件返回投影。"), func(ctx context.Context, _ *mcp.CallToolRequest, in CurrentContextInput) (*mcp.CallToolResult, projection.Result, error) {
 		after, e := parseRFC3339("started_after", in.StartedAfter)
 		if e != nil {
 			return nil, projection.Result{}, e
@@ -406,15 +406,19 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker,
 			if e != nil {
 				return nil, projection.Result{}, e
 			}
-			if len(pkg.Coverage.Conversations) == 0 && len(pkg.Coverage.TopicIDs) == 0 {
+			// The no-hits signal must come from the query-driven branches
+			// (lexical + semantic), not from the item list or the coverage: a
+			// pinned conversation adds its own items and always lands in
+			// coverage, so both would hide "your query recalled nothing".
+			queryHits := len(pkg.Trace.Lexical.HitIDs) + len(pkg.Trace.Semantic.HitIDs)
+			if queryHits == 0 {
 				result, e := projection.Build(ctx, store, store.DB(), req)
 				if e != nil {
 					return nil, projection.Result{}, e
 				}
 				result.Unresolved = append(result.Unresolved, projection.Unresolved{
-					Subject: in.Query,
-					Reason:  "no_retrieval_hits",
-					Detail:  "the retrieval pass matched no current memory; the projection runs unconstrained and reports why",
+					Reason: "no_retrieval_hits",
+					Detail: fmt.Sprintf("neither the lexical nor the semantic branch recalled anything for query %q; the projection runs under the requested filters and reports why", in.Query),
 				})
 				return nil, result, nil
 			}

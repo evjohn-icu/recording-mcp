@@ -239,6 +239,82 @@ func TestGetCurrentContextPinnedScopeIsNotWidened(t *testing.T) {
 	}
 }
 
+// TestGetCurrentContextReportsNoHitsUnderPinnedScope pins the no-hits signal:
+// a pinned conversation populates coverage even when nothing matched, so the
+// tool must key the no_retrieval_hits entry on the item list instead — while
+// still returning the pinned conversation's projection.
+func TestGetCurrentContextReportsNoHitsUnderPinnedScope(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	store, err := memory.Open(filepath.Join(t.TempDir(), "nohits.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.DB()
+	seed := []string{
+		`INSERT INTO conversations(id,title,summary,annotation_version,annotation_basis,recording_id,source_sha256,transcript_version,duration_ms,transcript_json,annotations_json) VALUES('conv:only','Only','','v1','','rec:only','sha','tv',1000,'{}','{}')`,
+		`INSERT INTO recordings(id,conversation_id,source_file,source_sha256,duration_ms,recording_started_at,absolute_time_known) VALUES('rec:only','conv:only','f','sha',1000,'2026-03-01T09:00:00+08:00',1)`,
+		`INSERT INTO turns(id,conversation_id,recording_id,segment_index,global_start_ms,global_end_ms,speaker_scoped_id,speaker_entity_id,content,source_sha256,transcript_version,original_turn_id,turn_json) VALUES('turn:only','conv:only','rec:only',0,1000,2000,NULL,NULL,'季度复盘的结论','sha','rev-1','turn:only','{}')`,
+		`INSERT INTO notes(id,conversation_id,kind,summary,topic_ids_json,claim_mode,interpretation_note,annotation_version) VALUES('note:only','conv:only','intention','计划下季度扩编','[]','inference','','v1')`,
+		`INSERT INTO note_evidence(note_id,turn_id,ordinal) VALUES('note:only','turn:only',0)`,
+	}
+	for _, stmt := range seed {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("seed: %v: %v", stmt, err)
+		}
+	}
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := newServer(store, false, nil, nil).Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1"}, nil)
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	res, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "get_current_context", Arguments: map[string]any{
+		"query":           "完全不相关的词条",
+		"conversation_id": "conv:only",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.IsError {
+		t.Fatalf("get_current_context rejected input: %+v", res.Content)
+	}
+	b, _ := json.Marshal(res.StructuredContent)
+	var result struct {
+		Objects    []map[string]any `json:"objects"`
+		Unresolved []struct {
+			Reason string `json:"reason"`
+			Detail string `json:"detail"`
+		} `json:"unresolved"`
+	}
+	if err := json.Unmarshal(b, &result); err != nil {
+		t.Fatalf("decode %s: %v", b, err)
+	}
+	reported := false
+	for _, u := range result.Unresolved {
+		if u.Reason == "no_retrieval_hits" {
+			reported = true
+			if u.Detail == "" {
+				t.Fatalf("no_retrieval_hits entry has no detail: %s", b)
+			}
+		}
+	}
+	if !reported {
+		t.Fatalf("query with no hits was not reported: %s", b)
+	}
+	if len(result.Objects) == 0 {
+		t.Fatalf("pinned conversation projection was dropped: %s", b)
+	}
+}
+
 func TestNeutralIngestAnnotateAndTrackCoverageOverMCP(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
