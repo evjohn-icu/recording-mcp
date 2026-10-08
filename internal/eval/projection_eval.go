@@ -241,19 +241,18 @@ func runProjectionPass(ctx context.Context, db *sql.DB, store *memory.Store, fix
 	}
 
 	// Every reported conflict must mark the earlier object superseded and the
-	// later one current.
-	if len(first.Conflicts) > 0 {
-		honest := 0
-		for _, conflict := range first.Conflicts {
-			earlier, okE := objectByID(first.Objects, conflict.EarlierID)
-			later, okL := objectByID(first.Objects, conflict.LaterID)
-			if okE && okL && earlier.Status == projection.StatusSuperseded && later.Status == projection.StatusCurrent {
-				honest++
-			}
+	// later one current. This is a hard invariant, not a score: an inconsistent
+	// conflict pair fails the run loudly instead of being averaged away.
+	for _, conflict := range first.Conflicts {
+		earlier, okE := objectByID(first.Objects, conflict.EarlierID)
+		later, okL := objectByID(first.Objects, conflict.LaterID)
+		if !okE || !okL {
+			return metrics, fmt.Errorf("projection conflict %s -> %s references a missing object", conflict.EarlierID, conflict.LaterID)
 		}
-		metrics.SupersededNotCurrent = float64(honest) / float64(len(first.Conflicts))
-	} else {
-		metrics.SupersededNotCurrent = 1
+		if earlier.Status != projection.StatusSuperseded || later.Status != projection.StatusCurrent {
+			return metrics, fmt.Errorf("projection conflict %s -> %s is inconsistent: earlier=%s later=%s",
+				conflict.EarlierID, conflict.LaterID, earlier.Status, later.Status)
+		}
 	}
 
 	// Fixture expectations: every one must be satisfiable, otherwise the
@@ -288,6 +287,10 @@ func runProjectionPass(ctx context.Context, db *sql.DB, store *memory.Store, fix
 	}
 	if supersededTotal > 0 {
 		metrics.SupersededNotCurrent = float64(supersededHonest) / float64(supersededTotal)
+	} else {
+		// No fixture expectation asserts a superseded status, so the metric is
+		// vacuous; report the neutral value instead of a misleading 0.
+		metrics.SupersededNotCurrent = 1
 	}
 	if conflictTotal > 0 {
 		metrics.ConflictingHonest = float64(conflictHonest) / float64(conflictTotal)

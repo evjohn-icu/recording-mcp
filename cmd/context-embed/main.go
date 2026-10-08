@@ -35,8 +35,8 @@ func run() error {
 		modelURL     = flag.String("model-url", "", "OpenAI-compatible embeddings endpoint (required when provider=openai)")
 		model        = flag.String("model", "", "embedding model name (required when provider=openai)")
 		keyEnv       = flag.String("key-env", "", "environment variable holding the API key (openai only)")
-		conversation = flag.String("conversation", "", "index only this conversation id (default: all)")
-		prune        = flag.Bool("prune", false, "delete embedding rows whose artifact no longer exists")
+		conversation = flag.String("conversation", "", "index only this conversation id (default: all); the id must exist")
+		prune        = flag.Bool("prune", false, "delete embedding rows whose artifact no longer exists (scoped to --conversation when set)")
 	)
 	flag.Parse()
 	if flag.NArg() != 0 {
@@ -58,12 +58,24 @@ func run() error {
 
 	ctx := context.Background()
 	ix := &semantic.Indexer{DB: store.DB(), Provider: provider}
-	report, err := ix.IndexConversation(ctx, strings.TrimSpace(*conversation))
+	conversationID := strings.TrimSpace(*conversation)
+	if conversationID != "" {
+		// A scoped run must fail loudly on a typo instead of printing an
+		// all-zero report and exiting 0.
+		var exists int
+		if err := store.DB().QueryRowContext(ctx, `SELECT COUNT(*) FROM conversations WHERE id=?`, conversationID).Scan(&exists); err != nil {
+			return fmt.Errorf("look up conversation %q: %w", conversationID, err)
+		}
+		if exists == 0 {
+			return fmt.Errorf("conversation %q not found", conversationID)
+		}
+	}
+	report, err := ix.IndexConversation(ctx, conversationID)
 	if err != nil {
 		return err
 	}
 	if *prune {
-		pruned, err := ix.Prune(ctx)
+		pruned, err := ix.PruneConversation(ctx, conversationID)
 		if err != nil {
 			return err
 		}

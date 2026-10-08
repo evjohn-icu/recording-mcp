@@ -104,9 +104,9 @@ type SemanticRetriever interface {
 ```sh
 # 索引（hash provider，默认）
 bin/context-embed --db data/context-memory.db --provider hash
-# 仅索引一个会话
+# 仅索引一个会话（id 必须存在，否则非零退出）
 bin/context-embed --db data/context-memory.db --provider hash --conversation conv-xxx
-# 清理工件已不存在的索引行
+# 清理工件已不存在的索引行（带 --conversation 时只清理该会话）
 bin/context-embed --db data/context-memory.db --prune
 
 # 真实 embedding 端点（opt-in）

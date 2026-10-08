@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"recordingmcp/internal/memory"
@@ -123,12 +124,31 @@ func (ix *Indexer) IndexConversation(ctx context.Context, conversationID string)
 // Prune deletes embedding rows whose artifact no longer exists in turns or
 // notes and returns the number of rows removed.
 func (ix *Indexer) Prune(ctx context.Context) (int, error) {
+	return ix.prune(ctx, "")
+}
+
+// PruneConversation prunes only the embedding rows of one conversation, so a
+// scoped indexing run cleans up exactly what it touched.
+func (ix *Indexer) PruneConversation(ctx context.Context, conversationID string) (int, error) {
+	if strings.TrimSpace(conversationID) == "" {
+		return ix.Prune(ctx)
+	}
+	return ix.prune(ctx, conversationID)
+}
+
+func (ix *Indexer) prune(ctx context.Context, conversationID string) (int, error) {
 	if ix == nil || ix.DB == nil {
 		return 0, errors.New("semantic: indexer database is required")
 	}
-	res, err := ix.DB.ExecContext(ctx, `DELETE FROM memory_embeddings
-		WHERE (kind='turn' AND NOT EXISTS(SELECT 1 FROM turns t WHERE t.id=memory_embeddings.artifact_id))
-		   OR (kind='note' AND NOT EXISTS(SELECT 1 FROM notes n WHERE n.id=memory_embeddings.artifact_id))`)
+	query := `DELETE FROM memory_embeddings
+		WHERE ((kind='turn' AND NOT EXISTS(SELECT 1 FROM turns t WHERE t.id=memory_embeddings.artifact_id))
+		    OR (kind='note' AND NOT EXISTS(SELECT 1 FROM notes n WHERE n.id=memory_embeddings.artifact_id)))`
+	args := []any{}
+	if conversationID != "" {
+		query += ` AND conversation_id=?`
+		args = append(args, conversationID)
+	}
+	res, err := ix.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("semantic: prune: %w", err)
 	}

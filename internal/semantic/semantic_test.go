@@ -275,6 +275,43 @@ func TestIndexIncludesStaleAndAmbientButSearchFiltersThem(t *testing.T) {
 	}
 }
 
+func TestPruneConversationIsScoped(t *testing.T) {
+	db := openTestDB(t)
+	seedConversation(t, db, "conv:a", "rec:a")
+	seedConversation(t, db, "conv:b", "rec:b")
+	seedTurn(t, db, "t:a", "conv:a", "rec:a", "甲会话内容")
+	seedTurn(t, db, "t:b", "conv:b", "rec:b", "乙会话内容")
+
+	ix := &Indexer{DB: db, Provider: NewHashProvider(64)}
+	if _, err := ix.IndexAll(context.Background()); err != nil {
+		t.Fatalf("index: %v", err)
+	}
+	// Orphan the artifacts of both conversations, then prune only conv:a.
+	mustExec(t, db, `DELETE FROM turns WHERE id IN ('t:a','t:b')`)
+	pruned, err := ix.PruneConversation(context.Background(), "conv:a")
+	if err != nil {
+		t.Fatalf("prune conversation: %v", err)
+	}
+	if pruned != 1 {
+		t.Fatalf("scoped prune removed %d rows, want 1", pruned)
+	}
+	var remaining int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM memory_embeddings WHERE conversation_id='conv:b'`).Scan(&remaining); err != nil {
+		t.Fatal(err)
+	}
+	if remaining != 1 {
+		t.Fatalf("out-of-scope rows removed: %d left in conv:b", remaining)
+	}
+	// An unscoped Prune then removes the rest.
+	pruned, err = ix.Prune(context.Background())
+	if err != nil {
+		t.Fatalf("prune: %v", err)
+	}
+	if pruned != 1 {
+		t.Fatalf("global prune removed %d rows, want 1", pruned)
+	}
+}
+
 func TestSearchRespectsConversationFilterAndLimit(t *testing.T) {
 	db := openTestDB(t)
 	seedConversation(t, db, "conv:a", "rec:a")

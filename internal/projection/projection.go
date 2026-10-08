@@ -63,7 +63,6 @@ type Object struct {
 	TopicIDs        []string `json:"topic_ids,omitempty"`
 	PersonIDs       []string `json:"person_ids,omitempty"`
 	LinkIDs         []string `json:"link_ids,omitempty"`
-	UpdatedAtMS     *int64   `json:"updated_at_ms,omitempty"`
 	ConflictWith    []string `json:"conflict_with,omitempty"`
 }
 
