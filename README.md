@@ -26,6 +26,7 @@ flowchart TD
 ## 已实现 / 实验 / 计划
 
 - ✅ 已实现：转写摄入与修订取代（stale 追踪）、extract/publish 候选记忆链路、话题关联提议与人工复核、说话人绑定与修订级身份投影、环境音分离、混合检索（字面 + 语义 + 已确认链接分支 + 融合打分与逐条来源 `retrieval_sources`）、上下文投影 v0（`get_current_context`）、确定性离线评估、任务队列 worker。
+- ✅ 转写配套工具：lite 兜底转写流水线、ASR 修复提案与服务健康判别（`scripts/`，见下文「转写工具链」）。
 - 🧪 实验：`build_context` 返回的包结构（items/evidence/coverage/gaps/trace/ranking）、语义后端默认使用离线哈希嵌入器（真实端点可选开启）、投影 v0 的规则集（笔记类型映射与否定线索）。
 - 🚧 计划：FTS5 字面索引与字面分支的 n-gram 覆盖率打分、真值引擎（`conflicting` 状态）、模型辅助的投影增强、`project` 记忆类型。
 
@@ -54,6 +55,20 @@ MCP 客户端里 `tools/list` 可见 27 个工具（19 个记忆工具 + 8 个�
 ```
 
 返回的每个对象携带 `evidence_turn_ids`、`derived_from`、`status`（current/superseded/unresolved）与 `conflicts`。
+
+## 转写工具链（ASR 配套）
+
+围绕 `asr-ingest` 的三个离线辅助工具（Python 3 标准库 + ffmpeg/ffprobe；key 走环境变量或
+`--key`，不落盘）：
+
+| 工具 | 用途 |
+| --- | --- |
+| `scripts/lite-transcribe.py` | ASR plan 配额不可用时的兜底转写：`doubao-seed-2.1-lite` 多模态逐字转写，静音对齐分块、VAD 跳过无人声块、逐块质检与块首补转、断点续跑，输出带 `[mm:ss]` 标记的逐字稿（[docs/lite-transcribe.md](docs/lite-transcribe.md)） |
+| `scripts/asr-repair.py` | 定向修复：库内 ASR 与 lite 稿按时间分桶比对，最差分歧跨度出提案（`repairs.md`）；仅对空/`(听不清)` 密集的 turn 受控落库，原文留档可回溯（[docs/asr-repair.md](docs/asr-repair.md)） |
+| `scripts/asr-health.sh` | `asr-ingest` 批量失败时的三层判别（DNS / TLS / 会话探针），区分网络故障与服务端配额拒绝，`--wait` 轮询恢复后可接续补跑（[docs/asr-health.md](docs/asr-health.md)） |
+
+典型补录流程：`asr-health.sh` 确认配额状态 → 可用则 `asr-ingest` 正常入库；不可用则
+`lite-transcribe.py` 出逐字稿，恢复后再 `asr-ingest` 补库、`asr-repair.py` 做质量对齐。
 
 ## 核心概念
 
