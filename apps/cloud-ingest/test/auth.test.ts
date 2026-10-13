@@ -119,6 +119,45 @@ describe("auth", () => {
     expect(await errorCodeOf(res)).toBe("unauthorized");
   });
 
+  it("returns 403 forbidden_scope when a valid device token calls an admin route", async () => {
+    const dev = await pairDevice();
+    const res = await SELF.fetch(`${BASE}/v1/admin/pairing-codes`, {
+      method: "POST",
+      headers: { ...VERSION_HEADERS, authorization: `Bearer ${dev.token}`, "content-type": "application/json" },
+      body: JSON.stringify({ owner: "default" }),
+    });
+    expect(res.status).toBe(403);
+    expect(await errorCodeOf(res)).toBe("forbidden_scope");
+  });
+
+  it("returns 401 token_revoked when a revoked device token calls an admin route", async () => {
+    const dev = await pairDevice();
+    const revoke = await SELF.fetch(`${BASE}/v1/admin/devices/${dev.deviceId}/revoke`, {
+      method: "POST",
+      headers: { ...VERSION_HEADERS, authorization: `Bearer ${ADMIN_TOKEN}` },
+    });
+    expect(revoke.status).toBe(200);
+
+    const res = await SELF.fetch(`${BASE}/v1/admin/pairing-codes`, {
+      method: "POST",
+      headers: { ...VERSION_HEADERS, authorization: `Bearer ${dev.token}`, "content-type": "application/json" },
+      body: JSON.stringify({ owner: "default" }),
+    });
+    expect(res.status).toBe(401);
+    expect(await errorCodeOf(res)).toBe("token_revoked");
+  });
+
+  it("returns 403 forbidden_scope when a valid sync token calls an admin route", async () => {
+    const sync = await mintSyncToken();
+    const res = await SELF.fetch(`${BASE}/v1/admin/pairing-codes`, {
+      method: "POST",
+      headers: { ...VERSION_HEADERS, authorization: `Bearer ${sync.token}`, "content-type": "application/json" },
+      body: JSON.stringify({ owner: "default" }),
+    });
+    expect(res.status).toBe(403);
+    expect(await errorCodeOf(res)).toBe("forbidden_scope");
+  });
+
   it("rejects /v1/* requests missing X-Ingest-Version with 400 unsupported_protocol_version", async () => {
     const res = await SELF.fetch(`${BASE}/v1/recordings`, { method: "POST", body: JSON.stringify({}) });
     expect(res.status).toBe(400);

@@ -2,16 +2,23 @@
 
 import type { Env } from "./index";
 import { ApiError, json } from "./errors";
-import { bearerToken, sha256Hex } from "./auth";
+import { authenticate, bearerToken, sha256Hex } from "./auth";
 import { MAX_JSON_BODY_BYTES, RATE_LIMITS, rateLimit, readJsonWithLimit } from "./limits";
 import { pairingCodeHash, randomBase32 } from "./pairing";
 
+// 管理面门禁（契约 §3）：
+//   ADMIN_TOKEN 未配置 → 路由视为不存在（404，不带错误体）；
+//   Bearer == ADMIN_TOKEN → 放行；
+//   Bearer 为有效（未撤销）device/sync 凭据 → 403 forbidden_scope（角色无权）；
+//   Bearer 已撤销 → 401 token_revoked；其余（缺失/未知）→ 401 unauthorized。
 // 返回非 null 时直接作为响应（admin 关闭 → 404）。
-function adminAuth(request: Request, env: Env): Response | null {
+async function adminAuth(request: Request, env: Env): Promise<Response | null> {
   if (!env.ADMIN_TOKEN) return new Response("not found", { status: 404 });
   const token = bearerToken(request);
-  if (!token || token !== env.ADMIN_TOKEN) throw new ApiError("unauthorized", "admin token required");
-  return null;
+  if (!token) throw new ApiError("unauthorized", "admin token required");
+  if (token === env.ADMIN_TOKEN) return null;
+  const principal = await authenticate(request, env);
+  throw new ApiError("forbidden_scope", `endpoint requires the admin token (role ${principal.role} is not authorized)`);
 }
 
 async function limitAdmin(request: Request, env: Env): Promise<void> {
@@ -24,7 +31,7 @@ async function upsertOwner(env: Env, owner: string, nowIso: string): Promise<voi
 }
 
 export async function handleAdminPairingCode(request: Request, env: Env): Promise<Response> {
-  const gate = adminAuth(request, env);
+  const gate = await adminAuth(request, env);
   if (gate) return gate;
   await limitAdmin(request, env);
 
@@ -52,7 +59,7 @@ export async function handleAdminPairingCode(request: Request, env: Env): Promis
 }
 
 export async function handleAdminSyncToken(request: Request, env: Env): Promise<Response> {
-  const gate = adminAuth(request, env);
+  const gate = await adminAuth(request, env);
   if (gate) return gate;
   await limitAdmin(request, env);
 
@@ -86,7 +93,7 @@ export async function handleAdminSyncToken(request: Request, env: Env): Promise<
 }
 
 export async function handleAdminRevokeDevice(request: Request, env: Env, deviceId: string): Promise<Response> {
-  const gate = adminAuth(request, env);
+  const gate = await adminAuth(request, env);
   if (gate) return gate;
   await limitAdmin(request, env);
 
@@ -104,7 +111,7 @@ export async function handleAdminRevokeDevice(request: Request, env: Env, device
 }
 
 export async function handleAdminRevokeSyncToken(request: Request, env: Env, tokenId: string): Promise<Response> {
-  const gate = adminAuth(request, env);
+  const gate = await adminAuth(request, env);
   if (gate) return gate;
   await limitAdmin(request, env);
 
