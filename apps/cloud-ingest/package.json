@@ -1,0 +1,25 @@
+{
+  "name": "@recording-mcp/cloud-ingest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ingest-v1 Cloudflare Worker: chunked PCM ingest (D1 + R2) with durable ACK semantics",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "migrate:local": "wrangler d1 migrations apply recording-mcp-ingest --local",
+    "deploy": "wrangler deploy",
+    "pair": "sh scripts/pair.sh"
+  },
+  "overrides": {
+    "workerd": "1.20260903.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.23.0",
+    "@cloudflare/workers-types": "5.20261013.1",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.11",
+    "wrangler": "4.129.0"
+  }
+}

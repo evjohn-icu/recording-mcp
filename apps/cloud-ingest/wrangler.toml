@@ -1,0 +1,20 @@
+name = "recording-mcp-ingest"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "recording-mcp-ingest"
+database_id = "local-recording-mcp-ingest"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "AUDIO"
+bucket_name = "recording-mcp-audio"
+
+[vars]
+EVENT_RETENTION_DAYS = "30"
+ENABLE_DEBUG_FAULTS = "0"
+
+[triggers]
+crons = ["17 3 * * *"]

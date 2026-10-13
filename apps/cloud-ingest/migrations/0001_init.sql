@@ -1,0 +1,11 @@
+CREATE TABLE owners(owner TEXT PRIMARY KEY, created_at TEXT NOT NULL);
+CREATE TABLE devices(device_id TEXT PRIMARY KEY, owner TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, revoked_at TEXT);
+CREATE TABLE pairing_codes(code_hash TEXT PRIMARY KEY, owner TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT, created_at TEXT NOT NULL);
+CREATE TABLE sync_tokens(token_id TEXT PRIMARY KEY, owner TEXT NOT NULL, label TEXT NOT NULL DEFAULT '', token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, revoked_at TEXT);
+CREATE TABLE recordings(owner TEXT NOT NULL, recording_id TEXT NOT NULL, device_id TEXT NOT NULL, codec TEXT NOT NULL, sample_rate INTEGER NOT NULL, channels INTEGER NOT NULL, recorded_at TEXT, timezone TEXT, state TEXT NOT NULL DEFAULT 'recording' CHECK(state IN ('recording','complete','deleted')), total_chunks INTEGER, total_samples INTEGER, total_duration_ms INTEGER, synced_at TEXT, transcription_state TEXT NOT NULL DEFAULT 'none' CHECK(transcription_state IN ('none','pending','ingested','failed','skipped')), created_at TEXT NOT NULL, finished_at TEXT, deleted_at TEXT, PRIMARY KEY(owner, recording_id));
+CREATE TABLE chunks(owner TEXT NOT NULL, recording_id TEXT NOT NULL, seq INTEGER NOT NULL, sample_offset INTEGER NOT NULL, sample_count INTEGER NOT NULL, bytes INTEGER NOT NULL, duration_ms INTEGER NOT NULL, sha256 TEXT NOT NULL, r2_key TEXT NOT NULL, uploaded_at TEXT NOT NULL, PRIMARY KEY(owner, recording_id, seq));
+CREATE TABLE events(id INTEGER PRIMARY KEY AUTOINCREMENT, owner TEXT NOT NULL, type TEXT NOT NULL, recording_id TEXT NOT NULL, seq INTEGER NOT NULL DEFAULT -1, payload_json TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE UNIQUE INDEX events_identity ON events(owner, type, recording_id, seq);
+CREATE INDEX events_owner_id ON events(owner, id);
+CREATE TABLE rate_counters(bucket TEXT NOT NULL, window_start INTEGER NOT NULL, count INTEGER NOT NULL, PRIMARY KEY(bucket, window_start));
+INSERT INTO owners(owner, created_at) VALUES('default', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
