@@ -118,6 +118,17 @@ CREATE INDEX IF NOT EXISTS turn_classes_class ON turn_classes(class);`
 const memoryEmbeddingsDDL = `CREATE TABLE IF NOT EXISTS memory_embeddings(kind TEXT NOT NULL CHECK(kind IN ('note','turn')), artifact_id TEXT NOT NULL, conversation_id TEXT NOT NULL, content_sha256 TEXT NOT NULL, provider_id TEXT NOT NULL, model_id TEXT NOT NULL, dims INTEGER NOT NULL, vector BLOB NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(kind, artifact_id, provider_id, model_id));
 CREATE INDEX IF NOT EXISTS memory_embeddings_conv ON memory_embeddings(conversation_id, kind);`
 
+// cloudSyncStateDDL adds the cloud-sync download state: a single-row cursor
+// into the ingest event log (sync_state), an append-only ledger of processed
+// events (sync_events), per-recording download/ingestion state
+// (sync_recordings) and per-chunk download provenance (sync_chunks). Rows are
+// written in the same SQLite transaction that advances the cursor, so a crash
+// never leaves a chunk downloaded without its bookkeeping.
+const cloudSyncStateDDL = `CREATE TABLE IF NOT EXISTS sync_state(id INTEGER PRIMARY KEY CHECK(id=1), cursor INTEGER NOT NULL DEFAULT 0, last_success_at INTEGER, last_error TEXT, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS sync_events(event_id INTEGER PRIMARY KEY, type TEXT NOT NULL, recording_id TEXT NOT NULL, seq INTEGER NOT NULL DEFAULT -1, payload_json TEXT NOT NULL, processed_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS sync_recordings(recording_id TEXT PRIMARY KEY, owner TEXT NOT NULL, device_id TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('downloading','downloaded','transcription_pending','ingested','skipped','deleted','failed')), total_chunks INTEGER, total_samples INTEGER, started_at TEXT, stitched_path TEXT, transcript_revision TEXT NOT NULL DEFAULT 'asr-v1', transcription_state TEXT NOT NULL DEFAULT 'none', last_error TEXT, acked_at INTEGER, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS sync_chunks(recording_id TEXT NOT NULL, seq INTEGER NOT NULL, sha256 TEXT NOT NULL, bytes INTEGER NOT NULL, file_path TEXT NOT NULL, downloaded_at INTEGER NOT NULL, PRIMARY KEY(recording_id, seq));`
+
 type migration struct {
 	version    int
 	name       string
@@ -152,6 +163,7 @@ var migrations = []migration{
 	{version: 10, name: "active-head-invariant", statements: statements(activeHeadIndexDDL)},
 	{version: 11, name: "turn-classes", statements: statements(turnClassesDDL)},
 	{version: 12, name: "memory-embeddings", statements: statements(memoryEmbeddingsDDL)},
+	{version: 13, name: "cloud-sync-state", statements: statements(cloudSyncStateDDL)},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`
