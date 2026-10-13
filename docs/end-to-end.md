@@ -13,7 +13,7 @@
 | crash-restart | `--crash-after-chunks 3` | 首跑 `exit 1` 后续跑续传，不重复上传已提交块，spool 清空 |
 | duplicate | 正常后重传首块 | `duplicates ≥ 1` 且云端 chunk 行数 == `total_chunks`（无重复记录） |
 | bad-checksum | 错误 sha + 异内容重放 | 观察码 `[validation_failed, conflict_checksum]` |
-| gap | 跳过 seq 2 | finish `409 sequence_gap`、`missing_sequences==[2]`、录音 `state=recording` |
+| gap | 跳过 seq 2 | finish `409 sequence_gap`、`missing_sequences==[2]`、录音 `state=recording`、无转写入库（`turns==0`，MCP verify 按设计跳过） |
 | r2-after-write 等 4 种 fault | `--scenario normal --fault <s>` | 500 后重试收敛到 `complete`；`/v1/sync` 事件无 `(type,recording_id,seq)` 重复 |
 
 隔离检查（normal 场景内执行，"场景 F"）：设备 B 跨 owner 读 A 的录音 → `404`；设备 token 调管理面 → `403 forbidden_scope`；sync token 上传 chunk → `403`；撤销后设备 token → `401 token_revoked`。

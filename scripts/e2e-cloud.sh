@@ -297,6 +297,13 @@ PYEOF
 		echo "spool 已清空"
 	fi
 
+	if [ "$s" = gap ]; then
+		# 录音未 complete → 不得有任何转写入库（context-sync 不推进游标、不拼接、不摄入）
+		turns=$(sqlite3 "$dir/context-memory.db" "select count(*) from turns" 2>/dev/null || echo 0)
+		[ "$turns" = "0" ] || fail "[$s] 录音未完成却产生了 $turns 条 turns"
+		echo "gap 无转写入库（turns=0，符合预期）"
+	fi
+
 	case "$s" in
 	r2-after-write | d1-manifest | d1-event | response-drop)
 		detail=$(curl -sf "$SERVER/v1/recordings/$RID" \

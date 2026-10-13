@@ -85,6 +85,7 @@
 | R2 写成功 + D1 失败 | 客户端重试：同 R2 key 覆盖写幂等，随后补 D1 → committed |
 | D1 提交成功 + 响应丢失 | 客户端重试 → `duplicate:true`，无新事件 |
 | 删除后旧事件重放 | 事件唯一索引阻止重复插入；音频读侧 `404` |
+| 已删除 recording 的后续操作 | `PUT chunk` / `finish` / 音频下载 → `404 recording_not_found`；`POST /v1/recordings` 同元数据重放 → `200 duplicate:true` 且 `state=deleted`（不复活、不产生新事件）；详情返回 tombstone（`state=deleted`） |
 
 持久化证据只认 R2 对象 + D1 行；内存、WebSocket、队列状态一律不算（本版本不使用 Queues/Durable Objects）。
 

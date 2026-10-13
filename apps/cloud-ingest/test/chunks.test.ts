@@ -8,8 +8,11 @@ import {
   VERSION_HEADERS,
   createRecording,
   decodeBase64,
+  deleteRecording,
   errorCodeOf,
   eventCount,
+  finishRecording,
+  getRecording,
   jsonObjectOf,
   pairDevice,
   putChunk,
@@ -137,6 +140,39 @@ describe("PUT /v1/recordings/{id}/chunks/{seq}", () => {
     expect(await errorCodeOf(replay)).toBe("recording_not_found");
     const fresh = await putChunk(dev, recordingId, 1, PCM, pcm440Vector.content_sha256);
     expect(fresh.status).toBe(404);
+  });
+
+  it("create replay on a deleted id returns duplicate with state=deleted and never resurrects", async () => {
+    const dev = await pairDevice();
+    const recordingId = crypto.randomUUID();
+    await createRecording(dev, recordingId);
+    expect((await deleteRecording(dev, recordingId)).status).toBe(200);
+
+    const replay = await createRecording(dev, recordingId);
+    expect(replay.status).toBe(200);
+    const data = await jsonObjectOf(replay);
+    expect(data.duplicate).toBe(true);
+    expect(data.state).toBe("deleted");
+
+    // 不复活：仍是一条 created 事件，详情保持 tombstone，音频上传依旧 404。
+    expect(await eventCount(recordingId, "recording.created")).toBe(1);
+    const detail = await jsonObjectOf(await getRecording(dev.token, recordingId));
+    expect(detail.state).toBe("deleted");
+    const chunk = await putChunk(dev, recordingId, 0, PCM, pcm440Vector.content_sha256);
+    expect(chunk.status).toBe(404);
+  });
+
+  it("finish on a deleted recording returns 404 and emits no finished event", async () => {
+    const dev = await pairDevice();
+    const recordingId = crypto.randomUUID();
+    await createRecording(dev, recordingId);
+    expect((await putChunk(dev, recordingId, 0, PCM, pcm440Vector.content_sha256)).status).toBe(200);
+    expect((await deleteRecording(dev, recordingId)).status).toBe(200);
+
+    const res = await finishRecording(dev, recordingId, 1, 16000, 1000);
+    expect(res.status).toBe(404);
+    expect(await errorCodeOf(res)).toBe("recording_not_found");
+    expect(await eventCount(recordingId, "recording.finished")).toBe(0);
   });
 
   describe("X-Debug-Fault injections (ENABLE_DEBUG_FAULTS=1)", () => {

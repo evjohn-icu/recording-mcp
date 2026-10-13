@@ -155,6 +155,13 @@ export async function getRecording(token: string, recordingId: string): Promise<
   return SELF.fetch(`${BASE}/v1/recordings/${recordingId}`, { headers: { ...VERSION_HEADERS, authorization: `Bearer ${token}` } });
 }
 
+export async function deleteRecording(dev: Device, recordingId: string): Promise<Response> {
+  return SELF.fetch(`${BASE}/v1/recordings/${recordingId}`, {
+    method: "DELETE",
+    headers: { ...VERSION_HEADERS, authorization: `Bearer ${dev.token}` },
+  });
+}
+
 export async function eventCount(recordingId: string, type: string): Promise<number> {
   const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM events WHERE recording_id = ? AND type = ?").bind(recordingId, type).first<{ n: number }>();
   return row?.n ?? 0;

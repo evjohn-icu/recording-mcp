@@ -1,6 +1,6 @@
 # 交付报告：android-cloud-sync-v1
 
-日期：2026-10-14 · 分支 `feat/android-cloud-sync`（基于 main `2febf1c`，共 9 个分阶段 commit，未 push）· 计划：`local://android-cloud-sync-v1-plan.md`
+日期：2026-10-14 · 分支 `feat/android-cloud-sync`（基于 main `2febf1c`，共 10 个分阶段 commit，未 push）· 计划：`local://android-cloud-sync-v1-plan.md`
 
 只记录真实执行过的命令与观察到的结果。"本地 Wrangler 通过"≠"真实 Cloudflare 已部署"；"fixture ASR 通过"≠"真实识别合格"；"APK 构建通过"≠"真机行为已验证"。
 
@@ -13,13 +13,15 @@
 | 3 | hermetic 演示 | `make demo` | PASS（data/demo，与 e2e 隔离） |
 | 4 | 契约向量 | `go run ./cmd/ingest-vectors`（连续两次） | 11 个文件逐字节一致；python 解码 base64 复算 sha256 与 `content_sha256`/`chunk_meta_ok` 一致；`openapi.yaml` 经 `yaml.safe_load` 解析成功 |
 | 5 | 向量漂移门 | `go test ./internal/cloudsync/ -run TestVectors`（含于 #1） | `ingestvectors.Build()` 与已提交文件逐字节相等 |
-| 6 | Worker 单测 | `npm run typecheck && npm test --prefix apps/cloud-ingest`（实际 `cd apps/cloud-ingest`） | tsc 0 错误；7 文件 **72/72 通过**（修复后连续 6 轮全绿） |
+| 6 | Worker 单测 | `npm run typecheck && npm test --prefix apps/cloud-ingest`（实际 `cd apps/cloud-ingest`） | tsc 0 错误；7 文件 **74/74 通过**（修复后连续多轮全绿） |
 | 7 | 本地云端冒烟 | `npx wrangler d1 migrations apply --local` + `wrangler dev` + curl | 迁移 0001 OK；`/healthz` → `{"status":"ok","version":"ingest-v1"}`；admin 签发配对码/sync token 成功 |
 | 8 | e2e 全场景 | `sh scripts/e2e-cloud.sh` | **10/10 场景 PASS**（详见下） |
 | 9 | 场景 F 隔离 | 同上（normal 场景内 4 条断言） | 跨 owner 404 / 设备 token 调管理面 403 `forbidden_scope` / sync token PUT 403 / 撤销后 401 `token_revoked` |
 | 10 | Android 单测+构建 | `cd apps/android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:testDebugUnitTest :app:assembleDebug` | **34/34**；APK `app/build/outputs/apk/debug/app-debug.apk` 12,896,644 B，sha256 `d4e702811e0e32e69dfa3262729ba4edc3c8a078e487f90e71a18d56f4f49ff9` |
 | 11 | Android-契约一致性 | `PcmChunkWriterTest`/`IngestApiTest`（含于 #10） | 分块字节与 `vectors/pcm_1s_440hz.json` 一致；`X-Chunk-Meta` 与 `chunk_meta_ok.json` 字面量一致 |
 | 12 | 最终验收目标 | #8 的 `normal` 场景 | 模拟录音 → 本地 Cloudflare 持久化 → `context-sync` 下载校验 → fixture ASR → 真实 `IngestTranscript` → pipeline drain → MCP `search_memory` 逐字命中 + `get_evidence_context` 非 stale + `indexing_status=ready` |
+
+口径说明（诚实声明）：e2e 的 pipeline drain 按计划使用 `--generator synthetic --allow-synthetic`（与 `make demo` 同口径）——extract/publish/curate/embed 各阶段的执行、任务队列、索引与检索路径是真实代码，但候选记忆的生成文本是确定性占位（非真实模型提炼；真实 `GENERATOR_API_KEY` 路径本轮 NOT_RUN）。原话（fixture 转写文本）的摄入、证据绑定与逐字检索不受此影响。
 
 ### e2e 场景明细（每场景独立 miniflare，日志在 `data/e2e/<s>/`）
 
@@ -61,6 +63,13 @@
 - **Go sync**：契约事件 payload 无 owner/device_id 字段 → 引擎接受可选回显并回退 `default`/`--device-id`；`sync_chunks` 无 sample_count 列 → 完备性用 `bytes/2`（服务端 durable-ACK 已保证 bytes==sample_count*2）；新增 `transcription_pending` 补转写扫描（`--asr off` 后重跑 `--asr fixture` 的唯一实现路径）；校验和失配记 `failed` 并放行后续事件（不堵塞流）。
 - **e2e**：`X-Debug-Fault` 仅随每块首次 PUT 发送（重试不带头），否则 500 注入永不收敛；场景 F 设备 B 用不同 owner 配对（同 owner 共享 recording 属合法行为）；gap 场景 `coverage_ok=false` 为设计使然。
 - **文档语言**：沿用仓库现状（中文叙述 + 英文标识符），未执行旧蓝图的"英文 README 为主"。
+
+## 评审轮（2026-10-14 自查 + 外部意见过滤后采纳项）
+
+- **契约补钉**：已删除 recording 的后续语义此前未冻结——实现为 `PUT chunk`/`finish`/音频下载 → `404 recording_not_found`，`POST /v1/recordings` 同元数据重放 → `200 duplicate:true` 且 `state=deleted`（不复活、无新事件），详情返回 tombstone。已写入 `contracts/ingest-v1/README.md` §5 幂等矩阵，并新增 2 个测试锁定（`chunks.test.ts`，含 `eventCount` 断言无复活/无 finished 事件）。
+- **gap 场景加严**：e2e 新增断言 `turns==0`（录音未 complete 时 context-sync 不得有任何转写入库），实测通过。
+- **报告修正**：commit 计数 9→10；补充"e2e pipeline 使用 `--generator synthetic --allow-synthetic`（计划规定、与 demo 同口径，生成文本为占位）"的口径声明。
+- 评审轮后复跑：`npm test` 74/74；`sh scripts/e2e-cloud.sh` 10/10 PASS（gap 新断言生效）；无残留 server 进程。
 
 ## 交付物
 
