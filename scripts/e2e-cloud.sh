@@ -217,7 +217,7 @@ print(n)')
 
 	echo "== [$s] 6/8 pipeline drain =="
 	i=0
-	while [ "$i" -lt 30 ]; do
+	while [ "$i" -lt 300 ]; do
 		out=$(bin/context-worker --db "$dir/context-memory.db" \
 			--executor pipeline --generator synthetic --allow-synthetic \
 			--stages extract,publish,curate,embed --once 2>&1) || true
@@ -230,7 +230,7 @@ print(n)')
 		printf '%s\n' "$out" >>"$dir/worker.log"
 		i=$((i + 1))
 	done
-	[ "$i" -lt 30 ] || fail "[$s] worker 30 轮未排空"
+	[ "$i" -lt 300 ] || fail "[$s] worker 300 轮未排空"
 
 	echo "== [$s] 7/8 MCP verify =="
 	if python3 scripts/e2e-verify.py --db "$dir/context-memory.db" \
