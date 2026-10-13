@@ -145,6 +145,10 @@ def main():
     items = page.get("items") or []
     conv = next((c for c in items
                  if c.get("recording_id") == args.recording_id), None)
+    if conv is None:
+        conv = next((c for c in items
+                     if c.get("title") in ("Recording %s" % args.recording_id,
+                                           args.recording_id)), None)
     if conv is None and len(items) == 1:
         conv = items[0]
     if conv is None:

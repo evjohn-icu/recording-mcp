@@ -16,12 +16,20 @@ SCENARIOS="normal offline-recover crash-restart duplicate bad-checksum gap r2-af
 
 WPID=""
 
+stop_wrangler() {
+	# wrangler(node) 派生 workerd 子进程；必须整组终止，否则 workerd 孤儿占端口。
+	# dash 内建 kill 不认负 pid，必须用外部 /bin/kill（procps/uutils 均支持 -- -PGID）。
+	[ -n "$WPID" ] || return 0
+	/bin/kill -TERM -- "-$WPID" 2>/dev/null || kill "$WPID" 2>/dev/null || true
+	wait "$WPID" 2>/dev/null || true
+	# 双保险：按 entry 端口清掉可能残留的 workerd
+	pkill -f "socket-addr=entry=localhost:$PORT" 2>/dev/null || true
+	/bin/kill -KILL -- "-$WPID" 2>/dev/null || true
+	WPID=""
+}
+
 cleanup() {
-	if [ -n "$WPID" ]; then
-		kill "$WPID" 2>/dev/null || true
-		wait "$WPID" 2>/dev/null || true
-		WPID=""
-	fi
+	stop_wrangler
 }
 trap cleanup EXIT INT TERM
 
@@ -121,8 +129,11 @@ run_scenario() {
 		{ tail -n 30 "$dir/migrate.log" >&2; fail "[$s] d1 migrations 失败"; }
 
 	echo "== [$s] 2/8 wrangler dev =="
+	if curl -s -o /dev/null --max-time 2 "$SERVER/healthz" 2>/dev/null; then
+		fail "[$s] 端口 $PORT 仍被占用（上一场景 server 未退出）"
+	fi
 	(cd apps/cloud-ingest &&
-		exec npx wrangler dev --port "$PORT" --persist-to "$ROOT/$dir/.wrangler-state") \
+		exec setsid npx wrangler dev --port "$PORT" --persist-to "$ROOT/$dir/.wrangler-state") \
 		> "$dir/wrangler.log" 2>&1 &
 	WPID=$!
 	ready=""
@@ -233,7 +244,10 @@ print(n)')
 	[ "$i" -lt 300 ] || fail "[$s] worker 300 轮未排空"
 
 	echo "== [$s] 7/8 MCP verify =="
-	if python3 scripts/e2e-verify.py --db "$dir/context-memory.db" \
+	# gap 场景按契约永不 complete → 无转写入库 → 无可检索内容，跳过 MCP 断言
+	if [ "$s" = gap ]; then
+		echo "[$s] 跳过 MCP verify（录音未完成属预期）"
+	elif python3 scripts/e2e-verify.py --db "$dir/context-memory.db" \
 		--recording-id "$RID" \
 		--expect-phrase "fixture transcript recording=$RID segment=00" \
 		>"$dir/verify.log" 2>&1; then
@@ -320,9 +334,7 @@ print("sync events OK: %d events for %s, no duplicate identity" % (mine, sys.arg
 		run_isolation_checks "$RID"
 	fi
 
-	kill "$WPID" 2>/dev/null || true
-	wait "$WPID" 2>/dev/null || true
-	WPID=""
+	stop_wrangler
 	n=0
 	while curl -s -o /dev/null --max-time 2 "$SERVER/healthz" 2>/dev/null && [ "$n" -lt 25 ]; do
 		sleep 0.2
