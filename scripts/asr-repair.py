@@ -12,17 +12,20 @@ Modes:
                    worst-diverging spans (top --max-windows)
   --span A-B       repair explicit time range(s) in seconds (repeatable), proposal unless --apply
 
---apply is conservative: a span is rewritten ONLY when every overlapped ASR turn is empty or
+--apply is conservative: a span is repaired ONLY when every overlapped ASR turn is empty or
 (听不清)-dominated (clear garbage; diff against lite may otherwise be overlapping speech, not
-an ASR error — those stay proposals in repairs.md). Rewrites are in-place: DB row content +
-turn_json via (start,end,text) match (turn ids differ across ingests), original text kept in
-turn_json.repaired.original; empty lite result blanks the turn.
+an ASR error — those stay proposals in repairs.md). Apply is versioned and offline: for each
+touched segment it writes <run>/repairs/<segment>-repair-normalized.json (asr-input/0.1)
+whose transcript_revision supersedes the current one (supersedes_revision set); nothing is
+written to the database or to the original normalized files. Import the printed command with
+bin/import-transcript — the old revision stays archived automatically, so the original text
+survives as audit history without any backup step. Empty lite result blanks the turn.
 
 Usage:
   scripts/asr-repair.py --run <stem> --lite /path/to/<stem>.lite.txt --audio-root /path/to/RECORD
   scripts/asr-repair.py --run <stem> --span 28-31 --apply
 """
-import argparse, base64, difflib, json, os, re, sqlite3, subprocess, sys, time, urllib.request
+import argparse, base64, difflib, json, os, re, subprocess, sys, time, urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -183,20 +186,16 @@ def main():
     log(f'wrote {run_dir}/repairs.md + repairs.json')
 
     if not args.apply:
-        log('(proposal mode; add --apply to rewrite turns)')
+        log('(proposal mode; add --apply to write versioned repair files)')
         return
-    db = sqlite3.connect(args.db)
-    db.row_factory = sqlite3.Row
-    # resolve the recording's DB id by duration (ingest-time ids are random hashes)
-    dur_ms = max((t.get('global_end_ms') or 0) for t in turns)
-    rid = db.execute('SELECT id FROM recordings WHERE duration_ms BETWEEN ? AND ?',
-                     (dur_ms - 2000, dur_ms + 2000)).fetchall()
-    if len(rid) != 1:
-        sys.exit(f'cannot resolve recording id: {len(rid)} candidates by duration {dur_ms}ms')
-    rid = rid[0]['id']
-    db_rows = db.execute('SELECT id, global_start_ms, global_end_ms, content FROM turns '
-                         'WHERE recording_id=?', (rid,)).fetchall()
-    applied = matched = 0
+    # Versioned apply: never touch the database or the original normalized
+    # files. Each touched segment yields <run>/repairs/<segment>-repair-
+    # normalized.json (asr-input/0.1) whose transcript_revision supersedes the
+    # current one, so importing it archives the old attachment (with the
+    # original text) as audit history — the revision model keeps the originals,
+    # the script stays backup-free.
+    repairs_dir = run_dir / 'repairs'
+    fixes = {}  # turn id -> (new_text, span_ms)
     for p in proposals:
         a_ms, b_ms = p['span_s'][0] * 1000, p['span_s'][1] * 1000
         sel = turns_in_span(turns, a_ms, b_ms)
@@ -204,53 +203,56 @@ def main():
             log(f"  hold [{p['span_s']}]: ASR side has real content -> proposal only "
                 f"(diff may be overlapping speech, not error)")
             continue
-        # map normalized turns to DB rows by (start,end,content) — ids differ across ingests;
-        # empty-text turns were never ingested (content NOT NULL) -> normalized-only repair
-        updates, normalized_only = [], []
-        for t in sel:
-            row = next((r for r in db_rows if r['global_start_ms'] == t['global_start_ms']
-                        and r['global_end_ms'] == t['global_end_ms']
-                        and (r['content'] or '') == (t['text'] or '')), None)
-            if row is None:
-                if not (t['text'] or '').strip():
-                    normalized_only.append(t)
-                else:
-                    log(f"  warn: no DB row for non-empty turn at {t['global_start_ms']}ms")
-                continue
-            updates.append((t, row))
         lite_n = norm(p['lite'])
         new = lite_n if lite_n and lite_n not in ('无有效语音', '听不清') else ''
-        if normalized_only:
-            log(f'  info: {len(normalized_only)} empty turn(s) -> normalized.json only (never ingested)')
-        for t, row in updates:
-            tj_raw = db.execute('SELECT turn_json FROM turns WHERE id=?', (row['id'],)).fetchone()[0]
-            tj = json.loads(tj_raw)
-            tj['text'] = new
-            tj['repaired'] = {'tool': 'asr-repair', 'span_ms': [int(a_ms), int(b_ms)],
-                              'original_text': row['content']}
-            cur = db.execute('UPDATE turns SET content=?, turn_json=? WHERE id=?',
-                             (new, json.dumps(tj, ensure_ascii=False), row['id']))
-            if cur.rowcount != 1:
-                sys.exit(f'UPDATE matched {cur.rowcount} rows for {row["id"]} — aborting')
-            matched += 1
-        # normalized.json in place (DB-matched turns + empty-text turns)
-        for p2 in run_dir.glob('segments/segment-*-normalized.json'):
-            data = json.loads(p2.read_text())
-            touched = False
-            for t in data['turns']:
-                if any(t['id'] == u[0]['id'] for u in updates) or \
-                   any(t['id'] == e['id'] for e in normalized_only):
-                    new = lite_n if lite_n and lite_n not in ('无有效语音', '听不清') else ''
-                    t['repaired'] = {'tool': 'asr-repair', 'span_ms': [int(a_ms), int(b_ms)],
-                                     'original_text': t['text']}
-                    t['text'] = new
-                    touched = True
-            if touched:
-                p2.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding='utf-8')
-        applied += len(sel)
-    db.commit()
-    db.close()
-    log(f'applied: {matched} DB row(s) rewritten across {applied} turn(s); originals in turn_json.repaired')
+        for t in sel:
+            fixes[t['id']] = (new, (int(a_ms), int(b_ms)))
+    if not fixes:
+        log('applied: no span passed the garbage guard; nothing to repair')
+        return
+    repairs_dir.mkdir(exist_ok=True)
+    written = 0
+    for p2 in sorted(run_dir.glob('segments/segment-*-normalized.json')):
+        data = json.loads(p2.read_text(encoding='utf-8'))
+        touched = {t['id'] for t in data.get('turns', []) if t.get('id') in fixes}
+        if not touched:
+            continue
+        seg_stem = p2.name[:-len('-normalized.json')]
+        target = repairs_dir / f'{seg_stem}-repair-normalized.json'
+        src = json.loads(json.dumps(data.get('source') or {}))  # deep copy
+        orig_rev = src.get('transcript_revision') or ''
+        if not orig_rev:
+            sys.exit(f'{p2.name}: source.transcript_revision missing; cannot derive a superseding revision')
+        # <orig>-r1, or one past the -rN recorded in an existing repair file.
+        n = 1
+        if target.exists():
+            prev = json.loads(target.read_text(encoding='utf-8'))['source']['transcript_revision']
+            m = re.fullmatch(re.escape(orig_rev) + r'-r(\d+)', prev)
+            if not m:
+                sys.exit(f'{target}: existing repair revision {prev!r} does not extend '
+                         f'{orig_rev!r}; refusing to overwrite — inspect or remove the file')
+            n = int(m.group(1)) + 1
+        src['transcript_revision'] = f'{orig_rev}-r{n}'
+        src['supersedes_revision'] = orig_rev
+        turns_out = []
+        for t in data.get('turns', []):
+            if t.get('id') in touched:
+                fix, span = fixes[t['id']]
+                t = dict(t)
+                t['repaired'] = {'tool': 'asr-repair', 'span_ms': list(span),
+                                 'original_text': t.get('text') or ''}
+                t['text'] = fix
+            turns_out.append(t)
+        out = {'contract_version': data.get('contract_version'), 'source': src, 'turns': turns_out}
+        if 'raw_source' in data:
+            out['raw_source'] = data['raw_source']
+        target.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')
+        written += 1
+        log(f'  {p2.name}: {len(touched)} turn(s) -> {target.name} '
+            f'(revision {src["transcript_revision"]} supersedes {orig_rev})')
+        log(f'  apply with: bin/import-transcript --db {args.db} --input {target}')
+    log(f'applied: {len(fixes)} turn(s) across {written} segment file(s) under {repairs_dir}; '
+        f'no DB writes — originals stay archived via the revision model')
 
 
 if __name__ == '__main__':

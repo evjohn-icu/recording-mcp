@@ -1,7 +1,11 @@
 // Package projection derives, at read time, the current context objects a
 // consumer should see: people, topics, commitments, preferences and events,
-// each with its evidence, provenance and a status of current, superseded or
-// unresolved. Nothing is persisted: every call rebuilds the projection from
+// each with its evidence, provenance and a status of current, proposed,
+// superseded or unresolved. Commitments and preferences derived from notes
+// are always proposed with reason "unconfirmed": no automatic pass may promote
+// an intention, request or constraint to an asserted fact — a consumer must
+// treat proposed objects as candidates pending explicit human review.
+// Nothing is persisted: every call rebuilds the projection from
 // the stored rows, so it is always consistent with the current state of the
 // memory database and can never drift from it.
 //
@@ -41,6 +45,7 @@ type Status string
 
 const (
 	StatusCurrent     Status = "current"
+	StatusProposed    Status = "proposed"
 	StatusSuperseded  Status = "superseded"
 	StatusConflicting Status = "conflicting"
 	StatusUnresolved  Status = "unresolved"
@@ -404,6 +409,12 @@ func projectNote(note noteRow) (Object, bool) {
 	if timeless {
 		return Object{}, false
 	}
+	// Commitments and preferences are never auto-confirmed: the note says what
+	// someone intended, requested or constrained, not that it is settled fact.
+	status, statusReason := StatusCurrent, ""
+	if kind == KindCommitment || kind == KindPreference {
+		status, statusReason = StatusProposed, "unconfirmed"
+	}
 	subject := ""
 	if len(note.topicIDs) > 0 {
 		subject = note.topicIDs[0]
@@ -415,7 +426,8 @@ func projectNote(note noteRow) (Object, bool) {
 		Kind:            kind,
 		Subject:         subject,
 		Summary:         note.summary,
-		Status:          StatusCurrent,
+		Status:          status,
+		StatusReason:    statusReason,
 		Confidence:      conf,
 		EvidenceTurnIDs: append([]string(nil), note.evidence...),
 		DerivedFrom:     []string{"note:" + note.id},
@@ -434,6 +446,12 @@ func applyCommitmentConflicts(objects []Object, primaryStart map[string]*int64) 
 	for i := range objects {
 		obj := &objects[i]
 		if obj.Kind != KindCommitment {
+			continue
+		}
+		// Proposed (unconfirmed) commitments are not asserted facts, so the
+		// supersede-cue rule must not demote them: cancellation keywords in
+		// someone's later talk do not erase an unconfirmed intention.
+		if obj.Status != StatusCurrent {
 			continue
 		}
 		if _, ok := groups[obj.Subject]; !ok {

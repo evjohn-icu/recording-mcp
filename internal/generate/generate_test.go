@@ -94,8 +94,8 @@ func TestOpenAICompatGenerate(t *testing.T) {
 			if gotBody["model"] != "glm-5.3-flash" {
 				t.Errorf("request model = %v", gotBody["model"])
 			}
-			if temp, ok := gotBody["temperature"].(float64); !ok || temp != 0 {
-				t.Errorf("request temperature = %v, want 0", gotBody["temperature"])
+			if _, ok := gotBody["temperature"]; ok {
+				t.Errorf("request temperature = %v, want the key omitted by default", gotBody["temperature"])
 			}
 			msgs, ok := gotBody["messages"].([]any)
 			if !ok || len(msgs) != 2 {
@@ -127,6 +127,29 @@ func TestOpenAICompatGenerateNoAPIKey(t *testing.T) {
 	gen := &OpenAICompat{Endpoint: srv.URL, Model: "m"}
 	if _, _, err := gen.Generate(context.Background(), "s", nil); err != nil {
 		t.Fatalf("Generate: %v", err)
+	}
+}
+
+func TestOpenAICompatGenerateExplicitTemperature(t *testing.T) {
+	var gotTemp any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		var body map[string]any
+		if err := json.Unmarshal(raw, &body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		gotTemp = body["temperature"]
+		_, _ = io.WriteString(w, chatReply(`{"candidates":[]}`))
+	}))
+	defer srv.Close()
+
+	zero := 0.0
+	gen := &OpenAICompat{Endpoint: srv.URL, Model: "m", Temperature: &zero}
+	if _, _, err := gen.Generate(context.Background(), "s", nil); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if temp, ok := gotTemp.(float64); !ok || temp != 0 {
+		t.Fatalf("request temperature = %v, want explicit 0 when configured", gotTemp)
 	}
 }
 

@@ -13,6 +13,8 @@ import (
 	"recordingmcp/internal/generate"
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/process"
+	"recordingmcp/internal/semantic"
+	"recordingmcp/internal/worker"
 )
 
 // e2eResult builds one final ASR segment for the end-to-end revision test.
@@ -232,4 +234,52 @@ func TestEndToEndSupersedeReprocess(t *testing.T) {
 	if !archived {
 		t.Fatalf("first annotation version %s not archived; history=%+v", firstVersion, history)
 	}
+
+	// --- embed round: the supersede cycle must re-index on its own ---
+	// The publish-time enqueueEmbed jobs are still queued, so the index status
+	// must honestly report pending; after the embed stage drains it must be
+	// ready again with no manual bin/context-embed run.
+	status, err := store.GetProcessingStatus(ctx, conv)
+	if err != nil {
+		t.Fatalf("processing status: %v", err)
+	}
+	if status.IndexingStatus != "pending" {
+		t.Fatalf("indexing_status = %q while embed jobs are queued, want pending", status.IndexingStatus)
+	}
+	embed := &EmbedHandler{DB: db, Provider: semantic.NewHashProvider(semantic.DefaultHashDims)}
+	// Drain the queued embed jobs through the real worker path so jobs are
+	// claimed AND completed, exactly as bin/context-worker would.
+	embedDone := false
+	for range 10 {
+		more, err := worker.RunOnce(ctx, worker.Config{
+			DB: db, WorkerID: "e2e-worker", Stages: []string{"embed"},
+			Lease: time.Minute, ProcessorVersion: "embed-v1",
+			Executor: embedExecutor{h: embed},
+		})
+		if err != nil {
+			t.Fatalf("embed worker run: %v", err)
+		}
+		if !more {
+			embedDone = true
+			break
+		}
+	}
+	if !embedDone {
+		t.Fatal("embed worker did not drain the queue")
+	}
+	status, err = store.GetProcessingStatus(ctx, conv)
+	if err != nil {
+		t.Fatalf("processing status after embed: %v", err)
+	}
+	if status.IndexingStatus != "ready" {
+		t.Fatalf("indexing_status = %q after the supersede round, want ready", status.IndexingStatus)
+	}
+}
+
+// embedExecutor adapts EmbedHandler to the worker.Executor interface for the
+// supersede re-index regression.
+type embedExecutor struct{ h *EmbedHandler }
+
+func (e embedExecutor) Execute(ctx context.Context, job process.Job) (string, error) {
+	return e.h.Execute(ctx, job)
 }

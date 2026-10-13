@@ -180,8 +180,11 @@ func TestNoteKindMappingProjectsCommitmentPreferenceEvent(t *testing.T) {
 	result := f.build(Request{})
 
 	intention := objectOf(t, result, "n:int")
-	if intention.Kind != KindCommitment || intention.Confidence != 0.6 || intention.Status != StatusCurrent {
+	if intention.Kind != KindCommitment || intention.Confidence != 0.6 {
 		t.Fatalf("n:int = %+v", intention)
+	}
+	if intention.Status != StatusProposed || intention.StatusReason != "unconfirmed" {
+		t.Fatalf("n:int status = %s/%s, want proposed/unconfirmed", intention.Status, intention.StatusReason)
 	}
 	if intention.Subject != "topic:move" {
 		t.Fatalf("n:int subject = %q", intention.Subject)
@@ -190,13 +193,22 @@ func TestNoteKindMappingProjectsCommitmentPreferenceEvent(t *testing.T) {
 	if request.Kind != KindCommitment || request.Confidence != 0.5 {
 		t.Fatalf("n:req = %+v", request)
 	}
+	if request.Status != StatusProposed || request.StatusReason != "unconfirmed" {
+		t.Fatalf("n:req status = %s/%s, want proposed/unconfirmed", request.Status, request.StatusReason)
+	}
 	constraint := objectOf(t, result, "n:cons")
 	if constraint.Kind != KindPreference || constraint.Confidence != 0.6 {
 		t.Fatalf("n:cons = %+v", constraint)
 	}
+	if constraint.Status != StatusProposed || constraint.StatusReason != "unconfirmed" {
+		t.Fatalf("n:cons status = %s/%s, want proposed/unconfirmed", constraint.Status, constraint.StatusReason)
+	}
 	obs := objectOf(t, result, "n:obs")
 	if obs.Kind != KindEvent || obs.Confidence != 0.5 {
 		t.Fatalf("n:obs = %+v", obs)
+	}
+	if obs.Status != StatusCurrent {
+		t.Fatalf("n:obs status = %s, want current", obs.Status)
 	}
 	if want := []string{"t:1"}; len(obs.EvidenceTurnIDs) != 1 || obs.EvidenceTurnIDs[0] != want[0] {
 		t.Fatalf("n:obs evidence = %v, want %v", obs.EvidenceTurnIDs, want)
@@ -218,7 +230,10 @@ func TestNoteKindMappingProjectsCommitmentPreferenceEvent(t *testing.T) {
 	}
 }
 
-func TestConflictRuleMarksEarlierCommitmentSuperseded(t *testing.T) {
+// TestConflictRuleSparesProposedCommitments pins the semantic-safety rule:
+// derived commitments are proposed (unconfirmed), so the supersede-cue rule
+// must not demote them and no conflict is reported.
+func TestConflictRuleSparesProposedCommitments(t *testing.T) {
 	f := newProjectionFixture(t)
 	f.conversation("conv-1", "rec-1")
 	f.recording("rec-1", "conv-1", new("2026-03-01T09:00:00+08:00"))
@@ -233,31 +248,21 @@ func TestConflictRuleMarksEarlierCommitmentSuperseded(t *testing.T) {
 	result := f.build(Request{})
 
 	earlier := objectOf(t, result, "n:early")
-	if earlier.Status != StatusSuperseded || earlier.StatusReason != "negated_by_later_note" {
-		t.Fatalf("n:early = %+v", earlier)
+	if earlier.Status != StatusProposed || earlier.StatusReason != "unconfirmed" {
+		t.Fatalf("n:early = %+v, want proposed/unconfirmed", earlier)
 	}
-	if len(earlier.ConflictWith) != 1 || earlier.ConflictWith[0] != "n:later" {
-		t.Fatalf("n:early conflict_with = %v", earlier.ConflictWith)
+	if len(earlier.ConflictWith) != 0 {
+		t.Fatalf("n:early conflict_with = %v, want none", earlier.ConflictWith)
 	}
 	later := objectOf(t, result, "n:later")
-	if later.Status != StatusCurrent {
-		t.Fatalf("n:later = %+v", later)
+	if later.Status != StatusProposed || later.StatusReason != "unconfirmed" {
+		t.Fatalf("n:later = %+v, want proposed/unconfirmed", later)
 	}
-	if len(later.ConflictWith) != 1 || later.ConflictWith[0] != "n:early" {
-		t.Fatalf("n:later conflict_with = %v", later.ConflictWith)
+	if len(later.ConflictWith) != 0 {
+		t.Fatalf("n:later conflict_with = %v, want none", later.ConflictWith)
 	}
-	if len(result.Conflicts) != 1 {
-		t.Fatalf("conflicts = %+v, want exactly one", result.Conflicts)
-	}
-	conflict := result.Conflicts[0]
-	if conflict.EarlierID != "n:early" || conflict.LaterID != "n:later" || conflict.Kind != KindCommitment {
-		t.Fatalf("conflict = %+v", conflict)
-	}
-	if conflict.Cue != "暂时不" {
-		t.Fatalf("cue = %q, want 暂时不", conflict.Cue)
-	}
-	if conflict.Subject != "topic:move" {
-		t.Fatalf("conflict subject = %q", conflict.Subject)
+	if len(result.Conflicts) != 0 {
+		t.Fatalf("conflicts = %+v, want none: a cancellation cue in unconfirmed talk must not supersede a proposed commitment", result.Conflicts)
 	}
 }
 
@@ -274,8 +279,8 @@ func TestConflictRuleIgnoresNonCueNegation(t *testing.T) {
 	result := f.build(Request{})
 
 	for _, id := range []string{"n:early", "n:later"} {
-		if obj := objectOf(t, result, id); obj.Status != StatusCurrent {
-			t.Fatalf("%s = %+v, want current", id, obj)
+		if obj := objectOf(t, result, id); obj.Status != StatusProposed {
+			t.Fatalf("%s = %+v, want proposed", id, obj)
 		}
 	}
 	if len(result.Conflicts) != 0 {

@@ -15,13 +15,16 @@ import (
 const maxResponseBytes = 4 << 20
 
 // OpenAICompat is a Generator backed by an OpenAI-compatible chat completions
-// endpoint. It sends a single temperature-0 completion request and parses the
-// strict-JSON candidates object from the assistant message.
+// endpoint. It sends a single completion request and parses the strict-JSON
+// candidates object from the assistant message. Temperature is optional: nil
+// omits the temperature field from the request body entirely, which keeps
+// endpoints that do not accept the parameter working.
 type OpenAICompat struct {
-	Endpoint   string
-	APIKey     string
-	Model      string
-	HTTPClient *http.Client
+	Endpoint    string
+	APIKey      string
+	Model       string
+	Temperature *float64
+	HTTPClient  *http.Client
 }
 
 // chatMessage is one entry of the chat messages array.
@@ -30,11 +33,12 @@ type chatMessage struct {
 	Content string `json:"content"`
 }
 
-// chatRequest is the OpenAI chat completions request body.
+// chatRequest is the OpenAI chat completions request body. Temperature is a
+// pointer so a nil value omits the key instead of sending an explicit zero.
 type chatRequest struct {
 	Model       string        `json:"model"`
 	Messages    []chatMessage `json:"messages"`
-	Temperature float64       `json:"temperature"`
+	Temperature *float64      `json:"temperature,omitempty"`
 }
 
 // chatResponse decodes the subset of the chat completions response we need.
@@ -91,7 +95,7 @@ func (c *OpenAICompat) Generate(ctx context.Context, state string, evidenceTurnI
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt(state, evidenceTurnIDs)},
 		},
-		Temperature: 0,
+		Temperature: c.Temperature,
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("generate: encode request: %w", err)

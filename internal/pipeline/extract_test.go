@@ -954,6 +954,102 @@ func TestExtractHandlerNilGeneratorRecordsCoverage(t *testing.T) {
 	}
 }
 
+func TestExtractHandlerNilEngineNilGeneratorSucceeds(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(100)
+	seedConversation(t, db, "conv-noengine", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "t1", seg: 0, start: &start, orig: 1},
+		{id: "t2", seg: 1, start: nil, orig: 2},
+	})
+	job := enqueueExtract(t, db, "conv-noengine")
+
+	handler := &ExtractHandler{DB: db, ProcessorVersion: "extract-v1"}
+	ref, err := handler.Execute(ctx, job)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if ref != "decision-run:none" {
+		t.Fatalf("ref = %q, want %q", ref, "decision-run:none")
+	}
+	var runs int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM decision_runs`).Scan(&runs); err != nil {
+		t.Fatalf("count runs: %v", err)
+	}
+	if runs != 0 {
+		t.Fatalf("decision_runs = %d, want 0 without an engine", runs)
+	}
+	covered := coverageRows(t, db, "conv-noengine", "extract-v1")
+	if len(covered) != 2 {
+		t.Fatalf("coverage rows = %d (%v), want 2", len(covered), covered)
+	}
+	if n := countPublishJobs(t, db, "conv-noengine"); n != 0 {
+		t.Fatalf("publish jobs = %d, want 0 without a generator", n)
+	}
+	validated, err := ListCandidates(ctx, db, "conv-noengine", "validated")
+	if err != nil {
+		t.Fatalf("list candidates: %v", err)
+	}
+	if len(validated) != 0 {
+		t.Fatalf("candidates = %d, want 0 without a generator", len(validated))
+	}
+}
+
+func TestExtractHandlerNilEngineWithGeneratorProducesCandidates(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(100)
+	seedConversation(t, db, "conv-noengine-gen", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "t1", seg: 0, start: &start, orig: 1},
+		{id: "t2", seg: 1, start: nil, orig: 2},
+	})
+	job := enqueueExtract(t, db, "conv-noengine-gen")
+
+	drafts := []generate.Draft{{
+		Kind:            "observation",
+		Summary:         "用户提到要安排周五的会议",
+		TopicTitle:      "会议安排",
+		EvidenceTurnIDs: []string{"t1"},
+	}}
+	handler := &ExtractHandler{DB: db, ProcessorVersion: "extract-v1", Generator: stubGenerator{drafts: drafts, model: "stub"}}
+	ref, err := handler.Execute(ctx, job)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if ref != "decision-run:none+candidates:1" {
+		t.Fatalf("ref = %q, want %q", ref, "decision-run:none+candidates:1")
+	}
+	var runs int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM decision_runs`).Scan(&runs); err != nil {
+		t.Fatalf("count runs: %v", err)
+	}
+	if runs != 0 {
+		t.Fatalf("decision_runs = %d, want 0 without an engine", runs)
+	}
+	validated, err := ListCandidates(ctx, db, "conv-noengine-gen", "validated")
+	if err != nil {
+		t.Fatalf("list candidates: %v", err)
+	}
+	if len(validated) != 1 {
+		t.Fatalf("validated candidates = %d, want 1", len(validated))
+	}
+	if n := countPublishJobs(t, db, "conv-noengine-gen"); n != 1 {
+		t.Fatalf("publish jobs = %d, want 1", n)
+	}
+}
+
 func TestLoadTurnsByIDsOrderingAndFilter(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()

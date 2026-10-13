@@ -1,6 +1,6 @@
-// Command context-worker runs processing jobs from the SQLite queue with a
-// synthetic executor. It is the first end-to-end consumer of internal/process
-// and internal/worker.
+// Command context-worker runs processing jobs from the SQLite queue with the
+// real pipeline executor by default. It is the first end-to-end consumer of
+// internal/process and internal/worker.
 package main
 
 import (
@@ -27,6 +27,7 @@ import (
 	"recordingmcp/internal/migrations"
 	"recordingmcp/internal/pipeline"
 	"recordingmcp/internal/process"
+	"recordingmcp/internal/semantic"
 	"recordingmcp/internal/worker"
 )
 
@@ -40,22 +41,29 @@ func main() {
 func run() error {
 	dbPath := flag.String("db", "", "path to the SQLite database (required)")
 	workerID := flag.String("worker-id", defaultWorkerID(), "worker identity recorded on claims")
-	stages := flag.String("stages", "extract,publish,curate", "comma-separated stage names to claim")
+	stages := flag.String("stages", "extract,publish,curate,embed", "comma-separated stage names to claim")
 	lease := flag.Duration("lease", 30*time.Second, "lease duration held while executing a job")
 	poll := flag.Duration("poll", time.Second, "idle poll interval")
 	once := flag.Bool("once", false, "claim and process at most one job, then exit")
-	executor := flag.String("executor", "synthetic", "executor implementation: synthetic|pipeline")
-	decisionURL := flag.String("decision-url", "http://127.0.0.1:8765/v1/systemone", "decision service endpoint used by the pipeline executor")
+	executor := flag.String("executor", "pipeline", "executor implementation: pipeline|synthetic")
+	allowSynthetic := flag.Bool("allow-synthetic", false, "permit the synthetic generator (placeholder candidates); demos and tests only")
+	decisionURL := flag.String("decision-url", "", "decision service endpoint used by the pipeline executor; empty = skip Decision evaluation, extract still distills")
 	decisionModel := flag.String("decision-model", "jev-style-2b-v2", "decision model name used by the pipeline executor")
-	generatorName := flag.String("generator", "synthetic", "candidate generator used by the pipeline executor: synthetic|openai")
+	generatorName := flag.String("generator", "off", "candidate generator used by the pipeline executor: off|synthetic|openai; off = only raw turns are retrievable, no candidates")
 	generatorURL := flag.String("generator-url", "", "OpenAI-compatible chat completions endpoint used by the openai generator")
 	generatorModel := flag.String("generator-model", "glm-5.3-flash", "generator model name")
+	generatorTemperature := flag.Float64("generator-temperature", -1, "sampling temperature sent to the generator; negative = omit the field from the request")
 	generatorKeyEnv := flag.String("generator-key-env", "GENERATOR_API_KEY", "environment variable holding the generator API key")
 	generatorTimeout := flag.Duration("generator-timeout", 180*time.Second, "HTTP timeout for the openai generator")
 	curatorCommand := flag.String("curator-command", "", "shell command running one curation pass; it must write proposals to $CONTEXT_PROPOSALS and may read $CONTEXT_DB. Empty completes curate jobs as skipped")
 	curatorTimeout := flag.Duration("curator-timeout", 15*time.Minute, "timeout for one curator command run")
 	curatorModel := flag.String("curator-model", "curator", "model identifier recorded on memory links written by the curate stage")
 	syntheticDelay := flag.Duration("synthetic-delay", 0, "artificial delay for the synthetic executor")
+	embedProvider := flag.String("embed-provider", "hash", "embedding provider for the embed stage: hash|openai|off; must match the query side (bin/context-memory) or search falls back to literal matching")
+	embedDims := flag.Int("embed-dims", 256, "embedding dimension count for the embed provider")
+	embedEndpoint := flag.String("embed-endpoint", "", "OpenAI-compatible embeddings endpoint used by the openai embed provider")
+	embedModel := flag.String("embed-model", "", "embedding model name used by the openai embed provider")
+	embedKeyEnv := flag.String("embed-key-env", "EMBED_API_KEY", "environment variable holding the embedding API key")
 	flag.Parse()
 
 	if flag.NArg() != 0 {
@@ -90,16 +98,34 @@ func run() error {
 	}
 	defer store.Close()
 
-	gen, err := buildGenerator(*generatorName, *generatorURL, *generatorModel, *generatorKeyEnv, *generatorTimeout)
+	var generatorTemp *float64
+	if *generatorTemperature >= 0 {
+		generatorTemp = generatorTemperature
+	}
+	gen, err := buildGenerator(*generatorName, *generatorURL, *generatorModel, *generatorKeyEnv, generatorTemp, *generatorTimeout)
 	if err != nil {
 		return err
+	}
+
+	executorName := strings.ToLower(strings.TrimSpace(*executor))
+	generatorChoice := strings.ToLower(strings.TrimSpace(*generatorName))
+	if err := validateRealMode(executorName, generatorChoice, *allowSynthetic); err != nil {
+		return err
+	}
+	if executorName == "synthetic" {
+		fmt.Fprintln(os.Stderr, "context-worker: synthetic executor acknowledges jobs without real processing (demo/test only)")
+		fmt.Fprintln(os.Stderr, "context-worker: embed jobs are acknowledged without indexing — get_processing_status.indexing_status stays pending")
 	}
 
 	absDBPath, err := filepath.Abs(*dbPath)
 	if err != nil {
 		return fmt.Errorf("resolve database path: %w", err)
 	}
-	inner, err := buildExecutor(*executor, db, store, *decisionURL, *decisionModel, gen, *syntheticDelay, absDBPath, *curatorCommand, *curatorModel, *curatorTimeout)
+	embedProviderImpl, err := buildEmbedProvider(*embedProvider, *embedDims, *embedEndpoint, *embedModel, *embedKeyEnv)
+	if err != nil {
+		return err
+	}
+	inner, err := buildExecutor(*executor, db, store, *decisionURL, *decisionModel, gen, *syntheticDelay, absDBPath, *curatorCommand, *curatorModel, *curatorTimeout, embedProviderImpl)
 	if err != nil {
 		return err
 	}
@@ -132,21 +158,35 @@ func run() error {
 }
 
 // buildExecutor selects the executor implementation named by --executor. The
-// pipeline executor routes extract, publish and curate jobs to their stage
-// handlers; the curate handler runs the configured curator command and stores
-// the proposals it produces.
-func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, decisionModel string, gen generate.Generator, syntheticDelay time.Duration, dbPath, curatorCommand, curatorModel string, curatorTimeout time.Duration) (worker.Executor, error) {
+// pipeline executor routes extract, publish, curate and embed jobs to their
+// stage handlers; the curate handler runs the configured curator command and
+// stores the proposals it produces.
+func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, decisionModel string, gen generate.Generator, syntheticDelay time.Duration, dbPath, curatorCommand, curatorModel string, curatorTimeout time.Duration, embedProvider semantic.Provider) (worker.Executor, error) {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "synthetic":
 		return worker.Synthetic{Delay: syntheticDelay}, nil
 	case "pipeline":
+		// Decision is optional: an empty URL runs extraction without any
+		// recorded decision runs instead of calling a service that is not up.
+		var engine decision.Engine
+		if strings.TrimSpace(decisionURL) != "" {
+			engine = &decision.SystemOneClient{
+				Endpoint:   decisionURL,
+				Model:      decisionModel,
+				HTTPClient: &http.Client{Timeout: 30 * time.Second},
+			}
+		}
 		return &stageExecutor{stages: map[string]worker.Executor{
 			"extract": &pipeline.ExtractHandler{
 				DB:               db,
-				Engine:           &decision.SystemOneClient{Endpoint: decisionURL, Model: decisionModel},
+				Engine:           engine,
 				Endpoint:         decisionURL,
 				ProcessorVersion: "extract-v1",
 				Generator:        gen,
+			},
+			"embed": &pipeline.EmbedHandler{
+				DB:       db,
+				Provider: embedProvider,
 			},
 			"publish": &pipeline.PublishHandler{
 				DB:               db,
@@ -170,10 +210,13 @@ func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, de
 // buildGenerator selects the candidate generator named by --generator. The
 // openai generator reads its API key from the environment variable named by
 // --generator-key-env at startup and applies --generator-timeout to its HTTP
-// client.
-func buildGenerator(name, endpoint, model, keyEnv string, timeout time.Duration) (generate.Generator, error) {
+// client. "off" (or empty) returns a nil generator: extraction records
+// coverage without proposing candidates, so only raw turns are retrievable.
+func buildGenerator(name, endpoint, model, keyEnv string, temperature *float64, timeout time.Duration) (generate.Generator, error) {
 	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "", "synthetic":
+	case "", "off":
+		return nil, nil
+	case "synthetic":
 		return generate.Synthetic{}, nil
 	case "openai":
 		if strings.TrimSpace(endpoint) == "" {
@@ -184,13 +227,61 @@ func buildGenerator(name, endpoint, model, keyEnv string, timeout time.Duration)
 			apiKey = os.Getenv(keyEnv)
 		}
 		return &generate.OpenAICompat{
-			Endpoint:   endpoint,
-			APIKey:     apiKey,
-			Model:      model,
-			HTTPClient: &http.Client{Timeout: timeout},
+			Endpoint:    endpoint,
+			APIKey:      apiKey,
+			Model:       model,
+			Temperature: temperature,
+			HTTPClient:  &http.Client{Timeout: timeout},
 		}, nil
 	default:
-		return nil, fmt.Errorf("unknown generator %q (want synthetic or openai)", name)
+		return nil, fmt.Errorf("unknown generator %q (want off, synthetic or openai)", name)
+	}
+}
+
+// validateRealMode guards against silently running placeholder analysis: the
+// synthetic generator fabricates candidates that look analysed but are not.
+// It is allowed only with --allow-synthetic, which is meant for demos and
+// tests.
+func validateRealMode(executor, generator string, allowSynthetic bool) error {
+	if executor == "pipeline" && generator == "synthetic" && !allowSynthetic {
+		return fmt.Errorf("--generator synthetic produces placeholder candidates; pass --allow-synthetic for demos and tests only")
+	}
+	return nil
+}
+
+// buildEmbedProvider selects the embedding provider named by --embed-provider.
+// hash is the offline default so indexing never needs the network; openai
+// requires a configured endpoint and model; off disables indexing (embed jobs
+// succeed as skipped and the status surface reports indexing disabled).
+func buildEmbedProvider(name string, dims int, endpoint, model, keyEnv string) (semantic.Provider, error) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", "hash":
+		return semantic.NewHashProvider(dims), nil
+	case "off":
+		return nil, nil
+	case "openai":
+		if strings.TrimSpace(endpoint) == "" {
+			return nil, fmt.Errorf("--embed-endpoint is required for the openai embed provider")
+		}
+		if strings.TrimSpace(model) == "" {
+			return nil, fmt.Errorf("--embed-model is required for the openai embed provider")
+		}
+		if dims <= 0 {
+			return nil, fmt.Errorf("--embed-dims must be positive for the openai embed provider")
+		}
+		apiKey := ""
+		if strings.TrimSpace(keyEnv) != "" {
+			apiKey = os.Getenv(keyEnv)
+		}
+		return &semantic.OpenAICompatProvider{
+			Endpoint:   endpoint,
+			APIKey:     apiKey,
+			ModelName:  model,
+			Dimensions: dims,
+			HTTPClient: &http.Client{Timeout: 60 * time.Second},
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown embed provider %q (want hash, openai or off)", name)
 	}
 }
 

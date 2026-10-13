@@ -349,7 +349,7 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker,
 		pkg, e := contextbuild.Build(ctx, contextbuild.Deps{Store: store, DB: store.DB(), Reranker: rerank, Semantic: semantic}, in)
 		return nil, pkg, e
 	})
-	mcp.AddTool(s, read("get_current_context", "实验性：读取当前上下文投影（person / topic / commitment / preference / event 对象），带证据、来源、状态（current/superseded/unresolved）与冲突。全部由当前（非 stale、非 ambient）证据在读取时推导，可重复构建。提供 query 时先做一次小规模检索，把命中会话/主题作为硬性范围（该检索在显式 conversation_id/topic_id 之内执行，只会收窄不会放宽）；检索的 query 自身零召回（字面与语义分支都没命中）时，会在 unresolved 里追加一条 reason=no_retrieval_hits（kind 与 subject 为空，query 写在 detail 里），同时仍按请求的过滤条件返回投影。"), func(ctx context.Context, _ *mcp.CallToolRequest, in CurrentContextInput) (*mcp.CallToolResult, projection.Result, error) {
+	mcp.AddTool(s, read("get_current_context", "实验性：读取当前上下文投影（person / topic / commitment / preference / event 对象），带证据、来源、状态（current/proposed/superseded/unresolved）与冲突。由笔记派生的 commitment/preference 一律为 proposed 且 status_reason=unconfirmed：没有任何自动确认，消费方不得把 proposed 对象当作已确认事实。全部由当前（非 stale、非 ambient）证据在读取时推导，可重复构建。提供 query 时先做一次小规模检索，把命中会话/主题作为硬性范围（该检索在显式 conversation_id/topic_id 之内执行，只会收窄不会放宽）；检索的 query 自身零召回（字面与语义分支都没命中）时，会在 unresolved 里追加一条 reason=no_retrieval_hits（kind 与 subject 为空，query 写在 detail 里），同时仍按请求的过滤条件返回投影。"), func(ctx context.Context, _ *mcp.CallToolRequest, in CurrentContextInput) (*mcp.CallToolResult, projection.Result, error) {
 		after, e := parseRFC3339("started_after", in.StartedAfter)
 		if e != nil {
 			return nil, projection.Result{}, e

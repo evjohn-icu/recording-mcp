@@ -80,19 +80,17 @@
     {
       "kind": "commitment",
       "subject_note_id": "proj-move-1",
-      "status": "superseded",
-      "conflict_with_note_id": "proj-move-2"
+      "status": "proposed"
     },
     {
       "kind": "commitment",
       "subject_note_id": "proj-move-2",
-      "status": "current",
-      "conflict_with_note_id": "proj-move-1"
+      "status": "proposed"
     },
     {
       "kind": "preference",
       "subject_note_id": "proj-pref-1",
-      "status": "current"
+      "status": "proposed"
     },
     {
       "kind": "event",

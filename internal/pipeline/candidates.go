@@ -75,11 +75,13 @@ func candidateID(conversationID, kind, summary, evidenceJSON string) string {
 }
 
 // InsertCandidates stores validated and rejected drafts for one conversation
-// and returns their deterministic ids in draft order. Rows are inserted with
-// INSERT OR IGNORE so re-inserting the same candidate is a no-op; the returned
-// id is stable across repeats. runID and jobID are provenance only: a repeat of
-// the same content keeps the first producer's values. Every draft is written in
-// a single transaction.
+// and returns their deterministic ids in draft order. Re-inserting identical
+// content is a no-op, so the returned id is stable across retries and repeated
+// windows — except one heal: the same content first rejected (e.g. its evidence
+// fell outside the producing window) is replaced when a later window validates
+// it, so a scoped-window rejection can never permanently block a validated
+// candidate. A validated row is never demoted back to rejected. runID and
+// jobID are provenance only. Every draft is written in a single transaction.
 func InsertCandidates(ctx context.Context, db *sql.DB, conversationID, runID, jobID, generatorModel string, drafts []ValidatedDraft, now time.Time) ([]string, error) {
 	ids := make([]string, 0, len(drafts))
 
@@ -96,8 +98,14 @@ func InsertCandidates(ctx context.Context, db *sql.DB, conversationID, runID, jo
 		}
 		id := candidateID(conversationID, d.Kind, d.Summary, string(evidenceJSON))
 		if _, err := tx.ExecContext(ctx,
-			`INSERT OR IGNORE INTO memory_candidates(id, conversation_id, run_id, job_id, kind, summary, topic_title, evidence_turn_ids_json, interpretation_note, status, rejection_reason, generator_model, created_at)
-			 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO memory_candidates(id, conversation_id, run_id, job_id, kind, summary, topic_title, evidence_turn_ids_json, interpretation_note, status, rejection_reason, generator_model, created_at)
+			 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			 ON CONFLICT(id) DO UPDATE SET
+			   run_id = excluded.run_id, job_id = excluded.job_id,
+			   topic_title = excluded.topic_title, interpretation_note = excluded.interpretation_note,
+			   status = excluded.status, rejection_reason = excluded.rejection_reason,
+			   generator_model = excluded.generator_model, created_at = excluded.created_at
+			 WHERE memory_candidates.status = 'rejected' AND excluded.status = 'validated'`,
 			id, conversationID, nullableString(runID), nullableString(jobID), d.Kind, d.Summary,
 			d.TopicTitle, string(evidenceJSON), d.InterpretationNote, d.Status, d.RejectionReason,
 			generatorModel, now.UnixMilli(),

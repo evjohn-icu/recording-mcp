@@ -11,24 +11,26 @@
 | `id` | 对象的稳定标识：笔记对象即笔记行 id，话题对象即 topic id，人物对象即 person id |
 | `kind` | 五类之一：person / topic / commitment / preference / event |
 | `subject` | 归组键：承诺按主题组（`topic_ids_json[0]`，无主题则 `conversation:<id>`），话题与人物是其自身 id |
-| `status` | current / superseded / unresolved（`conflicting` 保留给未来真值引擎，v0 **绝不**输出） |
+| `status` | current / proposed / superseded / unresolved（`conflicting` 保留给未来真值引擎，v0 **绝不**输出） |
 | `confidence` | 固定的规则置信度，见下方映射表 |
 | `evidence_turn_ids` | 支撑该对象的当前、非 ambient 轮次 |
 | `derived_from` | 来源记录（`note:<id>` 或 `binding:<id>`） |
 | `conflict_with` | 冲突对端的对象 id（仅有冲突时出现） |
 
-状态优先级：`superseded`（冲突规则判定）> `unresolved`（证据缺失）> `current`。
+状态优先级：`superseded`（冲突规则判定）> `unresolved`（证据缺失）> `proposed`（笔记派生的承诺/偏好）> `current`。
+
+**语义安全（v0.1 起）**：`intention` / `request` / `constraint` 派生的对象一律为 `proposed` 且 `status_reason="unconfirmed"`。投影没有任何自动确认路径——说话人说"打算/请求/要求"不等于事实成立；消费方**不得**把 `proposed` 对象当作已确认承诺使用，必须先经显式人工复核。`observation` 派生的 event 仍为 `current`（它只断言"说过/发生过"，不断言未来）。
 
 ## 笔记类型映射
 
-| notes.kind | 投影 | 置信度 | 条件 |
-|---|---|---|---|
-| intention | commitment | 0.6 | 无 |
-| request | commitment | 0.5 | 无 |
-| constraint | preference | 0.6 | 无 |
-| observation | event | 0.5 | 仅当主证据轮次（ordinal 0）的 `global_start_ms` 非空 |
-| suggestion | 不投影 | — | 记入 `unresolved`，原因 `kind_not_projected_in_v0` |
-| observation（无时间锚） | 不投影 | — | 同上 |
+| notes.kind | 投影 | 置信度 | 状态 | 条件 |
+|---|---|---|---|---|
+| intention | commitment | 0.6 | `proposed` / `unconfirmed` | 无 |
+| request | commitment | 0.5 | `proposed` / `unconfirmed` | 无 |
+| constraint | preference | 0.6 | `proposed` / `unconfirmed` | 无 |
+| observation | event | 0.5 | `current` | 仅当主证据轮次（ordinal 0）的 `global_start_ms` 非空 |
+| suggestion | 不投影 | — | — | 记入 `unresolved`，原因 `kind_not_projected_in_v0` |
+| observation（无时间锚） | 不投影 | — | — | 同上 |
 
 笔记必须同时满足两条与检索层完全一致的过滤：非 stale（`NoteStalePredicate`）、主证据轮次非 ambient。
 

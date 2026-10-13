@@ -47,6 +47,12 @@ type ProcessingStatus struct {
 	AmbientTurns             int    `json:"ambient_turns"`
 	IdentityUnconfirmedTurns int    `json:"identity_unconfirmed_turns"`
 	AnalysisStatus           string `json:"analysis_status"`
+	// IndexingStatus reports the latest embed-stage job for the conversation:
+	// "pending" (no job, or queued/running/retry_wait), "ready" (succeeded and
+	// indexed), "failed" (attempts exhausted; rerun bin/context-embed or wait
+	// for the next successful embed job), or "disabled" (worker runs without
+	// an embedding provider).
+	IndexingStatus string `json:"indexing_status"`
 }
 
 func stableKey(kind string, parts ...string) string {
@@ -295,6 +301,23 @@ func (s *Store) IngestTranscript(ctx context.Context, result asrinput.Result) (I
 	}, time.Now()); err != nil {
 		return IngestReport{}, err
 	}
+	// Raw turns are retrievable before any distillation: the embed job runs in
+	// the same transaction so even a generator-off worker indexes the transcript.
+	embedPayload, err := json.Marshal(struct {
+		ConversationID string `json:"conversation_id"`
+	}{ConversationID: conversationID})
+	if err != nil {
+		return IngestReport{}, err
+	}
+	if _, _, err := process.EnqueueTx(ctx, tx, process.Spec{
+		Stage:           "embed",
+		InputSnapshotID: conversationID,
+		IdempotencyKey:  "embed|" + attachmentID,
+		PayloadJSON:     string(embedPayload),
+		MaxAttempts:     3,
+	}, time.Now()); err != nil {
+		return IngestReport{}, err
+	}
 	if err = tx.Commit(); err != nil {
 		return IngestReport{}, err
 	}
@@ -355,5 +378,39 @@ func (s *Store) GetProcessingStatus(ctx context.Context, conversationID string) 
 	if analyzed > 0 {
 		out.AnalysisStatus = "partial"
 	}
+	out.IndexingStatus, err = deriveIndexingStatus(ctx, s.db, conversationID)
+	if err != nil {
+		return ProcessingStatus{}, err
+	}
 	return out, nil
+}
+
+// deriveIndexingStatus maps the latest embed-stage job of a conversation onto
+// the index surface. With no embed job at all the index is still pending; a
+// succeeded job whose newest attempt skipped indexing (no embedding provider
+// configured) reports disabled; an exhausted job reports failed; everything in
+// flight stays pending until it lands.
+func deriveIndexingStatus(ctx context.Context, db *sql.DB, conversationID string) (string, error) {
+	var jobID, jobStatus string
+	err := db.QueryRowContext(ctx, `SELECT id, status FROM processing_jobs WHERE stage='embed' AND input_snapshot_id=? ORDER BY created_at DESC, rowid DESC LIMIT 1`, conversationID).Scan(&jobID, &jobStatus)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "pending", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	switch jobStatus {
+	case "failed":
+		return "failed", nil
+	case "succeeded":
+		var resultRef *string
+		if e := db.QueryRowContext(ctx, `SELECT result_ref FROM processing_attempts WHERE job_id=? ORDER BY attempt DESC LIMIT 1`, jobID).Scan(&resultRef); e == nil && resultRef != nil && strings.HasPrefix(*resultRef, "embed:skipped") {
+			return "disabled", nil
+		}
+		return "ready", nil
+	default:
+		// queued, running, retry_wait and cancelled jobs stay pending until a
+		// later embed job lands.
+		return "pending", nil
+	}
 }

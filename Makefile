@@ -15,3 +15,7 @@ build:
 
 test:
 	go test -race ./...
+
+.PHONY: demo
+demo:
+	sh scripts/demo.sh

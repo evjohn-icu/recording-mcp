@@ -42,9 +42,9 @@
 生成器实现 `Generator` 接口：输入渲染后的窗口状态与证据轮次 ID 列表，输出 `Draft`（`Kind`、`Summary`、`TopicTitle`、`EvidenceTurnIDs`、`InterpretationNote`）列表与模型名。两个实现：
 
 - **Synthetic**：确定性合成生成器，由状态哈希派生 0–2 条候选草稿，不依赖外部服务。
-- **OpenAICompat**：调用 OpenAI 兼容的 chat 端点，`POST {model, messages:[system,user], temperature:0}`；提示词要求返回严格 JSON `{"candidates":[{"kind","summary","topic","evidence_turn_ids","interpretation_note"}]}`，解析容忍 ```json 代码围栏；非 2xx 响应或坏 JSON 都返回错误。
+- **OpenAICompat**：调用 OpenAI 兼容的 chat 端点，`POST {model, messages:[system,user], temperature?}`（`temperature` 为指针：未配置时整个键从请求体省略，兼容不支持该参数的端点；`--generator-temperature` ≥0 时下发）；提示词要求返回严格 JSON `{"candidates":[{"kind","summary","topic","evidence_turn_ids","interpretation_note"}]}`，解析容忍 ```json 代码围栏；非 2xx 响应或坏 JSON 都返回错误。
 
-`context-worker` 通过 `--generator synthetic|openai`（默认 `synthetic`）选择；`openai` 模式需配合 `--generator-url`（端点地址），API key 从 `--generator-key-env` 指定的环境变量读取（默认 `GENERATOR_API_KEY`），`--generator-model` 指定模型名（默认 `glm-5.3-flash`）。
+`context-worker` 通过 `--generator off|synthetic|openai`（默认 `off`）选择；`openai` 模式需配合 `--generator-url`（端点地址），API key 从 `--generator-key-env` 指定的环境变量读取（默认 `GENERATOR_API_KEY`），`--generator-model` 指定模型名（默认 `glm-5.3-flash`），`--generator-temperature` 配置采样温度（负数 = 请求体省略该字段，兼容不支持该参数的端点）。`off`（默认）= 诚实降级：extract 只记录覆盖、不产候选、不入队 publish，进入"仅原话可检索"模式（原话由摄入时的 embed 任务 + 字面检索保证可查）。`synthetic` 生成占位候选，仅限演示/测试：必须显式传 `--allow-synthetic`，否则 worker 启动即报错。
 
 本机统一走 **Agent Plan** 地址 `https://ark.cn-beijing.volces.com/api/plan/v3/chat/completions`（key 放 `VOLC_API_KEY`；`glm-5.3-flash`、`deepseek-v4.1-flash` 实测可用，`doubao-seed-2.0-mini` 亦可用但偶发超时）。不要用 `https://ark.cn-beijing.volces.com/api/v3`——那是按量计费入口；plan/coding 是订阅制路由。
 
@@ -228,7 +228,7 @@ make build
   --metadata ./examples/asr/doubao-metadata.json --output ./data/normalized.json
 ./bin/import-transcript --db ./data/context-memory.db --input ./data/normalized.json
 
-# 合成执行器处理一次（默认 --executor synthetic）
+# pipeline 执行器处理一次（默认 --executor pipeline）
 ./bin/context-worker --db ./data/context-memory.db --once
 
 # 判断服务（二选一）：真实 Decision 2.0 服务（本机默认 127.0.0.1:8765）已可运行；
@@ -251,12 +251,20 @@ make build
 # 自动策展：publish 提交后运行 curator 命令；命令必须把提议写入 $CONTEXT_PROPOSALS，
 # 校验与入库由 worker 完成（scripts/run-curator.sh 会按 CONTEXT_DB 配置 MCP）
 ./bin/context-worker --db ./data/context-memory.db \
-  --executor pipeline --stages extract,publish,curate \
+  --executor pipeline --stages extract,publish,curate,embed \
   --curator-command 'scripts/run-curator.sh' \
   --curator-model volces-agent-01/glm-5.3-flash
 ```
 
-`context-worker` 的完整参数：`--db`（必填）、`--worker-id`（默认 主机名+随机后缀）、`--stages`（默认 `extract,publish,curate`）、`--lease`（默认 30s）、`--poll`（默认 1s）、`--once`、`--executor`（`synthetic|pipeline`，默认 `synthetic`）、`--decision-url`（默认 `http://127.0.0.1:8765/v1/systemone`）、`--decision-model`（默认 `jev-style-2b-v2`）、`--generator`（`synthetic|openai`，默认 `synthetic`）、`--generator-url`、`--generator-model`（默认 `glm-5.3-flash`）、`--generator-key-env`（默认 `GENERATOR_API_KEY`）、`--curator-command`（默认空，空则 curate 任务以 skipped 结束）、`--curator-timeout`（默认 15m）、`--curator-model`（默认 `curator`）、`--synthetic-delay`。启动时会先执行 `migrations.Apply`。本地 Decision 服务未部署时，`--executor pipeline` 的任务会失败并按可重试错误留在队列中；`--generator openai` 未提供 `--generator-url` 时启动即报错。
+### embed stage（发布后自动增量索引；M1 起）
+
+两个入队点：**摄入事务内**（`Store.IngestTranscript` 与 extract 任务同一事务，幂等键 `embed|<attachmentID>`，保证 generator=off / publish noop 时原话也被索引）与 **publish 提交后**（`publish:committed` 之后入队，幂等键 `embed|<conversationID>|<version>`；`publish:noop` 不入队）。处理复用 `internal/semantic.Indexer`（内容哈希幂等、stale 排除、`PruneConversation` 清孤儿行），结果引用形如 `embed:hash-ngram-v1/hash-ngram-v1+notes:N+turns:N+skipped:N+pruned:N`。
+
+`get_processing_status` 新增 `indexing_status`：`pending`（无 embed 任务或排队/执行/重试中）、`ready`（最近一次 embed 成功且真实索引）、`failed`（3 次重试耗尽；恢复命令为手动 `bin/context-embed --db ... --conversation <id>`，后续成功的 embed 任务会把状态带回 `ready`）、`disabled`（worker 以 `--embed-provider off` 运行，embed 任务以 `embed:skipped:no-provider` 成功结束）。
+
+worker 嵌入端与查询端默认一致（`hash`/256，开箱匹配）；`openai` 需两侧 flags 对齐（`--embed-provider openai --embed-endpoint ... --embed-model ... --embed-dims ... --embed-key-env EMBED_API_KEY` 与 `context-memory --semantic-provider openai ...`），不一致时查询侧降级到字面分支并在 `gaps` 说明，不报错。新增 flags：`--embed-provider`（默认 `hash`）、`--embed-dims`（默认 256）、`--embed-endpoint`、`--embed-model`、`--embed-key-env`（默认 `EMBED_API_KEY`）、`--allow-synthetic`（放行占位候选生成器）、`--generator-temperature`（默认 -1 = 请求体省略 temperature）。
+
+`context-worker` 的完整参数：`--db`（必填）、`--worker-id`（默认 主机名+随机后缀）、`--stages`（默认 `extract,publish,curate,embed`）、`--lease`（默认 30s）、`--poll`（默认 1s）、`--once`、`--executor`（`synthetic|pipeline`，默认 `pipeline`；`synthetic` 仅演示/测试，运行时打 stderr 警告）、`--decision-url`（默认空 = 不做 Decision 评估，extract 照常提炼；配置时 HTTP 超时 30s）、`--decision-model`（默认 `jev-style-2b-v2`）、`--generator`（`off|synthetic|openai`，默认 `off`；`synthetic` 需 `--allow-synthetic`）、`--generator-url`、`--generator-model`（默认 `glm-5.3-flash`）、`--generator-key-env`（默认 `GENERATOR_API_KEY`）、`--curator-command`（默认空，空则 curate 任务以 skipped 结束）、`--curator-timeout`（默认 15m）、`--curator-model`（默认 `curator`）、`--synthetic-delay`。启动时会先执行 `migrations.Apply`。`--executor synthetic` 运行时打 stderr 警告 `synthetic executor acknowledges jobs without real processing (demo/test only)`，并注明 embed 任务被空转确认、`get_processing_status.indexing_status` 停留 `pending`；`--generator openai` 未提供 `--generator-url` 时启动即报错。
 
 ## 与开发计划的对应
 

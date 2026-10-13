@@ -141,8 +141,11 @@ func TestGetCurrentContextProjectsSeededMemory(t *testing.T) {
 		t.Fatalf("objects = %s", b)
 	}
 	obj := result.Objects[0]
-	if obj.ID != "note:cc" || obj.Kind != "commitment" || obj.Status != "current" {
+	if obj.ID != "note:cc" || obj.Kind != "commitment" {
 		t.Fatalf("object = %+v", obj)
+	}
+	if obj.Status != "proposed" {
+		t.Fatalf("object status = %q, want proposed: derived commitments are never auto-confirmed", obj.Status)
 	}
 	if len(obj.EvidenceTurnIDs) != 1 || obj.EvidenceTurnIDs[0] != "turn:cc" {
 		t.Fatalf("evidence = %v", obj.EvidenceTurnIDs)

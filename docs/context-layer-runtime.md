@@ -59,7 +59,7 @@ make build
 
 记忆家族共 19 个工具（上表 14 个只读 + 5 个写入；写入工具仅在未加 `--read-only` 时注册）。同一二进制还承载 8 个事件原型工具，见 [contract.md](contract.md)。
 
-`build_context` 与 `get_current_context` 的语义召回由服务端标志控制：`--semantic-provider`（`off|hash|openai`，默认 `hash`，离线确定性嵌入器）、`--semantic-dims`（默认 256）、`--semantic-endpoint` / `--semantic-model` / `--semantic-key-env`（openai 端点配置）。语义索引由 `bin/context-embed` 离线构建（`memory_embeddings` 表，迁移 v12）。降级模式：`off` 或索引为空时语义分支退化为仅字面检索并在 `gaps` 里给出 `semantic_unavailable` / `semantic_index_empty`；未配置决策引擎时保持原有的 rerank 降级说明。stale 与 ambient 的隔离不变量同时作用于两条路径。
+`build_context` 与 `get_current_context` 的语义召回由服务端标志控制：`--semantic-provider`（`off|hash|openai`，默认 `hash`，离线确定性嵌入器）、`--semantic-dims`（默认 256）、`--semantic-endpoint` / `--semantic-model` / `--semantic-key-env`（openai 端点配置）。语义索引由 `bin/context-embed` 离线构建（`memory_embeddings` 表，迁移 v12）；M1 起无需手动：worker 的 embed stage 在**摄入事务内**与 **publish 提交后**各入队一次增量索引（复用 `semantic.Indexer`，内容哈希幂等），`get_processing_status.indexing_status` 报告 `pending|ready|failed|disabled`。降级模式：`off` 或索引为空时语义分支退化为仅字面检索并在 `gaps` 里给出 `semantic_unavailable` / `semantic_index_empty`；未配置决策引擎时保持原有的 rerank 降级说明。stale 与 ambient 的隔离不变量同时作用于两条路径。
 
 `list_memory_links` 与 `review_memory_link` 服务于关联建议层（见 [associations.md](associations.md)）：提议由 `context-associate` 写入并停留在 `proposed`，只有显式复核才改变状态；确认不代表合并话题。已确认且未失效的关联会作为混合检索的一个排序分支（`retrieval_sources` 含 `confirmed_link`），proposed/rejected 仍然不参与检索。
 

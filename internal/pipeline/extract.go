@@ -29,9 +29,12 @@ const defaultMaxChars = 8000
 const maxCandidateSummaryRunes = 1000
 
 // ExtractHandler is the extract-stage executor: it turns one conversation job
-// into recorded decision-engine evaluations. When Generator is set it also
-// derives memory candidates from each window's rendered state, validates and
-// persists them, and enqueues one idempotent publish job per window.
+// into decision-engine evaluations when Engine is set. Engine is optional:
+// with a nil Engine the windows are still rendered, covered and (when
+// Generator is set) distilled into candidates without any recorded decision
+// run. When Generator is set it also derives memory candidates from each
+// window's rendered state, validates and persists them, and enqueues one
+// idempotent publish job per window.
 type ExtractHandler struct {
 	DB               *sql.DB
 	Engine           decision.Engine
@@ -51,14 +54,12 @@ type ExtractHandler struct {
 //
 // With a Generator configured, every window additionally yields validated
 // memory candidates and a publish job. The returned reference is
-// "decision-run:<runID>+candidates:<validatedCount>", where validatedCount is
+// "decision-run:<runID>+candidates:<validatedCount>", where runID is the last
+// recorded decision run or "none" when Engine is nil, and validatedCount is
 // the number of candidates that passed validation across all windows.
 func (h *ExtractHandler) Execute(ctx context.Context, job process.Job) (string, error) {
 	if h.DB == nil {
 		return "", errors.New("pipeline: ExtractHandler.DB is required")
-	}
-	if h.Engine == nil {
-		return "", errors.New("pipeline: ExtractHandler.Engine is required")
 	}
 	var payload struct {
 		ConversationID string   `json:"conversation_id"`
@@ -118,12 +119,6 @@ func (h *ExtractHandler) Execute(ctx context.Context, job process.Job) (string, 
 	}
 	turns = speech
 
-	questions := BuildQuestions()
-	questionsJSON, err := json.Marshal(questions)
-	if err != nil {
-		return "", err
-	}
-
 	windows := BuildWindows(turns, maxTurnsPerWindow)
 	if len(windows) == 0 {
 		return "decision-run:none", nil
@@ -133,32 +128,45 @@ func (h *ExtractHandler) Execute(ctx context.Context, job process.Job) (string, 
 	validatedCount := 0
 	for _, w := range windows {
 		state := RenderState(turns, w, defaultMaxChars)
-		result, err := h.Engine.Evaluate(ctx, state, questions)
-		if err != nil {
-			return "", fmt.Errorf("pipeline: evaluate window: %w", err)
-		}
-		usageJSON, err := json.Marshal(result.Usage)
-		if err != nil {
-			return "", err
-		}
-		weightsVersion := result.WeightsVersion
-		if weightsVersion == "" {
-			weightsVersion = h.ProcessorVersion
-		}
-		runID, err := RecordDecisionRun(ctx, h.DB, RunRecord{
-			JobID:           job.ID,
-			InputSnapshotID: job.InputSnapshotID,
-			InputHash:       result.InputHash,
-			Model:           result.Model,
-			WeightsVersion:  weightsVersion,
-			Endpoint:        h.Endpoint,
-			QuestionsJSON:   string(questionsJSON),
-			UsageJSON:       string(usageJSON),
-			Attempt:         job.AttemptCount,
-			Answers:         result.Answers,
-		}, time.Now())
-		if err != nil {
-			return "", fmt.Errorf("pipeline: record decision run: %w", err)
+
+		// Engine is optional: without it no decision run is recorded and the
+		// empty run id flows into any candidates (memory_candidates.run_id is
+		// nullable), so extraction still works without a Decision service.
+		runID := ""
+		if h.Engine != nil {
+			questions := BuildQuestions()
+			questionsJSON, err := json.Marshal(questions)
+			if err != nil {
+				return "", err
+			}
+			result, err := h.Engine.Evaluate(ctx, state, questions)
+			if err != nil {
+				return "", fmt.Errorf("pipeline: evaluate window: %w", err)
+			}
+			usageJSON, err := json.Marshal(result.Usage)
+			if err != nil {
+				return "", err
+			}
+			weightsVersion := result.WeightsVersion
+			if weightsVersion == "" {
+				weightsVersion = h.ProcessorVersion
+			}
+			run, err := RecordDecisionRun(ctx, h.DB, RunRecord{
+				JobID:           job.ID,
+				InputSnapshotID: job.InputSnapshotID,
+				InputHash:       result.InputHash,
+				Model:           result.Model,
+				WeightsVersion:  weightsVersion,
+				Endpoint:        h.Endpoint,
+				QuestionsJSON:   string(questionsJSON),
+				UsageJSON:       string(usageJSON),
+				Attempt:         job.AttemptCount,
+				Answers:         result.Answers,
+			}, time.Now())
+			if err != nil {
+				return "", fmt.Errorf("pipeline: record decision run: %w", err)
+			}
+			runID = run
 		}
 		lastRunID = runID
 
@@ -185,10 +193,14 @@ func (h *ExtractHandler) Execute(ctx context.Context, job process.Job) (string, 
 		}
 	}
 
-	if h.Generator == nil {
-		return "decision-run:" + lastRunID, nil
+	runRef := lastRunID
+	if runRef == "" {
+		runRef = "none"
 	}
-	return "decision-run:" + lastRunID + "+candidates:" + strconv.Itoa(validatedCount), nil
+	if h.Generator == nil {
+		return "decision-run:" + runRef, nil
+	}
+	return "decision-run:" + runRef + "+candidates:" + strconv.Itoa(validatedCount), nil
 }
 
 // validateDrafts applies the candidate contract to every generated draft:

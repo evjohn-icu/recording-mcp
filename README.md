@@ -36,13 +36,18 @@ flowchart TD
 
 ```sh
 make build
-# 摄入一段录音（转写并入库；需 VOLC_API_KEY）
+# 一分钟闭环演示（隔离库 data/demo，无需任何 API key）
+make demo
+
+# 真实摄入（转写并入库；需 VOLC_API_KEY）
 bin/asr-ingest --db data/context-memory.db --audio recording.wav \
   --conversation-id conv-1 --recording-id rec-1
-# 跑候选记忆链路
-bin/context-worker --db data/context-memory.db --stages extract,publish,curate --executor synthetic
-# 构建语义索引（离线，确定性）
-bin/context-embed --db data/context-memory.db --provider hash
+# 真实提炼（Decision 可选：默认不配 --decision-url 时 extract 照常提炼，只少决策评估）
+bin/context-worker --db data/context-memory.db \
+  --generator openai --generator-url https://ark.cn-beijing.volces.com/api/v3/chat/completions \
+  --generator-key-env GENERATOR_API_KEY
+# 不配 generator（默认 off）也可用：只记录覆盖、不产候选，原话仍可检索；
+# 发布/摄入后 embed stage 自动增量索引，无需手动跑 context-embed
 # 启动 MCP 服务器
 bin/context-memory --db data/context-memory.db
 ```
@@ -54,7 +59,7 @@ MCP 客户端里 `tools/list` 可见 27 个工具（19 个记忆工具 + 8 个�
  "params":{"name":"get_current_context","arguments":{"kinds":["commitment"],"limit":5}}}
 ```
 
-返回的每个对象携带 `evidence_turn_ids`、`derived_from`、`status`（current/superseded/unresolved）与 `conflicts`。
+返回的每个对象携带 `evidence_turn_ids`、`derived_from`、`status`（current/proposed/superseded/unresolved；笔记派生的 commitment/preference 一律 proposed/unconfirmed）与 `conflicts`。
 
 ## 转写工具链（ASR 配套）
 
@@ -80,7 +85,7 @@ MCP 客户端里 `tools/list` 可见 27 个工具（19 个记忆工具 + 8 个�
 - **说话人投影（speaker projection）**：人工确认的 speaker binding 按（录音，转录修订）解析为 person id。
 - **ambient turn**：语音助手指令、广播、自助点餐提示等环境音，默认与对话内容隔离，仅在显式参数下可见。
 - **混合检索（hybrid retrieval）**：字面子串、向量相似、导航与已确认链接四个分支按固定权重融合，逐条携带 `retrieval_sources`。
-- **上下文投影（context projection）**：读取时从当前证据推导 person/topic/commitment/preference/event 对象，带状态与冲突。
+- **上下文投影（context projection）**：读取时从当前证据推导 person/topic/commitment/preference/event 对象，带状态与冲突。intention/request/constraint 派生的对象一律为 `proposed`/`unconfirmed`——没有自动确认路径，消费方不得把 proposed 对象当作已确认事实。
 
 ## MCP 工具
 
