@@ -9,7 +9,10 @@ A local-first Context Layer that turns long-form recordings into revision-aware,
 ```mermaid
 flowchart TD
     A[音频/ASR] --> B[asr-ingest<br/>cmd/asr-ingest]
-    B --> C[来源附件与转写修订<br/>internal/memory ingestion]
+    R[Android 录音<br/>apps/android] --> X[Cloudflare ingest<br/>apps/cloud-ingest]
+    X --> S[context-sync<br/>cmd/context-sync]
+    S --> C[来源附件与转写修订<br/>internal/memory ingestion]
+    B --> C
     C --> D[extract：候选记忆<br/>internal/pipeline ExtractHandler]
     D --> E[publish：发布为笔记与话题<br/>internal/pipeline PublishHandler]
     E --> F[curate：关联建议<br/>cmd/context-associate]
@@ -25,7 +28,7 @@ flowchart TD
 
 ## 已实现 / 实验 / 计划
 
-- ✅ 已实现：转写摄入与修订取代（stale 追踪）、extract/publish 候选记忆链路、话题关联提议与人工复核、说话人绑定与修订级身份投影、环境音分离、混合检索（字面 + 语义 + 已确认链接分支 + 融合打分与逐条来源 `retrieval_sources`）、上下文投影 v0（`get_current_context`）、确定性离线评估、任务队列 worker。
+- ✅ 已实现：转写摄入与修订取代（stale 追踪）、extract/publish 候选记忆链路、话题关联提议与人工复核、说话人绑定与修订级身份投影、环境音分离、混合检索（字面 + 语义 + 已确认链接分支 + 融合打分与逐条来源 `retrieval_sources`）、上下文投影 v0（`get_current_context`）、确定性离线评估、任务队列 worker、跨设备采集链路（Android 分块录音 → Cloudflare ingest-v1 → `context-sync` 拉取入库）。
 - ✅ 转写配套工具：lite 兜底转写流水线、ASR 修复提案与服务健康判别（`scripts/`，见下文「转写工具链」）。
 - 🧪 实验：`build_context` 返回的包结构（items/evidence/coverage/gaps/trace/ranking）、语义后端默认使用离线哈希嵌入器（真实端点可选开启）、投影 v0 的规则集（笔记类型映射与否定线索）。
 - 🚧 计划：FTS5 字面索引与字面分支的 n-gram 覆盖率打分、真值引擎（`conflicting` 状态）、模型辅助的投影增强、`project` 记忆类型。
@@ -60,6 +63,34 @@ MCP 客户端里 `tools/list` 可见 27 个工具（19 个记忆工具 + 8 个�
 ```
 
 返回的每个对象携带 `evidence_turn_ids`、`derived_from`、`status`（current/proposed/superseded/unresolved；笔记派生的 commitment/preference 一律 proposed/unconfirmed）与 `conflicts`。
+
+## 跨设备采集（Android → Cloudflare → context-sync）
+
+手机录音 → Cloudflare（Workers + D1 + R2）持久化 → `context-sync` 拉取、校验、转写并复用既有摄入链路。协议契约冻结在 [contracts/ingest-v1](contracts/ingest-v1/README.md)（OpenAPI + 跨语言测试向量，幂等矩阵与 durable ACK 语义见该 README）。
+
+```sh
+# 本地云端（wrangler miniflare，无需账号）
+cd apps/cloud-ingest && npm ci && npx wrangler d1 migrations apply recording-mcp-ingest --local
+npx wrangler dev --port 8787        # 另开终端保持运行
+
+# 管理面签发配对码与 sync token（ADMIN_TOKEN 来自 .dev.vars）
+curl -s -X POST localhost:8787/v1/admin/pairing-codes \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "X-Ingest-Version: ingest-v1" \
+  -d '{"owner":"default"}'
+curl -s -X POST localhost:8787/v1/admin/sync-tokens \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "X-Ingest-Version: ingest-v1" \
+  -d '{"owner":"default","label":"home-vps"}'
+
+# 模拟录音上传（也是契约客户端验证器：7 种场景含断网恢复/崩溃续传/校验和冲突/缺口）
+bin/record-sim --server http://127.0.0.1:8787 --pair-code <PAIRING_CODE> \
+  --duration 60s --chunk-seconds 30 --report-json /tmp/sim.json
+
+# 拉取入库（--asr fixture 离线确定性转写；--asr doubao 需 VOLC_API_KEY）
+CF_SYNC_TOKEN=<token> bin/context-sync --db data/context-memory.db \
+  --server http://127.0.0.1:8787 --sync-token-env CF_SYNC_TOKEN --asr fixture --once
+```
+
+Android 端构建与真机说明见 [docs/android.md](docs/android.md)；云端部署/备份见 [docs/cloud-deploy.md](docs/cloud-deploy.md)；端到端场景与故障注入见 [docs/end-to-end.md](docs/end-to-end.md)，一键回归：`make e2e-cloud`（本地 wrangler 全场景）。
 
 ## 转写工具链（ASR 配套）
 
