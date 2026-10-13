@@ -74,7 +74,7 @@
 ## 交付物
 
 - `contracts/ingest-v1/`（README 语义权威 + OpenAPI 3.1 + 11 个确定性向量 + 生成器 `cmd/ingest-vectors`）
-- `apps/cloud-ingest/`（Worker + D1 0001_init.sql + R2 + 72 测试）
+- `apps/cloud-ingest/`（Worker + D1 0001_init.sql + R2 + 74 测试）
 - `internal/cloudsync/`（client/state/sync/asr + 4 个测试文件）+ `cmd/context-sync`（17 个 flags）+ migration v13
 - `cmd/record-sim`（7 场景 + 4 故障变体）+ `scripts/e2e-cloud.sh` + `scripts/e2e-verify.py` + Makefile `e2e-cloud` + CI 3 个新 job
 - `apps/android/`（Compose 三页 + FGS + 4 类 Worker + Room + 34 单测 + Gradle wrapper 9.8.1）
