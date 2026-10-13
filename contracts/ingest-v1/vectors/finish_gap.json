@@ -1,0 +1,27 @@
+{
+  "name": "finish_gap",
+  "method": "POST",
+  "path": "/v1/recordings/7e5a9c3f-2b1d-4e6f-8a9b-0c1d2e3f4a5b/finish",
+  "headers": {
+    "Authorization": "Bearer \u003cdevice_token\u003e",
+    "X-Ingest-Version": "ingest-v1"
+  },
+  "json_body": {
+    "protocol_version": "ingest-v1",
+    "total_chunks": 3,
+    "total_duration_ms": 3000,
+    "total_samples": 48000
+  },
+  "expected_status": 409,
+  "expected_error": "sequence_gap",
+  "expected_details": {
+    "missing_sequences": [
+      1
+    ]
+  },
+  "setup": [
+    "recording created",
+    "uploaded seq 0 and seq 2 only"
+  ],
+  "notes": "recording state must stay recording; completion forbidden while sequences are missing"
+}

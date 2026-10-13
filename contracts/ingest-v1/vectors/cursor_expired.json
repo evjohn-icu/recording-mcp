@@ -1,0 +1,18 @@
+{
+  "name": "cursor_expired",
+  "method": "GET",
+  "path": "/v1/sync?cursor=1\u0026limit=100",
+  "headers": {
+    "Authorization": "Bearer \u003csync_token\u003e",
+    "X-Ingest-Version": "ingest-v1"
+  },
+  "expected_status": 410,
+  "expected_error": "cursor_expired",
+  "expected_details": {
+    "min_available_cursor": "smallest surviving event id"
+  },
+  "setup": [
+    "event retention trimmed so the smallest surviving id exceeds cursor+1"
+  ],
+  "notes": "consumer must fall back to GET /v1/sync/recordings full snapshot"
+}

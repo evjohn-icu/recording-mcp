@@ -1,0 +1,27 @@
+{
+  "codes": {
+    "conflict_checksum": 409,
+    "conflict_payload": 409,
+    "cursor_expired": 410,
+    "forbidden_scope": 403,
+    "internal": 500,
+    "pairing_code_expired": 400,
+    "pairing_code_invalid": 400,
+    "payload_too_large": 413,
+    "rate_limited": 429,
+    "recording_not_found": 404,
+    "sequence_gap": 409,
+    "token_revoked": 401,
+    "unauthorized": 401,
+    "unsupported_protocol_version": 400,
+    "validation_failed": 400
+  },
+  "error_body_shape": {
+    "error": {
+      "code": "string (see codes)",
+      "details": "object",
+      "message": "string"
+    }
+  },
+  "name": "error_codes"
+}

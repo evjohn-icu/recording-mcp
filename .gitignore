@@ -16,3 +16,15 @@ __pycache__/
 .env.*
 !.env.example
 .pi/
+
+# cloud sync workspaces
+data/e2e/
+data/sim-spool/
+apps/cloud-ingest/node_modules/
+apps/cloud-ingest/.wrangler/
+apps/cloud-ingest/.dev.vars
+apps/android/local.properties
+apps/android/.gradle/
+apps/android/build/
+apps/android/app/build/
+apps/android/.idea/

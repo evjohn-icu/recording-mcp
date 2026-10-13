@@ -1,0 +1,22 @@
+{
+  "name": "put_chunk_duplicate",
+  "method": "PUT",
+  "path": "/v1/recordings/7e5a9c3f-2b1d-4e6f-8a9b-0c1d2e3f4a5b/chunks/0",
+  "headers": {
+    "Authorization": "Bearer \u003cdevice_token\u003e",
+    "Content-Type": "application/octet-stream",
+    "X-Chunk-Meta": "eyJzYW1wbGVfb2Zmc2V0IjowLCJzYW1wbGVfY291bnQiOjE2MDAwLCJkdXJhdGlvbl9tcyI6MTAwMCwiY29udGVudF9zaGEyNTYiOiI3ZGMzMTU1Y2FmYTEwYTQ0Njk1ZTVhYTVjZWYzZmJlNjhkYmRjZWRjNWQwMGY5OWE5YzBhYTVkMWRkNzFhNWMzIiwicmVjb3JkZWRfYXQiOm51bGx9",
+    "X-Ingest-Version": "ingest-v1"
+  },
+  "body_ref": "pcm_1s_440hz",
+  "expected_status": 200,
+  "expect_fields": {
+    "duplicate": true,
+    "durable": true,
+    "state": "committed"
+  },
+  "setup": [
+    "put_chunk_ok already committed seq 0"
+  ],
+  "notes": "byte-identical replay must not create a second event"
+}

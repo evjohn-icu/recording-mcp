@@ -1,0 +1,27 @@
+{
+  "expected_event_types_for_finish_ok_setup": [
+    "recording.created",
+    "chunk.committed",
+    "chunk.committed",
+    "chunk.committed",
+    "recording.finished"
+  ],
+  "expected_shape": {
+    "events": "array of {id:int,type:string,recording_id:string,seq:int,payload:object,created_at:rfc3339}",
+    "has_more": "bool",
+    "max_event_id": "current maximum event id",
+    "next_cursor": "id of last returned event; unchanged cursor on empty page",
+    "ordering": "strictly id \u003e cursor, ascending by id",
+    "server_protocol_version": "ingest-v1"
+  },
+  "expected_status": 200,
+  "name": "sync_page",
+  "request": {
+    "headers": {
+      "Authorization": "Bearer \u003csync_token\u003e",
+      "X-Ingest-Version": "ingest-v1"
+    },
+    "method": "GET",
+    "path": "/v1/sync?cursor=0\u0026limit=100"
+  }
+}

@@ -1,0 +1,406 @@
+openapi: 3.1.0
+info:
+  title: recording-mcp ingest
+  version: 1.0.0
+  description: |
+    ingest-v1: chunked PCM ingest from recorder devices plus event-log sync for memory consumers.
+    Every /v1/* request MUST carry header `X-Ingest-Version: ingest-v1`.
+    Audio chunks are raw PCM S16LE / 16000 Hz / mono bytes (no container, no header).
+    Semantics authority: contracts/ingest-v1/README.md.
+servers:
+  - url: http://127.0.0.1:8787
+tags:
+  - { name: meta, description: liveness }
+  - { name: device, description: recorder device endpoints }
+  - { name: sync, description: memory-consumer sync endpoints }
+  - { name: admin, description: operator endpoints }
+security: []
+components:
+  securitySchemes:
+    deviceAuth: { type: http, scheme: bearer, description: device token }
+    syncAuth: { type: http, scheme: bearer, description: sync token }
+    adminAuth: { type: http, scheme: bearer, description: ADMIN_TOKEN }
+  parameters:
+    recordingId: { name: recording_id, in: path, required: true, schema: { type: string, format: uuid } }
+    seq: { name: seq, in: path, required: true, schema: { type: integer, minimum: 0, maximum: 9999999 } }
+    cursor: { name: cursor, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+    syncLimit: { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 200 } }
+    listLimit: { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
+    after: { name: after, in: query, required: false, schema: { type: string, format: uuid } }
+    ingestVersion: { name: X-Ingest-Version, in: header, required: true, schema: { type: string, const: ingest-v1 } }
+  headers:
+    chunkMeta:
+      description: base64url(JSON) of {"sample_offset":int,"sample_count":int,"duration_ms":int,"content_sha256":"<64 hex>","recorded_at":string|null}
+      required: true
+      schema: { type: string }
+    contentSha:
+      description: SHA-256 (64 lowercase hex) of the response body bytes
+      schema: { type: string }
+  schemas:
+    ErrorBody:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [unsupported_protocol_version, validation_failed, unauthorized, token_revoked, forbidden_scope,
+                     pairing_code_invalid, pairing_code_expired, recording_not_found, conflict_payload,
+                     conflict_checksum, sequence_gap, cursor_expired, payload_too_large, rate_limited, internal]
+            message: { type: string }
+            details: { type: object, additionalProperties: true }
+    HealthOK:
+      type: object
+      required: [status, version, now]
+      properties:
+        status: { type: string, const: ok }
+        version: { type: string, const: ingest-v1 }
+        now: { type: string, format: date-time }
+    PairRequest:
+      type: object
+      required: [protocol_version, pairing_code]
+      properties:
+        protocol_version: { type: string, const: ingest-v1 }
+        pairing_code: { type: string, pattern: '^[A-Z2-7]{32}$' }
+        device_name: { type: string, maxLength: 128 }
+    PairResponse:
+      type: object
+      required: [device_id, owner, device_token, server_protocol_version]
+      properties:
+        device_id: { type: string, pattern: '^dev_[0-9a-f-]{36}$' }
+        owner: { type: string }
+        device_token: { type: string, description: base64url(32 bytes), 43 chars }
+        server_protocol_version: { type: string, const: ingest-v1 }
+    RecordingCreateRequest:
+      type: object
+      required: [protocol_version, recording_id, codec, sample_rate, channels]
+      properties:
+        protocol_version: { type: string, const: ingest-v1 }
+        recording_id: { type: string, format: uuid }
+        codec: { type: string, const: pcm_s16le }
+        sample_rate: { type: integer, const: 16000 }
+        channels: { type: integer, const: 1 }
+        recorded_at: { type: [string, 'null'], format: date-time }
+        timezone: { type: [string, 'null'], maxLength: 64 }
+    RecordingCreateResponse:
+      type: object
+      required: [recording_id, state, created_at, duplicate]
+      properties:
+        recording_id: { type: string, format: uuid }
+        state: { type: string, enum: [recording, complete, deleted] }
+        created_at: { type: string, format: date-time }
+        duplicate: { type: boolean }
+    ChunkCommitResponse:
+      type: object
+      required: [seq, state, r2_key, checksum, durable]
+      properties:
+        seq: { type: integer }
+        state: { type: string, const: committed }
+        r2_key: { type: string }
+        checksum: { type: string }
+        durable: { type: boolean, const: true }
+        duplicate: { type: boolean }
+    FinishRequest:
+      type: object
+      required: [protocol_version, total_chunks, total_samples, total_duration_ms]
+      properties:
+        protocol_version: { type: string, const: ingest-v1 }
+        total_chunks: { type: integer, minimum: 1, maximum: 720 }
+        total_samples: { type: integer, minimum: 1 }
+        total_duration_ms: { type: integer, minimum: 1 }
+    FinishResponse:
+      type: object
+      required: [state, total_chunks, total_samples, durable]
+      properties:
+        state: { type: string, const: complete }
+        total_chunks: { type: integer }
+        total_samples: { type: integer }
+        durable: { type: boolean, const: true }
+    ChunkInfo:
+      type: object
+      required: [seq, bytes, sample_offset, sample_count, content_sha256, uploaded_at]
+      properties:
+        seq: { type: integer }
+        bytes: { type: integer }
+        sample_offset: { type: integer }
+        sample_count: { type: integer }
+        content_sha256: { type: string }
+        uploaded_at: { type: string, format: date-time }
+    SyncInfo:
+      type: object
+      properties:
+        synced_at: { type: [string, 'null'], format: date-time }
+        transcription_state: { type: string, enum: [none, pending, ingested, failed, skipped] }
+    RecordingDetail:
+      type: object
+      required: [recording_id, state, codec, sample_rate, channels, created_at, chunks, sync]
+      properties:
+        recording_id: { type: string, format: uuid }
+        state: { type: string, enum: [recording, complete, deleted] }
+        codec: { type: string, const: pcm_s16le }
+        sample_rate: { type: integer }
+        channels: { type: integer }
+        recorded_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+        total_chunks: { type: [integer, 'null'] }
+        total_samples: { type: [integer, 'null'] }
+        total_duration_ms: { type: [integer, 'null'] }
+        chunks: { type: array, items: { $ref: '#/components/schemas/ChunkInfo' } }
+        sync: { $ref: '#/components/schemas/SyncInfo' }
+    SyncEvent:
+      type: object
+      required: [id, type, recording_id, seq, payload, created_at]
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [recording.created, chunk.committed, recording.finished, recording.deleted, transcript.available] }
+        recording_id: { type: string }
+        seq: { type: integer, description: -1 for non-chunk events }
+        payload: { type: object, additionalProperties: true }
+        created_at: { type: string, format: date-time }
+    SyncEventPage:
+      type: object
+      required: [events, next_cursor, has_more, max_event_id, server_protocol_version]
+      properties:
+        events: { type: array, items: { $ref: '#/components/schemas/SyncEvent' } }
+        next_cursor: { type: integer, description: id of last returned event; cursor itself when page empty }
+        has_more: { type: boolean }
+        max_event_id: { type: integer }
+        server_protocol_version: { type: string, const: ingest-v1 }
+    RecordingPage:
+      type: object
+      required: [recordings, next_after, has_more]
+      properties:
+        recordings: { type: array, items: { $ref: '#/components/schemas/RecordingDetail' } }
+        next_after: { type: [string, 'null'] }
+        has_more: { type: boolean }
+    AckRequest:
+      type: object
+      required: [protocol_version, last_event_id, transcription_state]
+      properties:
+        protocol_version: { type: string, const: ingest-v1 }
+        last_event_id: { type: integer, minimum: 0 }
+        transcription_state: { type: string, enum: [pending, ingested, failed, skipped] }
+        detail: { type: [string, 'null'], maxLength: 512 }
+    AckResponse:
+      type: object
+      required: [synced_at, transcription_state]
+      properties:
+        synced_at: { type: string, format: date-time }
+        transcription_state: { type: string, enum: [pending, ingested, failed, skipped] }
+    AdminPairingCodeRequest:
+      type: object
+      required: [owner]
+      properties:
+        owner: { type: string, default: default }
+        ttl_seconds: { type: integer, minimum: 60, maximum: 3600, default: 900 }
+    AdminPairingCodeResponse:
+      type: object
+      required: [pairing_code, expires_at]
+      properties:
+        pairing_code: { type: string, pattern: '^[A-Z2-7]{32}$' }
+        expires_at: { type: string, format: date-time }
+    AdminSyncTokenRequest:
+      type: object
+      required: [owner]
+      properties:
+        owner: { type: string, default: default }
+        label: { type: string, maxLength: 128 }
+    AdminSyncTokenResponse:
+      type: object
+      required: [token_id, sync_token]
+      properties:
+        token_id: { type: string, pattern: '^tok_[0-9a-f-]{36}$' }
+        sync_token: { type: string, description: base64url(32 bytes), 43 chars }
+    RevokeResponse:
+      type: object
+      required: [revoked_at]
+      properties:
+        revoked_at: { type: string, format: date-time }
+  responses:
+    Error:
+      description: ingest-v1 error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorBody' }
+paths:
+  /healthz:
+    get:
+      tags: [meta]
+      summary: Liveness (no auth)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/HealthOK' } } } }
+  /v1/devices/pair:
+    post:
+      tags: [device]
+      summary: Exchange one-time pairing code for device credentials (10/min/IP)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PairRequest' } } } }
+      responses:
+        '200': { description: Paired, content: { application/json: { schema: { $ref: '#/components/schemas/PairResponse' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /v1/recordings:
+    post:
+      tags: [device]
+      summary: Create recording (idempotent replay returns 200 + duplicate)
+      security: [{ deviceAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ingestVersion' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RecordingCreateRequest' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/RecordingCreateResponse' } } } }
+        '200': { description: Idempotent replay, content: { application/json: { schema: { $ref: '#/components/schemas/RecordingCreateResponse' } } } }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/recordings/{recording_id}:
+    parameters:
+      - { $ref: '#/components/parameters/recordingId' }
+      - { $ref: '#/components/parameters/ingestVersion' }
+    get:
+      tags: [device, sync]
+      summary: Recording detail incl. chunk manifest and sync state (device or sync token)
+      security: [{ deviceAuth: [] }, { syncAuth: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RecordingDetail' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [device]
+      summary: Delete recording (tombstone + best-effort R2 purge; idempotent)
+      security: [{ deviceAuth: [] }]
+      responses:
+        '200': { description: Deleted (or already deleted), content: { application/json: { schema: { $ref: '#/components/schemas/RecordingDetail' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/recordings/{recording_id}/chunks/{seq}:
+    parameters:
+      - { $ref: '#/components/parameters/recordingId' }
+      - { $ref: '#/components/parameters/seq' }
+      - { $ref: '#/components/parameters/ingestVersion' }
+    put:
+      tags: [device]
+      summary: Upload raw PCM chunk (durable ACK only after R2 + manifest + event)
+      security: [{ deviceAuth: [] }]
+      parameters:
+        - { $ref: '#/components/headers/chunkMeta' }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary, maxLength: 5242880 }
+      responses:
+        '200': { description: Committed (or duplicate), content: { application/json: { schema: { $ref: '#/components/schemas/ChunkCommitResponse' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/recordings/{recording_id}/finish:
+    parameters:
+      - { $ref: '#/components/parameters/recordingId' }
+      - { $ref: '#/components/parameters/ingestVersion' }
+    post:
+      tags: [device]
+      summary: Finalize recording; refuses with sequence_gap when chunks are missing
+      security: [{ deviceAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FinishRequest' } } } }
+      responses:
+        '200': { description: Complete, content: { application/json: { schema: { $ref: '#/components/schemas/FinishResponse' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/recordings/{recording_id}/chunks/{seq}/audio:
+    parameters:
+      - { $ref: '#/components/parameters/recordingId' }
+      - { $ref: '#/components/parameters/seq' }
+      - { $ref: '#/components/parameters/ingestVersion' }
+    get:
+      tags: [sync]
+      summary: Download chunk audio (sync token)
+      security: [{ syncAuth: [] }]
+      responses:
+        '200':
+          description: Raw PCM bytes
+          headers:
+            X-Content-SHA256: { $ref: '#/components/headers/contentSha' }
+          content:
+            audio/L16: { schema: { type: string, format: binary } }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/sync:
+    get:
+      tags: [sync]
+      summary: Event log page (strict id > cursor, ascending)
+      security: [{ syncAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ingestVersion' }, { $ref: '#/components/parameters/cursor' }, { $ref: '#/components/parameters/syncLimit' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SyncEventPage' } } } }
+        '410': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/sync/recordings:
+    get:
+      tags: [sync]
+      summary: Full recording snapshot page (cursor-expiry recovery path)
+      security: [{ syncAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ingestVersion' }, { $ref: '#/components/parameters/after' }, { $ref: '#/components/parameters/listLimit' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RecordingPage' } } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/sync/recordings/{recording_id}/ack:
+    parameters:
+      - { $ref: '#/components/parameters/recordingId' }
+      - { $ref: '#/components/parameters/ingestVersion' }
+    post:
+      tags: [sync]
+      summary: Report transcription state back to the device
+      security: [{ syncAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AckRequest' } } } }
+      responses:
+        '200': { description: Acked, content: { application/json: { schema: { $ref: '#/components/schemas/AckResponse' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/admin/pairing-codes:
+    post:
+      tags: [admin]
+      summary: Mint one-time pairing code
+      security: [{ adminAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ingestVersion' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminPairingCodeRequest' } } } }
+      responses:
+        '200': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AdminPairingCodeResponse' } } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/admin/sync-tokens:
+    post:
+      tags: [admin]
+      summary: Mint sync token (plaintext shown once)
+      security: [{ adminAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ingestVersion' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminSyncTokenRequest' } } } }
+      responses:
+        '200': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AdminSyncTokenResponse' } } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/admin/devices/{device_id}/revoke:
+    parameters:
+      - { name: device_id, in: path, required: true, schema: { type: string } }
+      - { $ref: '#/components/parameters/ingestVersion' }
+    post:
+      tags: [admin]
+      summary: Revoke device token
+      security: [{ adminAuth: [] }]
+      responses:
+        '200': { description: Revoked, content: { application/json: { schema: { $ref: '#/components/schemas/RevokeResponse' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/admin/sync-tokens/{token_id}/revoke:
+    parameters:
+      - { name: token_id, in: path, required: true, schema: { type: string } }
+      - { $ref: '#/components/parameters/ingestVersion' }
+    post:
+      tags: [admin]
+      summary: Revoke sync token
+      security: [{ adminAuth: [] }]
+      responses:
+        '200': { description: Revoked, content: { application/json: { schema: { $ref: '#/components/schemas/RevokeResponse' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }

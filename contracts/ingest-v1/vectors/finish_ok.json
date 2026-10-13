@@ -1,0 +1,25 @@
+{
+  "name": "finish_ok",
+  "method": "POST",
+  "path": "/v1/recordings/7e5a9c3f-2b1d-4e6f-8a9b-0c1d2e3f4a5b/finish",
+  "headers": {
+    "Authorization": "Bearer \u003cdevice_token\u003e",
+    "X-Ingest-Version": "ingest-v1"
+  },
+  "json_body": {
+    "protocol_version": "ingest-v1",
+    "total_chunks": 3,
+    "total_duration_ms": 3000,
+    "total_samples": 48000
+  },
+  "expected_status": 200,
+  "expect_fields": {
+    "durable": true,
+    "state": "complete",
+    "total_chunks": 3
+  },
+  "setup": [
+    "uploaded seq 0,1,2 of the 1 s sine vector with offsets 0,16000,32000"
+  ],
+  "notes": "replay of the same body returns 200 without emitting a second recording.finished event"
+}

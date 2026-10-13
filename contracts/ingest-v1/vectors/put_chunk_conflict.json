@@ -1,0 +1,18 @@
+{
+  "name": "put_chunk_conflict",
+  "method": "PUT",
+  "path": "/v1/recordings/7e5a9c3f-2b1d-4e6f-8a9b-0c1d2e3f4a5b/chunks/0",
+  "headers": {
+    "Authorization": "Bearer \u003cdevice_token\u003e",
+    "Content-Type": "application/octet-stream",
+    "X-Chunk-Meta": "eyJzYW1wbGVfb2Zmc2V0IjowLCJzYW1wbGVfY291bnQiOjE2MDAwLCJkdXJhdGlvbl9tcyI6MTAwMCwiY29udGVudF9zaGEyNTYiOiIwYzkyYmRkYjRlOTZmM2VhOWVjOWYwZjY0YTY2ODI1NWE2YzE1NTI3YWMwOWY2ZjExOWNhZmRlNjBjN2M0YTM5IiwicmVjb3JkZWRfYXQiOm51bGx9",
+    "X-Ingest-Version": "ingest-v1"
+  },
+  "body_ref": "pcm_1s_silence",
+  "expected_status": 409,
+  "expected_error": "conflict_checksum",
+  "setup": [
+    "put_chunk_ok already committed seq 0 with the sine body"
+  ],
+  "notes": "same (recording_id, seq), different bytes"
+}

@@ -1,0 +1,15 @@
+{
+  "chunk_meta_json": "{\"sample_offset\":0,\"sample_count\":16000,\"duration_ms\":1000,\"content_sha256\":\"7dc3155cafa10a44695e5aa5cef3fbe68dbdcedc5d00f99a9c0aa5d1dd71a5c3\",\"recorded_at\":null}",
+  "description": "X-Chunk-Meta headers for the 1 s sine vector (base64url of canonical compact JSON); per-seq offsets document the finish_ok offset chain",
+  "name": "chunk_meta_ok",
+  "per_seq": {
+    "0": "eyJzYW1wbGVfb2Zmc2V0IjowLCJzYW1wbGVfY291bnQiOjE2MDAwLCJkdXJhdGlvbl9tcyI6MTAwMCwiY29udGVudF9zaGEyNTYiOiI3ZGMzMTU1Y2FmYTEwYTQ0Njk1ZTVhYTVjZWYzZmJlNjhkYmRjZWRjNWQwMGY5OWE5YzBhYTVkMWRkNzFhNWMzIiwicmVjb3JkZWRfYXQiOm51bGx9",
+    "1": "eyJzYW1wbGVfb2Zmc2V0IjoxNjAwMCwic2FtcGxlX2NvdW50IjoxNjAwMCwiZHVyYXRpb25fbXMiOjEwMDAsImNvbnRlbnRfc2hhMjU2IjoiN2RjMzE1NWNhZmExMGE0NDY5NWU1YWE1Y2VmM2ZiZTY4ZGJkY2VkYzVkMDBmOTlhOWMwYWE1ZDFkZDcxYTVjMyIsInJlY29yZGVkX2F0IjpudWxsfQ",
+    "2": "eyJzYW1wbGVfb2Zmc2V0IjozMjAwMCwic2FtcGxlX2NvdW50IjoxNjAwMCwiZHVyYXRpb25fbXMiOjEwMDAsImNvbnRlbnRfc2hhMjU2IjoiN2RjMzE1NWNhZmExMGE0NDY5NWU1YWE1Y2VmM2ZiZTY4ZGJkY2VkYzVkMDBmOTlhOWMwYWE1ZDFkZDcxYTVjMyIsInJlY29yZGVkX2F0IjpudWxsfQ"
+  },
+  "required_request_headers": {
+    "Content-Type": "application/octet-stream",
+    "X-Ingest-Version": "ingest-v1"
+  },
+  "x_chunk_meta_base64url": "eyJzYW1wbGVfb2Zmc2V0IjowLCJzYW1wbGVfY291bnQiOjE2MDAwLCJkdXJhdGlvbl9tcyI6MTAwMCwiY29udGVudF9zaGEyNTYiOiI3ZGMzMTU1Y2FmYTEwYTQ0Njk1ZTVhYTVjZWYzZmJlNjhkYmRjZWRjNWQwMGY5OWE5YzBhYTVkMWRkNzFhNWMzIiwicmVjb3JkZWRfYXQiOm51bGx9"
+}
