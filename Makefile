@@ -1,4 +1,4 @@
-.PHONY: build test
+.PHONY: build test demo e2e-cloud
 
 build:
 	go build -o bin/recording-mcp ./cmd/server
@@ -12,6 +12,8 @@ build:
 	go build -o bin/context-decision ./cmd/context-decision
 	go build -o bin/context-eval ./cmd/context-eval
 	go build -o bin/context-embed ./cmd/context-embed
+	go build -o bin/context-sync ./cmd/context-sync
+	go build -o bin/record-sim ./cmd/record-sim
 
 test:
 	go test -race ./...
@@ -19,3 +21,7 @@ test:
 .PHONY: demo
 demo:
 	sh scripts/demo.sh
+
+.PHONY: e2e-cloud
+e2e-cloud:
+	sh scripts/e2e-cloud.sh

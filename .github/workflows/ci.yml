@@ -12,3 +12,54 @@ jobs:
       - run: go vet ./...
       - run: go test -race -count=1 ./...
       - run: make build
+
+  cloud-ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix apps/cloud-ingest
+      - run: npm run typecheck --prefix apps/cloud-ingest
+      - run: npm test --prefix apps/cloud-ingest
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/android/**/*.gradle*', 'apps/android/gradle/**') }}
+      - name: Unit tests and debug APK
+        working-directory: apps/android
+        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug
+
+  e2e-cloud:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix apps/cloud-ingest
+      - run: sh scripts/e2e-cloud.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-cloud-logs
+          path: data/e2e/**/*.log
+          if-no-files-found: ignore
