@@ -1,0 +1,180 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "4582baad18dd42d8a7f6b74847808605",
+    "entities": [
+      {
+        "tableName": "recordings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`recordingId` TEXT NOT NULL, `codec` TEXT NOT NULL, `sampleRate` INTEGER NOT NULL, `channels` INTEGER NOT NULL, `startedAtEpochMs` INTEGER, `state` TEXT NOT NULL, `totalChunks` INTEGER, `totalSamples` INTEGER, `durationMs` INTEGER, `createdAt` INTEGER NOT NULL, `syncedAt` INTEGER, `transcriptionState` TEXT, PRIMARY KEY(`recordingId`))",
+        "fields": [
+          {
+            "fieldPath": "recordingId",
+            "columnName": "recordingId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "codec",
+            "columnName": "codec",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sampleRate",
+            "columnName": "sampleRate",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "channels",
+            "columnName": "channels",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAtEpochMs",
+            "columnName": "startedAtEpochMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalChunks",
+            "columnName": "totalChunks",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "totalSamples",
+            "columnName": "totalSamples",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "durationMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "transcriptionState",
+            "columnName": "transcriptionState",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "recordingId"
+          ]
+        }
+      },
+      {
+        "tableName": "chunks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`recordingId` TEXT NOT NULL, `seq` INTEGER NOT NULL, `sampleOffset` INTEGER NOT NULL, `sampleCount` INTEGER NOT NULL, `bytes` INTEGER NOT NULL, `sha256` TEXT NOT NULL, `filePath` TEXT NOT NULL, `state` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `lastError` TEXT, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`recordingId`, `seq`))",
+        "fields": [
+          {
+            "fieldPath": "recordingId",
+            "columnName": "recordingId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seq",
+            "columnName": "seq",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sampleOffset",
+            "columnName": "sampleOffset",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sampleCount",
+            "columnName": "sampleCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bytes",
+            "columnName": "bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sha256",
+            "columnName": "sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "filePath",
+            "columnName": "filePath",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attempts",
+            "columnName": "attempts",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastError",
+            "columnName": "lastError",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "recordingId",
+            "seq"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_chunks_state",
+            "unique": false,
+            "columnNames": [
+              "state"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_chunks_state` ON `${TABLE_NAME}` (`state`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4582baad18dd42d8a7f6b74847808605')"
+    ]
+  }
+}
