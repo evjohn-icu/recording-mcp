@@ -32,6 +32,9 @@ type Options struct {
 	ProjectionPath string
 	// SemanticProvider overrides the default offline hashing embedder.
 	SemanticProvider semantic.Provider
+	// SemanticProviderConfigured distinguishes an explicit off provider from
+	// the zero-value options default, which remains the offline hash provider.
+	SemanticProviderConfigured bool
 	// LexicalOnly skips semantic indexing and the hybrid pass.
 	LexicalOnly bool
 }
@@ -52,13 +55,18 @@ type Metrics struct {
 	// EvidenceRecallAt5 is the macro-average over questions of the fraction of
 	// authored gold evidence turns that appear in the first five items.
 	EvidenceRecallAt5 float64 `json:"evidence_recall_at_5"`
-	// StaleLeakage is sum(stale items) / sum(items) across every question. An
-	// item counts as stale when the builder marks it stale or when all of its
-	// evidence turns come from a superseded transcript revision.
+	// StaleLeakage is sum(stale items) / sum(items) across every classic
+	// question. An item counts as stale when the builder marks it stale or when
+	// any of its evidence turns come from a superseded transcript revision.
 	StaleLeakage float64 `json:"stale_leakage"`
-	// InvalidEvidenceRefs counts distinct returned evidence ids that do not
-	// resolve to any row in the turns table.
-	InvalidEvidenceRefs int `json:"invalid_evidence_refs"`
+	// InvalidEvidenceRefs is the aggregate of invalid reference occurrences
+	// reported by classic and retrieval evaluations. The category fields retain
+	// the same counts by evaluation family (and retrieval mode).
+	InvalidEvidenceRefs                 int `json:"invalid_evidence_refs"`
+	ClassicInvalidEvidenceRefs          int `json:"classic_invalid_evidence_refs"`
+	RetrievalInvalidEvidenceRefs        int `json:"retrieval_invalid_evidence_refs"`
+	RetrievalLexicalInvalidEvidenceRefs int `json:"retrieval_lexical_invalid_evidence_refs"`
+	RetrievalHybridInvalidEvidenceRefs  int `json:"retrieval_hybrid_invalid_evidence_refs"`
 	// RelationAssisted counts gold evidence hits whose item is reachable only
 	// through a confirmed topic link.
 	RelationAssisted int `json:"relation_assisted"`
@@ -66,8 +74,17 @@ type Metrics struct {
 	// author gold topics.
 	ContextCoverage float64 `json:"context_coverage"`
 	LatencyMSAvg    float64 `json:"latency_ms_avg"`
-	LatencyMSMax    int64   `json:"latency_ms_max"`
-	LatencyMSTotal  int64   `json:"latency_ms_total"`
+	LatencyMSMax    float64 `json:"latency_ms_max"`
+	LatencyMSTotal  float64 `json:"latency_ms_total"`
+	// Retrieval latency is tracked separately for each retrieval mode. Values
+	// are fractional milliseconds so fast deterministic builds are not rounded
+	// down to zero.
+	RetrievalLexicalLatencyMSAvg   float64 `json:"retrieval_lexical_latency_ms_avg"`
+	RetrievalLexicalLatencyMSMax   float64 `json:"retrieval_lexical_latency_ms_max"`
+	RetrievalLexicalLatencyMSTotal float64 `json:"retrieval_lexical_latency_ms_total"`
+	RetrievalHybridLatencyMSAvg    float64 `json:"retrieval_hybrid_latency_ms_avg"`
+	RetrievalHybridLatencyMSMax    float64 `json:"retrieval_hybrid_latency_ms_max"`
+	RetrievalHybridLatencyMSTotal  float64 `json:"retrieval_hybrid_latency_ms_total"`
 	// ModelCalls is the number of rerank invocations; the harness configures no
 	// reranker, so the deterministic assembly runs untouched.
 	ModelCalls int `json:"model_calls"`
@@ -80,11 +97,26 @@ type Metrics struct {
 	// SemanticAssistedRecall is the macro-average of |gold found in hybrid but
 	// not lexical| / |gold| over the retrieval questions.
 	SemanticAssistedRecall float64 `json:"semantic_assisted_recall"`
+	// UnanswerableQuestions counts distinct unanswerable fixture ids that ran.
+	UnanswerableQuestions int `json:"unanswerable_questions"`
+	// UnanswerableCleanRate is the fraction of unanswerable evaluations with no returned items.
+	UnanswerableCleanRate float64 `json:"unanswerable_clean_rate"`
+	// UnanswerableFalsePositiveItems counts returned items from unanswerable evaluations.
+	UnanswerableFalsePositiveItems        int `json:"unanswerable_false_positive_items"`
+	UnanswerableLexicalFalsePositiveItems int `json:"unanswerable_lexical_false_positive_items"`
+	UnanswerableHybridFalsePositiveItems  int `json:"unanswerable_hybrid_false_positive_items"`
+	// The per-mode rates count an unanswerable evaluation as a false positive
+	// when that mode returns at least one item. Item counts above remain useful
+	// for diagnosing how much extra context each mode returned.
+	UnanswerableLexicalFalsePositiveRate float64 `json:"unanswerable_lexical_false_positive_rate"`
+	UnanswerableHybridFalsePositiveRate  float64 `json:"unanswerable_hybrid_false_positive_rate"`
+	// TurnTop1Accuracy checks the first turn item for retrieval questions with an authored top1.
+	TurnTop1Accuracy float64 `json:"turn_top1_accuracy"`
 	// AmbientLeakage is sum(ambient items/evidence) / sum(returned) across
 	// every build of the run. It must stay 0.
 	AmbientLeakage float64 `json:"ambient_leakage"`
-	// ScopeEscapeCount counts returned items that violate their question's
-	// explicit scope. It must stay 0.
+	// ScopeEscapeCount counts returned items and evidence refs that violate
+	// their question's explicit scope. It must stay 0.
 	ScopeEscapeCount int `json:"scope_escape_count"`
 	// Projection carries the projection-pass metrics.
 	Projection ProjectionMetrics `json:"projection"`
@@ -114,6 +146,9 @@ type QuestionResult struct {
 	Query               string   `json:"query"`
 	Mode                string   `json:"mode,omitempty"`
 	Hits                int      `json:"hits"`
+	Unanswerable        bool     `json:"unanswerable,omitempty"`
+	ReturnedItems       int      `json:"returned_items"`
+	TurnTop1Hit         *bool    `json:"turn_top1_hit,omitempty"`
 	GoldEvidenceCount   int      `json:"gold_evidence_count"`
 	GoldEvidenceFound   int      `json:"gold_evidence_found"`
 	RecallAt5           float64  `json:"recall_at_5"`
@@ -122,7 +157,7 @@ type QuestionResult struct {
 	AmbientItems        int      `json:"ambient_items,omitempty"`
 	ScopeEscapes        int      `json:"scope_escapes,omitempty"`
 	ContextCoverage     *float64 `json:"context_coverage,omitempty"`
-	LatencyMS           int64    `json:"latency_ms"`
+	LatencyMS           float64  `json:"latency_ms"`
 	ExpectStaleExcluded bool     `json:"expect_stale_excluded"`
 }
 
@@ -211,7 +246,7 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 	provider := opts.SemanticProvider
 	if opts.LexicalOnly {
 		provider = nil
-	} else if provider == nil {
+	} else if provider == nil && !opts.SemanticProviderConfigured {
 		provider = semantic.NewHashProvider(semantic.DefaultHashDims)
 	}
 	var retriever semantic.SemanticRetriever
@@ -266,10 +301,10 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 
 	report.PerQuestion = make([]QuestionResult, 0, len(questions))
 	totalItems, totalStale := 0, 0
-	recallSum := 0.0
+	recallSum, recallQuestions := 0.0, 0
 	coverageSum, coverageQuestions := 0.0, 0
 	ambientHitsTotal, ambientReturnedTotal := 0, 0
-	var latencyTotal, latencyMax int64
+	var latencyTotal, latencyMax float64
 	for _, q := range questions {
 		started := time.Now()
 		// The classic pass keeps the pre-hybrid behavior exactly: lexical mode,
@@ -283,7 +318,7 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 			IncludeRawEvidence: true,
 			Mode:               contextbuild.ModeLexical,
 		})
-		latency := time.Since(started).Milliseconds()
+		latency := float64(time.Since(started)) / float64(time.Millisecond)
 		if err != nil {
 			return Report{}, fmt.Errorf("question %q: build: %w", q.ID, err)
 		}
@@ -297,6 +332,8 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 			Query:               q.Query,
 			Mode:                contextbuild.ModeLexical,
 			Hits:                evaluated.hits,
+			Unanswerable:        q.Unanswerable,
+			ReturnedItems:       evaluated.hits,
 			GoldEvidenceCount:   len(q.GoldEvidenceTurnIDs),
 			GoldEvidenceFound:   evaluated.goldFound,
 			RecallAt5:           evaluated.recall,
@@ -307,12 +344,16 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 			LatencyMS:           latency,
 			ExpectStaleExcluded: q.ExpectStaleExcluded,
 		}
+		if !q.Unanswerable {
+			recallSum += res.RecallAt5
+			recallQuestions++
+		}
 		report.PerQuestion = append(report.PerQuestion, res)
 
-		recallSum += res.RecallAt5
 		totalItems += res.Hits
-		totalStale += int(res.StaleLeakage * float64(res.Hits))
+		totalStale += evaluated.staleItems
 		report.Metrics.InvalidEvidenceRefs += evaluated.invalidRefs
+		report.Metrics.ClassicInvalidEvidenceRefs += evaluated.invalidRefs
 		report.Metrics.RelationAssisted += res.RelationAssisted
 		if res.ContextCoverage != nil {
 			coverageSum += *res.ContextCoverage
@@ -323,8 +364,8 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 			latencyMax = latency
 		}
 	}
-	if n := len(questions); n > 0 {
-		report.Metrics.EvidenceRecallAt5 = recallSum / float64(n)
+	if recallQuestions > 0 {
+		report.Metrics.EvidenceRecallAt5 = recallSum / float64(recallQuestions)
 	}
 	if totalItems > 0 {
 		report.Metrics.StaleLeakage = float64(totalStale) / float64(totalItems)
@@ -342,6 +383,11 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 	// and once hybrid, so the semantic branch is measured against the same
 	// deterministic lexical baseline.
 	lexicalRecallSum, hybridRecallSum, assistedSum := 0.0, 0.0, 0.0
+	lexicalRecallQuestions, hybridRecallQuestions, assistedQuestions := 0, 0, 0
+	top1Hits, top1Questions := 0, 0
+	var lexicalLatencyTotal, lexicalLatencyMax float64
+	var hybridLatencyTotal, hybridLatencyMax float64
+	lexicalLatencyQuestions, hybridLatencyQuestions := 0, 0
 	startMemo := map[string]*time.Time{}
 	for _, q := range retrievalQuestions {
 		modes := []struct {
@@ -352,7 +398,7 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 			modes = append(modes, struct {
 				mode     string
 				semantic semantic.SemanticRetriever
-			}{contextbuild.ModeHybrid, retriever})
+			}{"hybrid", retriever})
 		}
 		asQuestion := Question{
 			ID:                  q.ID,
@@ -361,10 +407,13 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 			Notes:               q.Notes,
 			GoldEvidenceTurnIDs: q.GoldEvidenceTurnIDs,
 			GoldTopicIDs:        q.GoldTopicIDs,
+			Unanswerable:        q.Unanswerable,
+			GoldTop1TurnID:      q.GoldTop1TurnID,
 			ExpectStaleExcluded: q.ExpectStaleExcluded,
 		}
 		var lexicalFound, hybridFound map[string]bool
 		for _, m := range modes {
+			started := time.Now()
 			pkg, err := contextbuild.Build(ctx, contextbuild.Deps{Store: store, DB: db, Semantic: m.semantic}, contextbuild.Request{
 				Purpose:        q.Purpose,
 				Query:          q.Query,
@@ -376,10 +425,19 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 				MaxBytes:       maxBytes,
 				Mode:           m.mode,
 			})
+			latency := float64(time.Since(started)) / float64(time.Millisecond)
 			if err != nil {
 				return Report{}, fmt.Errorf("retrieval question %q (%s): build: %w", q.ID, m.mode, err)
 			}
 			evaluated := evaluateQuestion(asQuestion, pkg, staleTurns, knownTurns, noteEvidence)
+			report.Metrics.InvalidEvidenceRefs += evaluated.invalidRefs
+			report.Metrics.RetrievalInvalidEvidenceRefs += evaluated.invalidRefs
+			switch m.mode {
+			case contextbuild.ModeLexical:
+				report.Metrics.RetrievalLexicalInvalidEvidenceRefs += evaluated.invalidRefs
+			default:
+				report.Metrics.RetrievalHybridInvalidEvidenceRefs += evaluated.invalidRefs
+			}
 			ambient, returned := trackAmbient(pkg)
 			ambientHitsTotal += ambient
 			ambientReturnedTotal += returned
@@ -388,12 +446,19 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 				return Report{}, err
 			}
 			report.Metrics.ScopeEscapeCount += escapes
+			top1Hit := (*bool)(nil)
+			if !q.Unanswerable {
+				top1Hit = firstTurnTop1Hit(q.GoldTop1TurnID, pkg, noteEvidence)
+			}
 			report.PerQuestion = append(report.PerQuestion, QuestionResult{
 				ID:                  q.ID,
 				Purpose:             q.Purpose,
 				Query:               q.Query,
 				Mode:                m.mode,
 				Hits:                evaluated.hits,
+				Unanswerable:        q.Unanswerable,
+				ReturnedItems:       evaluated.hits,
+				TurnTop1Hit:         top1Hit,
 				GoldEvidenceCount:   len(q.GoldEvidenceTurnIDs),
 				GoldEvidenceFound:   evaluated.goldFound,
 				RecallAt5:           evaluated.recall,
@@ -401,36 +466,117 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 				RelationAssisted:    evaluated.relationAssisted,
 				AmbientItems:        ambient,
 				ScopeEscapes:        escapes,
-				LatencyMS:           0,
+				LatencyMS:           latency,
 				ExpectStaleExcluded: q.ExpectStaleExcluded,
 			})
 			found := foundGoldSet(asQuestion, pkg, noteEvidence)
 			switch m.mode {
 			case contextbuild.ModeLexical:
-				lexicalRecallSum += evaluated.recall
+				if !q.Unanswerable {
+					lexicalRecallSum += evaluated.recall
+					lexicalRecallQuestions++
+				}
+				lexicalLatencyTotal += latency
+				lexicalLatencyQuestions++
+				if latency > lexicalLatencyMax {
+					lexicalLatencyMax = latency
+				}
 				lexicalFound = found
 			default:
-				hybridRecallSum += evaluated.recall
+				if !q.Unanswerable {
+					hybridRecallSum += evaluated.recall
+					hybridRecallQuestions++
+				}
+				hybridLatencyTotal += latency
+				hybridLatencyQuestions++
+				if latency > hybridLatencyMax {
+					hybridLatencyMax = latency
+				}
 				hybridFound = found
 			}
-		}
-		if n := len(q.GoldEvidenceTurnIDs); n > 0 && hybridFound != nil {
-			assisted := 0
-			for _, gold := range q.GoldEvidenceTurnIDs {
-				if hybridFound[gold] && !lexicalFound[gold] {
-					assisted++
+			if !q.Unanswerable && q.GoldTop1TurnID != "" && ((opts.LexicalOnly && m.mode == contextbuild.ModeLexical) || (!opts.LexicalOnly && (m.mode == contextbuild.ModeHybrid || m.mode == "hybrid"))) {
+				top1Questions++
+				if top1Hit != nil && *top1Hit {
+					top1Hits++
 				}
 			}
-			assistedSum += float64(assisted) / float64(n)
+		}
+		if !q.Unanswerable {
+			if n := len(q.GoldEvidenceTurnIDs); n > 0 && hybridFound != nil {
+				assisted := 0
+				for _, gold := range q.GoldEvidenceTurnIDs {
+					if hybridFound[gold] && !lexicalFound[gold] {
+						assisted++
+					}
+				}
+				assistedSum += float64(assisted) / float64(n)
+				assistedQuestions++
+			}
 		}
 	}
-	if n := len(retrievalQuestions); n > 0 {
-		report.Metrics.LexicalRecallAt5 = lexicalRecallSum / float64(n)
-		report.Metrics.HybridRecallAt5 = hybridRecallSum / float64(n)
-		report.Metrics.SemanticAssistedRecall = assistedSum / float64(n)
+	if lexicalRecallQuestions > 0 {
+		report.Metrics.LexicalRecallAt5 = lexicalRecallSum / float64(lexicalRecallQuestions)
+	}
+	if hybridRecallQuestions > 0 {
+		report.Metrics.HybridRecallAt5 = hybridRecallSum / float64(hybridRecallQuestions)
+	}
+	if assistedQuestions > 0 {
+		report.Metrics.SemanticAssistedRecall = assistedSum / float64(assistedQuestions)
+	}
+	if top1Questions > 0 {
+		report.Metrics.TurnTop1Accuracy = float64(top1Hits) / float64(top1Questions)
+	}
+	if lexicalLatencyQuestions > 0 {
+		report.Metrics.RetrievalLexicalLatencyMSTotal = lexicalLatencyTotal
+		report.Metrics.RetrievalLexicalLatencyMSMax = lexicalLatencyMax
+		report.Metrics.RetrievalLexicalLatencyMSAvg = lexicalLatencyTotal / float64(lexicalLatencyQuestions)
+	}
+	if hybridLatencyQuestions > 0 {
+		report.Metrics.RetrievalHybridLatencyMSTotal = hybridLatencyTotal
+		report.Metrics.RetrievalHybridLatencyMSMax = hybridLatencyMax
+		report.Metrics.RetrievalHybridLatencyMSAvg = hybridLatencyTotal / float64(hybridLatencyQuestions)
 	}
 	if ambientReturnedTotal > 0 {
 		report.Metrics.AmbientLeakage = float64(ambientHitsTotal) / float64(ambientReturnedTotal)
+	}
+	unanswerableIDs := map[string]struct{}{}
+	unanswerableEvaluations, unanswerableClean := 0, 0
+	lexicalUnanswerableEvaluations, lexicalUnanswerableFalsePositives := 0, 0
+	hybridUnanswerableEvaluations, hybridUnanswerableFalsePositives := 0, 0
+	for _, result := range report.PerQuestion {
+		if !result.Unanswerable {
+			continue
+		}
+		unanswerableIDs[result.ID] = struct{}{}
+		unanswerableEvaluations++
+		if result.ReturnedItems == 0 {
+			unanswerableClean++
+		}
+		report.Metrics.UnanswerableFalsePositiveItems += result.ReturnedItems
+		switch result.Mode {
+		case contextbuild.ModeLexical:
+			lexicalUnanswerableEvaluations++
+			if result.ReturnedItems > 0 {
+				lexicalUnanswerableFalsePositives++
+			}
+			report.Metrics.UnanswerableLexicalFalsePositiveItems += result.ReturnedItems
+		case contextbuild.ModeHybrid, "hybrid":
+			hybridUnanswerableEvaluations++
+			if result.ReturnedItems > 0 {
+				hybridUnanswerableFalsePositives++
+			}
+			report.Metrics.UnanswerableHybridFalsePositiveItems += result.ReturnedItems
+		}
+	}
+	report.Metrics.UnanswerableQuestions = len(unanswerableIDs)
+	if unanswerableEvaluations > 0 {
+		report.Metrics.UnanswerableCleanRate = float64(unanswerableClean) / float64(unanswerableEvaluations)
+	}
+	if lexicalUnanswerableEvaluations > 0 {
+		report.Metrics.UnanswerableLexicalFalsePositiveRate = float64(lexicalUnanswerableFalsePositives) / float64(lexicalUnanswerableEvaluations)
+	}
+	if hybridUnanswerableEvaluations > 0 {
+		report.Metrics.UnanswerableHybridFalsePositiveRate = float64(hybridUnanswerableFalsePositives) / float64(hybridUnanswerableEvaluations)
 	}
 
 	// Projection pass: score the read-time projection against the fixture
@@ -469,12 +615,15 @@ func foundGoldSet(q Question, pkg contextbuild.Package, noteEvidence map[string]
 	return found
 }
 
-// countScopeEscapes counts returned items that violate the question's explicit
-// scope: the pinned conversation, the pinned topic or the time bounds (an
-// unknown recording start fails any set bound).
+// countScopeEscapes counts returned items and raw evidence references that
+// violate the question's explicit scope: the pinned conversation, the pinned
+// topic or the time bounds (an unknown recording start fails any set bound).
 func countScopeEscapes(ctx context.Context, store *memory.Store, q RetrievalQuestion, pkg contextbuild.Package, memo map[string]*time.Time) (int, error) {
 	if q.ScopeConversationID == "" && q.ScopeTopicID == "" && q.ScopeStartedAfter == nil && q.ScopeStartedBefore == nil {
 		return 0, nil
+	}
+	if memo == nil {
+		memo = map[string]*time.Time{}
 	}
 	escapes := 0
 	for _, item := range pkg.Items {
@@ -501,7 +650,58 @@ func countScopeEscapes(ctx context.Context, store *memory.Store, q RetrievalQues
 			}
 		}
 	}
+	for _, ref := range pkg.Evidence {
+		escaped, err := evidenceScopeEscape(ctx, store, q, ref.TurnID, memo)
+		if err != nil {
+			return 0, err
+		}
+		if escaped {
+			escapes++
+		}
+	}
 	return escapes, nil
+}
+
+// evidenceScopeEscape resolves a raw evidence turn back to its source
+// conversation and topics before checking the same hard scope as an item.
+// An unknown turn is not a scope escape: evaluateQuestion reports it as an
+// invalid reference, and one bad id must not make the scope query fail.
+func evidenceScopeEscape(ctx context.Context, store *memory.Store, q RetrievalQuestion, turnID string, memo map[string]*time.Time) (bool, error) {
+	var conversationID string
+	err := store.DB().QueryRowContext(ctx, `SELECT conversation_id FROM turns WHERE id=?`, turnID).Scan(&conversationID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("retrieval question %q: evidence %q: %w", q.ID, turnID, err)
+	}
+	if q.ScopeConversationID != "" && conversationID != q.ScopeConversationID {
+		return true, nil
+	}
+	if q.ScopeTopicID != "" {
+		var inTopic bool
+		if err := store.DB().QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM turn_topics WHERE turn_id=? AND topic_id=?)`, turnID, q.ScopeTopicID).Scan(&inTopic); err != nil {
+			return false, fmt.Errorf("retrieval question %q: evidence %q topic: %w", q.ID, turnID, err)
+		}
+		if !inTopic {
+			return true, nil
+		}
+	}
+	if q.ScopeStartedAfter != nil || q.ScopeStartedBefore != nil {
+		started, ok := memo[conversationID]
+		if !ok {
+			var err error
+			started, err = store.ConversationStartedAt(ctx, conversationID)
+			if err != nil {
+				return false, fmt.Errorf("retrieval question %q: evidence %q conversation start: %w", q.ID, turnID, err)
+			}
+			memo[conversationID] = started
+		}
+		if !memory.WithinStartedRange(started, q.ScopeStartedAfter, q.ScopeStartedBefore) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // isAmbientItem applies the store's ambient rule to one returned item: a turn

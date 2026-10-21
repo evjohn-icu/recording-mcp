@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"recordingmcp/internal/app"
 	"recordingmcp/internal/asrinput"
 	"recordingmcp/internal/contextbuild"
 	"recordingmcp/internal/memory"
@@ -30,7 +31,7 @@ func TestMCPToolsExposeQueryAndConversationMemory(t *testing.T) {
 		t.Fatal(err)
 	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, false, nil, nil).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +103,7 @@ func TestGetCurrentContextProjectsSeededMemory(t *testing.T) {
 		}
 	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, false, nil, nil).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +195,7 @@ func TestGetCurrentContextPinnedScopeIsNotWidened(t *testing.T) {
 		}
 	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, false, nil, nil).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +269,7 @@ func TestGetCurrentContextReportsNoHitsUnderPinnedScope(t *testing.T) {
 		}
 	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, false, nil, nil).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,7 +328,7 @@ func TestNeutralIngestAnnotateAndTrackCoverageOverMCP(t *testing.T) {
 	}
 	defer store.Close()
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, false, nil, nil).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -473,7 +474,7 @@ func TestRetrievalToolsOverMCP(t *testing.T) {
 	}
 	defer store.Close()
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, false, nil, nil).Connect(ctx, st, nil)
+	ss, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -537,7 +538,7 @@ func TestMCPReplayPreservesRawProviderNumbers(t *testing.T) {
 		t.Fatal(err)
 	}
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, false, nil, nil).Connect(ctx, st, nil)
+	ss, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -592,7 +593,7 @@ func TestMemoryLinkToolsOverMCP(t *testing.T) {
 	}
 
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, false, nil, nil).Connect(ctx, st, nil)
+	ss, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -703,7 +704,7 @@ func TestReadOnlyServerExposesOnlyReadTools(t *testing.T) {
 	}
 	defer store.Close()
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, true, nil, nil).Connect(ctx, st, nil)
+	ss, err := newServer(store, app.New(store, nil, nil, ""), true).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -791,7 +792,7 @@ func TestBuildContextToolSmoke(t *testing.T) {
 	}
 
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, false, nil, nil).Connect(ctx, st, nil)
+	ss, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -869,7 +870,7 @@ func TestSpeakerBindingToolsOverMCP(t *testing.T) {
 	}
 
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, false, nil, nil).Connect(ctx, st, nil)
+	ss, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

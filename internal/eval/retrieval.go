@@ -29,15 +29,14 @@ type authoredRetrievalQuestion struct {
 	Purpose               string         `json:"purpose"`
 	GoldTurnRefs          []TurnRef      `json:"gold_turn_refs"`
 	GoldTopicRefs         []TurnRef      `json:"gold_topic_refs"`
+	GoldEvidenceTurnIDs   []string       `json:"gold_evidence_turn_ids"`
+	GoldTopicIDs          []string       `json:"gold_topic_ids"`
+	Unanswerable          bool           `json:"unanswerable,omitempty"`
+	GoldTop1TurnRef       *TurnRef       `json:"gold_top1_turn_ref,omitempty"`
 	Scope                 retrievalScope `json:"scope"`
 	ExpectAmbientExcluded bool           `json:"expect_ambient_excluded"`
 	ExpectStaleExcluded   bool           `json:"expect_stale_excluded"`
 	Notes                 string         `json:"notes"`
-}
-
-type retrievalFile struct {
-	Description string                      `json:"description"`
-	Questions   []authoredRetrievalQuestion `json:"questions"`
 }
 
 // RetrievalQuestion is one resolved retrieval question.
@@ -48,12 +47,19 @@ type RetrievalQuestion struct {
 	Notes                 string
 	GoldEvidenceTurnIDs   []string
 	GoldTopicIDs          []string
+	Unanswerable          bool
+	GoldTop1TurnID        string
 	ScopeConversationID   string
 	ScopeTopicID          string
 	ScopeStartedAfter     *time.Time
 	ScopeStartedBefore    *time.Time
 	ExpectAmbientExcluded bool
 	ExpectStaleExcluded   bool
+}
+
+type retrievalFile struct {
+	Description string                      `json:"description"`
+	Questions   []authoredRetrievalQuestion `json:"questions"`
 }
 
 // LoadRetrievalQuestions reads the retrieval fixture and resolves every human
@@ -90,11 +96,17 @@ func LoadRetrievalQuestions(ctx context.Context, db *sql.DB, path string) ([]Ret
 		if aq.Query == "" {
 			return nil, fmt.Errorf("retrieval question %q has no query", aq.ID)
 		}
+		if aq.Unanswerable && (len(aq.GoldTurnRefs) > 0 || len(aq.GoldTopicRefs) > 0 || len(aq.GoldEvidenceTurnIDs) > 0 || len(aq.GoldTopicIDs) > 0 || aq.GoldTop1TurnRef != nil) {
+			return nil, fmt.Errorf("retrieval question %q is unanswerable but has gold refs", aq.ID)
+		}
 		q := RetrievalQuestion{
 			ID:                    aq.ID,
 			Query:                 aq.Query,
 			Purpose:               aq.Purpose,
 			Notes:                 aq.Notes,
+			GoldEvidenceTurnIDs:   append([]string(nil), aq.GoldEvidenceTurnIDs...),
+			GoldTopicIDs:          append([]string(nil), aq.GoldTopicIDs...),
+			Unanswerable:          aq.Unanswerable,
 			ExpectAmbientExcluded: aq.ExpectAmbientExcluded,
 			ExpectStaleExcluded:   aq.ExpectStaleExcluded,
 		}
@@ -112,7 +124,14 @@ func LoadRetrievalQuestions(ctx context.Context, db *sql.DB, path string) ([]Ret
 			}
 			q.GoldTopicIDs = appendUnique(q.GoldTopicIDs, id)
 		}
-		if len(q.GoldEvidenceTurnIDs) == 0 {
+		if aq.GoldTop1TurnRef != nil {
+			id, err := resolveTurnRef(ctx, db, *aq.GoldTop1TurnRef)
+			if err != nil {
+				return nil, fmt.Errorf("retrieval question %q: gold top1: %w", aq.ID, err)
+			}
+			q.GoldTop1TurnID = id
+		}
+		if !aq.Unanswerable && len(q.GoldEvidenceTurnIDs) == 0 {
 			return nil, fmt.Errorf("retrieval question %q: no gold evidence turns resolved", aq.ID)
 		}
 		q.ScopeConversationID = aq.Scope.ConversationID

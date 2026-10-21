@@ -17,6 +17,7 @@ type questionEval struct {
 	goldFound        int
 	recall           float64
 	staleLeakage     float64
+	staleItems       int
 	relationAssisted int
 	coverage         *float64
 	invalidRefs      int
@@ -97,6 +98,30 @@ func evidenceIDs(item memory.Item, noteEvidence map[string][]string) []string {
 	return noteEvidence[item.ID]
 }
 
+// firstTurnTop1Hit returns whether the first turn item in package order cites
+// the authored gold turn. A package without a turn is a miss, not an omitted
+// evaluation; note items may precede turns by design.
+func firstTurnTop1Hit(goldTurnID string, pkg contextbuild.Package, noteEvidence map[string][]string) *bool {
+	if goldTurnID == "" {
+		return nil
+	}
+	for _, item := range pkg.Items {
+		if item.Kind != "turn" {
+			continue
+		}
+		hit := false
+		for _, id := range evidenceIDs(item, noteEvidence) {
+			if id == goldTurnID {
+				hit = true
+				break
+			}
+		}
+		return &hit
+	}
+	hit := false
+	return &hit
+}
+
 // evaluateQuestion computes every per-question metric against one package.
 func evaluateQuestion(q Question, pkg contextbuild.Package, staleTurns, knownTurns map[string]bool, noteEvidence map[string][]string) questionEval {
 	var ev questionEval
@@ -122,17 +147,13 @@ func evaluateQuestion(q Question, pkg contextbuild.Package, staleTurns, knownTur
 		ev.recall = float64(ev.goldFound) / float64(n)
 	}
 
-	// Stale leakage: an item is stale when the builder says so or when every
-	// evidence turn behind it is superseded.
+	// Stale or mixed-staleness items still have to be scanned for invalid
+	// references: staleness and reference validity are independent checks.
 	stale := 0
 	invalid := map[string]bool{}
 	for _, item := range pkg.Items {
-		if item.Stale {
-			stale++
-			continue
-		}
 		ids := evidenceIDs(item, noteEvidence)
-		if len(ids) > 0 && allStale(ids, staleTurns) {
+		if item.Stale || anyStale(ids, staleTurns) {
 			stale++
 		}
 		for _, id := range ids {
@@ -147,6 +168,7 @@ func evaluateQuestion(q Question, pkg contextbuild.Package, staleTurns, knownTur
 		}
 	}
 	ev.invalidRefs = len(invalid)
+	ev.staleItems = stale
 	if ev.hits > 0 {
 		ev.staleLeakage = float64(stale) / float64(ev.hits)
 	}
@@ -214,13 +236,13 @@ func evaluateQuestion(q Question, pkg contextbuild.Package, staleTurns, knownTur
 	return ev
 }
 
-func allStale(ids []string, stale map[string]bool) bool {
+func anyStale(ids []string, stale map[string]bool) bool {
 	for _, id := range ids {
-		if !stale[id] {
-			return false
+		if stale[id] {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func removeIfExists(path string) error {

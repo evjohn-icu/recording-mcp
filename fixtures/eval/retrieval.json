@@ -44,6 +44,110 @@
       ],
       "expect_stale_excluded": true,
       "notes": "v1 已被 v2 取代；rev-1 的『下周三就能打款』绝不能作为当前结果出现。"
+    },
+    {
+      "id": "variants-mic-alias",
+      "query": "麦克风要装新电池",
+      "purpose": "hybrid_alias_observation",
+      "gold_turn_refs": [
+        {"segment_id": "seg-variant-mic", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "notes": "转写是话麦；不设 gold_top1，记录语义分支对别名的实际结果。"
+    },
+    {
+      "id": "variants-reimburse-alias",
+      "query": "费用报销附发票",
+      "purpose": "hybrid_synonym_observation",
+      "gold_turn_refs": [
+        {"segment_id": "seg-variant-reimburse", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "notes": "转写用走账；不设 gold_top1，记录同义改写的实际结果。"
+    },
+    {
+      "id": "variants-person-alias",
+      "query": "周工联系供应商",
+      "purpose": "hybrid_alias_observation",
+      "gold_turn_refs": [
+        {"segment_id": "seg-variant-person", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "notes": "转写用小周；不设 gold_top1，记录别名的实际结果。"
+    },
+    {
+      "id": "variants-asr-correct",
+      "query": "密钥写在申请表",
+      "purpose": "asr_error_normalization_limit",
+      "gold_turn_refs": [
+        {"segment_id": "seg-variant-asr", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "notes": "转写为密月；金证据引用该 ASR 轮次，记录正确词形的归一化限制。"
+    },
+    {
+      "id": "cross-session-both",
+      "query": "跨会话项目",
+      "purpose": "cross_session_evidence",
+      "gold_turn_refs": [
+        {"segment_id": "seg-cross-session-a", "transcript_revision": "rev-1", "turn_id": "utt-1"},
+        {"segment_id": "seg-cross-session-b", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "notes": "金证据覆盖不同录音开始时间的两个片段。"
+    },
+    {
+      "id": "update-later-top1",
+      "query": "改成下周二下午召开",
+      "purpose": "information_update_top1",
+      "gold_turn_refs": [
+        {"segment_id": "seg-update-plan", "transcript_revision": "rev-1", "turn_id": "utt-2"}
+      ],
+      "gold_top1_turn_ref": {"segment_id": "seg-update-plan", "transcript_revision": "rev-1", "turn_id": "utt-2"},
+      "notes": "后一句改口为下周二，top1 必须指向较晚轮次。"
+    },
+    {
+      "id": "unknown-time-bounded",
+      "query": "隐时密钥",
+      "purpose": "unknown_time_scope",
+      "unanswerable": true,
+      "scope": {
+        "conversation_id": "conv-eval-unknown-time",
+        "started_after": "2026-01-01T00:00:00+08:00",
+        "started_before": "2026-12-31T23:59:59+08:00"
+      },
+      "notes": "未知开始时间在任意时间边界下都不能命中。"
+    },
+    {
+      "id": "unknown-time-unbounded",
+      "query": "隐时密钥",
+      "purpose": "unknown_time_answerable",
+      "gold_turn_refs": [
+        {"segment_id": "seg-unknown-time", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "notes": "同一词在无时间边界时应命中未知时间录音。"
+    },
+    {
+      "id": "budget-supersede-extra",
+      "query": "财务说等下周五再审",
+      "purpose": "stale_exclusion_extra",
+      "gold_turn_refs": [
+        {"segment_id": "seg-budget", "transcript_revision": "rev-2", "turn_id": "utt-1"}
+      ],
+      "expect_stale_excluded": true,
+      "notes": "额外当前修订问题，旧修订仍不能泄漏。"
+    },
+    {
+      "id": "ambient-isolation-extra",
+      "query": "投影仪",
+      "purpose": "ambient_exclusion_extra",
+      "gold_turn_refs": [
+        {"segment_id": "seg-ambient", "transcript_revision": "rev-1", "turn_id": "utt-4"}
+      ],
+      "expect_ambient_excluded": true,
+      "notes": "额外环境音隔离问题，普通对话轮次应保留。"
+    },
+    {
+      "id": "unanswerable-nowhere",
+      "query": "量子纠缠实验室",
+      "purpose": "unanswerable_no_match",
+      "unanswerable": true,
+      "notes": "查询词不存在于语料，词面与语义结果都记录。"
     }
   ]
 }

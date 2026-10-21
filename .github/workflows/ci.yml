@@ -13,6 +13,17 @@ jobs:
       - run: go test -race -count=1 ./...
       - run: make build
 
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix web
+      - run: npm run typecheck --prefix web
+      - run: npm run build --prefix web
+
   cloud-ingest:
     runs-on: ubuntu-latest
     steps:

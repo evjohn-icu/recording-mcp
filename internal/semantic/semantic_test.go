@@ -182,6 +182,108 @@ func contains(s, sub string) bool {
 	return strings.Contains(s, sub)
 }
 
+func TestSearchSkipsEmbeddingWhenArtifactContentChanged(t *testing.T) {
+	db := openTestDB(t)
+	seedConversation(t, db, "conv:a", "rec:a")
+	seedNote(t, db, "n:1", "conv:a", "旧版季度预算搬迁计划")
+	provider := NewHashProvider(64)
+	ix := &Indexer{DB: db, Provider: provider}
+	if _, err := ix.IndexAll(context.Background()); err != nil {
+		t.Fatalf("index: %v", err)
+	}
+	// Simulate a summary edit after the old vector was committed but before
+	// its replacement embed job completes.
+	mustExec(t, db, `UPDATE notes SET summary='新版完全不同的内容' WHERE id='n:1'`)
+	r := &SQLiteRetriever{DB: db, Provider: provider}
+	hits, err := r.Search(context.Background(), "旧版季度预算搬迁计划", SearchOptions{})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	for _, hit := range hits {
+		if hit.Kind == "note" && hit.ArtifactID == "n:1" {
+			t.Fatalf("outdated vector returned for changed summary: %+v", hit)
+		}
+	}
+}
+
+func TestIndexDoesNotOverwriteNewerEmbeddingAfterProviderRace(t *testing.T) {
+	db := openTestDB(t)
+	seedConversation(t, db, "conv:race", "rec:race")
+	seedNote(t, db, "n:race", "conv:race", "old snapshot")
+
+	var hook func()
+	provider := raceProvider{hook: func() {
+		// Change the source and let a newer worker store its vector while the
+		// older provider call is still in flight.
+		mustExec(t, db, `UPDATE notes SET summary='new snapshot' WHERE id='n:race'`)
+		newer, err := (&Indexer{DB: db, Provider: raceProvider{}}).IndexAll(context.Background())
+		if err != nil {
+			t.Fatalf("newer index: %v", err)
+		}
+		if newer.Notes != 1 {
+			t.Fatalf("newer report = %+v, want one indexed note", newer)
+		}
+	}}
+	hook = provider.hook
+	provider.hook = func() {
+		callback := hook
+		hook = nil
+		callback()
+	}
+	ix := &Indexer{DB: db, Provider: provider}
+	rep, err := ix.IndexAll(context.Background())
+	if err != nil {
+		t.Fatalf("older index: %v", err)
+	}
+	if rep.Notes != 0 || rep.Skipped != 1 {
+		t.Fatalf("older report = %+v, want skipped=1 and no stored note", rep)
+	}
+
+	var encoded []byte
+	var contentHash string
+	if err := db.QueryRow(`SELECT vector, content_sha256 FROM memory_embeddings WHERE kind='note' AND artifact_id='n:race'`).Scan(&encoded, &contentHash); err != nil {
+		t.Fatalf("read embedding: %v", err)
+	}
+	got, err := Decode(encoded, 2)
+	if err != nil {
+		t.Fatalf("decode embedding: %v", err)
+	}
+	if got[0] != 2 || contentHash != sha256hex("new snapshot") {
+		t.Fatalf("stored stale embedding: vector=%v hash=%s", got, contentHash)
+	}
+}
+
+type raceProvider struct {
+	hook func()
+}
+
+func (raceProvider) ID() string    { return "race-test" }
+func (raceProvider) Model() string { return "race-test-model" }
+func (raceProvider) Dims() int     { return 2 }
+func (p raceProvider) Embed(_ context.Context, texts []string) ([]Vector, error) {
+	if p.hook != nil {
+		p.hook()
+	}
+	out := make([]Vector, len(texts))
+	for i, text := range texts {
+		if text == "new snapshot" {
+			out[i] = Vector{2, 0}
+		} else {
+			out[i] = Vector{1, 0}
+		}
+	}
+	return out, nil
+}
+
+func TestUnknownProviderConfigErrors(t *testing.T) {
+	if _, err := ProviderFromConfig(Config{Provider: "mystery"}); err == nil {
+		t.Fatal("unknown provider must be rejected")
+	}
+	if provider, err := ProviderFromConfig(Config{Provider: "off"}); err != nil || provider != nil {
+		t.Fatalf("off provider = %v, %v; want nil, nil", provider, err)
+	}
+}
+
 func TestIndexIsIdempotentAndHashKeyed(t *testing.T) {
 	db := openTestDB(t)
 	seedConversation(t, db, "conv:a", "rec:a")

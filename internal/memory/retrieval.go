@@ -178,17 +178,26 @@ func normalizeStatus(status string) (string, error) {
 	}
 }
 
+// ParseStartedAt parses a stored RFC3339 recording start. Empty means the
+// time is unknown (nil), never a fabricated zero time.
+func ParseStartedAt(raw string) (*time.Time, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, nil
+	}
+	t, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return nil, fmt.Errorf("invalid recording_started_at %q: %w", raw, err)
+	}
+	return &t, nil
+}
+
 // parseStartedAt converts a stored RFC3339 recording_started_at into a time.
 // NULL and empty values yield nil.
 func parseStartedAt(raw sql.NullString) (*time.Time, error) {
-	if !raw.Valid || strings.TrimSpace(raw.String) == "" {
+	if !raw.Valid {
 		return nil, nil
 	}
-	t, err := time.Parse(time.RFC3339, raw.String)
-	if err != nil {
-		return nil, fmt.Errorf("invalid recording_started_at %q: %w", raw.String, err)
-	}
-	return &t, nil
+	return ParseStartedAt(raw.String)
 }
 
 // WithinStartedRange reports whether started satisfies the inclusive bounds.
@@ -293,7 +302,7 @@ func (s *Store) ListConversations(ctx context.Context, f ConversationFilter) (Co
  (SELECT COUNT(*) FROM turns t WHERE t.conversation_id=c.id AND `+CurrentTurnPredicate("t")+` AND EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id)),
  (SELECT COUNT(*) FROM notes n WHERE n.conversation_id=c.id AND NOT `+NoteStalePredicate("n")+`)
  FROM conversations c LEFT JOIN recordings r ON r.id=c.recording_id
- WHERE (?='' OR EXISTS(SELECT 1 FROM topic_conversations tc WHERE tc.topic_id=? AND tc.conversation_id=c.id))`,
+ WHERE (?='' OR EXISTS(SELECT 1 FROM (`+currentTopicMembershipSQL()+`) tc WHERE tc.topic_id=? AND tc.conversation_id=c.id))`,
 		f.TopicID, f.TopicID)
 	if err != nil {
 		return ConversationPage{}, err

@@ -1,0 +1,21 @@
+{
+  "timeline_rows": 24,
+  "evidence_audio": {
+    "currentTime": 1.333514,
+    "duration": 3.5,
+    "paused": false,
+    "error": null
+  },
+  "conflict_preserves_draft": true,
+  "conflict_contains_current": true,
+  "focus_in_conflict": true,
+  "saved_draft": true,
+  "siblings_preserved": true,
+  "history_versions": 4,
+  "narrow": {
+    "width": 390,
+    "scroll": 390
+  },
+  "no_evidence_text": "搜索\n\n在原始转录与 AI 归纳中查找记忆\n\n关键词\n范围\n全部\n仅原始转录\n仅AI归纳\n混合检索（实验）\n开始日期\n结束日期\n主题\n全部主题\n合成主题 33d4e0\n合成主题 e6d81e\n合成主题 1d1899\n合成主题 3aa22f\n合成主题 7b25aa\n合成主题 f14cc9\n合成主题 8c0ccc\n合成主题 797e76\n合成主题 1eddc8\n合成主题 01be2b\n合成主题 ca0f58\n合成主题 1104e7\n合成主题 79bd42\n合成主题 4eaff7\n合成主题 d14cf5\n合成主题 2d7008\n合成主题 6c07bd\n合成主题 b16e29\n珠海搬家\n合成主题 664028\n合成主题 73960c\n合成主题 1f8261\n合成主题 1d396a\n合成主题 33d73e\n合成主题 493332\n合成主题 5c94d5\n合成主题 4beba3\n合成主题 24230d\n合成主题 d1a67e\n合成主题 d88fd3\n合成主题 b27dda\n合成主题 9f3d6b\n状态\n全部状态\n待分析\n部分已分析\n没有匹配的结果",
+  "js_errors": []
+}

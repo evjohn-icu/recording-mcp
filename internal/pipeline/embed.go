@@ -53,10 +53,10 @@ func (h *EmbedHandler) Execute(ctx context.Context, job process.Job) (string, er
 	return fmt.Sprintf("embed:%s/%s+notes:%d+turns:%d+skipped:%d+pruned:%d", rep.ProviderID, rep.Model, rep.Notes, rep.Turns, rep.Skipped, pruned), nil
 }
 
-// enqueueEmbed schedules the embed stage for one conversation. The caller
+// EnqueueEmbed schedules the embed stage for one conversation. The caller
 // derives the idempotency key from what triggered the refresh (ingested
 // attachment or published annotation version), so replays enqueue no new job.
-func enqueueEmbed(ctx context.Context, db *sql.DB, conversationID, idempotencyKey string) error {
+func EnqueueEmbed(ctx context.Context, db *sql.DB, conversationID, idempotencyKey string) error {
 	payload, err := json.Marshal(struct {
 		ConversationID string `json:"conversation_id"`
 	}{ConversationID: conversationID})

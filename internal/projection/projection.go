@@ -172,13 +172,13 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, req Request) (R
 
 	// Rule 1: commitment/preference/event objects from current, non-ambient
 	// notes, plus rule 6's audit objects from stale notes.
-	notes, err := loadNotes(ctx, db, false)
+	notes, err := loadNotes(ctx, db, false, req)
 	if err != nil {
 		return result, err
 	}
 	result.Coverage.NotesScanned += len(notes)
 	if req.Audit {
-		stale, err := loadNotes(ctx, db, true)
+		stale, err := loadNotes(ctx, db, true, req)
 		if err != nil {
 			return result, err
 		}
@@ -214,7 +214,7 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, req Request) (R
 	conflicts := applyCommitmentConflicts(objects, primaryStart)
 
 	// Rule 3: topic objects from current membership.
-	topics, linksScanned, err := loadTopics(ctx, db)
+	topics, linksScanned, err := loadTopics(ctx, db, req)
 	if err != nil {
 		return result, err
 	}
@@ -223,7 +223,7 @@ func Build(ctx context.Context, store *memory.Store, db *sql.DB, req Request) (R
 	objects = append(objects, topics...)
 
 	// Rule 4: person objects from confirmed speaker bindings.
-	bindings, err := loadBindings(ctx, db)
+	bindings, err := loadBindings(ctx, db, req)
 	if err != nil {
 		return result, err
 	}
@@ -293,7 +293,10 @@ type noteRow struct {
 
 // loadNotes reads current notes (stale=false) or stale notes (stale=true) with
 // the exact current/ambient predicates the retrieval layer uses.
-func loadNotes(ctx context.Context, db *sql.DB, stale bool) ([]noteRow, error) {
+func loadNotes(ctx context.Context, db *sql.DB, stale bool, req Request) ([]noteRow, error) {
+	if len(req.PersonIDs) > 0 {
+		return nil, nil
+	}
 	query := `SELECT n.id, n.conversation_id, n.kind, n.summary, n.topic_ids_json,
 		(SELECT t.global_start_ms FROM note_evidence ne2 JOIN turns t ON t.id=ne2.turn_id WHERE ne2.note_id=n.id AND ne2.ordinal=0)
 		FROM notes n WHERE `
@@ -302,8 +305,54 @@ func loadNotes(ctx context.Context, db *sql.DB, stale bool) ([]noteRow, error) {
 	} else {
 		query += `NOT ` + memory.NoteStalePredicate("n") + ` AND ` + noteEvidenceAmbientClause
 	}
+	query += ` AND (?='' OR n.conversation_id=?)`
+	args := []any{"", ""}
+	if len(req.ConversationIDs) == 1 {
+		args = []any{req.ConversationIDs[0], req.ConversationIDs[0]}
+	} else if len(req.ConversationIDs) > 1 {
+		query = strings.TrimSuffix(query, ` ORDER BY n.id`)
+		query += ` AND n.conversation_id IN (` + placeholders(len(req.ConversationIDs)) + `)`
+		args = append(args, stringsToAny(req.ConversationIDs)...)
+	}
+	if len(req.Kinds) > 0 {
+		values := []string{}
+		for _, kind := range req.Kinds {
+			switch kind {
+			case KindCommitment:
+				values = append(values, "intention", "request")
+			case KindPreference:
+				values = append(values, "constraint")
+			case KindEvent:
+				values = append(values, "observation")
+			}
+		}
+		if len(values) == 0 {
+			query = strings.TrimSuffix(query, ` ORDER BY n.id`) + ` AND 0`
+		} else {
+			query = strings.TrimSuffix(query, ` ORDER BY n.id`)
+			query += ` AND n.kind IN (` + placeholders(len(values)) + `)`
+			args = append(args, stringsToAny(values)...)
+		}
+	}
+	if len(req.TopicIDs) > 0 {
+		query = strings.TrimSuffix(query, ` ORDER BY n.id`)
+		query += ` AND EXISTS(SELECT 1 FROM json_each(n.topic_ids_json) WHERE value IN (` + placeholders(len(req.TopicIDs)) + `))`
+		args = append(args, stringsToAny(req.TopicIDs)...)
+	}
+	if req.StartedAfter != nil || req.StartedBefore != nil {
+		query = strings.TrimSuffix(query, ` ORDER BY n.id`)
+		query += ` AND EXISTS(SELECT 1 FROM conversations c JOIN recordings r ON r.id=c.recording_id WHERE c.id=n.conversation_id AND r.recording_started_at IS NOT NULL)`
+		if req.StartedAfter != nil {
+			query += ` AND julianday((SELECT r.recording_started_at FROM conversations c JOIN recordings r ON r.id=c.recording_id WHERE c.id=n.conversation_id))>=julianday(?)`
+			args = append(args, req.StartedAfter.Format(time.RFC3339Nano))
+		}
+		if req.StartedBefore != nil {
+			query += ` AND julianday((SELECT r.recording_started_at FROM conversations c JOIN recordings r ON r.id=c.recording_id WHERE c.id=n.conversation_id))<=julianday(?)`
+			args = append(args, req.StartedBefore.Format(time.RFC3339Nano))
+		}
+	}
 	query += ` ORDER BY n.id`
-	rows, err := db.QueryContext(ctx, query)
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("projection: select notes: %w", err)
 	}
@@ -353,7 +402,11 @@ func loadNotes(ctx context.Context, db *sql.DB, stale bool) ([]noteRow, error) {
 	const chunk = 400
 	for start := 0; start < len(ids); start += chunk {
 		end := min(start+chunk, len(ids))
-		q := fmt.Sprintf(`SELECT note_id, turn_id FROM note_evidence WHERE note_id IN (%s) ORDER BY note_id, ordinal`, placeholders(end-start))
+		evidenceFilter := `NOT EXISTS(SELECT 1 FROM turn_classes tc WHERE tc.turn_id=t.id AND tc.class='ambient')`
+		if !stale {
+			evidenceFilter = memory.CurrentTurnPredicate("t") + ` AND ` + evidenceFilter
+		}
+		q := fmt.Sprintf(`SELECT ne.note_id, ne.turn_id FROM note_evidence ne JOIN turns t ON t.id=ne.turn_id WHERE ne.note_id IN (%s) AND `+evidenceFilter+` ORDER BY ne.note_id, ne.ordinal`, placeholders(end-start))
 		evRows, err := db.QueryContext(ctx, q, stringsToAny(ids[start:end])...)
 		if err != nil {
 			return nil, fmt.Errorf("projection: select note evidence: %w", err)
@@ -522,7 +575,10 @@ func firstCue(summary string) (string, bool) {
 
 // loadTopics builds the topic objects from current membership and reports how
 // many confirmed links were scanned.
-func loadTopics(ctx context.Context, db *sql.DB) ([]Object, int, error) {
+func loadTopics(ctx context.Context, db *sql.DB, req Request) ([]Object, int, error) {
+	if len(req.PersonIDs) > 0 || (len(req.Kinds) > 0 && !toKinds(req.Kinds)[KindTopic]) {
+		return nil, 0, nil
+	}
 	query := `SELECT t.id, t.title FROM topics t
 WHERE EXISTS(SELECT 1 FROM notes n WHERE NOT ` + memory.NoteStalePredicate("n") + ` AND ` + noteEvidenceAmbientClause + `
 	AND EXISTS(SELECT 1 FROM json_each(n.topic_ids_json) WHERE value=t.id))
@@ -551,7 +607,12 @@ ORDER BY t.id`
 	}
 	rows.Close()
 
-	convRows, err := db.QueryContext(ctx, `SELECT topic_id, conversation_id FROM topic_conversations ORDER BY topic_id, conversation_id`)
+	convRows, err := db.QueryContext(ctx, `SELECT topic_id, conversation_id FROM (
+ SELECT tt.topic_id, t.conversation_id FROM turn_topics tt JOIN turns t ON t.id=tt.turn_id
+ WHERE `+memory.CurrentTurnPredicate("t")+` AND NOT EXISTS(SELECT 1 FROM turn_classes tc WHERE tc.turn_id=t.id AND tc.class='ambient')
+ UNION SELECT CAST(j.value AS TEXT), n.conversation_id FROM notes n JOIN json_each(n.topic_ids_json) j
+ WHERE NOT `+memory.NoteStalePredicate("n")+` AND `+noteEvidenceAmbientClause+`
+) ORDER BY topic_id, conversation_id`)
 	if err != nil {
 		return nil, 0, fmt.Errorf("projection: select topic conversations: %w", err)
 	}
@@ -570,37 +631,84 @@ ORDER BY t.id`
 	}
 	convRows.Close()
 
-	turnRows, err := db.QueryContext(ctx, `SELECT tt.topic_id, tt.turn_id FROM turn_topics tt
+	for topicID, convIDs := range topicConvs {
+		kept := convIDs[:0]
+		for _, convID := range convIDs {
+			ok, err := conversationInRequest(ctx, db, req, convID)
+			if err != nil {
+				return nil, 0, err
+			}
+			if ok {
+				kept = append(kept, convID)
+			}
+		}
+		topicConvs[topicID] = kept
+	}
+
+	turnRows, err := db.QueryContext(ctx, `SELECT tt.topic_id, tt.turn_id, t.conversation_id FROM turn_topics tt
 JOIN turns t ON t.id=tt.turn_id
 WHERE `+memory.CurrentTurnPredicate("t")+` AND NOT EXISTS(SELECT 1 FROM turn_classes tc WHERE tc.turn_id=t.id AND tc.class='ambient')
 ORDER BY tt.topic_id, tt.turn_id`)
 	if err != nil {
 		return nil, 0, fmt.Errorf("projection: select topic turns: %w", err)
 	}
-	topicTurns := map[string][]string{}
+	type topicTurnRow struct{ topicID, turnID, conversationID string }
+	turnCandidates := []topicTurnRow{}
 	for turnRows.Next() {
-		var tid, turnID string
-		if err := turnRows.Scan(&tid, &turnID); err != nil {
+		var row topicTurnRow
+		if err := turnRows.Scan(&row.topicID, &row.turnID, &row.conversationID); err != nil {
 			turnRows.Close()
 			return nil, 0, err
 		}
-		topicTurns[tid] = append(topicTurns[tid], turnID)
+		turnCandidates = append(turnCandidates, row)
 	}
 	if err := turnRows.Err(); err != nil {
 		turnRows.Close()
 		return nil, 0, err
 	}
 	turnRows.Close()
+	topicTurns := map[string][]string{}
+	for _, row := range turnCandidates {
+		ok, err := conversationInRequest(ctx, db, req, row.conversationID)
+		if err != nil {
+			return nil, 0, err
+		}
+		if ok {
+			topicTurns[row.topicID] = append(topicTurns[row.topicID], row.turnID)
+		}
+	}
 
 	links, err := pipeline.ListLinks(ctx, db, pipeline.LinkFilter{Status: pipeline.LinkStatusConfirmed})
 	if err != nil {
 		return nil, 0, fmt.Errorf("projection: list links: %w", err)
 	}
+	linksScanned := 0
 	linksByTopic := map[string][]string{}
 	for _, link := range links {
-		if link.Stale {
+		if link.Stale || !linkInTopicRequest(link, req) {
 			continue
 		}
+		inScope := len(req.ConversationIDs) == 0 && req.StartedAfter == nil && req.StartedBefore == nil
+		for _, turnID := range link.EvidenceTurnIDs {
+			var convID string
+			err := db.QueryRowContext(ctx, `SELECT conversation_id FROM turns WHERE id=? AND `+memory.CurrentTurnPredicate("turns"), turnID).Scan(&convID)
+			if err == nil {
+				allowed, err := conversationInRequest(ctx, db, req, convID)
+				if err != nil {
+					return nil, 0, err
+				}
+				if allowed {
+					inScope = true
+					break
+				}
+			} else if err != sql.ErrNoRows {
+				return nil, 0, err
+			}
+		}
+		if !inScope {
+			continue
+		}
+		linksScanned++
 		if link.FromKind == "topic" {
 			linksByTopic[link.FromID] = append(linksByTopic[link.FromID], link.ID)
 		}
@@ -615,7 +723,7 @@ ORDER BY tt.topic_id, tt.turn_id`)
 		if len(evidence) > 5 {
 			evidence = evidence[:5]
 		}
-		out = append(out, Object{
+		obj := Object{
 			ID:              t.id,
 			Kind:            KindTopic,
 			Subject:         t.id,
@@ -628,9 +736,70 @@ ORDER BY tt.topic_id, tt.turn_id`)
 			ConversationIDs: append([]string(nil), topicConvs[t.id]...),
 			TopicIDs:        []string{t.id},
 			LinkIDs:         sortedUnique(linksByTopic[t.id]),
-		})
+		}
+		if requestAllowsTopicObject(obj, req) {
+			out = append(out, obj)
+		}
 	}
-	return out, len(links), nil
+	return out, linksScanned, nil
+}
+
+func linkInTopicRequest(link pipeline.MemoryLink, req Request) bool {
+	if len(req.TopicIDs) == 0 {
+		return true
+	}
+	for _, id := range req.TopicIDs {
+		if link.FromKind == "topic" && link.FromID == id || link.ToKind == "topic" && link.ToID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func requestAllowsTopicObject(obj Object, req Request) bool {
+	if len(req.PersonIDs) > 0 || ((req.StartedAfter != nil || req.StartedBefore != nil) && len(obj.ConversationIDs) == 0) {
+		return false
+	}
+	if len(req.Kinds) > 0 && !toKinds(req.Kinds)[KindTopic] {
+		return false
+	}
+	if len(req.TopicIDs) > 0 && !anyAllowed(obj.TopicIDs, toSet(req.TopicIDs)) {
+		return false
+	}
+	if len(req.ConversationIDs) > 0 && !anyAllowed(obj.ConversationIDs, toSet(req.ConversationIDs)) {
+		return false
+	}
+	return true
+}
+
+func conversationInRequest(ctx context.Context, db *sql.DB, req Request, conversationID string) (bool, error) {
+	if len(req.ConversationIDs) > 0 && !stringIn(req.ConversationIDs, conversationID) {
+		return false, nil
+	}
+	if req.StartedAfter == nil && req.StartedBefore == nil {
+		return true, nil
+	}
+	var raw sql.NullString
+	if err := db.QueryRowContext(ctx, `SELECT r.recording_started_at FROM conversations c LEFT JOIN recordings r ON r.id=c.recording_id WHERE c.id=?`, conversationID).Scan(&raw); err != nil {
+		return false, err
+	}
+	started, err := memory.ParseStartedAt(raw.String)
+	if !raw.Valid {
+		started = nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return memory.WithinStartedRange(started, req.StartedAfter, req.StartedBefore), nil
+}
+
+func stringIn(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 // bindingRow is one confirmed speaker binding.
@@ -644,10 +813,31 @@ type bindingRow struct {
 
 // loadBindings reads every confirmed speaker binding with a person id,
 // deterministically ordered so merged summaries are stable.
-func loadBindings(ctx context.Context, db *sql.DB) ([]bindingRow, error) {
-	rows, err := db.QueryContext(ctx, `SELECT id, recording_id, transcript_revision, speaker_scoped_id, person_id
-FROM speaker_bindings WHERE status='confirmed' AND person_id IS NOT NULL AND person_id<>''
-ORDER BY recording_id, speaker_scoped_id, id`)
+func loadBindings(ctx context.Context, db *sql.DB, req Request) ([]bindingRow, error) {
+	if len(req.TopicIDs) > 0 || (len(req.Kinds) > 0 && !toKinds(req.Kinds)[KindPerson]) {
+		return nil, nil
+	}
+	query := `SELECT b.id, b.recording_id, b.transcript_revision, b.speaker_scoped_id, b.person_id
+FROM speaker_bindings b JOIN recordings r ON r.id=b.recording_id WHERE b.status='confirmed' AND b.person_id IS NOT NULL AND b.person_id<>''`
+	args := []any{}
+	if len(req.PersonIDs) > 0 {
+		query += ` AND b.person_id IN (` + placeholders(len(req.PersonIDs)) + `)`
+		args = append(args, stringsToAny(req.PersonIDs)...)
+	}
+	if len(req.ConversationIDs) > 0 {
+		query += ` AND r.conversation_id IN (` + placeholders(len(req.ConversationIDs)) + `)`
+		args = append(args, stringsToAny(req.ConversationIDs)...)
+	}
+	if req.StartedAfter != nil {
+		query += ` AND julianday(r.recording_started_at)>=julianday(?)`
+		args = append(args, req.StartedAfter.Format(time.RFC3339Nano))
+	}
+	if req.StartedBefore != nil {
+		query += ` AND julianday(r.recording_started_at)<=julianday(?)`
+		args = append(args, req.StartedBefore.Format(time.RFC3339Nano))
+	}
+	query += ` ORDER BY b.recording_id, b.speaker_scoped_id, b.id`
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("projection: select speaker bindings: %w", err)
 	}
@@ -691,7 +881,7 @@ func projectPersons(ctx context.Context, db *sql.DB, bindings []bindingRow) ([]O
 JOIN attachment_turns at ON at.turn_id=t.id
 JOIN source_attachments a ON a.id=at.attachment_id
 WHERE a.recording_id=? AND t.recording_id=? AND t.speaker_scoped_id=? AND a.transcript_revision=? AND a.active=1
-  AND `+memory.CurrentTurnPredicate("t")+`
+  AND `+memory.CurrentTurnPredicate("t")+` AND NOT EXISTS(SELECT 1 FROM turn_classes tc WHERE tc.turn_id=t.id AND tc.class='ambient')
 ORDER BY t.global_start_ms, t.id
 LIMIT 5`, b.recordingID, b.recordingID, b.speaker, b.revision)
 		if err != nil {

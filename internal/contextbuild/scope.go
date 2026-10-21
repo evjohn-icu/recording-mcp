@@ -92,6 +92,40 @@ func (s *requestScope) allows(ctx context.Context, db *sql.DB, item memory.Item)
 	return s.timeAllows(ctx, db, item.ConversationID)
 }
 
+func (s *requestScope) allowsEvidence(ctx context.Context, db *sql.DB, turnID string) (bool, error) {
+	var item memory.Item
+	item.Kind = "turn"
+	item.ID = turnID
+	if err := db.QueryRowContext(ctx, `SELECT conversation_id FROM turns WHERE id=? AND `+memory.CurrentTurnPredicate("turns"), turnID).Scan(&item.ConversationID); err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	rows, err := db.QueryContext(ctx, `SELECT topic_id FROM turn_topics WHERE turn_id=? ORDER BY topic_id`, turnID)
+	if err != nil {
+		return false, err
+	}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return false, err
+		}
+		item.TopicIDs = append(item.TopicIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return false, err
+	}
+	rows.Close()
+	ambient, err := s.store.ItemAmbient(ctx, item)
+	if err != nil || ambient {
+		return false, err
+	}
+	return s.allows(ctx, db, item)
+}
+
 // timeAllows applies the time bounds to the item's conversation using the
 // same semantics as the retrieval layer: unknown recording start is excluded
 // whenever a bound is set.

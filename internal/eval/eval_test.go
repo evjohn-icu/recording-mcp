@@ -43,6 +43,15 @@ func TestRunOnShippedFixtures(t *testing.T) {
 	if m.SemanticAssistedRecall <= 0 {
 		t.Errorf("semantic_assisted_recall = %f, want > 0", m.SemanticAssistedRecall)
 	}
+	if m.UnanswerableQuestions <= 0 {
+		t.Errorf("unanswerable_questions = %d, want > 0", m.UnanswerableQuestions)
+	}
+	if m.UnanswerableLexicalFalsePositiveItems != 0 {
+		t.Errorf("unanswerable_lexical_false_positive_items = %d, want 0", m.UnanswerableLexicalFalsePositiveItems)
+	}
+	if m.TurnTop1Accuracy <= 0 {
+		t.Errorf("turn_top1_accuracy = %f, want > 0", m.TurnTop1Accuracy)
+	}
 	if m.EvidenceRecallAt5 <= 0 {
 		t.Errorf("evidence_recall_at_5 = %f, want > 0", m.EvidenceRecallAt5)
 	}

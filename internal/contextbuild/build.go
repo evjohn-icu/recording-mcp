@@ -408,7 +408,23 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 		if !ok {
 			return false, "scope", nil
 		}
-		candidates.add(item, branch, raw, evidence, linkIDs)
+		filteredEvidence := make([]string, 0, len(evidence))
+		for _, id := range evidence {
+			allowed, err := scope.allowsEvidence(ctx, db, id)
+			if err != nil {
+				return false, "scope", err
+			}
+			if allowed {
+				filteredEvidence = append(filteredEvidence, id)
+			}
+		}
+		if isNoteKind(item.Kind) {
+			if len(evidence) > 0 && len(filteredEvidence) == 0 {
+				return false, "scope", nil
+			}
+			item.EvidenceTurnIDs = append([]string(nil), filteredEvidence...)
+		}
+		candidates.add(item, branch, raw, filteredEvidence, linkIDs)
 		return true, "accepted", nil
 	}
 
@@ -741,6 +757,13 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 			return Package{}, err
 		}
 		for _, turn := range window.Turns {
+			allowed, err := scope.allowsEvidence(ctx, db, turn.ID)
+			if err != nil {
+				return Package{}, err
+			}
+			if !allowed {
+				continue
+			}
 			if idx, ok := evidenceIndex[turn.ID]; ok {
 				evidence[idx].UsedByItemIDs = appendUnique(evidence[idx].UsedByItemIDs, c.item.ID)
 				continue

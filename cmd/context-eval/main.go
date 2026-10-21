@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"recordingmcp/internal/eval"
+	"recordingmcp/internal/semantic"
 )
 
 func main() {
@@ -38,6 +39,11 @@ func run() error {
 		reportMD      = flag.String("report-md", "", "write a human-readable markdown summary to this path")
 		maxItems      = flag.Int("max-items", 8, "contextbuild request MaxItems")
 		maxBytes      = flag.Int("max-bytes", 16000, "contextbuild request MaxBytes")
+		embedProvider = flag.String("embed-provider", "hash", "embedding provider: hash|off|openai")
+		embedDims     = flag.Int("embed-dims", semantic.DefaultHashDims, "embedding dimensions")
+		embedEndpoint = flag.String("embed-endpoint", "", "OpenAI-compatible embedding endpoint")
+		embedModel    = flag.String("embed-model", "", "embedding model")
+		embedKeyEnv   = flag.String("embed-key-env", "", "environment variable containing the embedding API key")
 	)
 	flag.Parse()
 
@@ -57,15 +63,27 @@ func run() error {
 	}
 	defer cleanup()
 
+	provider, err := semantic.ProviderFromConfig(semantic.Config{
+		Provider: *embedProvider,
+		Dims:     *embedDims,
+		Endpoint: *embedEndpoint,
+		Model:    *embedModel,
+		KeyEnv:   *embedKeyEnv,
+	})
+	if err != nil {
+		return err
+	}
 	report, err := eval.Run(context.Background(), eval.Options{
-		DBPath:         db,
-		CorpusPath:     *corpusPath,
-		QuestionsPath:  *questionsPath,
-		LinksPath:      *linksPath,
-		RetrievalPath:  *retrPath,
-		ProjectionPath: *projectionKey,
-		MaxItems:       *maxItems,
-		MaxBytes:       *maxBytes,
+		DBPath:                     db,
+		CorpusPath:                 *corpusPath,
+		QuestionsPath:              *questionsPath,
+		LinksPath:                  *linksPath,
+		RetrievalPath:              *retrPath,
+		ProjectionPath:             *projectionKey,
+		MaxItems:                   *maxItems,
+		MaxBytes:                   *maxBytes,
+		SemanticProvider:           provider,
+		SemanticProviderConfigured: true,
 	})
 	if err != nil {
 		return err
@@ -101,6 +119,12 @@ func markdownReport(report eval.Report) string {
 	fmt.Fprintf(&b, "| lexical_recall_at_5 | %.4f |\n", m.LexicalRecallAt5)
 	fmt.Fprintf(&b, "| hybrid_recall_at_5 | %.4f |\n", m.HybridRecallAt5)
 	fmt.Fprintf(&b, "| semantic_assisted_recall | %.4f |\n", m.SemanticAssistedRecall)
+	fmt.Fprintf(&b, "| unanswerable_questions | %d |\n", m.UnanswerableQuestions)
+	fmt.Fprintf(&b, "| unanswerable_clean_rate | %.4f |\n", m.UnanswerableCleanRate)
+	fmt.Fprintf(&b, "| unanswerable_false_positive_items | %d |\n", m.UnanswerableFalsePositiveItems)
+	fmt.Fprintf(&b, "| unanswerable_lexical_false_positive_items | %d |\n", m.UnanswerableLexicalFalsePositiveItems)
+	fmt.Fprintf(&b, "| unanswerable_hybrid_false_positive_items | %d |\n", m.UnanswerableHybridFalsePositiveItems)
+	fmt.Fprintf(&b, "| turn_top1_accuracy | %.4f |\n", m.TurnTop1Accuracy)
 	fmt.Fprintf(&b, "| stale_leakage | %.4f |\n", m.StaleLeakage)
 	fmt.Fprintf(&b, "| ambient_leakage | %.4f |\n", m.AmbientLeakage)
 	fmt.Fprintf(&b, "| scope_escape_count | %d |\n", m.ScopeEscapeCount)
@@ -108,6 +132,26 @@ func markdownReport(report eval.Report) string {
 	fmt.Fprintf(&b, "| relation_assisted | %d |\n", m.RelationAssisted)
 	fmt.Fprintf(&b, "| context_coverage | %.4f |\n", m.ContextCoverage)
 	fmt.Fprintf(&b, "| model_calls | %d |\n", m.ModelCalls)
+	fmt.Fprintf(&b, "\n## unanswerable\n\n")
+	fmt.Fprintf(&b, "| question | mode | returned_items | turn_top1_hit |\n|---|---|---:|---|\n")
+	for _, result := range report.PerQuestion {
+		if !result.Unanswerable {
+			continue
+		}
+		top1 := "n/a"
+		if result.TurnTop1Hit != nil {
+			top1 = fmt.Sprintf("%t", *result.TurnTop1Hit)
+		}
+		fmt.Fprintf(&b, "| %s | %s | %d | %s |\n", result.ID, result.Mode, result.ReturnedItems, top1)
+	}
+	fmt.Fprintf(&b, "\n### turn top1\n\n")
+	fmt.Fprintf(&b, "| question | mode | turn_top1_hit |\n|---|---|---|\n")
+	for _, result := range report.PerQuestion {
+		if result.TurnTop1Hit == nil {
+			continue
+		}
+		fmt.Fprintf(&b, "| %s | %s | %t |\n", result.ID, result.Mode, *result.TurnTop1Hit)
+	}
 	p := m.Projection
 	fmt.Fprintf(&b, "\n## projection\n\n")
 	fmt.Fprintf(&b, "| metric | value |\n|---|---|\n")

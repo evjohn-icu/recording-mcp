@@ -1008,8 +1008,10 @@ func TestBuildContextConfirmedLinkStopsAfterEvidenceSuperseded(t *testing.T) {
 	f.ingest("seg-1", "rev-2", "rev-1", "utt-1", "alpha planning revised")
 
 	after := f.build(nil, Request{Query: "alpha rollout"})
-	if !containsString(itemIDs(after.Items), "n:a") {
-		t.Fatalf("current recalled item missing: %v", itemIDs(after.Items))
+	// Even legacy notes without derived_artifact_sources must not expose a
+	// summary when every referenced source turn has been superseded.
+	if containsString(itemIDs(after.Items), "n:a") {
+		t.Fatalf("note with only superseded evidence recalled: %v", itemIDs(after.Items))
 	}
 	if containsString(itemIDs(after.Items), "n:b") {
 		t.Fatalf("link with superseded evidence still navigated: %v", itemIDs(after.Items))

@@ -37,6 +37,8 @@ type authoredQuestion struct {
 	GoldTopicRefs       []TurnRef `json:"gold_topic_refs"`
 	GoldEvidenceTurnIDs []string  `json:"gold_evidence_turn_ids"`
 	GoldTopicIDs        []string  `json:"gold_topic_ids"`
+	Unanswerable        bool      `json:"unanswerable,omitempty"`
+	GoldTop1TurnRef     *TurnRef  `json:"gold_top1_turn_ref,omitempty"`
 	ExpectStaleExcluded bool      `json:"expect_stale_excluded"`
 	Notes               string    `json:"notes"`
 }
@@ -54,6 +56,8 @@ type Question struct {
 	Notes               string
 	GoldEvidenceTurnIDs []string
 	GoldTopicIDs        []string
+	Unanswerable        bool
+	GoldTop1TurnID      string
 	ExpectStaleExcluded bool
 }
 
@@ -84,6 +88,9 @@ func LoadQuestions(ctx context.Context, db *sql.DB, path string) ([]Question, er
 		if aq.Query == "" {
 			return nil, fmt.Errorf("question %q has no query", aq.ID)
 		}
+		if aq.Unanswerable && (len(aq.GoldTurnRefs) > 0 || len(aq.GoldTopicRefs) > 0 || len(aq.GoldEvidenceTurnIDs) > 0 || len(aq.GoldTopicIDs) > 0 || aq.GoldTop1TurnRef != nil) {
+			return nil, fmt.Errorf("question %q is unanswerable but has gold refs", aq.ID)
+		}
 		q := Question{
 			ID:                  aq.ID,
 			Query:               aq.Query,
@@ -91,6 +98,7 @@ func LoadQuestions(ctx context.Context, db *sql.DB, path string) ([]Question, er
 			Notes:               aq.Notes,
 			GoldEvidenceTurnIDs: append([]string(nil), aq.GoldEvidenceTurnIDs...),
 			GoldTopicIDs:        append([]string(nil), aq.GoldTopicIDs...),
+			Unanswerable:        aq.Unanswerable,
 			ExpectStaleExcluded: aq.ExpectStaleExcluded,
 		}
 		for _, ref := range aq.GoldTurnRefs {
@@ -107,7 +115,14 @@ func LoadQuestions(ctx context.Context, db *sql.DB, path string) ([]Question, er
 			}
 			q.GoldTopicIDs = appendUnique(q.GoldTopicIDs, id)
 		}
-		if len(q.GoldEvidenceTurnIDs) == 0 {
+		if aq.GoldTop1TurnRef != nil {
+			id, err := resolveTurnRef(ctx, db, *aq.GoldTop1TurnRef)
+			if err != nil {
+				return nil, fmt.Errorf("question %q: gold top1: %w", aq.ID, err)
+			}
+			q.GoldTop1TurnID = id
+		}
+		if !aq.Unanswerable && len(q.GoldEvidenceTurnIDs) == 0 {
 			return nil, fmt.Errorf("question %q: no gold evidence turns resolved", aq.ID)
 		}
 		out = append(out, q)

@@ -55,6 +55,42 @@ bin/context-worker --db data/context-memory.db \
 bin/context-memory --db data/context-memory.db
 ```
 
+### 本地 Web 浏览器（安全合成演示）
+
+先构建后启动：
+
+```sh
+make build
+make web
+make web-demo                 # 默认只监听 127.0.0.1:8788
+# 或：make web-demo PORT=8790
+```
+
+`make web-demo` **不会触碰 `data/` 或任何已有数据库**。它在 `/tmp` 下用
+`mktemp -d` 创建一个新的目录，运行 `bin/context-eval --db <该目录>/synthetic-eval.db`
+（该命令会重建传入的路径），再从合成 fixture 的 `source_attachments` 读取真实的
+provider `recording_id`/`device_id`，写入确定性的 16 kHz mono s16le PCM 和
+`sync_recordings` 映射，最后启动：
+
+```sh
+bin/context-web --db /tmp/<demo>/synthetic-eval.db \
+  --audio-dir /tmp/<demo>/synthetic-audio \
+  --addr 127.0.0.1:8788 --web-dir web/dist --semantic-provider hash
+```
+
+脚本会打印 synthetic 数据库、音频目录和评估报告的完整路径，并明确标记
+`SYNTHETIC DATA ONLY`。`context-web` 随机生成一次性 bootstrap token；把启动日志中
+形如 `http://127.0.0.1:8788/#token=...` 的**完整 localhost 地址**粘贴到浏览器即可。
+token 只可交换一次、10 分钟有效。不要把 `--addr` 改成公网地址，也不要把真实库路径
+传给 `context-eval`；后者会删除并重建所给路径。
+
+这个演示已经由 `context-eval` 直接完成合成摄入、revision、extract/publish、链接和
+离线 hash 索引，不需要另起 worker。真实库的异步处理则是独立进程，例如另一个终端
+运行 `bin/context-worker --db data/context-memory.db ...`；它不是启动 Web UI 的隐含步骤。
+演示 PCM 是可定位 offset 的音频夹具，不代表真实 ASR 准确率或真实录音质量。更完整的删除、备份、回滚和证据口径见 [docs/local-web.md](docs/local-web.md)。
+
+## MCP 客户端与 Web 运行限制
+
 MCP 客户端里 `tools/list` 可见 27 个工具（19 个记忆工具 + 8 个事件原型工具）。调用 `get_current_context`：
 
 ```json

@@ -106,10 +106,15 @@ func (r *SQLiteRetriever) Search(ctx context.Context, query string, opts SearchO
 
 	hits := []SemanticHit{}
 	for rows.Next() {
-		var kind, id, conv string
+		var kind, id, conv, content, contentHash string
 		var blob []byte
-		if err := rows.Scan(&kind, &id, &conv, &blob); err != nil {
+		if err := rows.Scan(&kind, &id, &conv, &content, &contentHash, &blob); err != nil {
 			return nil, err
+		}
+		// An artifact can be edited while its replacement embedding is queued.
+		// Never expose the old vector until its matching index row is committed.
+		if sha256hex(content) != contentHash {
+			continue
 		}
 		if !kindAllowed(kind, opts.Kinds) {
 			continue
@@ -157,7 +162,10 @@ func (r *SQLiteRetriever) Search(ctx context.Context, query string, opts SearchO
 // store's CurrentTurnPredicate so a superseded revision can never be recalled;
 // the note clause mirrors the store's ambient rule (primary evidence turn,
 // ordinal 0).
-var candidateSQL = `SELECT e.kind, e.artifact_id, e.conversation_id, e.vector FROM memory_embeddings e
+var candidateSQL = `SELECT e.kind, e.artifact_id, e.conversation_id,
+ CASE e.kind WHEN 'note' THEN (SELECT n.summary FROM notes n WHERE n.id=e.artifact_id)
+             WHEN 'turn' THEN (SELECT t.content FROM turns t WHERE t.id=e.artifact_id) END,
+ e.content_sha256, e.vector FROM memory_embeddings e
 WHERE e.provider_id=? AND e.model_id=? AND e.dims=?
   AND (?='' OR e.conversation_id=?)
   AND (e.kind<>'turn' OR EXISTS(SELECT 1 FROM turns t WHERE t.id=e.artifact_id AND ` + memory.CurrentTurnPredicate("t") + ` AND NOT EXISTS(SELECT 1 FROM turn_classes tc WHERE tc.turn_id=t.id AND tc.class='ambient')))

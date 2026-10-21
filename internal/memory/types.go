@@ -54,6 +54,11 @@ type NoteAnnotation struct {
 	TopicIDs        []string `json:"topic_ids"`
 	Summary         string   `json:"summary"`
 	EvidenceTurnIDs []string `json:"evidence_turn_ids"`
+	// Edited marks a note whose summary a human corrected through the local
+	// web UI. Generation and ingestion never set it; the claim is still an
+	// inference over the cited evidence, so this flag records provenance
+	// only, never confirmation.
+	Edited bool `json:"edited,omitempty"`
 }
 type TurnTopicAnnotation struct {
 	TurnID   string   `json:"turn_id"`

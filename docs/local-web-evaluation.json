@@ -1,0 +1,133 @@
+{
+  "note": "same corrected fixtures; three sequential local runs per version; checker strengthened after; no external provider or QA generator; latency is median of per-run mean, not p95",
+  "metrics": {
+    "before": {
+      "evidence_recall_at_5": [
+        0.9347826086956522,
+        0.9347826086956522,
+        0.9347826086956522
+      ],
+      "lexical_recall_at_5": [
+        0.6153846153846154,
+        0.6153846153846154,
+        0.6153846153846154
+      ],
+      "hybrid_recall_at_5": [
+        0.6923076923076923,
+        0.6923076923076923,
+        0.6923076923076923
+      ],
+      "turn_top1_accuracy": [
+        1,
+        1,
+        1
+      ],
+      "unanswerable_lexical_false_positive_items": [
+        0,
+        0,
+        0
+      ],
+      "unanswerable_hybrid_false_positive_items": [
+        7,
+        7,
+        7
+      ],
+      "stale_leakage": [
+        0,
+        0,
+        0
+      ],
+      "scope_escape_count": [
+        0,
+        0,
+        0
+      ],
+      "ambient_leakage": [
+        0,
+        0,
+        0
+      ],
+      "invalid_evidence_refs": [
+        0,
+        0,
+        0
+      ],
+      "retrieval_lexical_latency_ms_avg": [
+        1.5720425999999998,
+        1.4957967333333333,
+        1.5653817333333335
+      ],
+      "retrieval_hybrid_latency_ms_avg": [
+        5.956800133333334,
+        5.9416937333333335,
+        5.908303666666666
+      ],
+      "median_lexical_ms": 1.5653817333333335,
+      "median_hybrid_ms": 5.9416937333333335
+    },
+    "after": {
+      "evidence_recall_at_5": [
+        0.9347826086956522,
+        0.9347826086956522,
+        0.9347826086956522
+      ],
+      "lexical_recall_at_5": [
+        0.6153846153846154,
+        0.6153846153846154,
+        0.6153846153846154
+      ],
+      "hybrid_recall_at_5": [
+        0.6923076923076923,
+        0.6923076923076923,
+        0.6923076923076923
+      ],
+      "turn_top1_accuracy": [
+        1,
+        1,
+        1
+      ],
+      "unanswerable_lexical_false_positive_items": [
+        0,
+        0,
+        0
+      ],
+      "unanswerable_hybrid_false_positive_items": [
+        7,
+        7,
+        7
+      ],
+      "stale_leakage": [
+        0,
+        0,
+        0
+      ],
+      "scope_escape_count": [
+        0,
+        0,
+        0
+      ],
+      "ambient_leakage": [
+        0,
+        0,
+        0
+      ],
+      "invalid_evidence_refs": [
+        0,
+        0,
+        0
+      ],
+      "retrieval_lexical_latency_ms_avg": [
+        1.7362879999999998,
+        1.6379752666666672,
+        1.6797150666666667
+      ],
+      "retrieval_hybrid_latency_ms_avg": [
+        7.3746556,
+        7.151763866666668,
+        7.198683466666667
+      ],
+      "median_lexical_ms": 1.6797150666666667,
+      "median_hybrid_ms": 7.198683466666667
+    }
+  }
+}

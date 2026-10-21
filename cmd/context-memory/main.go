@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"recordingmcp/internal/app"
 	"recordingmcp/internal/asrinput"
 	"recordingmcp/internal/contextbuild"
 	"recordingmcp/internal/decision"
@@ -232,47 +233,29 @@ func parseRFC3339(label, value string) (*time.Time, error) {
 	return &t, nil
 }
 
-func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker, semantic semantic.SemanticRetriever) *mcp.Server {
+func newServer(store *memory.Store, svc *app.Service, readOnly bool) *mcp.Server {
 	no := false
 	s := mcp.NewServer(&mcp.Implementation{Name: "context-memory-experimental", Version: "0.1-experimental"}, &mcp.ServerOptions{Instructions: "Experimental local conversation memory for private audio transcripts. Results preserve source evidence and are not verified facts. Speaker labels are recording-scoped and never identify real people. No audio is downloaded or processed by this server."})
 	read := func(name, desc string) *mcp.Tool {
 		return &mcp.Tool{Name: name, Description: "EXPERIMENTAL: " + desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &no}}
 	}
 	mcp.AddTool(s, read("query_context", "Find annotated discussion notes and optionally stored transcript turns. query is literal Unicode lowercase substring matching. Filters are ANDed. A speaker filter requires recording_id. Turns are excluded unless include_turns=true. Ambient sound is excluded by default; include_ambient=true opts in and marks such hits with ambient."), func(ctx context.Context, _ *mcp.CallToolRequest, in memory.Query) (*mcp.CallToolResult, memory.Page, error) {
-		p, e := store.Query(ctx, in)
+		p, e := svc.Query(ctx, in)
 		return nil, p, e
 	})
 	mcp.AddTool(s, read("get_conversation_context", "Read one conversation summary, topics and annotated notes; include_turns explicitly includes transcript text. Offset pagination applies to the combined context page. Ambient sound is excluded by default; include_ambient=true opts in and marks such items with ambient."), func(ctx context.Context, _ *mcp.CallToolRequest, in ConversationInput) (*mcp.CallToolResult, ConversationResult, error) {
-		if in.ConversationID == "" {
-			return nil, ConversationResult{}, fmt.Errorf("conversation_id is required")
-		}
-		title, e := store.Conversation(ctx, in.ConversationID)
+		cc, e := svc.ConversationContext(ctx, app.ConversationContextInput{ConversationID: in.ConversationID, IncludeTurns: in.IncludeTurns, IncludeAmbient: in.IncludeAmbient, Limit: in.Limit, Offset: in.Offset})
 		if e != nil {
 			return nil, ConversationResult{}, e
 		}
-		topics, e := store.Topics(ctx, in.ConversationID)
-		if e != nil {
-			return nil, ConversationResult{}, e
-		}
-		page, e := store.Query(ctx, memory.Query{ConversationID: in.ConversationID, IncludeTurns: in.IncludeTurns, IncludeAmbient: in.IncludeAmbient, Limit: in.Limit, Offset: in.Offset})
-		if e != nil {
-			return nil, ConversationResult{}, e
-		}
-		status, e := store.GetProcessingStatus(ctx, in.ConversationID)
-		if e != nil {
-			return nil, ConversationResult{}, e
-		}
-		return nil, ConversationResult{Experimental: true, ConversationID: in.ConversationID, Title: title, Topics: topics, Context: page, Processing: status}, nil
+		return nil, ConversationResult{Experimental: true, ConversationID: cc.ConversationID, Title: cc.Title, Topics: cc.Topics, Context: cc.Context, Processing: cc.Processing}, nil
 	})
 	mcp.AddTool(s, read("get_context_item", "Read one annotated note, a complete stored transcript turn, or the conversation summary by stable ID. Note results include their source turns."), func(ctx context.Context, _ *mcp.CallToolRequest, in ItemInput) (*mcp.CallToolResult, memory.ItemDetail, error) {
-		if in.ID == "" {
-			return nil, memory.ItemDetail{}, fmt.Errorf("id is required")
-		}
-		r, e := store.GetItem(ctx, in.ID, in.IncludeStale)
+		r, e := svc.GetItem(ctx, in.ID, in.IncludeStale)
 		return nil, r, e
 	})
 	mcp.AddTool(s, read("list_topics", "List the topics available in the local memory database, optionally scoped to one conversation."), func(ctx context.Context, _ *mcp.CallToolRequest, in TopicsInput) (*mcp.CallToolResult, memory.TopicList, error) {
-		r, e := store.Topics(ctx, in.ConversationID)
+		r, e := svc.Topics(ctx, in.ConversationID)
 		return nil, r, e
 	})
 	write := func(name, desc string) *mcp.Tool {
@@ -291,24 +274,18 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker,
 		})
 	}
 	mcp.AddTool(s, read("get_processing_status", "Report received transcript coverage, topic-linked and unclassified turns. Pending means analysis has not been completed."), func(ctx context.Context, _ *mcp.CallToolRequest, in StatusInput) (*mcp.CallToolResult, memory.ProcessingStatus, error) {
-		if in.ConversationID == "" {
-			return nil, memory.ProcessingStatus{}, fmt.Errorf("conversation_id is required")
-		}
-		r, e := store.GetProcessingStatus(ctx, in.ConversationID)
+		r, e := svc.ProcessingStatus(ctx, in.ConversationID)
 		return nil, r, e
 	})
 	if !readOnly {
 		mcp.AddTool(s, write("apply_annotations", "Apply a new interpretation revision to a conversation. Supply expected_version for optimistic concurrency; evidence accepts exact full turn IDs or original transcript turn IDs."), func(ctx context.Context, _ *mcp.CallToolRequest, in ApplyAnnotationsInput) (*mcp.CallToolResult, map[string]any, error) {
 			a := memory.Annotations{ConversationID: in.ConversationID, AnnotationVersion: in.AnnotationVersion, AnnotationBasis: in.AnnotationBasis, Summary: in.Summary, Title: in.Title, RecordingID: in.RecordingID, Topics: in.Topics, Notes: in.Notes, TurnTopics: in.TurnTopics}
-			e := store.ApplyAnnotations(ctx, in.ConversationID, in.ExpectedVersion, a)
+			e := svc.ApplyAnnotations(ctx, in.ConversationID, in.ExpectedVersion, a)
 			return nil, map[string]any{"conversation_id": in.ConversationID, "annotation_version": in.AnnotationVersion, "applied": e == nil}, e
 		})
 	}
 	mcp.AddTool(s, read("get_annotation_history", "List current and archived annotation revisions for a conversation."), func(ctx context.Context, _ *mcp.CallToolRequest, in HistoryInput) (*mcp.CallToolResult, HistoryResult, error) {
-		if in.ConversationID == "" {
-			return nil, HistoryResult{}, fmt.Errorf("conversation_id is required")
-		}
-		r, e := store.GetAnnotationHistory(ctx, in.ConversationID)
+		r, e := svc.AnnotationHistory(ctx, in.ConversationID)
 		return nil, HistoryResult{Experimental: true, ConversationID: in.ConversationID, Revisions: r}, e
 	})
 	mcp.AddTool(s, read("list_conversations", "列出本地记忆库中的会话：可按主题、分析状态与录音开始时间过滤，并按录音开始时间倒序游标分页返回摘要。"), func(ctx context.Context, _ *mcp.CallToolRequest, in ListConversationsInput) (*mcp.CallToolResult, memory.ConversationPage, error) {
@@ -320,20 +297,14 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker,
 		if e != nil {
 			return nil, memory.ConversationPage{}, e
 		}
-		r, e := store.ListConversations(ctx, memory.ConversationFilter{Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, Status: in.Status, StartedAfter: after, StartedBefore: before})
+		r, e := svc.ListConversations(ctx, memory.ConversationFilter{Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, Status: in.Status, StartedAfter: after, StartedBefore: before})
 		return nil, r, e
 	})
 	mcp.AddTool(s, read("get_evidence_context", "读取某个转录轮次及其同一录音内相邻轮次的上下文，用于核对原始证据；超出 max_bytes 预算时会截断并置 Truncated。"), func(ctx context.Context, _ *mcp.CallToolRequest, in GetEvidenceContextInput) (*mcp.CallToolResult, memory.EvidenceContext, error) {
-		if in.TurnID == "" {
-			return nil, memory.EvidenceContext{}, fmt.Errorf("turn_id is required")
-		}
-		r, e := store.GetEvidenceContext(ctx, in.TurnID, in.Radius, in.MaxBytes)
+		r, e := svc.EvidenceContext(ctx, in.TurnID, in.Radius, in.MaxBytes, true)
 		return nil, r, e
 	})
 	mcp.AddTool(s, read("search_memory", "在原始转录与派生笔记中执行大小写不敏感的子串检索；scope 可选 raw（仅转录）、derived（仅笔记）或 both（全部），并可按主题与录音开始时间过滤。环境音（广播、设备指令、媒体播放）默认不混入结果；include_ambient=true 时显式纳入并以 ambient 标记。"), func(ctx context.Context, _ *mcp.CallToolRequest, in SearchMemoryInput) (*mcp.CallToolResult, memory.SearchPage, error) {
-		if strings.TrimSpace(in.Text) == "" {
-			return nil, memory.SearchPage{}, fmt.Errorf("text is required")
-		}
 		after, e := parseRFC3339("started_after", in.StartedAfter)
 		if e != nil {
 			return nil, memory.SearchPage{}, e
@@ -342,11 +313,11 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker,
 		if e != nil {
 			return nil, memory.SearchPage{}, e
 		}
-		r, e := store.SearchMemory(ctx, memory.MemorySearch{Text: in.Text, Scope: in.Scope, Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, StartedAfter: after, StartedBefore: before, IncludeStale: in.IncludeStale, IncludeAmbient: in.IncludeAmbient})
+		r, e := svc.Search(ctx, memory.MemorySearch{Text: in.Text, Scope: in.Scope, Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, StartedAfter: after, StartedBefore: before, IncludeStale: in.IncludeStale, IncludeAmbient: in.IncludeAmbient})
 		return nil, r, e
 	})
 	mcp.AddTool(s, read("build_context", "实验性：为任务组装带预算与来源的上下文包（items / evidence / coverage / gaps / trace / ranking）。默认排除已失效的派生记忆；mode 可选 hybrid（默认，含语义召回）或 lexical（仅字面）；未配置决策引擎时不做重排并返回 degraded=true，确定性结果仍完整返回；未配置或未索引语义后端时同样降级并在 gaps 中说明。"), func(ctx context.Context, _ *mcp.CallToolRequest, in contextbuild.Request) (*mcp.CallToolResult, contextbuild.Package, error) {
-		pkg, e := contextbuild.Build(ctx, contextbuild.Deps{Store: store, DB: store.DB(), Reranker: rerank, Semantic: semantic}, in)
+		pkg, e := svc.BuildContext(ctx, in)
 		return nil, pkg, e
 	})
 	mcp.AddTool(s, read("get_current_context", "实验性：读取当前上下文投影（person / topic / commitment / preference / event 对象），带证据、来源、状态（current/proposed/superseded/unresolved）与冲突。由笔记派生的 commitment/preference 一律为 proposed 且 status_reason=unconfirmed：没有任何自动确认，消费方不得把 proposed 对象当作已确认事实。全部由当前（非 stale、非 ambient）证据在读取时推导，可重复构建。提供 query 时先做一次小规模检索，把命中会话/主题作为硬性范围（该检索在显式 conversation_id/topic_id 之内执行，只会收窄不会放宽）；检索的 query 自身零召回（字面与语义分支都没命中）时，会在 unresolved 里追加一条 reason=no_retrieval_hits（kind 与 subject 为空，query 写在 detail 里），同时仍按请求的过滤条件返回投影。"), func(ctx context.Context, _ *mcp.CallToolRequest, in CurrentContextInput) (*mcp.CallToolResult, projection.Result, error) {
@@ -402,7 +373,7 @@ func newServer(store *memory.Store, readOnly bool, rerank contextbuild.Reranker,
 			if in.TopicID != "" {
 				buildReq.TopicIDs = []string{in.TopicID}
 			}
-			pkg, e := contextbuild.Build(ctx, contextbuild.Deps{Store: store, DB: store.DB(), Reranker: rerank, Semantic: semantic}, buildReq)
+			pkg, e := svc.BuildContext(ctx, buildReq)
 			if e != nil {
 				return nil, projection.Result{}, e
 			}
@@ -585,36 +556,22 @@ func main() {
 	if strings.TrimSpace(*decisionURL) != "" {
 		rerank = &contextbuild.DecisionReranker{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*decisionURL), Model: *decisionModel}}
 	}
-	var semanticRetriever semantic.SemanticRetriever
-	switch strings.ToLower(strings.TrimSpace(*semanticProvider)) {
-	case "", "hash":
-		semanticRetriever = &semantic.SQLiteRetriever{DB: store.DB(), Provider: semantic.NewHashProvider(*semanticDims)}
-	case "openai":
-		endpoint := strings.TrimSpace(*semanticEndpoint)
-		model := strings.TrimSpace(*semanticModel)
-		if endpoint == "" || model == "" {
-			log.Fatal("--semantic-endpoint and --semantic-model are required when --semantic-provider=openai")
-		}
-		if *semanticDims <= 0 {
-			log.Fatal("--semantic-dims must be positive")
-		}
-		var key string
-		if env := strings.TrimSpace(*semanticKeyEnv); env != "" {
-			key = strings.TrimSpace(os.Getenv(env))
-			if key == "" {
-				log.Fatalf("environment variable %s is empty", env)
-			}
-		}
-		// Dimensions comes from --semantic-dims (not from the first response)
-		// so the memory_embeddings rows are keyed by the exact dims the server
-		// filters on; a mismatched endpoint fails loudly at embed time instead
-		// of silently poisoning the index.
-		semanticRetriever = &semantic.SQLiteRetriever{DB: store.DB(), Provider: semantic.OpenAICompatProvider{Endpoint: endpoint, APIKey: key, ModelName: model, Dimensions: *semanticDims}}
-	default:
-		// "off" and anything else: nil retriever, build_context and
-		// get_current_context degrade to lexical retrieval and record why.
+	// The provider selection is shared with context-web and context-eval, so a
+	// flag spelling resolves to the same backend everywhere. "off" and any
+	// unknown value yield a nil retriever: build_context and
+	// get_current_context then degrade to lexical retrieval and record why.
+	retriever, e := semantic.RetrieverFromConfig(semantic.Config{
+		Provider: *semanticProvider,
+		Dims:     *semanticDims,
+		Endpoint: *semanticEndpoint,
+		Model:    *semanticModel,
+		KeyEnv:   *semanticKeyEnv,
+	}, store.DB())
+	if e != nil {
+		log.Fatal(e)
 	}
-	srv := newServer(store, *readOnly, rerank, semanticRetriever)
+	svc := app.New(store, retriever, rerank, "")
+	srv := newServer(store, svc, *readOnly)
 	mcpserver.Register(srv, events, nil, *readOnly)
 	if e = srv.Run(ctx, &mcp.StdioTransport{}); e != nil && ctx.Err() == nil {
 		log.Fatal(e)

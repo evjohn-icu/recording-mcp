@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -114,6 +115,17 @@ func (h *PublishHandler) publish(ctx context.Context, conversationID, expectedVe
 	merged.ConversationID = conversationID
 	merged.AnnotationVersion = version
 	merged.AnnotationBasis = autoBasis
+	if reflect.DeepEqual(merged, current) {
+		if expectedVersion != "" && expectedVersion != currentVersion {
+			err := &memory.AnnotationConflictError{Expected: expectedVersion, Current: currentVersion}
+			rec := PublicationRun{ID: publicationRunID(conversationID, candidateIDs, "conflict"), ConversationID: conversationID, ExpectedVersion: expectedVersion, CandidateIDs: candidateIDs, Status: "conflict", Error: err.Error()}
+			if recErr := InsertPublicationRun(ctx, h.DB, rec, time.Now()); recErr != nil {
+				return "", fmt.Errorf("pipeline: publish %s: %w (recording publication run: %v)", conversationID, err, recErr)
+			}
+			return "", fmt.Errorf("pipeline: publish %s: %w", conversationID, err)
+		}
+		return "publish:" + version, nil
+	}
 
 	if err := h.Store.ApplyAnnotations(ctx, conversationID, expected, merged); err != nil {
 		status := "failed"
@@ -148,7 +160,7 @@ func (h *PublishHandler) publish(ctx context.Context, conversationID, expectedVe
 	// The published view changed, so the semantic index must see it before the
 	// next retrieval. publish:noop does not enqueue: freshly ingested turns are
 	// covered by the embed job enqueued at ingest time.
-	if err := enqueueEmbed(ctx, h.DB, conversationID, "embed|"+conversationID+"|"+version); err != nil {
+	if err := EnqueueEmbed(ctx, h.DB, conversationID, "embed|"+conversationID+"|"+version); err != nil {
 		return "", err
 	}
 	if err := enqueueCurate(ctx, h.DB, conversationID, version); err != nil {

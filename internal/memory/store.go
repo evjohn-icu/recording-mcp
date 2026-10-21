@@ -336,7 +336,12 @@ func unique(in []string) []string {
 }
 func turnKey(recording, id string) string    { return "turn:" + hashID(recording+"\x00"+id) }
 func noteKey(conversation, id string) string { return "note:" + hashID(conversation+"\x00"+id) }
-func hashID(s string) string                 { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+
+// NoteRowID maps a logical note id from the conversation's annotation view to
+// the stored notes.id (noteKey is a pure hash). Callers join the annotation
+// view with current-state note rows through this mapping.
+func NoteRowID(conversationID, noteID string) string { return noteKey(conversationID, noteID) }
+func hashID(s string) string                         { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
 
 func (s *Store) Conversation(ctx context.Context, id string) (string, error) {
 	var title string
@@ -676,7 +681,7 @@ func (s *Store) transcriptRevisions(ctx context.Context, query, id string) ([]st
 	return out, rows.Err()
 }
 func (s *Store) Topics(ctx context.Context, conversation string) (TopicList, error) {
-	rows, e := s.db.QueryContext(ctx, "SELECT t.id,t.title,tc.conversation_id FROM topics t JOIN topic_conversations tc ON tc.topic_id=t.id WHERE (?='' OR tc.conversation_id=?) ORDER BY tc.conversation_id,t.id", conversation, conversation)
+	rows, e := s.db.QueryContext(ctx, `SELECT t.id,t.title,tc.conversation_id FROM topics t JOIN (`+currentTopicMembershipSQL()+`) tc ON tc.topic_id=t.id WHERE (?='' OR tc.conversation_id=?) ORDER BY tc.conversation_id,t.id`, conversation, conversation)
 	if e != nil {
 		return TopicList{}, e
 	}

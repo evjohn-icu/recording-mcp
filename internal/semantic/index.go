@@ -102,13 +102,13 @@ func (ix *Indexer) IndexConversation(ctx context.Context, conversationID string)
 			if len(vectors[i]) != ix.Provider.Dims() {
 				return rep, fmt.Errorf("semantic: provider returned a %d-dim vector, want %d", len(vectors[i]), ix.Provider.Dims())
 			}
-			if _, err := ix.DB.ExecContext(ctx,
-				`INSERT OR REPLACE INTO memory_embeddings(kind, artifact_id, conversation_id, content_sha256, provider_id, model_id, dims, vector, created_at)
-				 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				p.kind, p.id, p.conv, p.sha, ix.Provider.ID(), ix.Provider.Model(), ix.Provider.Dims(),
-				Encode(vectors[i]), time.Now().UnixMilli(),
-			); err != nil {
-				return rep, fmt.Errorf("semantic: store embedding: %w", err)
+			stored, err := ix.storeEmbeddingIfCurrent(ctx, p.artifact, p.sha, vectors[i])
+			if err != nil {
+				return rep, err
+			}
+			if !stored {
+				rep.Skipped++
+				continue
 			}
 			switch p.kind {
 			case "note":
@@ -211,6 +211,35 @@ func (ix *Indexer) artifacts(ctx context.Context, conversationID string) ([]arti
 		return nil, err
 	}
 	return out, nil
+}
+
+func (ix *Indexer) storeEmbeddingIfCurrent(ctx context.Context, a artifact, sum string, vector Vector) (bool, error) {
+	table, contentColumn, currentPredicate := "", "", ""
+	switch a.kind {
+	case "note":
+		table, contentColumn = "notes", "summary"
+		currentPredicate = "NOT " + memory.NoteStalePredicate("source")
+	case "turn":
+		table, contentColumn = "turns", "content"
+		currentPredicate = memory.CurrentTurnPredicate("source")
+	default:
+		return false, fmt.Errorf("semantic: unsupported artifact kind %q", a.kind)
+	}
+	query := `INSERT OR REPLACE INTO memory_embeddings(kind, artifact_id, conversation_id, content_sha256, provider_id, model_id, dims, vector, created_at)
+			SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS(
+				SELECT 1 FROM ` + table + ` source WHERE source.id=? AND source.conversation_id=? AND source.` + contentColumn + `=? AND ` + currentPredicate + `)`
+	res, err := ix.DB.ExecContext(ctx, query,
+		a.kind, a.id, a.conv, sum, ix.Provider.ID(), ix.Provider.Model(), ix.Provider.Dims(),
+		Encode(vector), time.Now().UnixMilli(), a.id, a.conv, a.text,
+	)
+	if err != nil {
+		return false, fmt.Errorf("semantic: store embedding: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("semantic: store embedding count: %w", err)
+	}
+	return n != 0, nil
 }
 
 func (ix *Indexer) embeddingExists(ctx context.Context, a artifact, sum string) (bool, error) {

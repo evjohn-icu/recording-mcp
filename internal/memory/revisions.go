@@ -9,7 +9,32 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"recordingmcp/internal/process"
 )
+
+// ValidationError reports a request that fails ApplyAnnotations' input
+// contract. Its message is the exact literal the MCP tool returns, so typed
+// callers can map it onto a 400 without changing the text.
+type ValidationError struct{ Msg string }
+
+func (e *ValidationError) Error() string { return e.Msg }
+
+// AnnotationConflictError reports that expected_version does not match the
+// stored annotation version. Current is the version the caller lost against.
+type AnnotationConflictError struct{ Expected, Current string }
+
+func (e *AnnotationConflictError) Error() string {
+	return fmt.Sprintf("annotation version conflict: expected %s, current %s", e.Expected, e.Current)
+}
+
+// AnnotationVersionReusedError reports that annotation_version already exists
+// in annotation_history, so replaying it would rewrite history.
+type AnnotationVersionReusedError struct{ Version string }
+
+func (e *AnnotationVersionReusedError) Error() string {
+	return fmt.Sprintf("annotation version %s was already used", e.Version)
+}
 
 // AnnotationSnapshot is an immutable annotation revision. The current snapshot
 // is included by GetAnnotationHistory along with previously archived versions.
@@ -26,56 +51,56 @@ type AnnotationSnapshot struct {
 // IDs, scoped to this conversation.
 func (s *Store) ApplyAnnotations(ctx context.Context, conversationID, expectedVersion string, a Annotations) error {
 	if !validID(conversationID) || (a.ConversationID != "" && a.ConversationID != conversationID) {
-		return errors.New("conversation_id, when provided, must match the target conversation")
+		return &ValidationError{Msg: "conversation_id, when provided, must match the target conversation"}
 	}
 	if (expectedVersion != "" && !validID(expectedVersion)) || !validID(a.AnnotationVersion) {
-		return errors.New("new annotation_version is required and expected_version must be valid")
+		return &ValidationError{Msg: "new annotation_version is required and expected_version must be valid"}
 	}
 	if strings.TrimSpace(a.Title) == "" {
-		return errors.New("title is required")
+		return &ValidationError{Msg: "title is required"}
 	}
 	topics := make(map[string]TopicAnnotation, len(a.Topics))
 	for _, t := range a.Topics {
 		if !validID(t.ID) || strings.TrimSpace(t.Title) == "" {
-			return fmt.Errorf("invalid topic %q", t.ID)
+			return &ValidationError{Msg: fmt.Sprintf("invalid topic %q", t.ID)}
 		}
 		if _, exists := topics[t.ID]; exists {
-			return fmt.Errorf("duplicate topic ID %q", t.ID)
+			return &ValidationError{Msg: fmt.Sprintf("duplicate topic ID %q", t.ID)}
 		}
 		topics[t.ID] = t
 	}
 	notes := make(map[string]NoteAnnotation, len(a.Notes))
 	for _, n := range a.Notes {
 		if !validID(n.ID) || strings.TrimSpace(n.Summary) == "" {
-			return fmt.Errorf("invalid note %q", n.ID)
+			return &ValidationError{Msg: fmt.Sprintf("invalid note %q", n.ID)}
 		}
 		if _, exists := notes[n.ID]; exists {
-			return fmt.Errorf("duplicate note ID %q", n.ID)
+			return &ValidationError{Msg: fmt.Sprintf("duplicate note ID %q", n.ID)}
 		}
 		if err := validNoteKind(n.Kind); err != nil {
 			return err
 		}
 		if len(unique(n.TopicIDs)) != len(n.TopicIDs) || len(unique(n.EvidenceTurnIDs)) != len(n.EvidenceTurnIDs) {
-			return fmt.Errorf("duplicate topic or evidence reference in note %s", n.ID)
+			return &ValidationError{Msg: fmt.Sprintf("duplicate topic or evidence reference in note %s", n.ID)}
 		}
 		for _, tid := range n.TopicIDs {
 			if _, ok := topics[tid]; !ok {
-				return fmt.Errorf("note %s references unknown topic %s", n.ID, tid)
+				return &ValidationError{Msg: fmt.Sprintf("note %s references unknown topic %s", n.ID, tid)}
 			}
 		}
 		if len(n.EvidenceTurnIDs) == 0 {
-			return fmt.Errorf("note %s needs evidence turns", n.ID)
+			return &ValidationError{Msg: fmt.Sprintf("note %s needs evidence turns", n.ID)}
 		}
 		notes[n.ID] = n
 	}
 	links := make(map[string][]string)
 	for _, tt := range a.TurnTopics {
 		if !validID(tt.TurnID) || len(unique(tt.TopicIDs)) != len(tt.TopicIDs) {
-			return fmt.Errorf("invalid or duplicate turn_topics reference %q", tt.TurnID)
+			return &ValidationError{Msg: fmt.Sprintf("invalid or duplicate turn_topics reference %q", tt.TurnID)}
 		}
 		for _, tid := range tt.TopicIDs {
 			if _, ok := topics[tid]; !ok {
-				return fmt.Errorf("turn %s references unknown topic %s", tt.TurnID, tid)
+				return &ValidationError{Msg: fmt.Sprintf("turn %s references unknown topic %s", tt.TurnID, tid)}
 			}
 		}
 		links[tt.TurnID] = append(links[tt.TurnID], tt.TopicIDs...)
@@ -119,20 +144,20 @@ func (s *Store) ApplyAnnotations(ctx context.Context, conversationID, expectedVe
 		if current == a.AnnotationVersion && oldRaw == raw {
 			return tx.Commit()
 		}
-		return fmt.Errorf("annotation version conflict: expected %s, current %s", expectedVersion, current)
+		return &AnnotationConflictError{Expected: expectedVersion, Current: current}
 	}
 	if a.AnnotationVersion == current {
 		if oldRaw == raw {
 			return tx.Commit()
 		}
-		return errors.New("new annotation_version must differ from current version")
+		return &ValidationError{Msg: "new annotation_version must differ from current version"}
 	}
 	var reused int
 	if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM annotation_history WHERE conversation_id=? AND annotation_version=?`, conversationID, a.AnnotationVersion).Scan(&reused); err != nil {
 		return err
 	}
 	if reused != 0 {
-		return fmt.Errorf("annotation version %s was already used", a.AnnotationVersion)
+		return &AnnotationVersionReusedError{Version: a.AnnotationVersion}
 	}
 	// Resolve original turn IDs within this conversation and reject excluded or
 	// blank turns, as those never entered the immutable transcript store.
@@ -249,6 +274,22 @@ func (s *Store) ApplyAnnotations(ctx context.Context, conversationID, expectedVe
 	if _, err = tx.ExecContext(ctx, `UPDATE conversations SET title=?,summary=?,annotation_version=?,annotation_basis=?,annotations_json=? WHERE id=?`, a.Title, summary, a.AnnotationVersion, basis, raw, conversationID); err != nil {
 		return err
 	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM memory_embeddings WHERE kind='note' AND conversation_id=?`, conversationID); err != nil {
+		return err
+	}
+	payload, err := json.Marshal(struct {
+		ConversationID string `json:"conversation_id"`
+	}{ConversationID: conversationID})
+	if err != nil {
+		return err
+	}
+	if _, _, err = process.EnqueueTx(ctx, tx, process.Spec{
+		Stage: "embed", InputSnapshotID: conversationID,
+		IdempotencyKey: "embed|" + conversationID + "|" + a.AnnotationVersion,
+		PayloadJSON:    string(payload), MaxAttempts: 3,
+	}, time.Now()); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -257,7 +298,7 @@ func validNoteKind(kind string) error {
 	case "observation", "suggestion", "request", "constraint", "intention":
 		return nil
 	}
-	return fmt.Errorf("unsupported note kind %q", kind)
+	return &ValidationError{Msg: fmt.Sprintf("unsupported note kind %q", kind)}
 }
 
 // replaceNoteDerivedState rebuilds the derived_artifacts staleness state for
@@ -268,9 +309,6 @@ func validNoteKind(kind string) error {
 // republishing a conversation leaves a state consistent with the new notes.
 func replaceNoteDerivedState(ctx context.Context, tx *sql.Tx, conversationID string, now time.Time) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM derived_artifact_sources WHERE kind='note' AND artifact_id IN (SELECT artifact_id FROM derived_artifacts WHERE kind='note' AND conversation_id=?)`, conversationID); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM derived_artifacts WHERE kind='note' AND conversation_id=?`, conversationID); err != nil {
 		return err
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT n.id, COALESCE(MAX(CASE WHEN a.active=0 THEN 1 ELSE 0 END),0)
@@ -311,7 +349,13 @@ func replaceNoteDerivedState(ctx context.Context, tx *sql.Tx, conversationID str
 		if staleIDs[id] {
 			stale, reason, staleAt = 1, staleReasonSuperseded, now.UnixMilli()
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO derived_artifacts(kind, artifact_id, conversation_id, stale, stale_reason, stale_at) VALUES('note', ?, ?, ?, ?, ?)`, id, conversationID, stale, reason, staleAt); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO derived_artifacts(kind, artifact_id, conversation_id, stale, stale_reason, stale_at)
+			VALUES('note', ?, ?, ?, ?, ?)
+			ON CONFLICT(kind, artifact_id) DO UPDATE SET
+				conversation_id=excluded.conversation_id,
+				stale=CASE WHEN derived_artifacts.stale=1 THEN 1 ELSE excluded.stale END,
+				stale_reason=CASE WHEN derived_artifacts.stale=1 THEN derived_artifacts.stale_reason ELSE excluded.stale_reason END,
+				stale_at=CASE WHEN derived_artifacts.stale=1 THEN derived_artifacts.stale_at ELSE excluded.stale_at END`, id, conversationID, stale, reason, staleAt); err != nil {
 			return err
 		}
 	}

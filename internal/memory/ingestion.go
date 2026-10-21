@@ -59,6 +59,13 @@ func stableKey(kind string, parts ...string) string {
 	return kind + ":" + hashID(strings.Join(append([]string{"recording-mcp/asr-input/v1", kind}, parts...), "\x00"))
 }
 
+// RecordingID returns the stored recordings.id for one provider recording
+// identity. It is the inverse lookup the audio resolver needs because
+// sync_recordings keeps the provider UUID, not the hashed memory id.
+func RecordingID(deviceID, recordingID string) string {
+	return stableKey("recording", deviceID, recordingID)
+}
+
 // semanticJSONHash canonicalizes object key order while preserving the exact
 // decimal representation of numbers. This is used only for ingestion replay
 // identity; legacy hashJSON behavior remains unchanged for existing imports.

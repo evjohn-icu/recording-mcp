@@ -595,6 +595,42 @@
         }
       ],
       "notes": "The training<->patent link is proposed but not confirmed, so the gold must stay unreachable."
+    },
+    {
+      "id": "variants-mic-original",
+      "query": "话麦要装新电池",
+      "purpose": "lexical_variant_original",
+      "gold_turn_refs": [
+        {"segment_id": "seg-variant-mic", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "notes": "原词必须由字面检索命中。"
+    },
+    {
+      "id": "variants-reimburse-original",
+      "query": "费用走账要附发票",
+      "purpose": "lexical_variant_original",
+      "gold_turn_refs": [
+        {"segment_id": "seg-variant-reimburse", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "notes": "走账是转写原词，报销别名在 retrieval fixture 中单独观察。"
+    },
+    {
+      "id": "variants-person-original",
+      "query": "小周负责联系",
+      "purpose": "lexical_variant_original",
+      "gold_turn_refs": [
+        {"segment_id": "seg-variant-person", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "notes": "小周是转写原词，周工改写在 retrieval fixture 中单独观察。"
+    },
+    {
+      "id": "variants-asr-error",
+      "query": "密月写在申请表",
+      "purpose": "asr_error_literal",
+      "gold_turn_refs": [
+        {"segment_id": "seg-variant-asr", "transcript_revision": "rev-1", "turn_id": "utt-1"}
+      ],
+      "notes": "查询保留 ASR 错字密月，必须字面命中。"
     }
   ]
 }

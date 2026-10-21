@@ -9,8 +9,8 @@ import (
 // whose membership comes only from superseded turn_topics rows cannot route
 // current retrieval back to historical content: current-state queries see no
 // members of the dead mapping, while the audit switches can still inspect it.
-// The topic row itself remains historical taxonomy (auditable via list_topics);
-// only content retrieval is revision-scoped.
+// The topic row itself remains historical taxonomy in storage; current lists
+// and timeline filters require a current source too.
 func TestStaleTopicMembershipDoesNotSurfaceCurrentContent(t *testing.T) {
 	ctx := context.Background()
 	s := openTempStore(t)
@@ -55,6 +55,12 @@ func TestStaleTopicMembershipDoesNotSurfaceCurrentContent(t *testing.T) {
 	}
 	if page, err := s.SearchMemory(ctx, MemorySearch{Text: "phrase", Scope: "both", TopicID: "topic:hist"}); err != nil || len(page.Hits) != 0 {
 		t.Fatalf("stale topic mapping surfaced search hits: %+v %v", page, err)
+	}
+	if topics, err := s.Topics(ctx, conv); err != nil || len(topics.Topics) != 0 {
+		t.Fatalf("stale topic surfaced in current taxonomy: %+v %v", topics, err)
+	}
+	if page, err := s.ListConversations(ctx, ConversationFilter{TopicID: "topic:hist"}); err != nil || len(page.Items) != 0 {
+		t.Fatalf("stale topic surfaced in timeline: %+v %v", page, err)
 	}
 	// Audit switches still see the historical membership.
 	audit, err := s.Query(ctx, Query{TopicID: "topic:hist", IncludeTurns: true, IncludeStale: true})
