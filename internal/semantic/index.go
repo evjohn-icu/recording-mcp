@@ -28,12 +28,14 @@ type Indexer struct {
 // a second run over unchanged data reports Skipped equal to the first run's
 // Notes+Turns.
 type IndexReport struct {
-	Notes      int    `json:"notes"`
-	Turns      int    `json:"turns"`
-	Skipped    int    `json:"skipped"`
-	Pruned     int    `json:"pruned"`
-	ProviderID string `json:"provider_id"`
-	Model      string `json:"model"`
+	Notes        int    `json:"notes"`
+	Turns        int    `json:"turns"`
+	Skipped      int    `json:"skipped"`
+	Pruned       int    `json:"pruned"`
+	ProviderID   string `json:"provider_id"`
+	Model        string `json:"model"`
+	SidecarBuilt bool   `json:"sidecar_built,omitempty"`
+	SidecarPath  string `json:"sidecar_path,omitempty"`
 }
 
 type artifact struct {
@@ -64,61 +66,117 @@ func (ix *Indexer) IndexConversation(ctx context.Context, conversationID string)
 	rep.ProviderID = ix.Provider.ID()
 	rep.Model = ix.Provider.Model()
 
-	arts, err := ix.artifacts(ctx, conversationID)
-	if err != nil {
-		return rep, err
+	for _, kind := range []string{"turn", "note"} {
+		after := ""
+		for {
+			batch, err := ix.artifactsPage(ctx, kind, conversationID, after)
+			if err != nil {
+				return rep, err
+			}
+			if len(batch) == 0 {
+				break
+			}
+			after = batch[len(batch)-1].id
+			if err := ix.indexBatch(ctx, batch, &rep); err != nil {
+				return rep, err
+			}
+			if len(batch) < embedBatch {
+				break
+			}
+		}
 	}
-	type pending struct {
-		artifact
-		sha string
-	}
-	todo := make([]pending, 0, len(arts))
+	return rep, nil
+}
+
+type pendingArtifact struct {
+	artifact
+	sha string
+}
+
+func (ix *Indexer) indexBatch(ctx context.Context, arts []artifact, rep *IndexReport) error {
+	todo := make([]pendingArtifact, 0, len(arts))
 	for _, a := range arts {
 		sum := sha256hex(a.text)
 		exists, err := ix.embeddingExists(ctx, a, sum)
 		if err != nil {
-			return rep, err
+			return err
 		}
 		if exists {
 			rep.Skipped++
 			continue
 		}
-		todo = append(todo, pending{artifact: a, sha: sum})
+		todo = append(todo, pendingArtifact{artifact: a, sha: sum})
 	}
-	for start := 0; start < len(todo); start += embedBatch {
-		end := min(start+embedBatch, len(todo))
-		texts := make([]string, 0, end-start)
-		for _, p := range todo[start:end] {
-			texts = append(texts, p.text)
+	if len(todo) == 0 {
+		return nil
+	}
+	texts := make([]string, len(todo))
+	for i, p := range todo {
+		texts[i] = p.text
+	}
+	vectors, err := ix.Provider.Embed(ctx, texts)
+	if err != nil {
+		return err
+	}
+	if len(vectors) != len(texts) {
+		return fmt.Errorf("semantic: provider returned %d vectors for %d texts", len(vectors), len(texts))
+	}
+	for i, p := range todo {
+		if len(vectors[i]) != ix.Provider.Dims() {
+			return fmt.Errorf("semantic: provider returned a %d-dim vector, want %d", len(vectors[i]), ix.Provider.Dims())
 		}
-		vectors, err := ix.Provider.Embed(ctx, texts)
+		stored, err := ix.storeEmbeddingIfCurrent(ctx, p.artifact, p.sha, vectors[i])
 		if err != nil {
-			return rep, err
+			return err
 		}
-		if len(vectors) != len(texts) {
-			return rep, fmt.Errorf("semantic: provider returned %d vectors for %d texts", len(vectors), len(texts))
+		if !stored {
+			rep.Skipped++
+			continue
 		}
-		for i, p := range todo[start:end] {
-			if len(vectors[i]) != ix.Provider.Dims() {
-				return rep, fmt.Errorf("semantic: provider returned a %d-dim vector, want %d", len(vectors[i]), ix.Provider.Dims())
-			}
-			stored, err := ix.storeEmbeddingIfCurrent(ctx, p.artifact, p.sha, vectors[i])
-			if err != nil {
-				return rep, err
-			}
-			if !stored {
-				rep.Skipped++
-				continue
-			}
-			switch p.kind {
-			case "note":
-				rep.Notes++
-			case "turn":
-				rep.Turns++
-			}
+		if p.kind == "note" {
+			rep.Notes++
+		} else {
+			rep.Turns++
 		}
 	}
-	return rep, nil
+	return nil
+}
+
+func (ix *Indexer) artifactsPage(ctx context.Context, kind, conversationID, after string) ([]artifact, error) {
+	var q string
+	alias := "t"
+	args := []any{}
+	if kind == "turn" {
+		q = `SELECT t.id,t.conversation_id,t.content FROM turns t WHERE ` + memory.CurrentTurnPredicate("t")
+	} else {
+		alias = "n"
+		q = `SELECT n.id,n.conversation_id,n.summary FROM notes n WHERE NOT ` + memory.NoteStalePredicate("n")
+	}
+	if conversationID != "" {
+		q += ` AND ` + alias + `.conversation_id=?`
+		args = append(args, conversationID)
+	}
+	if after != "" {
+		q += ` AND ` + alias + `.id>?`
+		args = append(args, after)
+	}
+	q += ` ORDER BY ` + alias + `.id LIMIT ?`
+	args = append(args, embedBatch)
+	rows, err := ix.DB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]artifact, 0, embedBatch)
+	for rows.Next() {
+		var a artifact
+		a.kind = kind
+		if err := rows.Scan(&a.id, &a.conv, &a.text); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
 }
 
 // Prune deletes embedding rows whose artifact no longer exists in turns or
@@ -157,60 +215,6 @@ func (ix *Indexer) prune(ctx context.Context, conversationID string) (int, error
 		return 0, fmt.Errorf("semantic: prune count: %w", err)
 	}
 	return int(n), nil
-}
-
-func (ix *Indexer) artifacts(ctx context.Context, conversationID string) ([]artifact, error) {
-	out := []artifact{}
-	turnSQL := `SELECT t.id, t.conversation_id, t.content FROM turns t WHERE ` + memory.CurrentTurnPredicate("t")
-	turnArgs := []any{}
-	if conversationID != "" {
-		turnSQL += ` AND t.conversation_id=?`
-		turnArgs = append(turnArgs, conversationID)
-	}
-	turnSQL += ` ORDER BY t.id`
-	rows, err := ix.DB.QueryContext(ctx, turnSQL, turnArgs...)
-	if err != nil {
-		return nil, fmt.Errorf("semantic: select turns: %w", err)
-	}
-	for rows.Next() {
-		var a artifact
-		a.kind = "turn"
-		if err := rows.Scan(&a.id, &a.conv, &a.text); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		out = append(out, a)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return nil, err
-	}
-	rows.Close()
-
-	noteSQL := `SELECT n.id, n.conversation_id, n.summary FROM notes n WHERE NOT ` + memory.NoteStalePredicate("n")
-	noteArgs := []any{}
-	if conversationID != "" {
-		noteSQL += ` AND n.conversation_id=?`
-		noteArgs = append(noteArgs, conversationID)
-	}
-	noteSQL += ` ORDER BY n.id`
-	nrows, err := ix.DB.QueryContext(ctx, noteSQL, noteArgs...)
-	if err != nil {
-		return nil, fmt.Errorf("semantic: select notes: %w", err)
-	}
-	defer nrows.Close()
-	for nrows.Next() {
-		var a artifact
-		a.kind = "note"
-		if err := nrows.Scan(&a.id, &a.conv, &a.text); err != nil {
-			return nil, err
-		}
-		out = append(out, a)
-	}
-	if err := nrows.Err(); err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (ix *Indexer) storeEmbeddingIfCurrent(ctx context.Context, a artifact, sum string, vector Vector) (bool, error) {

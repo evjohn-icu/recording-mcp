@@ -13,9 +13,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"recordingmcp/internal/memory"
+	"recordingmcp/internal/profile"
 	"recordingmcp/internal/semantic"
 )
 
@@ -37,13 +39,33 @@ func run() error {
 		keyEnv       = flag.String("key-env", "", "environment variable holding the API key (openai only)")
 		conversation = flag.String("conversation", "", "index only this conversation id (default: all); the id must exist")
 		prune        = flag.Bool("prune", false, "delete embedding rows whose artifact no longer exists (scoped to --conversation when set)")
+		indexPath    = flag.String("index-path", "", "optional pure-Go HNSW sidecar destination (profile-owned in profile mode)")
+		buildIndex   = flag.Bool("build-index", false, "build or atomically replace the HNSW sidecar after embedding")
 	)
+	profileCLI := profile.RegisterCLI(flag.CommandLine)
 	flag.Parse()
 	if flag.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %v", flag.Args())
 	}
+	profileMode := strings.TrimSpace(*dbPath) == ""
+	resolvedDB, _, err := profileCLI.Resolve(*dbPath, "")
+	if err != nil {
+		return err
+	}
+	if *dbPath == "" {
+		*dbPath = resolvedDB
+	}
 	if strings.TrimSpace(*dbPath) == "" {
 		return fmt.Errorf("--db is required")
+	}
+	if profileMode {
+		if strings.TrimSpace(*indexPath) != "" {
+			return fmt.Errorf("--index-path cannot be used with --profile; the sidecar path is profile-owned")
+		}
+		*indexPath = filepath.Join(filepath.Dir(filepath.Dir(*dbPath)), "index", "semantic.vec")
+	}
+	if *buildIndex && strings.TrimSpace(*indexPath) == "" {
+		return fmt.Errorf("--index-path is required with --build-index")
 	}
 
 	provider, err := buildProvider(*providerName, *dims, *modelURL, *model, *keyEnv)
@@ -80,6 +102,13 @@ func run() error {
 			return err
 		}
 		report.Pruned = pruned
+	}
+	if *buildIndex {
+		if err := semantic.BuildHNSWSidecar(ctx, store.DB(), provider, *indexPath); err != nil {
+			return err
+		}
+		report.SidecarBuilt = true
+		report.SidecarPath = *indexPath
 	}
 	encoded, err := json.Marshal(report)
 	if err != nil {

@@ -21,6 +21,7 @@ import (
 
 	"recordingmcp/internal/migrations"
 	"recordingmcp/internal/pipeline"
+	"recordingmcp/internal/profile"
 )
 
 func main() {
@@ -42,11 +43,19 @@ func run(args []string, stdout, stderr io.Writer) error {
 	inputPath := fs.String("input", "", "path to the link-proposal JSON file (required)")
 	model := fs.String("model", "", "name of the proposing model recorded on each link")
 	dryRun := fs.Bool("dry-run", false, "validate and report without writing any link")
+	profileCLI := profile.RegisterCLI(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %v", fs.Args())
+	}
+	resolvedDB, _, err := profileCLI.Resolve(*dbPath, "")
+	if err != nil {
+		return err
+	}
+	if *dbPath == "" {
+		*dbPath = resolvedDB
 	}
 	if strings.TrimSpace(*dbPath) == "" {
 		return errors.New("--db is required")

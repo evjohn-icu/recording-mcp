@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"recordingmcp/internal/memory"
+	"recordingmcp/internal/retention"
 )
 
 // pcmBytesPerMS is the fixed ingest contract: 16 kHz mono s16le .pcm is 32
@@ -77,6 +78,13 @@ type audioSource struct {
 
 func (s *Service) newAudioSource(ctx context.Context, conversationID, recordingID string) (audioSource, error) {
 	src := audioSource{state: AudioUnavailable}
+	var cleanupPending bool
+	if err := s.Store.DB().QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM forget_tombstones WHERE (recording_id=? OR (scope='conversation' AND conversation_id=?)) AND status!='complete')`, recordingID, conversationID).Scan(&cleanupPending); err != nil {
+		return src, err
+	}
+	if cleanupPending {
+		return src, nil
+	}
 	row, ok, err := s.syncRowForRecording(ctx, conversationID, recordingID)
 	if err != nil {
 		return src, err
@@ -171,6 +179,7 @@ func (a audioSource) clipBounds(start, end *int64) (int64, int64, bool) {
 // header and then copies Size bytes from PCM, which is already positioned at
 // StartMS.
 type AudioClip struct {
+	release     func()
 	RecordingID string
 	StartMS     int64
 	EndMS       int64
@@ -183,12 +192,27 @@ func (c *AudioClip) Close() error {
 	if c == nil || c.PCM == nil {
 		return nil
 	}
-	return c.PCM.Close()
+	err := c.PCM.Close()
+	if c.release != nil {
+		c.release()
+		c.release = nil
+	}
+	return err
 }
 
 // AudioClip resolves and opens one turn's audio. Only current-state turns are
 // playable: a stale revision's turn is not part of what the UI shows.
 func (s *Service) AudioClip(ctx context.Context, turnID string) (*AudioClip, error) {
+	release, lockErr := retention.Lock(ctx, s.audioRoot, false)
+	if lockErr != nil {
+		return nil, lockErr
+	}
+	handedOff := false
+	defer func() {
+		if !handedOff {
+			release()
+		}
+	}()
 	if strings.TrimSpace(turnID) == "" {
 		return nil, validationError("turn_id is required")
 	}
@@ -244,7 +268,8 @@ func (s *Service) AudioClip(ctx context.Context, turnID string) (*AudioClip, err
 		f.Close()
 		return nil, audioError(CodeAudioMissing, "本机找不到音频文件", 404)
 	}
-	return &AudioClip{RecordingID: recordingID, StartMS: start.Int64, EndMS: end.Int64, PCM: f, Size: to - from}, nil
+	handedOff = true
+	return &AudioClip{release: release, RecordingID: recordingID, StartMS: start.Int64, EndMS: end.Int64, PCM: f, Size: to - from}, nil
 }
 
 // WriteWAVHeader writes the 44-byte RIFF/WAVE header of 16 kHz mono s16le PCM

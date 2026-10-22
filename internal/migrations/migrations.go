@@ -164,6 +164,9 @@ var migrations = []migration{
 	{version: 11, name: "turn-classes", statements: statements(turnClassesDDL)},
 	{version: 12, name: "memory-embeddings", statements: statements(memoryEmbeddingsDDL)},
 	{version: 13, name: "cloud-sync-state", statements: statements(cloudSyncStateDDL)},
+	{version: 14, name: "permanent-forget", statements: forgetStatements},
+	{version: 15, name: "profile-retirement", statements: profileRetirementStatements},
+	{version: 16, name: "suppression-cleanup-operations", statements: suppressionCleanupStatements},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`

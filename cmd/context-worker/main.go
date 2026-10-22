@@ -27,6 +27,7 @@ import (
 	"recordingmcp/internal/migrations"
 	"recordingmcp/internal/pipeline"
 	"recordingmcp/internal/process"
+	"recordingmcp/internal/profile"
 	"recordingmcp/internal/semantic"
 	"recordingmcp/internal/worker"
 )
@@ -40,6 +41,7 @@ func main() {
 
 func run() error {
 	dbPath := flag.String("db", "", "path to the SQLite database (required)")
+	profileCLI := profile.RegisterCLI(flag.CommandLine)
 	workerID := flag.String("worker-id", defaultWorkerID(), "worker identity recorded on claims")
 	stages := flag.String("stages", "extract,publish,curate,embed", "comma-separated stage names to claim")
 	lease := flag.Duration("lease", 30*time.Second, "lease duration held while executing a job")
@@ -68,6 +70,13 @@ func run() error {
 
 	if flag.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %v", flag.Args())
+	}
+	resolvedDB, _, err := profileCLI.Resolve(*dbPath, "")
+	if err != nil {
+		return err
+	}
+	if *dbPath == "" {
+		*dbPath = resolvedDB
 	}
 	if strings.TrimSpace(*dbPath) == "" {
 		return fmt.Errorf("--db is required")

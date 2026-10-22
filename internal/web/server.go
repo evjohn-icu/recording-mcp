@@ -22,6 +22,9 @@ const maxRequestBody = 1 << 20
 type Config struct {
 	// Service is the shared business facade; required.
 	Service *app.Service
+	// TimeService is optional and uses the authenticated session profile as its
+	// event scope (or "local" in legacy bootstrap mode).
+	TimeService *app.TimeService
 	// WebDir is the built frontend directory (web/dist). Empty disables static
 	// serving while the API keeps working.
 	WebDir string
@@ -33,18 +36,31 @@ type Config struct {
 	BootstrapToken string
 	// TokenTTL is how long the bootstrap token stays valid. Zero means 10m.
 	TokenTTL time.Duration
-	Logger   *log.Logger
+	// ProfileName binds every browser session to the profile selected when this
+	// server instance was created. Empty preserves the legacy bootstrap-token
+	// flow. Multi-profile dispatch should create one server per profile.
+	ProfileName string
+	// VerifyProfilePassword validates a password for ProfileName. Required when
+	// ProfileName is set; it must be backed by the trusted profile registry.
+	VerifyProfilePassword func(password string) bool
+	ChangeProfilePassword func(oldPassword, newPassword string) error
+	Logger                *log.Logger
 }
 
 // Server is the local web application: one JSON API, one static SPA and one
 // audio endpoint over the shared app service.
 type Server struct {
-	svc        *app.Service
-	sessions   *sessionStore
-	webDir     string
-	devOrigins map[string]bool
-	logger     *log.Logger
-	handler    http.Handler
+	svc                   *app.Service
+	sessions              *sessionStore
+	webDir                string
+	devOrigins            map[string]bool
+	logger                *log.Logger
+	handler               http.Handler
+	profileName           string
+	verifyProfilePassword func(string) bool
+	changeProfilePassword func(string, string) error
+	timeService           *app.TimeService
+	loginGate             *loginGate
 
 	bootstrap       string
 	bootstrapExpiry time.Time
@@ -60,7 +76,11 @@ func New(cfg Config) (*Server, error) {
 		logger = log.Default()
 	}
 	token := strings.TrimSpace(cfg.BootstrapToken)
-	if token == "" {
+	profileName := strings.TrimSpace(cfg.ProfileName)
+	if profileName != "" && cfg.VerifyProfilePassword == nil {
+		return nil, errors.New("web: profile password verifier is required")
+	}
+	if token == "" && profileName == "" {
 		generated, err := randomToken()
 		if err != nil {
 			return nil, err
@@ -68,12 +88,17 @@ func New(cfg Config) (*Server, error) {
 		token = generated
 	}
 	s := &Server{
-		svc:        cfg.Service,
-		sessions:   newSessionStore(token, cfg.TokenTTL),
-		webDir:     cfg.WebDir,
-		devOrigins: map[string]bool{},
-		logger:     logger,
-		bootstrap:  token,
+		svc:                   cfg.Service,
+		timeService:           cfg.TimeService,
+		sessions:              newSessionStore(token, cfg.TokenTTL),
+		webDir:                cfg.WebDir,
+		devOrigins:            map[string]bool{},
+		logger:                logger,
+		bootstrap:             token,
+		profileName:           profileName,
+		verifyProfilePassword: cfg.VerifyProfilePassword,
+		changeProfilePassword: cfg.ChangeProfilePassword,
+		loginGate:             newLoginGate(),
 	}
 	for _, origin := range cfg.DevOrigins {
 		if origin = strings.TrimSpace(origin); origin != "" {
@@ -89,6 +114,9 @@ func New(cfg Config) (*Server, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/session", s.handleSessionCreate)
 	mux.HandleFunc("GET /api/session", s.handleSessionRead)
+	mux.HandleFunc("POST /api/login", s.handleProfileLogin)
+	mux.HandleFunc("POST /api/logout", s.handleLogout)
+	mux.HandleFunc("POST /api/profile/password", s.handleProfilePasswordChange)
 	mux.HandleFunc("GET /api/conversations", s.handleConversations)
 	mux.HandleFunc("GET /api/conversations/{id}", s.handleConversation)
 	mux.HandleFunc("GET /api/conversations/{id}/turns", s.handleTurns)
@@ -101,6 +129,17 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /api/search/hybrid", s.handleHybrid)
 	mux.HandleFunc("GET /api/topics", s.handleTopics)
 	mux.HandleFunc("GET /healthz", s.handleHealth)
+	mux.HandleFunc("GET /api/auth-info", s.handleAuthInfo)
+	if cfg.TimeService != nil {
+		RegisterTimeRoutes(mux, cfg.TimeService, func(r *http.Request) string {
+			if sess, ok := sessionOf(r); ok && strings.TrimSpace(sess.profile) != "" {
+				return sess.profile
+			}
+			return "local"
+		})
+	}
+	s.registerCorrectionRoutes(mux)
+	s.registerForgetRoutes(mux)
 	mux.HandleFunc("/", s.handleCatchAll)
 	s.handler = s.wrap(mux)
 	return s, nil
@@ -132,14 +171,31 @@ func (s *Server) wrap(next http.Handler) http.Handler {
 			writeForbidden(w, app.CodeOriginRejected, "host rejected")
 			return
 		}
+		if s.profileName != "" && strings.HasPrefix(r.URL.Path, "/api/") {
+			_, retired, err := s.svc.Store.ProfileRetirement(r.Context())
+			if err != nil || retired {
+				writeJSON(w, http.StatusGone, errorBody{Error: errorDetail{Code: "profile_retired", Message: "this local profile has been permanently retired"}})
+				return
+			}
+		}
 		api := strings.HasPrefix(r.URL.Path, "/api/")
 		if api {
 			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 			sessionEndpoint := r.URL.Path == "/api/session"
 			bootstrapPost := sessionEndpoint && r.Method == http.MethodPost
-			if bootstrapPost {
+			profileLogin := r.URL.Path == "/api/login" && r.Method == http.MethodPost
+			authInfo := r.URL.Path == "/api/auth-info" && r.Method == http.MethodGet
+			if bootstrapPost || profileLogin || authInfo {
 				if !s.originAllowed(r) {
+					if authInfo {
+						next.ServeHTTP(w, r)
+						return
+					}
 					writeForbidden(w, app.CodeOriginRejected, "origin rejected")
+					return
+				}
+				if profileLogin || authInfo {
+					next.ServeHTTP(w, r)
 					return
 				}
 			} else {
@@ -164,6 +220,16 @@ func (s *Server) wrap(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (s *Server) handleAuthInfo(w http.ResponseWriter, _ *http.Request) {
+	mode := "token"
+	info := map[string]string{"mode": mode}
+	if s.profileName != "" {
+		info["mode"] = "profile"
+		info["profile"] = s.profileName
+	}
+	writeJSON(w, http.StatusOK, info)
 }
 
 // handleCatchAll serves the SPA for non-API paths and a JSON 404 for unmatched
@@ -206,5 +272,5 @@ func (s *Server) handleSessionRead(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, errorBody{Error: errorDetail{Code: app.CodeUnauthenticated, Message: "session required"}})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "csrf_token": sess.csrf})
+	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "csrf_token": sess.csrf, "profile": sess.profile})
 }

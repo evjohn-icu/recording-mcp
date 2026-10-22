@@ -89,6 +89,12 @@ token 只可交换一次、10 分钟有效。不要把 `--addr` 改成公网地�
 运行 `bin/context-worker --db data/context-memory.db ...`；它不是启动 Web UI 的隐含步骤。
 演示 PCM 是可定位 offset 的音频夹具，不代表真实 ASR 准确率或真实录音质量。更完整的删除、备份、回滚和证据口径见 [docs/local-web.md](docs/local-web.md)。
 
+### 本地 v2：独立资料库、纠错与遗忘
+
+支持密码保护的独立本地 profile、转写版本纠错、说话人复核、事实时间历史，以及带重同步屏障的本地永久遗忘。Go + SQLite 与现有 MCP 保持兼容，精确检索仍为默认。
+
+启动与旧数据库迁入见 [本地 v2 使用说明](docs/local-v2.md)；测试、浏览器验证、性能门槛及未完成项见 [交付验证记录](docs/local-v2-verification.md)。实验 ANN 未达到百万规模验收门槛，本地 profile 也不等于远程多租户或磁盘加密。
+
 ## MCP 客户端与 Web 运行限制
 
 MCP 客户端里 `tools/list` 可见 27 个工具（19 个记忆工具 + 8 个事件原型工具）。调用 `get_current_context`：

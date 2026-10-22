@@ -1,3 +1,45 @@
+export interface TemporalEvent {
+  id: string
+  type: string
+  timestamp: string
+  source: string
+  content: string
+  confidence: number
+  structured_data?: Record<string, unknown>
+  recorded_at?: string
+  valid_at?: string
+  valid_from?: string
+  known_at?: string
+  source_status: 'current' | 'source_stale' | 'unknown' | string
+}
+export interface TemporalState {
+  id: string
+  dimension: string
+  status: string
+  summary: string
+  provenance: string[]
+  updated_at: string
+  structured_data?: Record<string, unknown>
+}
+
+export interface AuthInfo {
+  mode: 'profile' | 'token' | 'profiles'
+  profile?: string
+  profiles?: string[]
+}
+
+export interface TranscriptTurn { id: string; original_index: number; text: string; speaker_scoped_id?: string | null }
+export interface TranscriptSource {
+  conversation_id: string
+  recording_id: string
+  segment_id: string
+  result: { source: { transcript_revision: string }; turns: TranscriptTurn[] }
+}
+export interface SpeakerBinding {
+  id: string; recording_id: string; transcript_revision: string; speaker_scoped_id: string
+  person_id?: string; status: string; evidence_turn_ids: string[]; version: number
+}
+
 export type AnalysisStatus = 'pending' | 'partial'
 export type IndexingStatus = 'pending' | 'ready' | 'failed' | 'disabled'
 
@@ -268,6 +310,7 @@ export interface HybridView extends ContextPackage {
 export interface SessionResponse {
   authenticated?: boolean
   csrf_token: string
+  profile?: string
 }
 
 export interface SearchParams {

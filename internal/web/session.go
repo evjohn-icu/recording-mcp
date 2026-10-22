@@ -18,8 +18,9 @@ const sessionCookieName = "ctxweb_session"
 // session is one authenticated browser session. csrf is issued with the cookie
 // and must be echoed in X-CSRF-Token on every write.
 type session struct {
-	id   string
-	csrf string
+	id      string
+	csrf    string
+	profile string
 }
 
 // sessionStore keeps sessions and the single-use bootstrap token in memory, so
@@ -80,6 +81,39 @@ func (s *sessionStore) redeem(token string) (*session, bool) {
 	return s.sessions[id], true
 }
 
+// createProfileSession issues a session already bound to the process-selected
+// profile. The profile value is immutable for the lifetime of that session.
+func (s *sessionStore) createProfileSession(profile string) (*session, bool) {
+	if strings.TrimSpace(profile) == "" {
+		return nil, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id, err := randomToken()
+	if err != nil {
+		return nil, false
+	}
+	csrf, err := randomToken()
+	if err != nil {
+		return nil, false
+	}
+	sess := &session{id: id, csrf: csrf, profile: profile}
+	s.sessions[id] = sess
+	return sess, true
+}
+
+func (s *sessionStore) revoke(id string) {
+	s.mu.Lock()
+	delete(s.sessions, id)
+	s.mu.Unlock()
+}
+
+func (s *sessionStore) revokeAll() {
+	s.mu.Lock()
+	clear(s.sessions)
+	s.mu.Unlock()
+}
+
 func (s *sessionStore) lookup(id string) (*session, bool) {
 	if strings.TrimSpace(id) == "" {
 		return nil, false
@@ -110,6 +144,13 @@ func setSessionCookie(w http.ResponseWriter, sess *session) {
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
+	})
+}
+
+func clearSessionCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name: sessionCookieName, Value: "", Path: "/", HttpOnly: true,
+		SameSite: http.SameSiteStrictMode, MaxAge: -1,
 	})
 }
 

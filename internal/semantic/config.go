@@ -1,6 +1,7 @@
 package semantic
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -23,6 +24,9 @@ type Config struct {
 	Model    string
 	// KeyEnv names the environment variable holding the API key (openai only).
 	KeyEnv string
+	// IndexPath opts in to a rebuildable pure-Go HNSW sidecar. Empty keeps the
+	// exact SQLite scan backend.
+	IndexPath string
 }
 
 // ProviderFromConfig returns the embedding provider named by cfg. It returns
@@ -68,6 +72,9 @@ func RetrieverFromConfig(cfg Config, db *sql.DB) (SemanticRetriever, error) {
 	}
 	if provider == nil {
 		return nil, nil
+	}
+	if strings.TrimSpace(cfg.IndexPath) != "" {
+		return OpenHNSWRetriever(context.Background(), db, provider, strings.TrimSpace(cfg.IndexPath))
 	}
 	return &SQLiteRetriever{DB: db, Provider: provider}, nil
 }

@@ -7,6 +7,7 @@ import (
 
 	"recordingmcp/internal/contextbuild"
 	"recordingmcp/internal/memory"
+	"recordingmcp/internal/plane"
 	"recordingmcp/internal/semantic"
 )
 
@@ -20,6 +21,11 @@ type Service struct {
 	// beneath it; an empty value disables audio serving instead of allowing
 	// paths relative to the process working directory.
 	AudioDir string
+	// Managed retention roots are provided by the profile resolver, never by
+	// request parameters. Empty means no managed copy of that type exists.
+	ManagedIndexDir  string
+	ManagedBackupDir string
+	ForgetPlane      *plane.Service
 
 	audioRoot string
 }

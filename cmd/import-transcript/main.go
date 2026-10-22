@@ -13,6 +13,7 @@ import (
 
 	"recordingmcp/internal/asrinput"
 	"recordingmcp/internal/memory"
+	"recordingmcp/internal/profile"
 )
 
 func decode(path string, out any) error {
@@ -38,13 +39,22 @@ func run(args []string) error {
 	fs.SetOutput(os.Stderr)
 	fs.String("db", "data/context-memory.db", "experimental context memory SQLite file")
 	fs.String("input", "", "provider-neutral normalized transcript JSON")
+	profileCLI := profile.RegisterCLI(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %v", fs.Args())
 	}
-	db, input := fs.Lookup("db").Value.String(), fs.Lookup("input").Value.String()
+	resolvedDB, _, err := profileCLI.Resolve(fs.Lookup("db").Value.String(), "")
+	if err != nil {
+		return err
+	}
+	db := fs.Lookup("db").Value.String()
+	if resolvedDB != "" {
+		db = resolvedDB
+	}
+	input := fs.Lookup("input").Value.String()
 	if input == "" {
 		return errors.New("--input normalized.json is required")
 	}

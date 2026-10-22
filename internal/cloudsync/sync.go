@@ -12,10 +12,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
+	"syscall"
 	"time"
 
 	"recordingmcp/internal/asrinput"
 	"recordingmcp/internal/memory"
+	"recordingmcp/internal/retention"
 )
 
 // syncPageLimit is the event page size used by the engine loop; the server
@@ -51,6 +54,13 @@ type Engine struct {
 	Log *log.Logger
 }
 
+type audioBaselineKey struct{}
+
+type audioBaseline struct {
+	mu      sync.Mutex
+	existed map[string]bool
+}
+
 // Report is one RunOnce outcome, printed as one JSON line by the CLI.
 type Report struct {
 	Cursor             int64 `json:"cursor"`
@@ -79,6 +89,12 @@ func (e *Engine) revision() string {
 // retry with the configured poll interval and never skip events.
 func (e *Engine) RunOnce(ctx context.Context) (Report, error) {
 	var rep Report
+	release, err := retention.Lock(ctx, e.AudioDir, false)
+	if err != nil {
+		return rep, err
+	}
+	defer release()
+	ctx = context.WithValue(ctx, audioBaselineKey{}, &audioBaseline{existed: make(map[string]bool)})
 	cur, err := cursor(ctx, e.DB)
 	if err != nil {
 		return rep, err
@@ -142,7 +158,35 @@ func (e *Engine) commitEvent(ctx context.Context, ev *Event, extra func(ctx cont
 	}
 	defer tx.Rollback()
 	now := time.Now().UnixMilli()
-	if extra != nil {
+	// Acquire the SQLite write lock before checking the fence. This makes the
+	// check and all following local effects mutually exclusive with a forget
+	// transaction that inserts the fence and redacts sync state.
+	if _, err := tx.ExecContext(ctx, `UPDATE sync_state SET updated_at=updated_at WHERE id=1`); err != nil {
+		return err
+	}
+	forgotten := false
+	if ev != nil && ev.RecordingID != "" {
+		forgotten, err = forgottenTx(ctx, tx, ev.RecordingID)
+		if err != nil {
+			return err
+		}
+		if forgotten {
+			// Event payloads can contain transcript/audio metadata. Never let a
+			// replay put it back into the local event ledger after forgetting.
+			ev.Payload = []byte(`{}`)
+			full, err := fullForgetTx(ctx, tx, ev.RecordingID)
+			if err != nil {
+				return err
+			}
+			if err := clearForgottenRecordingTx(ctx, tx, ev.RecordingID, now, full); err != nil {
+				return err
+			}
+		} else if extra != nil {
+			if err := extra(ctx, tx); err != nil {
+				return err
+			}
+		}
+	} else if extra != nil {
 		if err := extra(ctx, tx); err != nil {
 			return err
 		}
@@ -155,12 +199,140 @@ func (e *Engine) commitEvent(ctx context.Context, ev *Event, extra func(ctx cont
 			return err
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if forgotten {
+		return e.removeForgottenAudio(ctx, ev.RecordingID)
+	}
+	return nil
+}
+
+// commitRecording applies snapshot or pending-sweep effects only while the
+// provider recording has no durable forget fence. The caller already holds
+// RunOnce's shared retention lock, so an exclusive cleanup cannot race the
+// post-commit file removal.
+func (e *Engine) commitRecording(ctx context.Context, recordingID string, extra func(ctx context.Context, tx *sql.Tx) error) error {
+	forgotten := false
+	err := e.commitEvent(ctx, nil, func(ctx context.Context, tx *sql.Tx) error {
+		var err error
+		forgotten, err = forgottenTx(ctx, tx, recordingID)
+		if err != nil {
+			return err
+		}
+		if forgotten {
+			full, err := fullForgetTx(ctx, tx, recordingID)
+			if err != nil {
+				return err
+			}
+			return clearForgottenRecordingTx(ctx, tx, recordingID, time.Now().UnixMilli(), full)
+		}
+		if extra != nil {
+			return extra(ctx, tx)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if forgotten {
+		return e.removeForgottenAudio(ctx, recordingID)
+	}
+	return nil
+}
+
+func (e *Engine) removeForgottenAudio(ctx context.Context, recordingID string) error {
+	chunkDir := filepath.Join(e.AudioDir, recordingID)
+	parts, err := filepath.Glob(filepath.Join(chunkDir, "*.part"))
+	if err != nil {
+		return err
+	}
+	for _, path := range parts {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	chunks, err := filepath.Glob(filepath.Join(chunkDir, "chunk-*.pcm"))
+	if err != nil {
+		return err
+	}
+	candidates := append(chunks, e.stitchedPath(recordingID))
+	for _, path := range candidates {
+		var registered bool
+		if err := e.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM forget_files WHERE path=?)`, path).Scan(&registered); err != nil {
+			return err
+		}
+		// Files present at preview time have a forget_files row and must be
+		// erased only according to that row's exact byte range/remove policy.
+		// An unregistered file was created after preview (typically a chunk
+		// finalized before its ledger transaction) and is safe to discard.
+		if createdThisPass(ctx, path) && !registered {
+			if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+		}
+	}
+	if err := os.Remove(chunkDir); err != nil && !errors.Is(err, os.ErrNotExist) && !errors.Is(err, os.ErrExist) && !errors.Is(err, syscall.ENOTEMPTY) {
+		return err
+	}
+	return nil
+}
+
+func trackAudioPath(ctx context.Context, path string) {
+	baseline, _ := ctx.Value(audioBaselineKey{}).(*audioBaseline)
+	if baseline == nil {
+		return
+	}
+	baseline.mu.Lock()
+	defer baseline.mu.Unlock()
+	if _, ok := baseline.existed[path]; !ok {
+		_, err := os.Stat(path)
+		baseline.existed[path] = err == nil
+	}
+}
+
+func createdThisPass(ctx context.Context, path string) bool {
+	baseline, _ := ctx.Value(audioBaselineKey{}).(*audioBaseline)
+	if baseline == nil {
+		return false
+	}
+	baseline.mu.Lock()
+	defer baseline.mu.Unlock()
+	existed, ok := baseline.existed[path]
+	return ok && !existed
+}
+
+func (e *Engine) cleanupIfForgotten(ctx context.Context, recordingID string) (bool, error) {
+	forgotten := false
+	err := e.commitEvent(ctx, nil, func(ctx context.Context, tx *sql.Tx) error {
+		var err error
+		forgotten, err = forgottenTx(ctx, tx, recordingID)
+		if err != nil || !forgotten {
+			return err
+		}
+		full, err := fullForgetTx(ctx, tx, recordingID)
+		if err != nil {
+			return err
+		}
+		return clearForgottenRecordingTx(ctx, tx, recordingID, time.Now().UnixMilli(), full)
+	})
+	if err == nil && forgotten {
+		err = e.removeForgottenAudio(ctx, recordingID)
+	}
+	return forgotten, err
 }
 
 // handleEvent dispatches one unprocessed event. The bool reports whether the
 // event was settled (mark processed + advance cursor).
 func (e *Engine) handleEvent(ctx context.Context, ev Event, rep *Report) (bool, error) {
+	forgotten, err := e.locallyForgotten(ctx, ev.RecordingID)
+	if err != nil {
+		return false, err
+	}
+	if forgotten {
+		ev.Payload = []byte(`{}`)
+		return true, e.commitEvent(ctx, &ev, nil)
+	}
 	switch ev.Type {
 	case "recording.created":
 		return e.handleCreated(ctx, ev, rep)
@@ -292,6 +464,10 @@ func (e *checksumMismatchError) Error() string { return e.msg }
 // final chunk file name. Transport errors abort the pass; only verified
 // content mismatches surface as checksumMismatchError.
 func (e *Engine) downloadChunkVerified(ctx context.Context, recID string, p ChunkCommittedPayload) error {
+	trackAudioPath(ctx, e.chunkPath(recID, p.Seq))
+	if err := e.requireNotForgotten(ctx, recID); err != nil {
+		return err
+	}
 	dir := filepath.Join(e.AudioDir, recID)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
@@ -316,7 +492,11 @@ func (e *Engine) downloadChunkVerified(ctx context.Context, recID string, p Chun
 		case p.SampleCount >= 0 && n != p.SampleCount*2:
 			lastErr = fmt.Errorf("sample count mismatch: %d bytes imply %d samples, event says %d", n, n/2, p.SampleCount)
 		default:
-			if err := os.Rename(part, final); err != nil {
+			if err := e.requireNotForgotten(ctx, recID); err != nil {
+				os.Remove(part)
+				return err
+			}
+			if err := e.finalizeDownload(ctx, recID, part, final); err != nil {
 				os.Remove(part)
 				return err
 			}
@@ -451,7 +631,15 @@ func completenessGap(chunks []chunkRow, totalChunks, totalSamples int64) string 
 // ingest failure holds the event (chunks remain on disk) so the next pass
 // retries deterministically.
 func (e *Engine) stitchTranscribeSettle(ctx context.Context, ev *Event, p RecordingFinishedPayload, rep *Report, row *syncRecording, chunks []chunkRow) (bool, error) {
+	forgotten, err := e.cleanupIfForgotten(ctx, row.RecordingID)
+	if err != nil {
+		return false, err
+	}
+	if forgotten {
+		return true, e.settleForgottenEvent(ctx, ev)
+	}
 	stitched := e.stitchedPath(row.RecordingID)
+	trackAudioPath(ctx, stitched)
 	sum, err := stitchChunks(chunks, stitched)
 	if err != nil {
 		return false, err
@@ -484,6 +672,11 @@ func (e *Engine) stitchTranscribeSettle(ctx context.Context, ev *Event, p Record
 		Revision:          e.revision(),
 		SourceAudioSHA256: sum,
 	})
+	if cleanup, cleanupErr := e.cleanupIfForgotten(ctx, row.RecordingID); cleanupErr != nil {
+		return false, cleanupErr
+	} else if cleanup {
+		return true, e.settleForgottenEvent(ctx, ev)
+	}
 	if err != nil {
 		e.logf("cloudsync: recording %s transcription failed: %v; will retry", row.RecordingID, err)
 		rep.Errors++
@@ -519,6 +712,13 @@ func (e *Engine) stitchTranscribeSettle(ctx context.Context, ev *Event, p Record
 // transcribeAndSettle drives a recording that is already stitched and parked
 // in transcription_pending (a previous pass ran with --asr off).
 func (e *Engine) transcribeAndSettle(ctx context.Context, ev *Event, rep *Report, row *syncRecording) (bool, error) {
+	forgotten, err := e.cleanupIfForgotten(ctx, row.RecordingID)
+	if err != nil {
+		return false, err
+	}
+	if forgotten {
+		return true, e.settleForgottenEvent(ctx, ev)
+	}
 	if row.StitchedPath == nil {
 		return false, fmt.Errorf("cloudsync: recording %s transcription_pending without stitched_path", row.RecordingID)
 	}
@@ -533,6 +733,11 @@ func (e *Engine) transcribeAndSettle(ctx context.Context, ev *Event, rep *Report
 		Revision:          e.revision(),
 		SourceAudioSHA256: sum,
 	})
+	if cleanup, cleanupErr := e.cleanupIfForgotten(ctx, row.RecordingID); cleanupErr != nil {
+		return false, cleanupErr
+	} else if cleanup {
+		return true, e.settleForgottenEvent(ctx, ev)
+	}
 	if err != nil {
 		e.logf("cloudsync: recording %s transcription failed: %v; will retry", row.RecordingID, err)
 		rep.Errors++
@@ -556,6 +761,13 @@ func (e *Engine) transcribeAndSettle(ctx context.Context, ev *Event, rep *Report
 	rep.RecordingsIngested++
 	e.ackBestEffort(ctx, row.RecordingID, "ingested")
 	return true, nil
+}
+
+func (e *Engine) settleForgottenEvent(ctx context.Context, ev *Event) error {
+	if ev == nil {
+		return nil
+	}
+	return e.commitEvent(ctx, ev, nil)
 }
 
 // sweepPendingTranscriptions completes recordings parked in
@@ -590,6 +802,13 @@ func (e *Engine) sweepPendingTranscriptions(ctx context.Context, rep *Report) er
 	}
 	rows.Close()
 	for _, p := range pendings {
+		forgotten, err := e.cleanupIfForgotten(ctx, p.recID)
+		if err != nil {
+			return err
+		}
+		if forgotten {
+			continue
+		}
 		sum, err := fileSHA256(p.path)
 		if err != nil {
 			e.logf("cloudsync: recording %s pending sweep skipped: %v", p.recID, err)
@@ -603,6 +822,11 @@ func (e *Engine) sweepPendingTranscriptions(ctx context.Context, rep *Report) er
 			Revision:          e.revision(),
 			SourceAudioSHA256: sum,
 		})
+		if forgotten, err := e.cleanupIfForgotten(ctx, p.recID); err != nil {
+			return err
+		} else if forgotten {
+			continue
+		}
 		if err != nil {
 			e.logf("cloudsync: recording %s transcription failed: %v; stays pending", p.recID, err)
 			rep.Errors++
@@ -616,7 +840,7 @@ func (e *Engine) sweepPendingTranscriptions(ctx context.Context, rep *Report) er
 		now := time.Now().UnixMilli()
 		ingested := stateIngested
 		tstate := "ingested"
-		err = e.commitEvent(ctx, nil, func(ctx context.Context, tx *sql.Tx) error {
+		err = e.commitRecording(ctx, p.recID, func(ctx context.Context, tx *sql.Tx) error {
 			return updateRecordingTx(ctx, tx, p.recID, &ingested, &tstate, nil, nil, nil, nil, nil, now)
 		})
 		if err != nil {
@@ -631,6 +855,9 @@ func (e *Engine) sweepPendingTranscriptions(ctx context.Context, rep *Report) er
 // ingestResults pushes every segment result through the single memory
 // ingestion entry point, in segment order.
 func (e *Engine) ingestResults(ctx context.Context, recID string, results []asrinput.Result) error {
+	if err := e.requireNotForgotten(ctx, recID); err != nil {
+		return err
+	}
 	if e.Store == nil {
 		return errors.New("cloudsync: memory store is required for transcription ingest")
 	}
@@ -763,12 +990,19 @@ func (e *Engine) recoverFromSnapshot(ctx context.Context, rep *Report) error {
 
 // recoverRecording reconciles one snapshot recording with local state.
 func (e *Engine) recoverRecording(ctx context.Context, rec RecordingDetail, rep *Report) error {
+	forgotten, err := e.locallyForgotten(ctx, rec.RecordingID)
+	if err != nil {
+		return err
+	}
+	if forgotten {
+		return nil
+	}
 	now := time.Now().UnixMilli()
 	if rec.State == "deleted" {
 		_ = os.Remove(e.stitchedPath(rec.RecordingID))
 		_ = removeChunkFiles(rec.RecordingID, e.AudioDir)
 		deleted := stateDeleted
-		return e.commitEvent(ctx, nil, func(ctx context.Context, tx *sql.Tx) error {
+		return e.commitRecording(ctx, rec.RecordingID, func(ctx context.Context, tx *sql.Tx) error {
 			if err := deleteChunksTx(ctx, tx, rec.RecordingID); err != nil {
 				return err
 			}
@@ -800,7 +1034,7 @@ func (e *Engine) recoverRecording(ctx context.Context, rec RecordingDetail, rep 
 				// recovering the rest of the snapshot.
 				e.logf("cloudsync: recovery: recording %s chunk %d: %v", rec.RecordingID, ch.Seq, err)
 				rep.Errors++
-				if err := e.commitEvent(ctx, nil, func(ctx context.Context, tx *sql.Tx) error {
+				if err := e.commitRecording(ctx, rec.RecordingID, func(ctx context.Context, tx *sql.Tx) error {
 					return failRecordingTx(ctx, tx, rec.RecordingID, time.Now().UnixMilli())
 				}); err != nil {
 					return err
@@ -809,7 +1043,7 @@ func (e *Engine) recoverRecording(ctx context.Context, rec RecordingDetail, rep 
 			}
 			return err
 		}
-		if err := e.commitEvent(ctx, nil, func(ctx context.Context, tx *sql.Tx) error {
+		if err := e.commitRecording(ctx, rec.RecordingID, func(ctx context.Context, tx *sql.Tx) error {
 			return addChunkTx(ctx, tx, rec.RecordingID, chunkRow{
 				Seq:         ch.Seq,
 				SHA256:      ch.ContentSHA256,

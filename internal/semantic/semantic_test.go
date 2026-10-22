@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -132,6 +134,33 @@ func TestDecodeRejectsWrongLength(t *testing.T) {
 	}
 }
 
+func TestHNSWSearchAndSidecarRoundTrip(t *testing.T) {
+	h := NewHNSW(3)
+	for i, v := range []Vector{{1, 0, 0}, {0.99, 0.01, 0}, {0, 1, 0}, {0, 0, 1}, {-1, 0, 0}} {
+		if err := h.Add(HNSWItem{Kind: "note", ID: fmt.Sprint(i), Vector: v}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hits := h.Search(Vector{1, 0, 0}, 2, 8)
+	if len(hits) != 2 || hits[0].ID != "0" || hits[1].ID != "1" {
+		t.Fatalf("nearest hits = %+v", hits)
+	}
+	path := filepath.Join(t.TempDir(), "profile.vec")
+	if err := SaveHNSWSidecar(path, sidecarFile{Version: 1, ProviderID: "p", Model: "m", Dims: 3, Fingerprint: "fp", Index: h}); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := LoadHNSWSidecar(path, "p", "m", "fp", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := loaded.Search(Vector{1, 0, 0}, 2, 8); len(got) != 2 || got[1].ID != "1" {
+		t.Fatalf("round trip hits = %+v", got)
+	}
+	if _, err := LoadHNSWSidecar(path, "p", "m", "changed", 3); err == nil {
+		t.Fatal("fingerprint mismatch accepted")
+	}
+}
+
 func TestOpenAICompatProviderParsesEmbeddings(t *testing.T) {
 	var gotBody embedRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -203,6 +232,127 @@ func TestSearchSkipsEmbeddingWhenArtifactContentChanged(t *testing.T) {
 		if hit.Kind == "note" && hit.ArtifactID == "n:1" {
 			t.Fatalf("outdated vector returned for changed summary: %+v", hit)
 		}
+	}
+}
+
+func TestHNSWSidecarChecksAuthoritativeRowsAndFallsBackWhenStale(t *testing.T) {
+	db := openTestDB(t)
+	seedConversation(t, db, "conv:hnsw", "rec:hnsw")
+	seedConversation(t, db, "conv:hnsw-other", "rec:hnsw-other")
+	seedNote(t, db, "n:hnsw", "conv:hnsw", "季度计划迁往珠海")
+	seedNote(t, db, "n:hnsw-other", "conv:hnsw-other", "季度计划迁往珠海")
+	p := NewHashProvider(64)
+	if _, err := (&Indexer{DB: db, Provider: p}).IndexAll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "profile.vec")
+	if err := BuildHNSWSidecar(context.Background(), db, p, path); err != nil {
+		t.Fatal(err)
+	}
+	configured, err := RetrieverFromConfig(Config{Provider: "hash", Dims: 64, IndexPath: path}, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := configured.(*HNSWRetriever); !ok {
+		t.Fatalf("IndexPath selected %T, want HNSWRetriever", configured)
+	}
+	exactDefault, err := RetrieverFromConfig(Config{Provider: "hash", Dims: 64}, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := exactDefault.(*SQLiteRetriever); !ok {
+		t.Fatalf("empty IndexPath selected %T, want exact SQLiteRetriever", exactDefault)
+	}
+	r, err := OpenHNSWRetriever(context.Background(), db, p, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.HasIndex() {
+		t.Fatal("valid sidecar not loaded")
+	}
+	hits, err := r.Search(context.Background(), "季度计划迁往珠海", SearchOptions{Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, h := range hits {
+		if h.ArtifactID == "n:hnsw" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("sidecar search omitted exact match: %+v", hits)
+	}
+	scoped, err := r.Search(context.Background(), "季度计划迁往珠海", SearchOptions{ConversationID: "conv:hnsw", Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scoped) != 1 || scoped[0].ConversationID != "conv:hnsw" {
+		t.Fatalf("conversation scope escaped or underfilled: %+v", scoped)
+	}
+	oldIndex := r.index
+	r.Invalidate()
+	if r.HasIndex() {
+		t.Fatal("invalidation did not release the in-memory graph")
+	}
+	if oldIndex == nil || len(oldIndex.Nodes) != 0 {
+		t.Fatal("invalidation retained graph vectors")
+	}
+	hits, err = r.Search(context.Background(), "季度计划迁往珠海", SearchOptions{ConversationID: "conv:hnsw", Limit: 1})
+	if err != nil || len(hits) != 1 || hits[0].ArtifactID != "n:hnsw" {
+		t.Fatalf("exact fallback after invalidation: hits=%+v err=%v", hits, err)
+	}
+	mustExec(t, db, `UPDATE notes SET summary='完全更新的不同内容' WHERE id='n:hnsw'`)
+	hits, err = r.Search(context.Background(), "季度计划迁往珠海", SearchOptions{Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range hits {
+		if h.ArtifactID == "n:hnsw" {
+			t.Fatalf("stale content escaped authoritative validation: %+v", hits)
+		}
+	}
+	// A new embedding changes the database fingerprint, so opening the old
+	// sidecar returns an exact-fallback retriever rather than trusting it.
+	if _, err := (&Indexer{DB: db, Provider: p}).IndexAll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	// Add a newly eligible artifact after opening the sidecar. The update
+	// generation must force exact fallback so it is not silently omitted.
+	seedNote(t, db, "n:new-after-open", "conv:hnsw", "季度计划迁居珠海的新讨论")
+	if _, err := (&Indexer{DB: db, Provider: p}).IndexAll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	hits, err = r.Search(context.Background(), "季度计划迁居珠海的新讨论", SearchOptions{Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found = false
+	for _, h := range hits {
+		if h.ArtifactID == "n:new-after-open" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("post-open eligible artifact omitted after index update: %+v", hits)
+	}
+	r, err = OpenHNSWRetriever(context.Background(), db, p, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.HasIndex() {
+		t.Fatal("stale fingerprint sidecar accepted")
+	}
+	corrupt := filepath.Join(t.TempDir(), "corrupt.vec")
+	if err := os.WriteFile(corrupt, []byte("broken"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	r, err = OpenHNSWRetriever(context.Background(), db, p, corrupt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.HasIndex() {
+		t.Fatal("corrupt sidecar should select exact fallback")
 	}
 }
 
@@ -326,6 +476,30 @@ func TestIndexIsIdempotentAndHashKeyed(t *testing.T) {
 	}
 	if third.Notes != 1 || third.Skipped != 1 {
 		t.Fatalf("third report = %+v, want notes=1 skipped=1", third)
+	}
+}
+
+func TestIndexerUsesBoundedKeysetPages(t *testing.T) {
+	db := openTestDB(t)
+	seedConversation(t, db, "conv:pages", "rec:pages")
+	for i := 0; i < 130; i++ {
+		seedNote(t, db, fmt.Sprintf("n:%03d", i), "conv:pages", fmt.Sprintf("bounded page item %d", i))
+	}
+	p := NewHashProvider(16)
+	ix := &Indexer{DB: db, Provider: p}
+	rep, err := ix.IndexAll(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Notes != 130 || rep.Skipped != 0 {
+		t.Fatalf("first page report = %+v", rep)
+	}
+	rep, err = ix.IndexAll(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Notes != 0 || rep.Skipped != 130 {
+		t.Fatalf("repeat page report = %+v", rep)
 	}
 }
 

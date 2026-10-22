@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { NoteView } from '../api/types'
 
 const NOTE_KIND_LABELS: Record<string, string> = {
@@ -23,6 +24,8 @@ export interface NoteCardProps {
   onCancelEdit: () => void
   onSubmitEdit: () => void
   onOpenEvidence: (turnId: string) => void
+  onSuppress?: () => void
+  suppressionAction?: ReactNode
 }
 
 export function NoteCard({
@@ -36,6 +39,8 @@ export function NoteCard({
   onCancelEdit,
   onSubmitEdit,
   onOpenEvidence,
+  onSuppress,
+  suppressionAction,
 }: NoteCardProps) {
   const canEdit = note.annotation_version !== '' && note.evidence_turn_ids.length > 0
   return (
@@ -84,6 +89,8 @@ export function NoteCard({
       {!editing && canEdit && (
         <div className="note-actions">
           <button type="button" className="secondary-button" onClick={onStartEdit}>编辑</button>
+          {suppressionAction}
+          {onSuppress && <button type="button" className="secondary-button" onClick={onSuppress}>移除并抑制同源归纳</button>}
         </div>
       )}
     </article>

@@ -28,6 +28,7 @@ import (
 	"recordingmcp/internal/asrinput"
 	"recordingmcp/internal/asrstream"
 	"recordingmcp/internal/memory"
+	"recordingmcp/internal/profile"
 )
 
 const (
@@ -94,11 +95,19 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 	fs.StringVar(&o.recordingID, "recording-id", "", "recording id recorded on ingested turns")
 	fs.StringVar(&o.deviceID, "device-id", "device:local", "device id recorded in the source envelope")
 	fs.StringVar(&o.transcriptRevision, "transcript-revision", "asr-v1", "transcript revision label")
+	profileCLI := profile.RegisterCLI(fs)
 	if err := fs.Parse(args); err != nil {
 		return options{}, err
 	}
 	if fs.NArg() != 0 {
 		return options{}, fmt.Errorf("unexpected arguments: %v", fs.Args())
+	}
+	resolvedDB, _, err := profileCLI.Resolve(o.dbPath, "")
+	if err != nil {
+		return options{}, err
+	}
+	if resolvedDB != "" {
+		o.dbPath = resolvedDB
 	}
 	if strings.TrimSpace(o.audioPath) == "" {
 		return options{}, errors.New("--audio is required")

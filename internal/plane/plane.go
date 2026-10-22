@@ -28,11 +28,15 @@ type Event struct {
 	Confidence     float64        `json:"confidence"`
 	Priority       string         `json:"priority,omitempty"`
 	ObservedAt     time.Time      `json:"observed_at"`
+	RecordedAt     *time.Time     `json:"recorded_at,omitempty"`
+	ValidAt        *time.Time     `json:"valid_at,omitempty"`
+	KnownAt        *time.Time     `json:"known_at,omitempty"`
 	ValidFrom      *time.Time     `json:"valid_from,omitempty"`
 	ValidUntil     *time.Time     `json:"valid_until,omitempty"`
 	TTLSeconds     int            `json:"ttl_seconds,omitempty"`
 	Tags           []string       `json:"tags,omitempty"`
 	ConversationID string         `json:"conversation_id,omitempty"`
+	SourceStatus   string         `json:"source_status,omitempty"`
 }
 type Query struct {
 	Query         string     `json:"query"`
@@ -74,7 +78,7 @@ func Open(path string) (*Service, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	_, err = db.Exec(`PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY,payload TEXT NOT NULL); CREATE TRIGGER IF NOT EXISTS events_no_update BEFORE UPDATE ON events BEGIN SELECT RAISE(ABORT,'immutable events'); END; CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events BEGIN SELECT RAISE(ABORT,'immutable events'); END;`)
+	_, err = db.Exec(`PRAGMA busy_timeout=5000; PRAGMA secure_delete=ON; CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY,payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS plane_control(id INTEGER PRIMARY KEY CHECK(id=1),retired INTEGER NOT NULL DEFAULT 0 CHECK(retired IN (0,1))); INSERT OR IGNORE INTO plane_control(id,retired) VALUES(1,0); CREATE TRIGGER IF NOT EXISTS events_no_update BEFORE UPDATE ON events BEGIN SELECT RAISE(ABORT,'immutable events'); END; CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events WHEN NOT EXISTS(SELECT 1 FROM plane_control WHERE id=1 AND retired=1) BEGIN SELECT RAISE(ABORT,'immutable events'); END; CREATE TRIGGER IF NOT EXISTS events_no_insert BEFORE INSERT ON events WHEN EXISTS(SELECT 1 FROM plane_control WHERE id=1 AND retired=1) BEGIN SELECT RAISE(ABORT,'profile event store is retired'); END;`)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -192,6 +196,18 @@ func normalize(e Event) (Event, error) {
 	}
 	e.Timestamp = e.Timestamp.UTC()
 	e.ObservedAt = e.ObservedAt.UTC()
+	if e.RecordedAt != nil {
+		t := e.RecordedAt.UTC()
+		e.RecordedAt = &t
+	}
+	if e.ValidAt != nil {
+		t := e.ValidAt.UTC()
+		e.ValidAt = &t
+	}
+	if e.KnownAt != nil {
+		t := e.KnownAt.UTC()
+		e.KnownAt = &t
+	}
 	if e.ValidFrom != nil {
 		t := e.ValidFrom.UTC()
 		e.ValidFrom = &t
@@ -233,9 +249,28 @@ func unique(v []string) []string {
 func (s *Service) Ingest(ctx context.Context, events []Event) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	existing, err := s.repo.Events(ctx)
+	if err != nil {
+		return 0, err
+	}
+	existingByID := make(map[string]Event, len(existing))
+	for _, e := range existing {
+		existingByID[e.ID] = e
+	}
 	out := make([]Event, len(events))
 	ids := map[string]Event{}
 	for i, e := range events {
+		// recorded_at is assigned by this process and cannot be backdated by
+		// an importer. Preserve the original server time for exact retries,
+		// including legacy rows whose recording time is unknown.
+		if prior, ok := ids[e.ID]; ok {
+			e.RecordedAt = prior.RecordedAt
+		} else if prior, ok := existingByID[e.ID]; ok {
+			e.RecordedAt = prior.RecordedAt
+		} else {
+			now := time.Now().UTC()
+			e.RecordedAt = &now
+		}
 		n, err := normalize(e)
 		if err != nil {
 			return 0, fmt.Errorf("event %d: %w", i, err)
@@ -245,10 +280,6 @@ func (s *Service) Ingest(ctx context.Context, events []Event) (int, error) {
 		}
 		ids[n.ID] = n
 		out[i] = n
-	}
-	existing, err := s.repo.Events(ctx)
-	if err != nil {
-		return 0, err
 	}
 	all := append(append([]Event{}, existing...), out...)
 	seen := map[string]bool{}
@@ -481,4 +512,39 @@ func (s *Service) Commitments(ctx context.Context, status, person, deadlineBefor
 		out = append(out, st)
 	}
 	return out, nil
+}
+
+// RetireAndPurge permanently disables event writes and removes every local
+// event payload. The database retains only its retirement marker.
+func (s *Service) RetireAndPurge(ctx context.Context) error {
+	r, ok := s.repo.(*sqliteRepository)
+	if !ok {
+		return errors.New("plane: profile purge requires SQLite repository")
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS plane_control(id INTEGER PRIMARY KEY CHECK(id=1),retired INTEGER NOT NULL CHECK(retired IN (0,1))); INSERT OR IGNORE INTO plane_control(id,retired) VALUES(1,0);`); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE plane_control SET retired=1 WHERE id=1`); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `DROP TRIGGER IF EXISTS events_no_delete; DROP TRIGGER IF EXISTS events_no_insert; CREATE TRIGGER events_no_insert BEFORE INSERT ON events WHEN EXISTS(SELECT 1 FROM plane_control WHERE id=1 AND retired=1) BEGIN SELECT RAISE(ABORT,'profile event store is retired'); END; CREATE TRIGGER events_no_delete BEFORE DELETE ON events WHEN NOT EXISTS(SELECT 1 FROM plane_control WHERE id=1 AND retired=1) BEGIN SELECT RAISE(ABORT,'immutable events'); END; DELETE FROM events;`); err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	var busy, pages, checkpointed int
+	if err = r.db.QueryRowContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`).Scan(&busy, &pages, &checkpointed); err != nil {
+		return err
+	}
+	if busy != 0 {
+		return errors.New("plane database readers still hold old pages")
+	}
+	_, err = r.db.ExecContext(ctx, `VACUUM`)
+	return err
 }

@@ -22,6 +22,7 @@ import (
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/pipeline"
 	"recordingmcp/internal/plane"
+	"recordingmcp/internal/profile"
 	"recordingmcp/internal/projection"
 	"recordingmcp/internal/semantic"
 )
@@ -520,9 +521,11 @@ func newServer(store *memory.Store, svc *app.Service, readOnly bool) *mcp.Server
 func main() {
 	log.SetOutput(os.Stderr)
 	db := flag.String("db", "data/context-memory.db", "experimental SQLite memory database")
+	profileCLI := profile.RegisterCLI(flag.CommandLine)
 	readOnly := flag.Bool("read-only", false, "register only the read tools; ingest_transcript, apply_annotations, review_memory_link, propose_speaker_binding and review_speaker_binding are not exposed")
 	decisionURL := flag.String("decision-url", "", "optional Decision engine endpoint used to rerank build_context items (empty disables reranking)")
 	decisionModel := flag.String("decision-model", "jev-style-2b-v2", "model name sent to the Decision engine for build_context reranking")
+	useSemanticIndex := flag.Bool("semantic-index", false, "opt in to the experimental profile-owned HNSW sidecar; exact search remains default")
 	semanticProvider := flag.String("semantic-provider", "hash", "semantic recall backend: off, hash (offline deterministic embedder) or openai")
 	semanticDims := flag.Int("semantic-dims", semantic.DefaultHashDims, "embedding dimensions (hash provider; openai provider validates the endpoint against it)")
 	semanticEndpoint := flag.String("semantic-endpoint", "", "OpenAI-compatible embeddings endpoint (required when --semantic-provider=openai)")
@@ -531,6 +534,13 @@ func main() {
 	flag.Parse()
 	if flag.NArg() != 0 {
 		log.Fatalf("unexpected arguments: %v", flag.Args())
+	}
+	resolvedDB, _, profileErr := profileCLI.Resolve(*db, "")
+	if profileErr != nil {
+		log.Fatal(profileErr)
+	}
+	if resolvedDB != "" {
+		*db = resolvedDB
 	}
 	if *db != ":memory:" {
 		if e := os.MkdirAll(filepath.Dir(*db), 0700); e != nil {
@@ -560,12 +570,21 @@ func main() {
 	// flag spelling resolves to the same backend everywhere. "off" and any
 	// unknown value yield a nil retriever: build_context and
 	// get_current_context then degrade to lexical retrieval and record why.
+	indexPath := ""
+	if *useSemanticIndex {
+		dir, err := profileCLI.IndexDirectory(*db)
+		if err != nil {
+			log.Fatal(err)
+		}
+		indexPath = filepath.Join(dir, "semantic.vec")
+	}
 	retriever, e := semantic.RetrieverFromConfig(semantic.Config{
-		Provider: *semanticProvider,
-		Dims:     *semanticDims,
-		Endpoint: *semanticEndpoint,
-		Model:    *semanticModel,
-		KeyEnv:   *semanticKeyEnv,
+		IndexPath: indexPath,
+		Provider:  *semanticProvider,
+		Dims:      *semanticDims,
+		Endpoint:  *semanticEndpoint,
+		Model:     *semanticModel,
+		KeyEnv:    *semanticKeyEnv,
 	}, store.DB())
 	if e != nil {
 		log.Fatal(e)

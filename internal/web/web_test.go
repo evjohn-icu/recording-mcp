@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -179,6 +180,45 @@ func TestUnauthenticatedRequestsAreRejected(t *testing.T) {
 	}
 }
 
+func TestPendingForgetListIsReadOnlyAndPathFree(t *testing.T) {
+	env := newTestEnv(t, "")
+	ctx := context.Background()
+	req := memory.ForgetRequest{Scope: "conversation", ConversationID: env.convID}
+	preview, err := env.store.PreviewForget(ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.ExpectedState = preview.ExpectedState
+	result, err := env.store.CommitForget(ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := env.store.ForgetStatus(ctx, result.TombstoneID)
+	if err != nil || before.Status != "pending_external_cleanup" {
+		t.Fatalf("fixture did not create pending tombstone: %+v err=%v", before, err)
+	}
+	status, body := env.do(t, http.MethodGet, "/api/forget", "", nil)
+	if status != http.StatusOK {
+		t.Fatalf("GET pending forget list status=%d body=%s", status, body)
+	}
+	var response struct {
+		Operations []app.PendingForgetOperation `json:"operations"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Operations) != 1 || response.Operations[0].ID != result.TombstoneID || response.Operations[0].Status != "pending_external_cleanup" {
+		t.Fatalf("unexpected pending list: %+v", response)
+	}
+	if strings.Contains(string(body), "path") || strings.Contains(string(body), "files") {
+		t.Fatalf("pending list exposed file metadata: %s", body)
+	}
+	after, err := env.store.ForgetStatus(ctx, result.TombstoneID)
+	if err != nil || after.Status != "pending_external_cleanup" {
+		t.Fatalf("GET list triggered cleanup: %+v err=%v", after, err)
+	}
+}
+
 func TestSessionBootstrapIsSingleUse(t *testing.T) {
 	env := newTestEnv(t, "")
 	resp := env.raw(t, http.MethodPost, "/api/session", `{"token":"test-token"}`, func(r *http.Request) { r.Header.Set("Origin", env.http.URL) })
@@ -201,6 +241,183 @@ func TestSessionBootstrapIsSingleUse(t *testing.T) {
 	}
 	if session["authenticated"] != true || session["csrf_token"] != env.csrf {
 		t.Fatalf("unexpected session body: %s", data)
+	}
+}
+
+func TestProfileLoginSessionIsBoundAndLogoutRevokesIt(t *testing.T) {
+	dir := t.TempDir()
+	store, err := memory.Open(filepath.Join(dir, "profile.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	server, err := New(Config{
+		Service:               app.New(store, nil, nil, filepath.Join(dir, "audio")),
+		ProfileName:           "alice",
+		VerifyProfilePassword: func(password string) bool { return password == "correct password" },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+	request := func(method, path, body string, cookie *http.Cookie, csrf string) *http.Response {
+		t.Helper()
+		req, err := http.NewRequest(method, httpServer.URL+path, strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if body != "" {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		req.Header.Set("Origin", httpServer.URL)
+		if cookie != nil {
+			req.AddCookie(cookie)
+		}
+		if csrf != "" {
+			req.Header.Set("X-CSRF-Token", csrf)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp
+	}
+	resp := request(http.MethodPost, "/api/login", `{"password":"wrong password"}`, nil, "")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong password status = %d, want 401", resp.StatusCode)
+	}
+	resp = request(http.MethodPost, "/api/login", `{"password":"correct password"}`, nil, "")
+	if resp.StatusCode != http.StatusOK {
+		data, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		t.Fatalf("profile login status = %d: %s", resp.StatusCode, data)
+	}
+	var body struct {
+		CSRFToken string `json:"csrf_token"`
+		Profile   string `json:"profile"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	cookies := resp.Cookies()
+	resp.Body.Close()
+	if body.Profile != "alice" || body.CSRFToken == "" || len(cookies) == 0 {
+		t.Fatalf("incomplete login response: %+v cookies=%v", body, cookies)
+	}
+	var cookie *http.Cookie
+	for _, candidate := range cookies {
+		if candidate.Name == sessionCookieName {
+			cookie = candidate
+		}
+	}
+	if cookie == nil {
+		t.Fatal("profile login did not set session cookie")
+	}
+	resp = request(http.MethodGet, "/api/session", "", cookie, "")
+	var sessionBody map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&sessionBody); err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if sessionBody["profile"] != "alice" || sessionBody["authenticated"] != true {
+		t.Fatalf("session not bound to profile: %v", sessionBody)
+	}
+	resp = request(http.MethodPost, "/api/logout", "{}", cookie, body.CSRFToken)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("logout status = %d, want 204", resp.StatusCode)
+	}
+	resp = request(http.MethodGet, "/api/session", "", cookie, "")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("revoked session status = %d, want 401", resp.StatusCode)
+	}
+}
+
+func TestProfilePasswordChangeRevokesSessions(t *testing.T) {
+	dir := t.TempDir()
+	store, err := memory.Open(filepath.Join(dir, "profile.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	password := "current password"
+	server, err := New(Config{
+		Service: app.New(store, nil, nil, filepath.Join(dir, "audio")), ProfileName: "alice",
+		VerifyProfilePassword: func(candidate string) bool { return candidate == password },
+		ChangeProfilePassword: func(oldPassword, next string) error {
+			if oldPassword != password {
+				return errors.New("invalid current password")
+			}
+			password = next
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+	request := func(method, path, body string, cookie *http.Cookie, csrf string) *http.Response {
+		t.Helper()
+		req, err := http.NewRequest(method, httpServer.URL+path, strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if body != "" {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		req.Header.Set("Origin", httpServer.URL)
+		if cookie != nil {
+			req.AddCookie(cookie)
+		}
+		if csrf != "" {
+			req.Header.Set("X-CSRF-Token", csrf)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp
+	}
+	resp := request(http.MethodPost, "/api/login", `{"password":"current password"}`, nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("login: %d", resp.StatusCode)
+	}
+	var login struct {
+		CSRF string `json:"csrf_token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&login); err != nil {
+		t.Fatal(err)
+	}
+	var cookie *http.Cookie
+	for _, c := range resp.Cookies() {
+		if c.Name == sessionCookieName {
+			cookie = c
+		}
+	}
+	resp.Body.Close()
+	resp = request(http.MethodPost, "/api/profile/password", `{"current_password":"current password","new_password":"replacement password"}`, cookie, login.CSRF)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("password change: %d", resp.StatusCode)
+	}
+	resp = request(http.MethodGet, "/api/session", "", cookie, "")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("old session survived password change: %d", resp.StatusCode)
+	}
+	resp = request(http.MethodPost, "/api/login", `{"password":"current password"}`, nil, "")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("old password still worked: %d", resp.StatusCode)
+	}
+	resp = request(http.MethodPost, "/api/login", `{"password":"replacement password"}`, nil, "")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("new password failed: %d", resp.StatusCode)
 	}
 }
 

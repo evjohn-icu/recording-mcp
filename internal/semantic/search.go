@@ -1,6 +1,7 @@
 package semantic
 
 import (
+	"container/heap"
 	"context"
 	"database/sql"
 	"fmt"
@@ -96,7 +97,10 @@ func (r *SQLiteRetriever) Search(ctx context.Context, query string, opts SearchO
 	if len(vectors) != 1 {
 		return nil, fmt.Errorf("semantic: provider returned %d vectors for one query", len(vectors))
 	}
-	queryVec := vectors[0]
+	return r.searchVector(ctx, vectors[0], opts)
+}
+
+func (r *SQLiteRetriever) searchVector(ctx context.Context, queryVec Vector, opts SearchOptions) ([]SemanticHit, error) {
 
 	rows, err := r.DB.QueryContext(ctx, candidateSQL, r.Provider.ID(), r.Provider.Model(), r.Provider.Dims(), opts.ConversationID, opts.ConversationID)
 	if err != nil {
@@ -104,7 +108,8 @@ func (r *SQLiteRetriever) Search(ctx context.Context, query string, opts SearchO
 	}
 	defer rows.Close()
 
-	hits := []SemanticHit{}
+	limit := searchLimit(opts.Limit)
+	hits := make(hitHeap, 0, limit)
 	for rows.Next() {
 		var kind, id, conv, content, contentHash string
 		var blob []byte
@@ -130,32 +135,51 @@ func (r *SQLiteRetriever) Search(ctx context.Context, query string, opts SearchO
 		if score < minSemanticScore {
 			continue
 		}
-		hits = append(hits, SemanticHit{Kind: kind, ArtifactID: id, ConversationID: conv, Score: score})
+		h := SemanticHit{Kind: kind, ArtifactID: id, ConversationID: conv, Score: score}
+		if len(hits) < limit {
+			heap.Push(&hits, h)
+		} else if betterHit(h, hits[0]) {
+			hits[0] = h
+			heap.Fix(&hits, 0)
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	sort.SliceStable(hits, func(i, j int) bool {
-		if hits[i].Score != hits[j].Score {
-			return hits[i].Score > hits[j].Score
-		}
-		if hits[i].Kind != hits[j].Kind {
-			return hits[i].Kind < hits[j].Kind
-		}
-		return hits[i].ArtifactID < hits[j].ArtifactID
-	})
-	limit := opts.Limit
-	if limit <= 0 {
-		limit = defaultSearchLimit
-	}
-	if limit > maxSearchLimit {
-		limit = maxSearchLimit
-	}
-	if len(hits) > limit {
-		hits = hits[:limit]
-	}
-	return hits, nil
+	ordered := []SemanticHit(hits)
+	sort.Slice(ordered, func(i, j int) bool { return betterHit(ordered[i], ordered[j]) })
+	return ordered, nil
 }
+
+func searchLimit(n int) int {
+	if n <= 0 {
+		return defaultSearchLimit
+	}
+	if n > maxSearchLimit {
+		return maxSearchLimit
+	}
+	return n
+}
+
+func betterHit(a, b SemanticHit) bool {
+	if a.Score != b.Score {
+		return a.Score > b.Score
+	}
+	if a.Kind != b.Kind {
+		return a.Kind < b.Kind
+	}
+	return a.ArtifactID < b.ArtifactID
+}
+
+// hitHeap keeps the worst retained hit at its root, bounding exact-search
+// result memory to the requested result count.
+type hitHeap []SemanticHit
+
+func (h hitHeap) Len() int           { return len(h) }
+func (h hitHeap) Less(i, j int) bool { return betterHit(h[j], h[i]) }
+func (h hitHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *hitHeap) Push(x any)        { *h = append(*h, x.(SemanticHit)) }
+func (h *hitHeap) Pop() any          { old := *h; n := len(old); x := old[n-1]; *h = old[:n-1]; return x }
 
 // candidateSQL selects embedding rows for one provider/model/dims that still
 // resolve to a current, non-ambient artifact. The turn clause reuses the

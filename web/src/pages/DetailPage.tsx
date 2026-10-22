@@ -16,6 +16,11 @@ import { StateView } from '../components/StateView'
 import { StatusBadge } from '../components/StatusBadge'
 import { useAudio } from '../components/AudioBar'
 import { CLOSE_EVENT } from '../keyboard'
+import { CorrectionPanel, SpeakerReviewPanel } from '../components/CorrectionPanels'
+import { getTranscriptSource, observeFact } from '../api/client'
+import { ForgetAction } from '../components/ForgetAction'
+import { SuppressAction } from '../components/SuppressAction'
+import type { ForgetRequest } from '../api/retention'
 
 const INDEXING_LABELS: Record<string, string> = {
   pending: '语义索引待更新',
@@ -49,11 +54,48 @@ function playDisabledReason(status: string): string | null {
   return '此录音没有本地音频'
 }
 
-function TurnRow({ turn, onOpenEvidence }: { turn: TurnView; onOpenEvidence: (turnId: string) => void }) {
+function FactCapture({ turnId, onDone }: { turnId: string; onDone: () => void }) {
+  const [content, setContent] = useState('')
+  const [validAt, setValidAt] = useState('')
+  const [revision, setRevision] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let active = true
+    getTranscriptSource(turnId).then((result) => { if (active) setRevision(result.result.source.transcript_revision) })
+      .catch((e) => { if (active) setError(e instanceof Error ? e.message : '无法读取当前转写来源') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [turnId])
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!validAt) { setError('请提供陈述的适用时间；系统不会替您推测。'); return }
+    setBusy(true); setError('')
+    try {
+      const at = new Date(validAt).toISOString()
+      await observeFact({ id: crypto.randomUUID(), type: 'fact.observed', timestamp: at, valid_from: at, source: 'local-user', content, confidence: 0, structured_data: { dimension: 'topic' } }, [{ turn_id: turnId, revision }])
+      onDone()
+    } catch (e) { setError(e instanceof Error ? e.message : '提交失败') } finally { setBusy(false) }
+  }
+  return <form className="temporal-form" onSubmit={submit}>
+    <strong>记录一条来源报告（不是已确认事实）</strong>
+    {loading ? <p role="status">正在核对当前转写版本…</p> : revision ? <>
+      <label>报告内容<textarea value={content} onChange={(e) => setContent(e.target.value)} required /></label>
+      <label>陈述适用时间（必填，不推测）<input type="datetime-local" value={validAt} onChange={(e) => setValidAt(e.target.value)} required /></label>
+      <p className="page-subtitle">记录时间由本地服务记录；适用时间未知时目前不能提交。</p>
+    </> : <p role="alert">{error || '缺少当前来源版本'}</p>}
+    {error && <p role="alert" className="note-error">{error}</p>}
+    <div className="turn-actions"><button disabled={busy || loading || !revision}>{busy ? '提交中…' : '保存报告'}</button><button type="button" className="secondary-button" onClick={onDone}>取消</button></div>
+  </form>
+}
+
+function TurnRow({ turn, recordingId, onOpenEvidence, onChanged, onCorrectionSuccess }: { turn: TurnView; recordingId: string; onOpenEvidence: (turnId: string) => void; onChanged: () => void; onCorrectionSuccess: () => void }) {
   const { play } = useAudio()
+  const [factEntry, setFactEntry] = useState(false)
   const reason = playDisabledReason(turn.audio_status)
   return (
-    <article className={`turn-row ${turn.ambient ? 'turn-ambient' : ''}`.trim()}>
+    <article className={`turn-row ${turn.ambient ? 'turn-ambient' : ''}`.trim()} data-turn-id={turn.id}>
       <header className="turn-header">
         <span className="turn-time">{offsetTime(turn.global_start_ms)}</span>
         <span className="turn-speaker">
@@ -70,7 +112,12 @@ function TurnRow({ turn, onOpenEvidence }: { turn: TurnView; onOpenEvidence: (tu
           <button type="button" className="secondary-button" disabled title={reason}>{reason}</button>
         )}
         <button type="button" className="link-button" onClick={() => onOpenEvidence(turn.id)}>查看证据</button>
+        {!turn.ambient && <button type="button" className="secondary-button" onClick={() => setFactEntry((value) => !value)}>记录事实变化</button>}
+        <CorrectionPanel turnId={turn.id} onChanged={onChanged} onSuccess={onCorrectionSuccess} />
+        <ForgetAction profile={sessionStorage.getItem('recording-profile') || ''} request={{ scope: 'turn', turn_id: turn.id }} label="永久遗忘这句话" onDone={onChanged} />
+        {turn.speaker_scoped_id && <SpeakerReviewPanel recordingId={recordingId} turnId={turn.id} speakerId={turn.speaker_scoped_id} onChanged={onChanged} />}
       </div>
+      {factEntry && <FactCapture turnId={turn.id} onDone={() => { setFactEntry(false); onChanged() }} />}
     </article>
   )
 }
@@ -80,16 +127,19 @@ function RecordingTurns({
   recording,
   includeAmbient,
   onOpenEvidence,
+  onChanged,
 }: {
   conversationId: string
   recording: RecordingView
   includeAmbient: boolean
   onOpenEvidence: (turnId: string) => void
+  onChanged: () => void
 }) {
   const [offset, setOffset] = useState(0)
   const [items, setItems] = useState<TurnView[]>([])
   const [nextOffset, setNextOffset] = useState<number | null>(null)
   const [autoPages, setAutoPages] = useState(0)
+  const [correctionSubmitted, setCorrectionSubmitted] = useState(false)
 
   const requestKey = `${conversationId}:${recording.recording_id}:${includeAmbient}:${offset}`
   const { data: result, loading, error, reload } = useApi(
@@ -141,9 +191,11 @@ function RecordingTurns({
       <header className="recording-header">
         <h3>{formatDate(recording.started_at)}</h3>
         <StatusBadge status={recording.local_audio} />
+        <ForgetAction profile={sessionStorage.getItem('recording-profile') || ''} request={{ scope: 'recording', recording_id: recording.recording_id }} label="永久遗忘此录音" onDone={onChanged} />
       </header>
+      {correctionSubmitted && <p role="status">已提交；后续处理已排队，尚未完成。</p>}
       <StateView loading={loading && turns.length === 0} error={turns.length === 0 ? error : undefined} onRetry={reload} empty={!loading && !error && turns.length === 0} emptyMessage="该录音没有转写片段">
-        {turns.map((turn) => <TurnRow turn={turn} onOpenEvidence={onOpenEvidence} key={turn.id} />)}
+        {turns.map((turn) => <TurnRow turn={turn} recordingId={recording.recording_id} onChanged={() => { reload(); onChanged() }} onCorrectionSuccess={() => setCorrectionSubmitted(true)} onOpenEvidence={onOpenEvidence} key={turn.id} />)}
       </StateView>
       {nextOffset !== null && (
         <>
@@ -157,7 +209,7 @@ function RecordingTurns({
   )
 }
 
-function TranscriptTab({ conversation, onOpenEvidence }: { conversation: ConversationView; onOpenEvidence: (turnId: string) => void }) {
+function TranscriptTab({ conversation, onOpenEvidence, onChanged }: { conversation: ConversationView; onOpenEvidence: (turnId: string) => void; onChanged: () => void }) {
   const [includeAmbient, setIncludeAmbient] = useState(false)
   return (
     <div className="tab-panel">
@@ -174,6 +226,7 @@ function TranscriptTab({ conversation, onOpenEvidence }: { conversation: Convers
             recording={recording}
             includeAmbient={includeAmbient}
             onOpenEvidence={onOpenEvidence}
+            onChanged={onChanged}
             key={recording.recording_id}
           />
         ))}
@@ -395,6 +448,7 @@ function NotesTab({
             }}
             onSubmitEdit={() => void submitEdit(note.row_id)}
             onOpenEvidence={onOpenEvidence}
+            suppressionAction={<SuppressAction conversationId={conversation.conversation_id} rowId={note.row_id} version={conversation.annotation_version} onDone={onChanged} />}
             key={note.row_id}
           />
         ))}
@@ -556,6 +610,7 @@ export function DetailPage() {
           <>
             <header className="detail-header">
               <h1>{data.title || '未命名会话'}</h1>
+              <ForgetAction profile={sessionStorage.getItem('recording-profile') || ''} request={{ scope: 'conversation', conversation_id: conversationId }} label="永久遗忘整个会话" onDone={reload} />
               <p className="detail-meta">
                 <time dateTime={data.recording_started_at || undefined}>{formatDate(data.recording_started_at)}</time>
                 <StatusBadge status={data.processing.analysis_status} />
@@ -600,7 +655,7 @@ export function DetailPage() {
               ))}
             </div>
             <div role="tabpanel" id="panel-transcript" aria-labelledby="tab-transcript" hidden={tab !== 'transcript'}>
-              <TranscriptTab conversation={data} onOpenEvidence={setEvidenceTurn} />
+              <TranscriptTab conversation={data} onOpenEvidence={setEvidenceTurn} onChanged={reload} />
             </div>
             <div role="tabpanel" id="panel-notes" aria-labelledby="tab-notes" hidden={tab !== 'notes'}>
               <NotesTab key={data.conversation_id} conversation={data} onChanged={reload} onOpenEvidence={setEvidenceTurn} highlightedItem={highlightedItem} />

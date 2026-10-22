@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"recordingmcp/internal/memory"
+	"recordingmcp/internal/profile"
 )
 
 type runInfo struct {
@@ -45,9 +46,17 @@ func run() error {
 	transcriptPath := flag.String("transcript", "", "normalized transcript.json")
 	annotationPath := flag.String("annotations", "", "human interpretation annotations.json")
 	runPath := flag.String("run", "", "ASR run.json containing source audio SHA-256")
+	profileCLI := profile.RegisterCLI(flag.CommandLine)
 	flag.Parse()
 	if flag.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %v", flag.Args())
+	}
+	resolvedDB, _, e := profileCLI.Resolve(*db, "")
+	if e != nil {
+		return e
+	}
+	if resolvedDB != "" {
+		*db = resolvedDB
 	}
 	if *transcriptPath == "" || *annotationPath == "" || *runPath == "" {
 		return errors.New("--transcript, --annotations and --run are required")

@@ -4,6 +4,7 @@ build:
 	go build -o bin/recording-mcp ./cmd/server
 	go build -o bin/context-memory ./cmd/context-memory
 	go build -o bin/context-web ./cmd/context-web
+	go build -o bin/context-profile ./cmd/context-profile
 	go build -o bin/import-conversation ./cmd/import-conversation
 	go build -o bin/adapter-doubao ./cmd/adapter-doubao
 	go build -o bin/asr-ingest ./cmd/asr-ingest

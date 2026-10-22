@@ -213,7 +213,20 @@ func (s *Store) ApplyAnnotations(ctx context.Context, conversationID, expectedVe
 			resolved[id] = dbid
 		}
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO annotation_history VALUES(?,?,?,?,?)`, conversationID, current, oldBasis, oldSummary, oldRaw); err != nil {
+	// A forget or suppression can already have written the sanitized snapshot
+	// for its new current version. Reuse it only when every stored field matches;
+	// never overwrite different historical content under the same version key.
+	var historyBasis, historySummary, historyRaw string
+	err = tx.QueryRowContext(ctx, `SELECT annotation_basis,summary,annotations_json FROM annotation_history WHERE conversation_id=? AND annotation_version=?`, conversationID, current).Scan(&historyBasis, &historySummary, &historyRaw)
+	if err == nil {
+		if historyBasis != oldBasis || historySummary != oldSummary || historyRaw != oldRaw {
+			return &AnnotationVersionReusedError{Version: current}
+		}
+	} else if errors.Is(err, sql.ErrNoRows) {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO annotation_history VALUES(?,?,?,?,?)`, conversationID, current, oldBasis, oldSummary, oldRaw); err != nil {
+			return err
+		}
+	} else {
 		return err
 	}
 	// Global topic IDs are stable: an existing ID can be reused only with its

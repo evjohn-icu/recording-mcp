@@ -69,8 +69,10 @@ type fakeCloud struct {
 	maxEventID int64
 	// trimmedMin emulates event-log retention: events with id < trimmedMin
 	// are no longer served by GET /v1/sync.
-	trimmedMin int64
-	acks       []ackRecord
+	trimmedMin   int64
+	acks         []ackRecord
+	audioStarted chan struct{}
+	audioRelease chan struct{}
 }
 
 func newFakeCloud(t *testing.T) *fakeCloud {
@@ -211,16 +213,28 @@ func (f *fakeCloud) handleAudio(w http.ResponseWriter, r *http.Request) {
 	recID, seqStr := r.PathValue("id"), r.PathValue("seq")
 	seq, _ := strconv.ParseInt(seqStr, 10, 64)
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	rec, ok := f.recs[recID]
 	if !ok {
+		f.mu.Unlock()
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 	pcm, ok := rec.chunks[seq]
 	if !ok {
+		f.mu.Unlock()
 		w.WriteHeader(http.StatusNotFound)
 		return
+	}
+	pcm = append([]byte(nil), pcm...)
+	f.mu.Unlock()
+	if f.audioStarted != nil {
+		select {
+		case f.audioStarted <- struct{}{}:
+		default:
+		}
+	}
+	if f.audioRelease != nil {
+		<-f.audioRelease
 	}
 	w.Header().Set("X-Content-SHA256", sha256Hex(pcm))
 	w.Header().Set("Content-Type", "audio/L16")

@@ -20,6 +20,7 @@ import (
 	"recordingmcp/internal/asrstream"
 	"recordingmcp/internal/cloudsync"
 	"recordingmcp/internal/memory"
+	"recordingmcp/internal/profile"
 )
 
 type options struct {
@@ -72,11 +73,20 @@ func run(args []string) error {
 	fs.StringVar(&o.deviceID, "device-id", "device:cloud", "device id fallback for ingested segments")
 	fs.BoolVar(&o.noAck, "no-ack", false, "skip best-effort transcription-state acks")
 	fs.BoolVar(&o.status, "status", false, "print sync_state + sync_recordings summary JSON and exit")
+	profileCLI := profile.RegisterCLI(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %v", fs.Args())
+	}
+	resolvedDB, resolvedAudio, err := profileCLI.Resolve(o.db, o.audioDir)
+	if err != nil {
+		return err
+	}
+	if resolvedDB != "" {
+		o.db = resolvedDB
+		o.audioDir = resolvedAudio
 	}
 	if o.status {
 		return printStatus(o.db)
