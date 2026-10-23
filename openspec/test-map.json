@@ -1,0 +1,248 @@
+{
+  "description": "每个 change 场景必须显式映射为 covered 或 pending。covered 仅验证精确测试函数存在，不证明测试充分、已运行或先于实现。",
+  "scenarios": [
+    {
+      "id": "recovery.cancelled-worker",
+      "status": "covered",
+      "spec": "openspec/specs/recovery/spec.md",
+      "test_file": "internal/app/worldline_durable_test.go",
+      "test_anchor": "TestCancelledWorldlineLeaseCannotPublishPair"
+    },
+    {
+      "id": "recovery.commit-and-outbox",
+      "status": "covered",
+      "spec": "openspec/specs/recovery/spec.md",
+      "test_file": "internal/pipeline/publish_test.go",
+      "test_anchor": "TestPublishHandlerRecoversAfterAnnotationCommit"
+    },
+    {
+      "id": "recovery.current-revision",
+      "status": "covered",
+      "spec": "openspec/specs/recovery/spec.md",
+      "test_file": "internal/app/processing_test.go",
+      "test_anchor": "TestRetryProcessingRejectsSupersededExtractSnapshot"
+    },
+    {
+      "id": "recovery.generator-off",
+      "status": "covered",
+      "spec": "openspec/specs/recovery/spec.md",
+      "test_file": "internal/pipeline/extract_test.go",
+      "test_anchor": "TestExtractHandlerNilGeneratorPreservesExistingCandidates"
+    },
+    {
+      "id": "recovery.progress-scoped-retry",
+      "status": "covered",
+      "spec": "openspec/specs/recovery/spec.md",
+      "test_file": "internal/process/runtime_test.go",
+      "test_anchor": "TestRetryFailedIsRequestIdempotentAndAttemptGuarded"
+    },
+    {
+      "id": "recovery.retry-internal-error",
+      "status": "covered",
+      "spec": "openspec/specs/recovery/spec.md",
+      "test_file": "internal/web/processing_test.go",
+      "test_anchor": "TestProcessingRetryInternalFailureUsesGenericServerError"
+    },
+    {
+      "id": "recovery.stale-lease.preemption",
+      "status": "covered",
+      "spec": "openspec/specs/recovery/spec.md",
+      "test_file": "internal/process/process_test.go",
+      "test_anchor": "TestLeasePreemption"
+    },
+    {
+      "id": "recovery.worker-liveness",
+      "status": "covered",
+      "spec": "openspec/specs/recovery/spec.md",
+      "test_file": "scripts/test_local_start.py",
+      "test_anchor": "test_worker_exit_stops_web_and_propagates_status"
+    },
+    {
+      "id": "retrieval.frozen-quality-set",
+      "status": "covered",
+      "spec": "openspec/specs/retrieval/spec.md",
+      "test_file": "scripts/test_retrieval_quality.py",
+      "test_anchor": "test_authored_corpus_has_isolated_50_25_25_concept_groups"
+    },
+    {
+      "id": "retrieval.no-answer-latency-denominators",
+      "status": "covered",
+      "spec": "openspec/specs/retrieval/spec.md",
+      "test_file": "internal/eval/eval_test.go",
+      "test_anchor": "TestRunAuthoredQualityFixtureReportsAccountingBucketsAndMRR"
+    },
+    {
+      "id": "retrieval.outage-distinct-from-empty",
+      "status": "covered",
+      "spec": "openspec/specs/retrieval/spec.md",
+      "test_file": "internal/contextbuild/build_semantic_test.go",
+      "test_anchor": "TestSemanticOutageIsDistinctFromSuccessfulEmptyResult"
+    },
+    {
+      "id": "retrieval.report-accounting",
+      "status": "covered",
+      "spec": "openspec/specs/retrieval/spec.md",
+      "test_file": "internal/eval/eval_test.go",
+      "test_anchor": "TestRunAuthoredQualityFixtureReportsAccountingBucketsAndMRR"
+    },
+    {
+      "id": "retrieval.topic-evidence-scope",
+      "status": "covered",
+      "spec": "openspec/specs/retrieval/spec.md",
+      "test_file": "internal/contextbuild/evidence_scope_regression_test.go",
+      "test_anchor": "TestTopicScopeAlsoFiltersEmbeddedNoteEvidence"
+    },
+    {
+      "id": "review.forget-suppresses-source",
+      "status": "covered",
+      "spec": "openspec/specs/review/spec.md",
+      "test_file": "internal/app/worldline_semantic_review_service_test.go",
+      "test_anchor": "TestWorldlineSemanticReviewAndSuggestionArePurgedWhenSourceIsForgotten"
+    },
+    {
+      "id": "review.reject-insufficient-distinct",
+      "status": "covered",
+      "spec": "openspec/specs/review/spec.md",
+      "test_file": "internal/app/worldline_semantic_review_service_test.go",
+      "test_anchor": "TestWorldlineSemanticReviewRejectAndInsufficientStaySeparateFromRelation"
+    },
+    {
+      "id": "review.relation-reject-recorded",
+      "status": "covered",
+      "spec": "openspec/specs/review/spec.md",
+      "test_file": "internal/app/worldline_semantic_review_service_test.go",
+      "test_anchor": "TestWorldlineSemanticReviewRejectAndInsufficientStaySeparateFromRelation"
+    },
+    {
+      "id": "review.reopen-versioned",
+      "status": "covered",
+      "spec": "openspec/specs/review/spec.md",
+      "test_file": "internal/app/worldline_semantic_review_service_test.go",
+      "test_anchor": "TestWorldlineReviewAcceptReopenReplayAndCount"
+    },
+    {
+      "id": "review.request-id-replay",
+      "status": "covered",
+      "spec": "openspec/specs/review/spec.md",
+      "test_file": "internal/app/worldline_semantic_review_service_test.go",
+      "test_anchor": "TestWorldlineReviewAcceptReopenReplayAndCount"
+    },
+    {
+      "id": "review.revision-invalidates-review",
+      "status": "covered",
+      "spec": "openspec/specs/review/spec.md",
+      "test_file": "internal/app/worldline_semantic_review_service_test.go",
+      "test_anchor": "TestWorldlineSemanticReviewRejectsSupersededSuggestion"
+    },
+    {
+      "id": "review.semantic-confirmation-distinct",
+      "status": "covered",
+      "spec": "openspec/specs/review/spec.md",
+      "test_file": "internal/app/worldline_semantic_review_service_test.go",
+      "test_anchor": "TestWorldlineReviewAcceptReopenReplayAndCount"
+    },
+    {
+      "id": "semantic-job.cache-model-rubric",
+      "status": "covered",
+      "spec": "openspec/specs/semantic-job/spec.md",
+      "test_file": "internal/app/worldline_durable_test.go",
+      "test_anchor": "TestDurableWorldlineCacheKeyInvalidatesRubric"
+    },
+    {
+      "id": "semantic-job.cancelled-lease-rejected",
+      "status": "covered",
+      "spec": "openspec/specs/semantic-job/spec.md",
+      "test_file": "internal/app/worldline_durable_test.go",
+      "test_anchor": "TestCancelledWorldlineLeaseCannotPublishPair"
+    },
+    {
+      "id": "semantic-job.config-version-key",
+      "status": "covered",
+      "spec": "openspec/specs/semantic-job/spec.md",
+      "test_file": "internal/app/worldline_durable_test.go",
+      "test_anchor": "TestDurableWorldlineCacheInvalidatesOnlyChangedPairAndModel"
+    },
+    {
+      "id": "semantic-job.decision-run-idempotency",
+      "status": "covered",
+      "spec": "openspec/specs/semantic-job/spec.md",
+      "test_file": "internal/pipeline/decisionlog_test.go",
+      "test_anchor": "TestRecordDecisionRunIdempotent"
+    },
+    {
+      "id": "semantic-job.resume-source-changed-only",
+      "status": "covered",
+      "spec": "openspec/specs/semantic-job/spec.md",
+      "test_file": "internal/app/worldline_durable_test.go",
+      "test_anchor": "TestDurableWorldlineCacheInvalidatesOnlyChangedPairAndModel"
+    },
+    {
+      "id": "semantic-job.worldline-batch-window",
+      "status": "covered",
+      "spec": "openspec/specs/semantic-job/spec.md",
+      "test_file": "internal/app/worldline_durable_test.go",
+      "test_anchor": "TestDurableWorldlinePairBatchesResumeAfterRestart"
+    },
+    {
+      "id": "topic.different-title-explicit-group",
+      "status": "covered",
+      "spec": "openspec/specs/topic/spec.md",
+      "test_file": "internal/app/worldline_threads_review_test.go",
+      "test_anchor": "TestWorldlineManualThreadGroupCanBeRevokedWithoutMergingClaims"
+    },
+    {
+      "id": "topic.revision-removes-stale-membership",
+      "status": "covered",
+      "spec": "openspec/specs/topic/spec.md",
+      "test_file": "internal/pipeline/topic_membership_test.go",
+      "test_anchor": "TestRebuildAutomaticTopicMembershipDropsSupersededOnly"
+    },
+    {
+      "id": "topic.revoke-preserves-peers",
+      "status": "covered",
+      "spec": "openspec/specs/topic/spec.md",
+      "test_file": "internal/app/worldline_threads_review_test.go",
+      "test_anchor": "TestWorldlineManualThreadGroupCanBeRevokedWithoutMergingClaims"
+    },
+    {
+      "id": "topic.same-name-not-merge",
+      "status": "covered",
+      "spec": "openspec/specs/topic/spec.md",
+      "test_file": "internal/app/worldline_threads_review_test.go",
+      "test_anchor": "TestWorldlineThreadsExactTitleAndRepeatedSummaryDoNotInferPersonOrFact"
+    },
+    {
+      "id": "topic.stale-membership-filter",
+      "status": "covered",
+      "spec": "openspec/specs/topic/spec.md",
+      "test_file": "internal/memory/topic_scope_test.go",
+      "test_anchor": "TestStaleTopicMembershipDoesNotSurfaceCurrentContent"
+    },
+    {
+      "id": "workflow.missing-scenario-fails",
+      "status": "covered",
+      "spec": "openspec/specs/workflow/spec.md",
+      "test_file": "scripts/test_check_spec_test_map.py",
+      "test_anchor": "test_missing_required_spec_scenario_mapping_fails"
+    },
+    {
+      "id": "workflow.no-tdd-inference",
+      "status": "pending",
+      "manual_note": "docs/implementation-validation.md：人工确认映射脚本与 CLI 不证明测试先于实现；无自动化锚点，状态保留 pending。"
+    },
+    {
+      "id": "workflow.pending-is-visible",
+      "status": "covered",
+      "spec": "openspec/specs/workflow/spec.md",
+      "test_file": "scripts/test_check_spec_test_map.py",
+      "test_anchor": "test_pending_is_explicit_and_does_not_claim_test"
+    },
+    {
+      "id": "workflow.scenario-map.anchor-exists",
+      "status": "covered",
+      "spec": "openspec/specs/workflow/spec.md",
+      "test_file": "scripts/test_check_spec_test_map.py",
+      "test_anchor": "test_exact_test_anchor_passes"
+    }
+  ]
+}

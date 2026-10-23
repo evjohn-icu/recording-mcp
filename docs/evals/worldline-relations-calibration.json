@@ -1,0 +1,813 @@
+{
+  "experiment": "worldline-relations-quality-v1",
+  "synthetic_only": true,
+  "status": "FAIL",
+  "fixture_sha256": "6963c6fe60fdf18c020922d686c06207f4d5dbc3da15bbf564737ab8473d6d7a",
+  "runner_sha256": "e07985266192f0f63989197dd603d646628cd93fb4aa583ac0d14aab3b7ff75b",
+  "split": "calibration",
+  "endpoint": "http://127.0.0.1:8799/v1/systemone",
+  "requested_model": null,
+  "actual_models": [
+    "Jev-Style-0.8B-Decision-v3"
+  ],
+  "weights_versions": [
+    "b023d1f9c7858fbf01504577a3bfc349ea5c7385"
+  ],
+  "started_at": "2026-10-23T20:07:35.514616+00:00",
+  "total": 60,
+  "incorrect": 23,
+  "latency_ms": {
+    "mean": 100.81890649938335,
+    "p50": 102.2915399807971,
+    "p95": 136.10162201803178
+  },
+  "denominator": 60,
+  "errors": 0,
+  "abstain": 5,
+  "confusion": {
+    "text_similarity": {
+      "text_similarity": 12,
+      "complementary_context": 0,
+      "review_required": 0,
+      "unrelated": 0,
+      "insufficient_evidence": 0
+    },
+    "complementary_context": {
+      "text_similarity": 3,
+      "complementary_context": 3,
+      "review_required": 0,
+      "unrelated": 6,
+      "insufficient_evidence": 0
+    },
+    "review_required": {
+      "text_similarity": 2,
+      "complementary_context": 3,
+      "review_required": 6,
+      "unrelated": 1,
+      "insufficient_evidence": 0
+    },
+    "unrelated": {
+      "text_similarity": 0,
+      "complementary_context": 1,
+      "review_required": 0,
+      "unrelated": 11,
+      "insufficient_evidence": 0
+    },
+    "insufficient_evidence": {
+      "text_similarity": 5,
+      "complementary_context": 0,
+      "review_required": 1,
+      "unrelated": 1,
+      "insufficient_evidence": 5
+    }
+  },
+  "per_class": {
+    "text_similarity": {
+      "support": 12,
+      "precision": 0.5454545454545454,
+      "recall": 1.0
+    },
+    "complementary_context": {
+      "support": 12,
+      "precision": 0.42857142857142855,
+      "recall": 0.25
+    },
+    "review_required": {
+      "support": 12,
+      "precision": 0.8571428571428571,
+      "recall": 0.5
+    },
+    "unrelated": {
+      "support": 12,
+      "precision": 0.5789473684210527,
+      "recall": 0.9166666666666666
+    },
+    "insufficient_evidence": {
+      "support": 12,
+      "precision": 1.0,
+      "recall": 0.4166666666666667
+    }
+  },
+  "cases": [
+    {
+      "id": "rel-001",
+      "expected": "text_similarity",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.427781320212052,
+        "complementary_context": 0.18538731435747247,
+        "review_required": 0.08699628022615087,
+        "unrelated": 0.21490188406313915,
+        "insufficient_evidence": 0.08493320114118535
+      }
+    },
+    {
+      "id": "rel-002",
+      "expected": "text_similarity",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.42158316859919326,
+        "complementary_context": 0.09577264379101605,
+        "review_required": 0.06609210795036875,
+        "unrelated": 0.3482127337618747,
+        "insufficient_evidence": 0.06833934589754721
+      }
+    },
+    {
+      "id": "rel-003",
+      "expected": "text_similarity",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.4364382747735296,
+        "complementary_context": 0.15172805303175899,
+        "review_required": 0.05285453691211041,
+        "unrelated": 0.258054251280812,
+        "insufficient_evidence": 0.10092488400178913
+      }
+    },
+    {
+      "id": "rel-004",
+      "expected": "text_similarity",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.44791298196041446,
+        "complementary_context": 0.13046813907625296,
+        "review_required": 0.0764022743747224,
+        "unrelated": 0.26518103994337416,
+        "insufficient_evidence": 0.08003556464523591
+      }
+    },
+    {
+      "id": "rel-005",
+      "expected": "text_similarity",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.38164509652264555,
+        "complementary_context": 0.1543065218895724,
+        "review_required": 0.17670034179807054,
+        "unrelated": 0.20025751575625503,
+        "insufficient_evidence": 0.0870905240334566
+      }
+    },
+    {
+      "id": "rel-006",
+      "expected": "text_similarity",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.4641753166240823,
+        "complementary_context": 0.09885947903185963,
+        "review_required": 0.07784162899808827,
+        "unrelated": 0.2862927939570441,
+        "insufficient_evidence": 0.07283078138892583
+      }
+    },
+    {
+      "id": "rel-007",
+      "expected": "text_similarity",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.477557980997492,
+        "complementary_context": 0.14939164134347035,
+        "review_required": 0.07016591687350109,
+        "unrelated": 0.21518132951521443,
+        "insufficient_evidence": 0.08770313127032225
+      }
+    },
+    {
+      "id": "rel-008",
+      "expected": "text_similarity",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.43015214062273616,
+        "complementary_context": 0.11849722370132879,
+        "review_required": 0.08443219039389883,
+        "unrelated": 0.29439927169807384,
+        "insufficient_evidence": 0.07251917358396222
+      }
+    },
+    {
+      "id": "rel-009",
+      "expected": "text_similarity",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.5166588556972932,
+        "complementary_context": 0.11522093862884467,
+        "review_required": 0.059020455781846004,
+        "unrelated": 0.2391662438902352,
+        "insufficient_evidence": 0.06993350600178094
+      }
+    },
+    {
+      "id": "rel-010",
+      "expected": "text_similarity",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.35780306932261263,
+        "complementary_context": 0.19166998173365962,
+        "review_required": 0.15114497758174555,
+        "unrelated": 0.21614832974651016,
+        "insufficient_evidence": 0.08323364161547193
+      }
+    },
+    {
+      "id": "rel-011",
+      "expected": "text_similarity",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.40534417951208873,
+        "complementary_context": 0.2364072788348987,
+        "review_required": 0.08382616974686354,
+        "unrelated": 0.19155548120292812,
+        "insufficient_evidence": 0.08286689070322083
+      }
+    },
+    {
+      "id": "rel-012",
+      "expected": "text_similarity",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.4223572025342241,
+        "complementary_context": 0.10361122126092408,
+        "review_required": 0.06946194592588105,
+        "unrelated": 0.34173288415640307,
+        "insufficient_evidence": 0.06283674612256787
+      }
+    },
+    {
+      "id": "rel-025",
+      "expected": "complementary_context",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.2586541006273696,
+        "complementary_context": 0.28018023876045645,
+        "review_required": 0.06853037114622972,
+        "unrelated": 0.2951331658988396,
+        "insufficient_evidence": 0.09750212356710458
+      }
+    },
+    {
+      "id": "rel-026",
+      "expected": "complementary_context",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.362246087891303,
+        "complementary_context": 0.1895236084477638,
+        "review_required": 0.07481717870293808,
+        "unrelated": 0.3033801172200933,
+        "insufficient_evidence": 0.07003300773790168
+      }
+    },
+    {
+      "id": "rel-027",
+      "expected": "complementary_context",
+      "prediction": "complementary_context",
+      "distribution": {
+        "text_similarity": 0.28090317751651617,
+        "complementary_context": 0.32492771789845826,
+        "review_required": 0.08249654795071487,
+        "unrelated": 0.21407169026899198,
+        "insufficient_evidence": 0.09760086636531866
+      }
+    },
+    {
+      "id": "rel-028",
+      "expected": "complementary_context",
+      "prediction": "complementary_context",
+      "distribution": {
+        "text_similarity": 0.2505996808540613,
+        "complementary_context": 0.39469845626893935,
+        "review_required": 0.06435377536770918,
+        "unrelated": 0.20557786204346168,
+        "insufficient_evidence": 0.08477022546582837
+      }
+    },
+    {
+      "id": "rel-029",
+      "expected": "complementary_context",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.26156646298109265,
+        "complementary_context": 0.258002172173658,
+        "review_required": 0.07082243578662607,
+        "unrelated": 0.3347974005670415,
+        "insufficient_evidence": 0.07481152849158178
+      }
+    },
+    {
+      "id": "rel-030",
+      "expected": "complementary_context",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.2529334765786797,
+        "complementary_context": 0.27058664006581457,
+        "review_required": 0.07431708876072962,
+        "unrelated": 0.31025142125270777,
+        "insufficient_evidence": 0.09191137334206818
+      }
+    },
+    {
+      "id": "rel-031",
+      "expected": "complementary_context",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.3698841809064174,
+        "complementary_context": 0.22215812889429584,
+        "review_required": 0.07338210634589135,
+        "unrelated": 0.2896819333625798,
+        "insufficient_evidence": 0.0448936504908156
+      }
+    },
+    {
+      "id": "rel-032",
+      "expected": "complementary_context",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.23627981371885737,
+        "complementary_context": 0.21963923648125117,
+        "review_required": 0.05636202191600588,
+        "unrelated": 0.41804296647830685,
+        "insufficient_evidence": 0.06967596140557865
+      }
+    },
+    {
+      "id": "rel-033",
+      "expected": "complementary_context",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.29468058069070574,
+        "complementary_context": 0.1988589293989261,
+        "review_required": 0.09179035818694316,
+        "unrelated": 0.36056976930765966,
+        "insufficient_evidence": 0.054100362415765296
+      }
+    },
+    {
+      "id": "rel-034",
+      "expected": "complementary_context",
+      "prediction": "complementary_context",
+      "distribution": {
+        "text_similarity": 0.20673637176528156,
+        "complementary_context": 0.3271204944491108,
+        "review_required": 0.0793158985489885,
+        "unrelated": 0.20721669037840057,
+        "insufficient_evidence": 0.1796105448582185
+      }
+    },
+    {
+      "id": "rel-035",
+      "expected": "complementary_context",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.3071838119066367,
+        "complementary_context": 0.2836091412091933,
+        "review_required": 0.046422511821866616,
+        "unrelated": 0.3057315885260844,
+        "insufficient_evidence": 0.057052946536218944
+      }
+    },
+    {
+      "id": "rel-036",
+      "expected": "complementary_context",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.28805003099155596,
+        "complementary_context": 0.25317551283514,
+        "review_required": 0.06554130796132249,
+        "unrelated": 0.3353121627895499,
+        "insufficient_evidence": 0.057920985422431674
+      }
+    },
+    {
+      "id": "rel-049",
+      "expected": "review_required",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.31414082523892284,
+        "complementary_context": 0.18546236001834354,
+        "review_required": 0.17394306670642928,
+        "unrelated": 0.240238950750656,
+        "insufficient_evidence": 0.08621479728564828
+      }
+    },
+    {
+      "id": "rel-050",
+      "expected": "review_required",
+      "prediction": "review_required",
+      "distribution": {
+        "text_similarity": 0.14600139383091318,
+        "complementary_context": 0.1804194908837951,
+        "review_required": 0.2916787402336055,
+        "unrelated": 0.2788993217611474,
+        "insufficient_evidence": 0.10300105329053871
+      }
+    },
+    {
+      "id": "rel-051",
+      "expected": "review_required",
+      "prediction": "review_required",
+      "distribution": {
+        "text_similarity": 0.22063041364397384,
+        "complementary_context": 0.2220743165269804,
+        "review_required": 0.2324378294192954,
+        "unrelated": 0.23183540114157172,
+        "insufficient_evidence": 0.09302203926817854
+      }
+    },
+    {
+      "id": "rel-052",
+      "expected": "review_required",
+      "prediction": "review_required",
+      "distribution": {
+        "text_similarity": 0.1962149880775288,
+        "complementary_context": 0.13394837243501362,
+        "review_required": 0.32449156478309715,
+        "unrelated": 0.23777653054993597,
+        "insufficient_evidence": 0.10756854415442443
+      }
+    },
+    {
+      "id": "rel-053",
+      "expected": "review_required",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.25017516568156806,
+        "complementary_context": 0.20755864146835828,
+        "review_required": 0.19259004876112146,
+        "unrelated": 0.21859478621146822,
+        "insufficient_evidence": 0.13108135787748396
+      }
+    },
+    {
+      "id": "rel-054",
+      "expected": "review_required",
+      "prediction": "review_required",
+      "distribution": {
+        "text_similarity": 0.11537022601051429,
+        "complementary_context": 0.12737571525229746,
+        "review_required": 0.5006066063039353,
+        "unrelated": 0.12255764186844255,
+        "insufficient_evidence": 0.13408981056481056
+      }
+    },
+    {
+      "id": "rel-055",
+      "expected": "review_required",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.17938026966047144,
+        "complementary_context": 0.1969100181476891,
+        "review_required": 0.21367494115277946,
+        "unrelated": 0.276886936729121,
+        "insufficient_evidence": 0.133147834309939
+      }
+    },
+    {
+      "id": "rel-056",
+      "expected": "review_required",
+      "prediction": "complementary_context",
+      "distribution": {
+        "text_similarity": 0.23838997317348926,
+        "complementary_context": 0.30823886893211716,
+        "review_required": 0.19287200845194435,
+        "unrelated": 0.15690899558536417,
+        "insufficient_evidence": 0.10359015385708507
+      }
+    },
+    {
+      "id": "rel-057",
+      "expected": "review_required",
+      "prediction": "review_required",
+      "distribution": {
+        "text_similarity": 0.15789211878611792,
+        "complementary_context": 0.1994418345157914,
+        "review_required": 0.3327279757365011,
+        "unrelated": 0.1334078986167494,
+        "insufficient_evidence": 0.17653017234484025
+      }
+    },
+    {
+      "id": "rel-058",
+      "expected": "review_required",
+      "prediction": "complementary_context",
+      "distribution": {
+        "text_similarity": 0.21496781223774708,
+        "complementary_context": 0.2910549129566398,
+        "review_required": 0.17780211683722624,
+        "unrelated": 0.23335795617376337,
+        "insufficient_evidence": 0.08281720179462349
+      }
+    },
+    {
+      "id": "rel-059",
+      "expected": "review_required",
+      "prediction": "complementary_context",
+      "distribution": {
+        "text_similarity": 0.16405871055597732,
+        "complementary_context": 0.3012716968595585,
+        "review_required": 0.28454492965759504,
+        "unrelated": 0.12449261906833482,
+        "insufficient_evidence": 0.12563204385853421
+      }
+    },
+    {
+      "id": "rel-060",
+      "expected": "review_required",
+      "prediction": "review_required",
+      "distribution": {
+        "text_similarity": 0.20286285616260924,
+        "complementary_context": 0.18927375878917208,
+        "review_required": 0.26058983333022967,
+        "unrelated": 0.2434718571011599,
+        "insufficient_evidence": 0.10380169461682918
+      }
+    },
+    {
+      "id": "rel-073",
+      "expected": "unrelated",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.2252092136908051,
+        "complementary_context": 0.23257789181206195,
+        "review_required": 0.0979841880667927,
+        "unrelated": 0.34389847260336337,
+        "insufficient_evidence": 0.10033023382697671
+      }
+    },
+    {
+      "id": "rel-074",
+      "expected": "unrelated",
+      "prediction": "complementary_context",
+      "distribution": {
+        "text_similarity": 0.21779320550201745,
+        "complementary_context": 0.2972834386555332,
+        "review_required": 0.09209110108581695,
+        "unrelated": 0.26068573257012806,
+        "insufficient_evidence": 0.13214652218650433
+      }
+    },
+    {
+      "id": "rel-075",
+      "expected": "unrelated",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.12624394270272887,
+        "complementary_context": 0.1949249414079358,
+        "review_required": 0.18247410765956285,
+        "unrelated": 0.3581481082661775,
+        "insufficient_evidence": 0.13820889996359503
+      }
+    },
+    {
+      "id": "rel-076",
+      "expected": "unrelated",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.1786153683167287,
+        "complementary_context": 0.16255078146815533,
+        "review_required": 0.08797016095877974,
+        "unrelated": 0.5013258903599557,
+        "insufficient_evidence": 0.06953779889638056
+      }
+    },
+    {
+      "id": "rel-077",
+      "expected": "unrelated",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.20644260158135821,
+        "complementary_context": 0.15866448421936533,
+        "review_required": 0.10102726881367718,
+        "unrelated": 0.42994803524038455,
+        "insufficient_evidence": 0.10391761014521464
+      }
+    },
+    {
+      "id": "rel-078",
+      "expected": "unrelated",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.20940126693881625,
+        "complementary_context": 0.15537913470862097,
+        "review_required": 0.10976388408005694,
+        "unrelated": 0.4031030456583359,
+        "insufficient_evidence": 0.12235266861416993
+      }
+    },
+    {
+      "id": "rel-079",
+      "expected": "unrelated",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.14366675751603522,
+        "complementary_context": 0.19714144936774647,
+        "review_required": 0.18933893861712636,
+        "unrelated": 0.3324919718700105,
+        "insufficient_evidence": 0.13736088262908158
+      }
+    },
+    {
+      "id": "rel-080",
+      "expected": "unrelated",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.09637508222953894,
+        "complementary_context": 0.13963659415681562,
+        "review_required": 0.18032740836853514,
+        "unrelated": 0.3998493901332191,
+        "insufficient_evidence": 0.1838115251118912
+      }
+    },
+    {
+      "id": "rel-081",
+      "expected": "unrelated",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.17079002135358728,
+        "complementary_context": 0.13119351291019496,
+        "review_required": 0.05286075592631263,
+        "unrelated": 0.5899759114289227,
+        "insufficient_evidence": 0.05517979838098254
+      }
+    },
+    {
+      "id": "rel-082",
+      "expected": "unrelated",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.20849611792727005,
+        "complementary_context": 0.2810726605325462,
+        "review_required": 0.08094834104647294,
+        "unrelated": 0.35600663504657104,
+        "insufficient_evidence": 0.07347624544713989
+      }
+    },
+    {
+      "id": "rel-083",
+      "expected": "unrelated",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.22607463050623788,
+        "complementary_context": 0.16833504764020776,
+        "review_required": 0.11142193106329734,
+        "unrelated": 0.4135930176720344,
+        "insufficient_evidence": 0.08057537311822276
+      }
+    },
+    {
+      "id": "rel-084",
+      "expected": "unrelated",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.14829328753571275,
+        "complementary_context": 0.19656278894488177,
+        "review_required": 0.09027222190440803,
+        "unrelated": 0.46255807804988575,
+        "insufficient_evidence": 0.10231362356511169
+      }
+    },
+    {
+      "id": "rel-097",
+      "expected": "insufficient_evidence",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.3515709158655052,
+        "complementary_context": 0.22160230917774984,
+        "review_required": 0.09413239914081965,
+        "unrelated": 0.24048891618880308,
+        "insufficient_evidence": 0.09220545962712222
+      }
+    },
+    {
+      "id": "rel-098",
+      "expected": "insufficient_evidence",
+      "prediction": "insufficient_evidence",
+      "distribution": {
+        "text_similarity": 0.24147047100704708,
+        "complementary_context": 0.10969155889031326,
+        "review_required": 0.15494318218523934,
+        "unrelated": 0.13750263124117904,
+        "insufficient_evidence": 0.3563921566762213
+      }
+    },
+    {
+      "id": "rel-099",
+      "expected": "insufficient_evidence",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.28389660876831846,
+        "complementary_context": 0.20797434023003175,
+        "review_required": 0.14182797251525558,
+        "unrelated": 0.1759185188106532,
+        "insufficient_evidence": 0.190382559675741
+      }
+    },
+    {
+      "id": "rel-100",
+      "expected": "insufficient_evidence",
+      "prediction": "insufficient_evidence",
+      "distribution": {
+        "text_similarity": 0.2674303718510778,
+        "complementary_context": 0.11126221779567362,
+        "review_required": 0.0938998877315645,
+        "unrelated": 0.19445231375956862,
+        "insufficient_evidence": 0.3329552088621154
+      }
+    },
+    {
+      "id": "rel-101",
+      "expected": "insufficient_evidence",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.25796132050226145,
+        "complementary_context": 0.1826141393029051,
+        "review_required": 0.1852368849882327,
+        "unrelated": 0.15580132323115242,
+        "insufficient_evidence": 0.21838633197544838
+      }
+    },
+    {
+      "id": "rel-102",
+      "expected": "insufficient_evidence",
+      "prediction": "insufficient_evidence",
+      "distribution": {
+        "text_similarity": 0.27187699882986144,
+        "complementary_context": 0.10175884505723148,
+        "review_required": 0.1411488755311317,
+        "unrelated": 0.11931852680139066,
+        "insufficient_evidence": 0.36589675378038466
+      }
+    },
+    {
+      "id": "rel-103",
+      "expected": "insufficient_evidence",
+      "prediction": "review_required",
+      "distribution": {
+        "text_similarity": 0.16058734803503008,
+        "complementary_context": 0.2040913943347285,
+        "review_required": 0.2347634408407863,
+        "unrelated": 0.19720799062877975,
+        "insufficient_evidence": 0.2033498261606754
+      }
+    },
+    {
+      "id": "rel-104",
+      "expected": "insufficient_evidence",
+      "prediction": "insufficient_evidence",
+      "distribution": {
+        "text_similarity": 0.26640005057179267,
+        "complementary_context": 0.0526095347245256,
+        "review_required": 0.0931806728999113,
+        "unrelated": 0.1242555169619851,
+        "insufficient_evidence": 0.4635542248417853
+      }
+    },
+    {
+      "id": "rel-105",
+      "expected": "insufficient_evidence",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.3227272786977933,
+        "complementary_context": 0.113432463542863,
+        "review_required": 0.12511151039608248,
+        "unrelated": 0.22914082234218805,
+        "insufficient_evidence": 0.2095879250210732
+      }
+    },
+    {
+      "id": "rel-106",
+      "expected": "insufficient_evidence",
+      "prediction": "insufficient_evidence",
+      "distribution": {
+        "text_similarity": 0.22387232138586205,
+        "complementary_context": 0.10356795863959373,
+        "review_required": 0.072634935935268,
+        "unrelated": 0.19146434116771183,
+        "insufficient_evidence": 0.40846044287156447
+      }
+    },
+    {
+      "id": "rel-107",
+      "expected": "insufficient_evidence",
+      "prediction": "text_similarity",
+      "distribution": {
+        "text_similarity": 0.30064154433266405,
+        "complementary_context": 0.11720515535739869,
+        "review_required": 0.1092151524090313,
+        "unrelated": 0.2484445387015006,
+        "insufficient_evidence": 0.22449360919940528
+      }
+    },
+    {
+      "id": "rel-108",
+      "expected": "insufficient_evidence",
+      "prediction": "unrelated",
+      "distribution": {
+        "text_similarity": 0.23162439230343676,
+        "complementary_context": 0.145627216524571,
+        "review_required": 0.17606566659736966,
+        "unrelated": 0.23716004789353648,
+        "insufficient_evidence": 0.2095226766810861
+      }
+    }
+  ]
+}

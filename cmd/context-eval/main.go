@@ -14,7 +14,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"recordingmcp/internal/eval"
 	"recordingmcp/internal/semantic"
@@ -44,6 +46,8 @@ func run() error {
 		embedEndpoint = flag.String("embed-endpoint", "", "OpenAI-compatible embedding endpoint")
 		embedModel    = flag.String("embed-model", "", "embedding model")
 		embedKeyEnv   = flag.String("embed-key-env", "", "environment variable containing the embedding API key")
+		minSimilarity = flag.Float64("min-similarity", -1, "optional semantic admission threshold; omit for default behavior")
+		timeout       = flag.Duration("timeout", 5*time.Minute, "total evaluation timeout")
 	)
 	flag.Parse()
 
@@ -73,7 +77,19 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	report, err := eval.Run(context.Background(), eval.Options{
+	if *minSimilarity > 1 {
+		return fmt.Errorf("min-similarity must be in [0,1]")
+	}
+	threshold := (*float64)(nil)
+	if *minSimilarity >= 0 {
+		threshold = minSimilarity
+	}
+	if *timeout <= 0 {
+		return fmt.Errorf("timeout must be positive")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
+	report, err := eval.Run(ctx, eval.Options{
 		DBPath:                     db,
 		CorpusPath:                 *corpusPath,
 		QuestionsPath:              *questionsPath,
@@ -84,6 +100,7 @@ func run() error {
 		MaxBytes:                   *maxBytes,
 		SemanticProvider:           provider,
 		SemanticProviderConfigured: true,
+		MinimumSimilarity:          threshold,
 	})
 	if err != nil {
 		return err
@@ -118,6 +135,22 @@ func markdownReport(report eval.Report) string {
 	fmt.Fprintf(&b, "| evidence_recall_at_5 | %.4f |\n", m.EvidenceRecallAt5)
 	fmt.Fprintf(&b, "| lexical_recall_at_5 | %.4f |\n", m.LexicalRecallAt5)
 	fmt.Fprintf(&b, "| hybrid_recall_at_5 | %.4f |\n", m.HybridRecallAt5)
+	fmt.Fprintf(&b, "| retrieval_hybrid_mrr_at_10 | %.4f |\n", m.RetrievalHybridMRRAt10)
+	fmt.Fprintf(&b, "| retrieval_lexical_mrr_at_10 | %.4f |\n", m.RetrievalLexicalMRRAt10)
+	fmt.Fprintf(&b, "| retrieval_hybrid_precision_at_5 | %.4f |\n", m.RetrievalHybridPrecisionAt5)
+	fmt.Fprintf(&b, "| retrieval_lexical_precision_at_5 | %.4f |\n", m.RetrievalLexicalPrecisionAt5)
+	fmt.Fprintf(&b, "| retrieval_requests | %d |\n", m.RetrievalRequests)
+	fmt.Fprintf(&b, "| semantic_query_embed_requests | %d |\n", m.SemanticQueryEmbedRequests)
+	fmt.Fprintf(&b, "| semantic_index_embed_requests | %d |\n", m.SemanticIndexEmbedRequests)
+	fmt.Fprintf(&b, "| semantic_index_embedded_items | %d |\n", m.SemanticIndexEmbeddedItems)
+	fmt.Fprintf(&b, "| semantic_provider_embed_requests | %d |\n", m.SemanticProviderEmbedRequests)
+	fmt.Fprintf(&b, "| semantic_provider_embed_items | %d |\n", m.SemanticProviderEmbedItems)
+	fmt.Fprintf(&b, "| semantic_provider_embed_errors | %d |\n", m.SemanticProviderEmbedErrors)
+	fmt.Fprintf(&b, "| semantic_index_duration_ms | %.3f |\n", m.SemanticIndexDurationMS)
+	fmt.Fprintf(&b, "| retrieval_lexical_latency_ms_p50 | %.3f |\n", m.RetrievalLexicalLatencyMSP50)
+	fmt.Fprintf(&b, "| retrieval_lexical_latency_ms_p95 | %.3f |\n", m.RetrievalLexicalLatencyMSP95)
+	fmt.Fprintf(&b, "| retrieval_hybrid_latency_ms_p50 | %.3f |\n", m.RetrievalHybridLatencyMSP50)
+	fmt.Fprintf(&b, "| retrieval_hybrid_latency_ms_p95 | %.3f |\n", m.RetrievalHybridLatencyMSP95)
 	fmt.Fprintf(&b, "| semantic_assisted_recall | %.4f |\n", m.SemanticAssistedRecall)
 	fmt.Fprintf(&b, "| unanswerable_questions | %d |\n", m.UnanswerableQuestions)
 	fmt.Fprintf(&b, "| unanswerable_clean_rate | %.4f |\n", m.UnanswerableCleanRate)
@@ -132,6 +165,19 @@ func markdownReport(report eval.Report) string {
 	fmt.Fprintf(&b, "| relation_assisted | %d |\n", m.RelationAssisted)
 	fmt.Fprintf(&b, "| context_coverage | %.4f |\n", m.ContextCoverage)
 	fmt.Fprintf(&b, "| model_calls | %d |\n", m.ModelCalls)
+	if len(m.RetrievalBuckets) > 0 {
+		keys := make([]string, 0, len(m.RetrievalBuckets))
+		for key := range m.RetrievalBuckets {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		fmt.Fprintf(&b, "\n## retrieval buckets\n\n")
+		fmt.Fprintf(&b, "| split / mode / bucket | questions | answerable | no-evidence | precision@5 | recall@5 | MRR@10 | false-positive rate | p50 ms | p95 ms |\n|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
+		for _, key := range keys {
+			bucket := m.RetrievalBuckets[key]
+			fmt.Fprintf(&b, "| %s | %d | %d | %d | %.4f | %.4f | %.4f | %.4f | %.3f | %.3f |\n", key, bucket.Questions, bucket.AnswerableQuestions, bucket.NoEvidenceQuestions, bucket.PrecisionAt5, bucket.RecallAt5, bucket.MRRAt10, bucket.FalsePositiveRate, bucket.LatencyMSP50, bucket.LatencyMSP95)
+		}
+	}
 	fmt.Fprintf(&b, "\n## unanswerable\n\n")
 	fmt.Fprintf(&b, "| question | mode | returned_items | turn_top1_hit |\n|---|---|---:|---|\n")
 	for _, result := range report.PerQuestion {

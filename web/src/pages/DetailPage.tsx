@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { ApiError, editNote, getAnnotationHistory, getConversation, getItem, getTurns } from '../api/client'
+import { ApiError, editNote, getAnnotationHistory, getConversation, getItem, getTurns, getProcessing, retryProcessing } from '../api/client'
 import type {
   AnnotationSnapshot,
   ConversationView,
   NoteView,
   RecordingView,
   TurnView,
+  ProcessingSnapshot,
 } from '../api/types'
 import { useApi } from '../hooks/useApi'
 import { EvidencePanel } from '../components/EvidencePanel'
@@ -564,10 +565,44 @@ export function DetailPage() {
   const itemId = searchParams.get('item') || ''
   const { data: linkedItem } = useApi((signal) => itemId ? getItem(itemId, signal) : Promise.resolve(undefined as never), [itemId])
   const { data, loading, error, reload } = useApi((signal) => getConversation(conversationId, signal), [conversationId])
+  const [processing, setProcessing] = useState<ProcessingSnapshot | null>(null)
+  const [processingRefresh, setProcessingRefresh] = useState(0)
+  const [retryError, setRetryError] = useState('')
+  const retryRequestIDs = useRef(new Map<string, string>())
   const [tab, setTab] = useState<'transcript' | 'notes' | 'history'>('transcript')
   const [evidenceTurn, setEvidenceTurn] = useState<string | null>(null)
   const [highlightedItem, setHighlightedItem] = useState('')
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+
+  useEffect(() => {
+    if (!conversationId) return
+    let active = true
+    let continuePolling = true
+    let pollInterval = 10000
+    let timer: number | undefined
+    let controller: AbortController | undefined
+    const poll = async () => {
+      if (document.visibilityState !== 'visible') return
+      controller?.abort(); controller = new AbortController()
+      try { const value = await getProcessing(conversationId, controller.signal); if (active) { setProcessing(value); setRetryError(''); const jobs = value.jobs ?? []; const terminal = jobs.every((j) => ['succeeded', 'failed', 'cancelled'].includes(j.status)); const analysis = value.status?.analysis_status ?? 'pending'; const indexing = value.status?.indexing_status ?? 'pending'; const pending = ['pending', 'running'].includes(analysis) || ['pending', 'running'].includes(indexing); continuePolling = !terminal || pending; pollInterval = jobs.some((job) => ['queued', 'running', 'retry_wait'].includes(job.status)) ? 2000 : 10000 } }
+      catch (e) { if (active && !(e instanceof DOMException && e.name === 'AbortError')) setRetryError(e instanceof Error ? e.message : '无法读取处理状态') }
+      finally { if (active && continuePolling && document.visibilityState === 'visible') timer = window.setTimeout(poll, pollInterval) }
+    }
+    const visibility = () => { if (document.visibilityState === 'visible') { if (timer) window.clearTimeout(timer); void poll() } else { if (timer) window.clearTimeout(timer); controller?.abort() } }
+    void poll(); document.addEventListener('visibilitychange', visibility)
+    return () => { active = false; if (timer) window.clearTimeout(timer); controller?.abort(); document.removeEventListener('visibilitychange', visibility) }
+  }, [conversationId, processingRefresh])
+
+  async function retryJob(jobId: string, attempt: number) {
+    setRetryError('')
+    const key = `${jobId}:${attempt}`
+    let requestID = retryRequestIDs.current.get(key)
+    if (!requestID) { requestID = crypto.randomUUID(); retryRequestIDs.current.set(key, requestID) }
+    try { await retryProcessing(conversationId, jobId, attempt, requestID); setProcessing(await getProcessing(conversationId)); retryRequestIDs.current.delete(key); setProcessingRefresh((value) => value + 1) }
+    catch (e) { setRetryError(e instanceof Error ? e.message : '重试失败') }
+  }
+
+  function refreshConversationAndProcessing() { reload(); setProcessingRefresh((value) => value + 1) }
 
   useEffect(() => {
     function onClose() {
@@ -627,6 +662,16 @@ export function DetailPage() {
                   <p>身份未确认轮次：{data.processing.identity_unconfirmed_turns}</p>
                 </div>
               </details>
+              {processing && <section className="processing-progress" aria-live="polite">
+                <strong>后台处理</strong>
+                <span>{(processing.workers ?? []).some((worker) => worker.alive) ? '工作进程在线' : '未检测到工作进程'}</span>
+                <span>{processing.generator_enabled ? '候选生成器已启用' : (processing.workers ?? []).some((worker) => worker.alive) ? '候选生成器已关闭' : '候选生成器状态未知'}</span>
+                {(processing.jobs ?? []).filter((job) => ['queued', 'running', 'retry_wait', 'failed'].includes(job.status)).map((job) => <p key={job.id}>
+                  {job.stage}：{job.status}（{job.attempt_count}/{job.max_attempts}）
+                  {job.status === 'failed' && <button type="button" className="secondary-button" onClick={() => void retryJob(job.id, job.attempt_count)}>重试</button>}
+                </p>)}
+                {retryError && <p role="alert" className="note-error">{retryError}</p>}
+              </section>}
             </header>
             <div className="tabs" role="tablist" aria-label="详情视图">
               {tabs.map((entry, index) => (
@@ -655,10 +700,10 @@ export function DetailPage() {
               ))}
             </div>
             <div role="tabpanel" id="panel-transcript" aria-labelledby="tab-transcript" hidden={tab !== 'transcript'}>
-              <TranscriptTab conversation={data} onOpenEvidence={setEvidenceTurn} onChanged={reload} />
+              <TranscriptTab conversation={data} onOpenEvidence={setEvidenceTurn} onChanged={refreshConversationAndProcessing} />
             </div>
             <div role="tabpanel" id="panel-notes" aria-labelledby="tab-notes" hidden={tab !== 'notes'}>
-              <NotesTab key={data.conversation_id} conversation={data} onChanged={reload} onOpenEvidence={setEvidenceTurn} highlightedItem={highlightedItem} />
+              <NotesTab key={data.conversation_id} conversation={data} onChanged={refreshConversationAndProcessing} onOpenEvidence={setEvidenceTurn} highlightedItem={highlightedItem} />
             </div>
             <div role="tabpanel" id="panel-history" aria-labelledby="tab-history" hidden={tab !== 'history'}>
               <HistoryTab key={`${data.conversation_id}:${data.annotation_version}`} conversationId={data.conversation_id} current={data.notes} />

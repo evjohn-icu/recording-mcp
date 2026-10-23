@@ -18,7 +18,7 @@ func TestFilterThreadBuildsCountsOnlyCurrentFilteredReviews(t *testing.T) {
 	builds := []threadBuild{{
 		thread: WorldlineThread{ID: "thread", Title: "Topic"},
 		entries: []WorldlineThreadEntry{
-			{ID: "review", Status: "unconfirmed", SemanticSuggestion: &WorldlineSemanticSuggestion{Status: "review_required"}},
+			{ID: "review", Status: "unconfirmed", SemanticSuggestion: &WorldlineSemanticSuggestion{Status: "review_required", RequiresReview:true}},
 			{ID: "uncertain", Status: "unconfirmed", SemanticSuggestion: &WorldlineSemanticSuggestion{Status: "insufficient_evidence"}},
 			{ID: "routine", Status: "reviewed"},
 		},

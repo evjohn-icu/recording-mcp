@@ -204,53 +204,77 @@ func (r *HNSWRetriever) Invalidate() {
 	r.mu.Unlock()
 }
 
+type SearchDiagnostics struct {
+	Path           string `json:"path"` // "hnsw" or "exact-fallback"
+	Fallback       bool   `json:"fallback"`
+	FallbackReason string `json:"fallback_reason,omitempty"`
+}
+
 func (r *HNSWRetriever) Search(ctx context.Context, query string, opts SearchOptions) ([]SemanticHit, error) {
+	hits, _, err := r.SearchWithDiagnostics(ctx, query, opts)
+	return hits, err
+}
+
+// SearchWithDiagnostics reports the path taken by this individual query. It
+// is returned rather than stored on the retriever, so concurrent searches do
+// not race over shared last-result state.
+func (r *HNSWRetriever) SearchWithDiagnostics(ctx context.Context, query string, opts SearchOptions) ([]SemanticHit, SearchDiagnostics, error) {
+	diag := SearchDiagnostics{Path: "hnsw"}
+	fallback := func(reason string) SearchDiagnostics {
+		return SearchDiagnostics{Path: "exact-fallback", Fallback: true, FallbackReason: reason}
+	}
 	if r == nil {
-		return nil, nil
+		return nil, fallback("nil-retriever"), nil
 	}
 	if r.Exact == nil || r.Provider == nil {
-		return r.exact(ctx, query, opts)
+		d := fallback("exact-retriever-unavailable")
+		hits, err := r.exact(ctx, query, opts)
+		return hits, d, err
 	}
 	query = strings.TrimSpace(query)
 	if query == "" {
-		return nil, nil
+		return nil, diag, nil
 	}
 	vectors, err := r.Provider.Embed(ctx, []string{query})
 	if err != nil {
-		return nil, err
+		return nil, diag, err
 	}
 	if len(vectors) != 1 {
-		return nil, fmt.Errorf("semantic: provider returned %d vectors for one query", len(vectors))
+		return nil, diag, fmt.Errorf("semantic: provider returned %d vectors for one query", len(vectors))
 	}
 	queryVec := vectors[0]
 	r.mu.RLock()
 	idx := r.index
 	if idx == nil {
 		r.mu.RUnlock()
-		return r.Exact.searchVector(ctx, queryVec, opts)
+		d := fallback("sidecar-unavailable")
+		hits, err := r.Exact.searchVector(ctx, queryVec, opts)
+		return hits, d, err
 	}
-	dataVersion, err := getDataVersion(ctx, r.DB)
-	if err != nil || dataVersion != r.dataVersion || semanticIndexGeneration.Load() != r.generation {
+	dataVersion, versionErr := getDataVersion(ctx, r.DB)
+	if versionErr != nil || dataVersion != r.dataVersion || semanticIndexGeneration.Load() != r.generation {
 		r.mu.RUnlock()
-		return r.Exact.searchVector(ctx, queryVec, opts)
+		d := fallback("sidecar-stale-or-version-check-failed")
+		hits, err := r.Exact.searchVector(ctx, queryVec, opts)
+		return hits, d, err
 	}
 	limit := searchLimit(opts.Limit)
-	for _, n := range []int{max(limit*64, 2048)} {
-		items := idx.Search(queryVec, n, n)
-		r.mu.RUnlock()
-		if len(items) == 0 {
-			break
-		}
+	items := idx.Search(queryVec, max(limit*64, 2048), max(limit*64, 2048))
+	r.mu.RUnlock()
+	if len(items) != 0 {
 		hits, err := r.validateCandidates(ctx, items, queryVec, opts)
 		if err != nil {
-			return nil, err
+			return nil, diag, err
 		}
 		if len(hits) >= limit {
-			return hits[:limit], nil
+			return hits[:limit], diag, nil
 		}
 	}
-	return r.Exact.searchVector(ctx, queryVec, opts)
+	d := fallback("filtered-candidate-set-underfilled")
+	hits, err := r.Exact.searchVector(ctx, queryVec, opts)
+	return hits, d, err
 }
+
 func (r *HNSWRetriever) exact(ctx context.Context, q string, o SearchOptions) ([]SemanticHit, error) {
 	if r == nil || r.Exact == nil {
 		return nil, nil
@@ -258,52 +282,80 @@ func (r *HNSWRetriever) exact(ctx context.Context, q string, o SearchOptions) ([
 	return r.Exact.Search(ctx, q, o)
 }
 func (r *HNSWRetriever) validateCandidates(ctx context.Context, items []HNSWItem, q Vector, opts SearchOptions) ([]SemanticHit, error) {
-	args := []any{r.Provider.ID(), r.Provider.Model(), r.Provider.Dims(), opts.ConversationID, opts.ConversationID}
-	clauses := make([]string, 0, len(items))
+	// Bound each SQL statement well below SQLite's variable limit and avoid the
+	// deep expression tree created by one OR term per HNSW candidate.
+	const batchSize = 400
+	type candidate struct{ kind, id string }
+	unique := make([]candidate, 0, len(items))
+	seen := make(map[candidate]struct{}, len(items))
 	for _, it := range items {
+		key := candidate{kind: it.Kind, id: it.ID}
 		if !kindAllowed(it.Kind, opts.Kinds) {
 			continue
 		}
-		clauses = append(clauses, "(e.kind=? AND e.artifact_id=?)")
-		args = append(args, it.Kind, it.ID)
-	}
-	if len(clauses) == 0 {
-		return nil, nil
-	}
-	sqlq := candidateSQL + " AND (" + strings.Join(clauses, " OR ") + ")"
-	rows, err := r.DB.QueryContext(ctx, sqlq, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	hits := make([]SemanticHit, 0, len(items))
-	for rows.Next() {
-		var kind, id, conv, content, hash string
-		var blob []byte
-		if err := rows.Scan(&kind, &id, &conv, &content, &hash, &blob); err != nil {
-			return nil, err
-		}
-		if sha256hex(content) != hash {
+		if _, ok := seen[key]; ok {
 			continue
 		}
-		vec, err := Decode(blob, r.Provider.Dims())
+		seen[key] = struct{}{}
+		unique = append(unique, key)
+	}
+	if len(unique) == 0 {
+		return nil, nil
+	}
+	allHits := make([]SemanticHit, 0, len(unique))
+	for start := 0; start < len(unique); start += batchSize {
+		end := min(start+batchSize, len(unique))
+		values := make([]string, 0, end-start)
+		args := []any{r.Provider.ID(), r.Provider.Model(), r.Provider.Dims(), opts.ConversationID, opts.ConversationID}
+		for _, key := range unique[start:end] {
+			values = append(values, "(?, ?)")
+			args = append(args, key.kind, key.id)
+		}
+		sqlq := candidateSQL + " AND (e.kind,e.artifact_id) IN (VALUES " + strings.Join(values, ",") + ")"
+		rows, err := r.DB.QueryContext(ctx, sqlq, args...)
 		if err != nil {
 			return nil, err
 		}
-		score, err := Cosine(q, vec)
-		if err != nil {
+		for rows.Next() {
+			var kind, id, conv, content, hash string
+			var blob []byte
+			if err := rows.Scan(&kind, &id, &conv, &content, &hash, &blob); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			if sha256hex(content) != hash {
+				continue
+			}
+			vec, err := Decode(blob, r.Provider.Dims())
+			if err != nil {
+				rows.Close()
+				return nil, err
+			}
+			score, err := Cosine(q, vec)
+			if err != nil {
+				rows.Close()
+				return nil, err
+			}
+			minimumScore := minSemanticScore
+			if r.Exact != nil && r.Exact.MinimumSimilarity != nil {
+				minimumScore = *r.Exact.MinimumSimilarity
+			}
+			if score >= minimumScore {
+				allHits = append(allHits, SemanticHit{Kind: kind, ArtifactID: id, ConversationID: conv, Score: score})
+			}
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
 			return nil, err
 		}
-		if score >= minSemanticScore {
-			hits = append(hits, SemanticHit{Kind: kind, ArtifactID: id, ConversationID: conv, Score: score})
+		if err := rows.Close(); err != nil {
+			return nil, err
 		}
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
+	// Rank across every batch before applying the global result cap.
+	sort.Slice(allHits, func(i, j int) bool { return betterHit(allHits[i], allHits[j]) })
+	if len(allHits) > maxSearchLimit {
+		allHits = allHits[:maxSearchLimit]
 	}
-	sort.Slice(hits, func(i, j int) bool { return betterHit(hits[i], hits[j]) })
-	if len(hits) > maxSearchLimit {
-		hits = hits[:maxSearchLimit]
-	}
-	return hits, nil
+	return allHits, nil
 }

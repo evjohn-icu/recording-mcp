@@ -70,6 +70,88 @@ func seedNote(t *testing.T, db *sql.DB, noteID, convID, summary string, evidence
 	}
 }
 
+func TestHNSWValidateCandidatesHandlesMoreThanSQLiteExpressionDepth(t *testing.T) {
+	db := openTestDB(t)
+	seedConversation(t, db, "conv:many", "rec:many")
+	provider := NewHashProvider(2)
+	items := make([]HNSWItem, 2050)
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	turnStmt, err := tx.Prepare(`INSERT INTO turns(id,conversation_id,recording_id,segment_index,global_start_ms,global_end_ms,content,source_sha256,transcript_version,original_turn_id,turn_json) VALUES(?,?,'rec:many',0,0,1,?,'sha','v1',?,'{}')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	embStmt, err := tx.Prepare(`INSERT INTO memory_embeddings(kind,artifact_id,conversation_id,content_sha256,provider_id,model_id,dims,vector,created_at) VALUES('turn',?,?,?,?,?,?,?,0)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range items {
+		id := fmt.Sprintf("many-%04d", i)
+		content := "same synthetic content"
+		if _, err := turnStmt.Exec(id, "conv:many", content, id); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := embStmt.Exec(id, "conv:many", sha256hex(content), provider.ID(), provider.Model(), provider.Dims(), Encode(Vector{1, 0})); err != nil {
+			t.Fatal(err)
+		}
+		items[i] = HNSWItem{Kind: "turn", ID: id}
+	}
+	if err := turnStmt.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := embStmt.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	r := &HNSWRetriever{DB: db, Provider: provider, Exact: &SQLiteRetriever{DB: db, Provider: provider}}
+	hits, err := r.validateCandidates(context.Background(), items, Vector{1, 0}, SearchOptions{Limit: maxSearchLimit})
+	if err != nil {
+		t.Fatalf("validate %d candidates: %v", len(items), err)
+	}
+	if len(hits) != maxSearchLimit {
+		t.Fatalf("got %d globally ranked hits, want capped %d", len(hits), maxSearchLimit)
+	}
+}
+
+func TestHNSWRetrieverHonorsExactMinimumSimilarity(t *testing.T) {
+	db := openTestDB(t)
+	seedConversation(t, db, "conv:threshold-sidecar", "rec:threshold-sidecar")
+	seedNote(t, db, "n:threshold-sidecar", "conv:threshold-sidecar", "季度预算审批计划")
+	p := NewHashProvider(64)
+	if _, err := (&Indexer{DB: db, Provider: p}).IndexAll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	strict := 1.01
+	exact := &SQLiteRetriever{DB: db, Provider: p, MinimumSimilarity: &strict}
+	r := &HNSWRetriever{DB: db, Provider: p, Exact: exact}
+	idx := NewHNSW(p.Dims())
+	v, err := p.Embed(context.Background(), []string{"季度预算审批计划"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add(HNSWItem{Kind: "note", ID: "n:threshold-sidecar", Vector: v[0]}); err != nil {
+		t.Fatal(err)
+	}
+	r.index = idx
+	r.generation = semanticIndexGeneration.Load()
+	r.dataVersion, err = getDataVersion(context.Background(), db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hits, err := r.Search(context.Background(), "季度预算审批计划", SearchOptions{Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 0 {
+		t.Fatalf("sidecar ignored Exact.MinimumSimilarity: %+v", hits)
+	}
+}
+
 func TestHashProviderDeterministic(t *testing.T) {
 	p := NewHashProvider(64)
 	ctx := context.Background()
@@ -211,6 +293,37 @@ func contains(s, sub string) bool {
 	return strings.Contains(s, sub)
 }
 
+func TestSQLiteRetrieverMinimumSimilarityOverride(t *testing.T) {
+	db := openTestDB(t)
+	seedConversation(t, db, "conv:threshold", "rec:threshold")
+	seedNote(t, db, "n:threshold", "conv:threshold", "季度预算审批计划")
+	provider := NewHashProvider(64)
+	if _, err := (&Indexer{DB: db, Provider: provider}).IndexAll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	query := "季度预算审批计划"
+	defaultRetriever := &SQLiteRetriever{DB: db, Provider: provider}
+	baseline, err := defaultRetriever.Search(context.Background(), query, SearchOptions{})
+	if err != nil || len(baseline) != 1 {
+		t.Fatalf("default threshold: hits=%+v err=%v", baseline, err)
+	}
+	strict := 1.01
+	configured := &SQLiteRetriever{DB: db, Provider: provider, MinimumSimilarity: &strict}
+	hits, err := configured.Search(context.Background(), query, SearchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 0 {
+		t.Fatalf("strict threshold admitted hits: %+v", hits)
+	}
+	zero := 0.0
+	permissive := &SQLiteRetriever{DB: db, Provider: provider, MinimumSimilarity: &zero}
+	hits, err = permissive.Search(context.Background(), query, SearchOptions{})
+	if err != nil || len(hits) != 1 {
+		t.Fatalf("zero threshold: hits=%+v err=%v", hits, err)
+	}
+}
+
 func TestSearchSkipsEmbeddingWhenArtifactContentChanged(t *testing.T) {
 	db := openTestDB(t)
 	seedConversation(t, db, "conv:a", "rec:a")
@@ -274,6 +387,10 @@ func TestHNSWSidecarChecksAuthoritativeRowsAndFallsBackWhenStale(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, diag, err := r.SearchWithDiagnostics(context.Background(), "季度计划迁往珠海", SearchOptions{Limit: 1})
+	if err != nil || diag.Path != "hnsw" || diag.Fallback {
+		t.Fatalf("sidecar diagnostics = %+v err=%v", diag, err)
+	}
 	found := false
 	for _, h := range hits {
 		if h.ArtifactID == "n:hnsw" {
@@ -298,9 +415,9 @@ func TestHNSWSidecarChecksAuthoritativeRowsAndFallsBackWhenStale(t *testing.T) {
 	if oldIndex == nil || len(oldIndex.Nodes) != 0 {
 		t.Fatal("invalidation retained graph vectors")
 	}
-	hits, err = r.Search(context.Background(), "季度计划迁往珠海", SearchOptions{ConversationID: "conv:hnsw", Limit: 1})
-	if err != nil || len(hits) != 1 || hits[0].ArtifactID != "n:hnsw" {
-		t.Fatalf("exact fallback after invalidation: hits=%+v err=%v", hits, err)
+	hits, diag, err = r.SearchWithDiagnostics(context.Background(), "季度计划迁往珠海", SearchOptions{ConversationID: "conv:hnsw", Limit: 1})
+	if err != nil || !diag.Fallback || diag.Path != "exact-fallback" || diag.FallbackReason != "sidecar-unavailable" || len(hits) != 1 || hits[0].ArtifactID != "n:hnsw" {
+		t.Fatalf("exact fallback diagnostics: hits=%+v diag=%+v err=%v", hits, diag, err)
 	}
 	mustExec(t, db, `UPDATE notes SET summary='完全更新的不同内容' WHERE id='n:hnsw'`)
 	hits, err = r.Search(context.Background(), "季度计划迁往珠海", SearchOptions{Limit: 5})

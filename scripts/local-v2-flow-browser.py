@@ -8,18 +8,29 @@ ALPHA = os.environ.get('ALPHA_PASSWORD', 'synthetic-pass-alpha')
 BETA = os.environ.get('BETA_PASSWORD', 'synthetic-pass-beta')
 SECOND_PROFILE = os.environ.get('SECOND_PROFILE', 'beta')
 SECOND_PASSWORD = os.environ.get('SECOND_PASSWORD', BETA if SECOND_PROFILE == 'beta' else 'synthetic-pass-gamma')
-OUT = pathlib.Path(__file__).resolve().parents[1] / 'docs'
-OUT.mkdir(exist_ok=True)
-results = {'base_url': BASE, 'synthetic_fixture': True, 'cases': [], 'js_errors': [], 'forget_flow': 'NOT_RUN'}
+OUT = pathlib.Path(os.environ.get('BROWSER_ARTIFACT_DIR', str(pathlib.Path(__file__).resolve().parents[1] / 'docs')))
+OUT.mkdir(parents=True, exist_ok=True)
+results = {'base_url': BASE, 'synthetic_fixture': True, 'cases': [], 'js_errors': [], 'console_errors': [], 'forget_flow': 'NOT_RUN'}
 
 def record(name, status, detail=''):
     results['cases'].append({'name': name, 'status': status, 'detail': detail})
 
 async def main():
   async with async_playwright() as p:
-    browser = await p.chromium.launch(headless=True, executable_path='/usr/bin/google-chrome', args=['--no-sandbox','--autoplay-policy=no-user-gesture-required'])
+    browser_options = {'headless': True, 'args':['--no-sandbox','--autoplay-policy=no-user-gesture-required']}
+    if os.environ.get('BROWSER_PATH'):
+      browser_options['executable_path'] = os.environ['BROWSER_PATH']
+    browser = await p.chromium.launch(**browser_options)
     context = await browser.new_context(viewport={'width': 1280, 'height': 900}, accept_downloads=True)
     page = await context.new_page()
+    async def login_profile(profile, password):
+      if await page.locator('#auth-profile').count(): await page.locator('#auth-profile').select_option(profile)
+      await page.locator('#auth-credential').fill(password)
+      await page.get_by_role('button', name='进入').click()
+      await page.locator('.profile-toolbar').wait_for(timeout=20000)
+      await page.goto(BASE + '/recordings', wait_until='networkidle')
+      await page.locator('.profile-toolbar').wait_for(timeout=20000)
+      await page.get_by_role('heading', name='时间线').wait_for(timeout=20000)
     observed = {'forget': [], 'suppression': []}
     async def capture_mutation(response):
       path = response.url.split('?', 1)[0]
@@ -32,13 +43,16 @@ async def main():
         except Exception: pass
     page.on('response', lambda response: asyncio.create_task(capture_mutation(response)))
     page.on('pageerror', lambda error: results['js_errors'].append(str(error)))
-    page.on('console', lambda msg: results['js_errors'].append('console: '+msg.text) if msg.type == 'error' else None)
+    # Browser console resource errors include intentional HTTP conflicts, aborts,
+    # and negative-path API checks; retain them for diagnostics but fail only on
+    # uncaught JavaScript page errors or explicit mandatory case failures.
+    page.on('console', lambda msg: results['console_errors'].append(msg.text) if msg.type == 'error' else None)
     try:
       await page.goto(BASE, wait_until='networkidle', timeout=30000)
       if await page.locator('#auth-credential').count():
-        if await page.locator('#auth-profile').count(): await page.locator('#auth-profile').select_option('alpha')
-        await page.locator('#auth-credential').fill(ALPHA)
-        await page.get_by_role('button', name='进入').click()
+        await login_profile('alpha', ALPHA)
+      else:
+        await page.goto(BASE + '/recordings', wait_until='networkidle')
       await page.get_by_role('heading', name='时间线').wait_for(timeout=20000)
       await page.wait_for_timeout(1000)
       titles = await page.locator('.timeline-row h2').all_text_contents()
@@ -48,22 +62,25 @@ async def main():
       # profile switch and verify logged-in profile identity plus separate timeline contents
       await page.get_by_role('button', name='退出登录').click()
       await page.locator('#auth-credential').wait_for()
-      await page.locator('#auth-profile').select_option(SECOND_PROFILE)
-      await page.locator('#auth-credential').fill(SECOND_PASSWORD)
-      await page.get_by_role('button', name='进入').click()
-      await page.get_by_role('heading', name='时间线').wait_for(timeout=20000)
+      await login_profile(SECOND_PROFILE, SECOND_PASSWORD)
       await page.wait_for_timeout(700)
       beta_titles = await page.locator('.timeline-row h2').all_text_contents()
       record('profile-switch-isolation', 'PASS' if f'配置：{SECOND_PROFILE}' in await page.locator('.profile-toolbar').inner_text() else 'FAIL', f'{SECOND_PROFILE}: {len(beta_titles)} rows; alpha rows={len(titles)}')
       # Back to alpha for subsequent checks.
-      await page.get_by_role('button', name='退出登录').click(); await page.locator('#auth-profile').select_option('alpha'); await page.locator('#auth-credential').fill(ALPHA); await page.get_by_role('button', name='进入').click()
-      await page.get_by_role('heading', name='时间线').wait_for(timeout=20000)
+      await page.get_by_role('button', name='退出登录').click(); await page.locator('#auth-credential').wait_for(); await login_profile('alpha', ALPHA)
       await page.wait_for_timeout(500)
       titles = await page.locator('.timeline-row h2').all_text_contents()
       if titles:
         await page.locator('.timeline-row').first.click()
         await page.locator('.turn-row').first.wait_for(timeout=20000)
         print('detail', await page.locator('h1').first.inner_text(), 'turns', await page.locator('.turn-row').count())
+        await page.locator('.processing-progress').wait_for(timeout=10000)
+        processing_text = await page.locator('.processing-progress').inner_text()
+        processing_snapshot = await page.evaluate("async () => { const id=decodeURIComponent(location.pathname.split('/').pop()); const r=await fetch(`/api/conversations/${encodeURIComponent(id)}/processing`); return {status:r.status, body:await r.json()}; }")
+        worker_absent = '未检测到工作进程' in processing_text
+        generator_off = processing_snapshot['body'].get('generator_enabled') is False
+        generator_ui_unknown = '候选生成器状态未知' in processing_text
+        record('processing-status-generator-off-worker-absent', 'PASS' if processing_snapshot['status'] == 200 and worker_absent and generator_off and generator_ui_unknown else 'FAIL', f"API={processing_snapshot['status']}; generator_enabled={processing_snapshot['body'].get('generator_enabled')}; worker_absent={worker_absent}; generator_ui_unknown={generator_ui_unknown}; {processing_text}")
         record('detail-transcript', 'PASS' if await page.locator('.turn-row').count() else 'FAIL')
         # Audio actual interaction, verify currentTime advances.
         play = page.locator('.turn-row').filter(has=page.get_by_role('button', name='播放')).first.get_by_role('button', name='播放')
@@ -315,7 +332,7 @@ async def main():
       await page.get_by_role('button', name='退出登录').click(); await page.locator('#auth-profile').wait_for(timeout=10000); await page.locator('#auth-credential').wait_for(timeout=10000); await page.locator('#auth-profile').select_option(SECOND_PROFILE)
       await page.locator('#auth-credential').fill(SECOND_PASSWORD); await page.get_by_role('button', name='进入').click()
       await page.locator('.profile-toolbar').filter(has_text=f'配置：{SECOND_PROFILE}').wait_for(timeout=20000)
-      await page.get_by_role('link', name='时间线').click()
+      await page.get_by_role('link', name='录音').click()
       await page.get_by_role('heading', name='时间线').wait_for(timeout=20000)
       await page.get_by_role('button', name='永久遗忘整个资料库').click()
       dialog = page.get_by_role('dialog')
@@ -332,7 +349,12 @@ async def main():
       await page.screenshot(path=str(OUT/'local-v2-browser.png'), full_page=True)
     finally:
       await browser.close()
+  failures = [case for case in results['cases'] if case['status'] == 'FAIL']
+  if results['js_errors']:
+    failures.append({'name': 'javascript-errors'})
   (OUT/'local-v2-browser-results.json').write_text(json.dumps(results, ensure_ascii=False, indent=2)+'\n')
   print(json.dumps(results, ensure_ascii=False, indent=2))
+  if failures:
+    raise SystemExit(1)
 
 if __name__ == '__main__': asyncio.run(main())

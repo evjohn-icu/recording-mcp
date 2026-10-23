@@ -64,7 +64,7 @@ func (s *Store) PurgeRetiredProfile(ctx context.Context) error {
 	}
 	tables := []string{
 		"decision_answers", "processing_attempts", "note_evidence", "turn_topics", "turn_classes", "analysis_coverage", "attachment_turns", "derived_artifact_sources", "speaker_binding_events",
-		"memory_embeddings", "memory_links", "derived_artifacts", "decision_runs", "publication_runs", "memory_candidates", "notes", "speaker_bindings", "turns", "source_attachments", "processing_jobs", "recordings", "topic_conversations", "topics", "conversations", "sync_chunks", "sync_events", "sync_recordings", "sync_state", "ai_note_suppressions", "suppression_cleanup_operations", "annotation_history", "forget_files", "forget_provider_fences", "forget_tombstones",
+		"worker_heartbeats", "processing_retry_requests", "memory_embeddings", "memory_links", "derived_artifacts", "decision_runs", "publication_runs", "memory_candidates", "notes", "speaker_bindings", "turns", "source_attachments", "processing_jobs", "recordings", "topic_conversations", "topics", "conversations", "sync_chunks", "sync_events", "sync_recordings", "sync_state", "ai_note_suppressions", "suppression_cleanup_operations", "annotation_history", "forget_files", "forget_provider_fences", "forget_tombstones",
 	}
 	for _, table := range tables {
 		if _, err = tx.ExecContext(ctx, "DELETE FROM "+table); err != nil {

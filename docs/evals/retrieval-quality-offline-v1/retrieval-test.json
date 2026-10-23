@@ -1,0 +1,735 @@
+{
+  "description": "Authored 160-query Chinese retrieval benchmark, 120 answerable / 40 no-evidence. Grouped 50/25/25 train/calibration/test by independent concept group; no query rewrites cross splits.",
+  "questions": [
+    {
+      "id": "q-046-1",
+      "group_id": "positive-046",
+      "split": "test",
+      "bucket": "home",
+      "query": "垃圾分类点几点关",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-046",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-046",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-046 仅属于 test。"
+    },
+    {
+      "id": "q-046-2",
+      "group_id": "positive-046",
+      "split": "test",
+      "bucket": "home",
+      "query": "厨余垃圾应该放在哪类桶",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-046",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-046",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-046 仅属于 test。"
+    },
+    {
+      "id": "q-047-1",
+      "group_id": "positive-047",
+      "split": "test",
+      "bucket": "home",
+      "query": "路由器放在哪儿",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-047",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-047",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-047 仅属于 test。"
+    },
+    {
+      "id": "q-047-2",
+      "group_id": "positive-047",
+      "split": "test",
+      "bucket": "home",
+      "query": "哪个房间信号弱怎么改善",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-047",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-047",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-047 仅属于 test。"
+    },
+    {
+      "id": "q-048-1",
+      "group_id": "positive-048",
+      "split": "test",
+      "bucket": "home",
+      "query": "周末几点能装修",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-048",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-048",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-048 仅属于 test。"
+    },
+    {
+      "id": "q-048-2",
+      "group_id": "positive-048",
+      "split": "test",
+      "bucket": "home",
+      "query": "中午以后可以钻墙吗",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-048",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-048",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-048 仅属于 test。"
+    },
+    {
+      "id": "q-049-1",
+      "group_id": "positive-049",
+      "split": "test",
+      "bucket": "home",
+      "query": "晾衣绳什么时候能用",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-049",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-049",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-049 仅属于 test。"
+    },
+    {
+      "id": "q-049-2",
+      "group_id": "positive-049",
+      "split": "test",
+      "bucket": "home",
+      "query": "下雨时屋顶晾衣架怎么处理",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-049",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-049",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-049 仅属于 test。"
+    },
+    {
+      "id": "q-050-1",
+      "group_id": "positive-050",
+      "split": "test",
+      "bucket": "home",
+      "query": "备用钥匙放在哪里",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-050",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-050",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-050 仅属于 test。"
+    },
+    {
+      "id": "q-050-2",
+      "group_id": "positive-050",
+      "split": "test",
+      "bucket": "home",
+      "query": "去物业拿钥匙要登记什么",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-050",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-050",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-050 仅属于 test。"
+    },
+    {
+      "id": "q-051-1",
+      "group_id": "positive-051",
+      "split": "test",
+      "bucket": "education",
+      "query": "机器人材料包何时发",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-051",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-051",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-051 仅属于 test。"
+    },
+    {
+      "id": "q-051-2",
+      "group_id": "positive-051",
+      "split": "test",
+      "bucket": "education",
+      "query": "零件缺失最迟哪天反馈",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-051",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-051",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-051 仅属于 test。"
+    },
+    {
+      "id": "q-052-1",
+      "group_id": "positive-052",
+      "split": "test",
+      "bucket": "education",
+      "query": "英语角讨论什么主题",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-052",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-052",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-052 仅属于 test。"
+    },
+    {
+      "id": "q-052-2",
+      "group_id": "positive-052",
+      "split": "test",
+      "bucket": "education",
+      "query": "每人分享要讲多久",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-052",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-052",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-052 仅属于 test。"
+    },
+    {
+      "id": "q-053-1",
+      "group_id": "positive-053",
+      "split": "test",
+      "bucket": "education",
+      "query": "绘本课在哪上",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-053",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-053",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-053 仅属于 test。"
+    },
+    {
+      "id": "q-053-2",
+      "group_id": "positive-053",
+      "split": "test",
+      "bucket": "education",
+      "query": "家长怎么给孩子签到",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-053",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-053",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-053 仅属于 test。"
+    },
+    {
+      "id": "q-054-1",
+      "group_id": "positive-054",
+      "split": "test",
+      "bucket": "education",
+      "query": "编程结课交哪些文件",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-054",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-054",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-054 仅属于 test。"
+    },
+    {
+      "id": "q-054-2",
+      "group_id": "positive-054",
+      "split": "test",
+      "bucket": "education",
+      "query": "结课项目需要录视频吗",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-054",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-054",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-054 仅属于 test。"
+    },
+    {
+      "id": "q-055-1",
+      "group_id": "positive-055",
+      "split": "test",
+      "bucket": "education",
+      "query": "美术课自己带什么",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-055",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-055",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-055 仅属于 test。"
+    },
+    {
+      "id": "q-055-2",
+      "group_id": "positive-055",
+      "split": "test",
+      "bucket": "education",
+      "query": "颜料是学生准备还是教室提供",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-055",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-055",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-055 仅属于 test。"
+    },
+    {
+      "id": "q-056-1",
+      "group_id": "positive-056",
+      "split": "test",
+      "bucket": "education",
+      "query": "研讨间一次能用多久",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-056",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-056",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-056 仅属于 test。"
+    },
+    {
+      "id": "q-056-2",
+      "group_id": "positive-056",
+      "split": "test",
+      "bucket": "education",
+      "query": "小组间最多坐几个人",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-056",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-056",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-056 仅属于 test。"
+    },
+    {
+      "id": "q-057-1",
+      "group_id": "positive-057",
+      "split": "test",
+      "bucket": "education",
+      "query": "科学展怎么报名",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-057",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-057",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-057 仅属于 test。"
+    },
+    {
+      "id": "q-057-2",
+      "group_id": "positive-057",
+      "split": "test",
+      "bucket": "education",
+      "query": "报名材料何时交，谁要签字",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-057",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-057",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-057 仅属于 test。"
+    },
+    {
+      "id": "q-058-1",
+      "group_id": "positive-058",
+      "split": "test",
+      "bucket": "education",
+      "query": "合唱彩排用什么伴奏",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-058",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-058",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-058 仅属于 test。"
+    },
+    {
+      "id": "q-058-2",
+      "group_id": "positive-058",
+      "split": "test",
+      "bucket": "education",
+      "query": "弦乐什么时候加入",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-058",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-058",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-058 仅属于 test。"
+    },
+    {
+      "id": "q-059-1",
+      "group_id": "positive-059",
+      "split": "test",
+      "bucket": "education",
+      "query": "家长会从哪里进",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-059",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-059",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-059 仅属于 test。"
+    },
+    {
+      "id": "q-059-2",
+      "group_id": "positive-059",
+      "split": "test",
+      "bucket": "education",
+      "query": "签到后按什么领取座位",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-059",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-059",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-059 仅属于 test。"
+    },
+    {
+      "id": "q-060-1",
+      "group_id": "positive-060",
+      "split": "test",
+      "bucket": "education",
+      "query": "观察作业要记录什么",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-060",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-060",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-060 仅属于 test。"
+    },
+    {
+      "id": "q-060-2",
+      "group_id": "positive-060",
+      "split": "test",
+      "bucket": "education",
+      "query": "做自然作业可以摘叶子吗",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-060",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-060",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-060 仅属于 test。"
+    },
+    {
+      "id": "q-neg-031",
+      "group_id": "neg-food-03",
+      "split": "test",
+      "bucket": "no_evidence",
+      "query": "读书会是否提供咖啡和甜点",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-food-03，split=test。"
+    },
+    {
+      "id": "q-neg-032",
+      "group_id": "neg-food-04",
+      "split": "test",
+      "bucket": "no_evidence",
+      "query": "市集摊位能不能售卖自制酒",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-food-04，split=test。"
+    },
+    {
+      "id": "q-neg-033",
+      "group_id": "neg-dev-01",
+      "split": "test",
+      "bucket": "no_evidence",
+      "query": "打印机管理员的门禁密码",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-dev-01，split=test。"
+    },
+    {
+      "id": "q-neg-034",
+      "group_id": "neg-dev-02",
+      "split": "test",
+      "bucket": "no_evidence",
+      "query": "会议室投影仪支持无线投屏吗",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-dev-02，split=test。"
+    },
+    {
+      "id": "q-neg-035",
+      "group_id": "neg-dev-03",
+      "split": "test",
+      "bucket": "no_evidence",
+      "query": "路由器的管理员账号是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-dev-03，split=test。"
+    },
+    {
+      "id": "q-neg-036",
+      "group_id": "neg-dev-04",
+      "split": "test",
+      "bucket": "no_evidence",
+      "query": "员工手机补贴每月多少",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-dev-04，split=test。"
+    },
+    {
+      "id": "q-neg-037",
+      "group_id": "neg-com-01",
+      "split": "test",
+      "bucket": "no_evidence",
+      "query": "合唱团是否参加年底电视晚会",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-com-01，split=test。"
+    },
+    {
+      "id": "q-neg-038",
+      "group_id": "neg-com-02",
+      "split": "test",
+      "bucket": "no_evidence",
+      "query": "社区花园有几只流浪猫",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-com-02，split=test。"
+    },
+    {
+      "id": "q-neg-039",
+      "group_id": "neg-com-03",
+      "split": "test",
+      "bucket": "no_evidence",
+      "query": "市集活动有没有抽奖环节",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-com-03，split=test。"
+    },
+    {
+      "id": "q-neg-040",
+      "group_id": "neg-com-04",
+      "split": "test",
+      "bucket": "no_evidence",
+      "query": "志愿者今年服务时长排名",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-com-04，split=test。"
+    }
+  ]
+}

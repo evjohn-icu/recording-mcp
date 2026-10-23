@@ -114,6 +114,8 @@ export interface WorldlineGeneration {
   semantic_truncated?: boolean
 }
 
+export interface WorldlineAnalysisJob extends WorldlineGeneration { job_id: string; request_id?: string; error?: string }
+
 export interface WorldlineSemanticSuggestion {
   status: string
   relation: string
@@ -128,12 +130,15 @@ export interface WorldlineSemanticSuggestion {
   identity_status?: string
   reason?: string
   requires_review: boolean
+  suggestion_id: string
+  review_status?: 'accept' | 'reject' | 'insufficient' | 'reopen' | string
 }
 
 export type WorldlineMentionRelation = 'first_mention' | 'subsequent_mention' | 'repeated_statement' | 'plan' | 'human_correction' | 'human_reality_change' | 'review_required' | string
 
 export interface WorldlineThreadSummary {
   id: string
+  manual_group?: boolean
   title: string
   source_topic_ids: string[]
   macro_topic_id: string
@@ -226,8 +231,30 @@ export function submitWorldlineFeedback(feedback: WorldlineFeedback): Promise<{ 
   return request('/api/worldline/feedback', { method: 'POST', body: JSON.stringify(feedback) })
 }
 
+export function renameWorldlineThread(id: string, title: string, expectedVersion: string, requestID: string): Promise<{ version: string }> {
+  return request(`/api/worldline/threads/${encodeURIComponent(id)}/rename`, { method: 'POST', body: JSON.stringify({ title, expected_version: expectedVersion, request_id: requestID }) })
+}
+
+export function groupWorldlineThreads(threadIDs: string[], title: string, expectedVersion: string, requestID: string): Promise<{ version: string }> {
+  return request('/api/worldline/threads/group', { method: 'POST', body: JSON.stringify({ action: 'group', thread_ids: threadIDs, title, expected_version: expectedVersion, request_id: requestID }) })
+}
+export function revokeWorldlineThreadGroup(groupID: string, expectedVersion: string, requestID: string): Promise<{ version: string }> {
+  return request('/api/worldline/threads/group', { method: 'POST', body: JSON.stringify({ action: 'revoke', group_id: groupID, expected_version: expectedVersion, request_id: requestID }) })
+}
+
+export function reviewWorldlineSemantic(suggestionID: string, decision: 'accept' | 'reject' | 'insufficient' | 'reopen', expectedVersion: string, requestID: string): Promise<{ version: string }> {
+  return request('/api/worldline/semantic-review', { method: 'POST', body: JSON.stringify({ suggestion_id: suggestionID, decision, expected_version: expectedVersion, request_id: requestID }) })
+}
+
 export function generateWorldline(requestID: string): Promise<WorldlineGeneration> {
   return request('/api/worldline/generate', { method: 'POST', body: JSON.stringify({ request_id: requestID }) })
+}
+
+export function startWorldlineAnalysis(requestID: string, signal?: AbortSignal): Promise<WorldlineAnalysisJob> {
+  return request('/api/worldline/analysis', { method: 'POST', body: JSON.stringify({ request_id: requestID }), signal })
+}
+export function getWorldlineAnalysis(jobID: string, signal?: AbortSignal): Promise<WorldlineAnalysisJob> {
+  return request(`/api/worldline/analysis/${encodeURIComponent(jobID)}`, { signal })
 }
 
 export function getWorldlineThreads(params: WorldlineThreadParams = {}, signal?: AbortSignal): Promise<WorldlineThreadsResponse> {

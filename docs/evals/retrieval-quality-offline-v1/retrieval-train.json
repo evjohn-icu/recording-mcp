@@ -1,0 +1,1465 @@
+{
+  "description": "Authored 160-query Chinese retrieval benchmark, 120 answerable / 40 no-evidence. Grouped 50/25/25 train/calibration/test by independent concept group; no query rewrites cross splits.",
+  "questions": [
+    {
+      "id": "q-001-1",
+      "group_id": "positive-001",
+      "split": "train",
+      "bucket": "finance",
+      "query": "西桥门店备用金是多少",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-001",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-001",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-001 仅属于 train。"
+    },
+    {
+      "id": "q-001-2",
+      "group_id": "positive-001",
+      "split": "train",
+      "bucket": "finance",
+      "query": "西桥店每月可周转的备用款额度",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-001",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-001",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-001 仅属于 train。"
+    },
+    {
+      "id": "q-002-1",
+      "group_id": "positive-002",
+      "split": "train",
+      "bucket": "finance",
+      "query": "展示柜采购怎么付款",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-002",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-002",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-002 仅属于 train。"
+    },
+    {
+      "id": "q-002-2",
+      "group_id": "positive-002",
+      "split": "train",
+      "bucket": "finance",
+      "query": "展示柜验收前要付多少比例",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-002",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-002",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-002 仅属于 train。"
+    },
+    {
+      "id": "q-003-1",
+      "group_id": "positive-003",
+      "split": "train",
+      "bucket": "finance",
+      "query": "差旅报销要交哪些材料",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-003",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-003",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-003 仅属于 train。"
+    },
+    {
+      "id": "q-003-2",
+      "group_id": "positive-003",
+      "split": "train",
+      "bucket": "finance",
+      "query": "出差费用核销的凭证要求",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-003",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-003",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-003 仅属于 train。"
+    },
+    {
+      "id": "q-004-1",
+      "group_id": "positive-004",
+      "split": "train",
+      "bucket": "finance",
+      "query": "工牌押金什么时候退",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-004",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-004",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-004 仅属于 train。"
+    },
+    {
+      "id": "q-004-2",
+      "group_id": "positive-004",
+      "split": "train",
+      "bucket": "finance",
+      "query": "归还门禁卡之后多久返押金",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-004",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-004",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-004 仅属于 train。"
+    },
+    {
+      "id": "q-005-1",
+      "group_id": "positive-005",
+      "split": "train",
+      "bucket": "finance",
+      "query": "读书会场地费多少钱",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-005",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-005",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-005 仅属于 train。"
+    },
+    {
+      "id": "q-005-2",
+      "group_id": "positive-005",
+      "split": "train",
+      "bucket": "finance",
+      "query": "云桥活动租场每季怎么分摊",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-005",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-005",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-005 仅属于 train。"
+    },
+    {
+      "id": "q-006-1",
+      "group_id": "positive-006",
+      "split": "train",
+      "bucket": "finance",
+      "query": "摄影器材维修预算上限",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-006",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-006",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-006 仅属于 train。"
+    },
+    {
+      "id": "q-006-2",
+      "group_id": "positive-006",
+      "split": "train",
+      "bucket": "finance",
+      "query": "修相机超过多少要再报批",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-006",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-006",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-006 仅属于 train。"
+    },
+    {
+      "id": "q-007-1",
+      "group_id": "positive-007",
+      "split": "train",
+      "bucket": "finance",
+      "query": "市集摊位费交给谁",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-007",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-007",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-007 仅属于 train。"
+    },
+    {
+      "id": "q-007-2",
+      "group_id": "positive-007",
+      "split": "train",
+      "bucket": "finance",
+      "query": "社区摊位费可以用现金吗",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-007",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-007",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-007 仅属于 train。"
+    },
+    {
+      "id": "q-008-1",
+      "group_id": "positive-008",
+      "split": "train",
+      "bucket": "finance",
+      "query": "团建餐费报销标准",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-008",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-008",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-008 仅属于 train。"
+    },
+    {
+      "id": "q-008-2",
+      "group_id": "positive-008",
+      "split": "train",
+      "bucket": "finance",
+      "query": "聚餐每个人最多报多少，酒水算吗",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-008",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-008",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-008 仅属于 train。"
+    },
+    {
+      "id": "q-009-1",
+      "group_id": "positive-009",
+      "split": "train",
+      "bucket": "finance",
+      "query": "工作室每月能打印多少页",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-009",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-009",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-009 仅属于 train。"
+    },
+    {
+      "id": "q-009-2",
+      "group_id": "positive-009",
+      "split": "train",
+      "bucket": "finance",
+      "query": "彩色打印怎么扣工作室额度",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-009",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-009",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-009 仅属于 train。"
+    },
+    {
+      "id": "q-010-1",
+      "group_id": "positive-010",
+      "split": "train",
+      "bucket": "finance",
+      "query": "志愿活动保险谁买",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-010",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-010",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-010 仅属于 train。"
+    },
+    {
+      "id": "q-010-2",
+      "group_id": "positive-010",
+      "split": "train",
+      "bucket": "finance",
+      "query": "参加公益活动要自己先交保险费吗",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-010",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-010",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-010 仅属于 train。"
+    },
+    {
+      "id": "q-011-1",
+      "group_id": "positive-011",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "产品评审几点开始",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-011",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-011",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-011 仅属于 train。"
+    },
+    {
+      "id": "q-011-2",
+      "group_id": "positive-011",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "周五评审改到什么时间和房间",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-011",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-011",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-011 仅属于 train。"
+    },
+    {
+      "id": "q-012-1",
+      "group_id": "positive-012",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "周一站会安排",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-012",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-012",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-012 仅属于 train。"
+    },
+    {
+      "id": "q-012-2",
+      "group_id": "positive-012",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "星期一上班后先开什么会",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-012",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-012",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-012 仅属于 train。"
+    },
+    {
+      "id": "q-013-1",
+      "group_id": "positive-013",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "合唱团哪天排练",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-013",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-013",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-013 仅属于 train。"
+    },
+    {
+      "id": "q-013-2",
+      "group_id": "positive-013",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "文化馆六月十二号晚上有什么安排",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-013",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-013",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-013 仅属于 train。"
+    },
+    {
+      "id": "q-014-1",
+      "group_id": "positive-014",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "季度盘点截止时间",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-014",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-014",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-014 仅属于 train。"
+    },
+    {
+      "id": "q-014-2",
+      "group_id": "positive-014",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "最迟什么时候交库存表",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-014",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-014",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-014 仅属于 train。"
+    },
+    {
+      "id": "q-015-1",
+      "group_id": "positive-015",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "读书分享什么时候举行",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-015",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-015",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-015 仅属于 train。"
+    },
+    {
+      "id": "q-015-2",
+      "group_id": "positive-015",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "双周读书会安排在周几，多久",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-015",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-015",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-015 仅属于 train。"
+    },
+    {
+      "id": "q-016-1",
+      "group_id": "positive-016",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "供应商演示改到何时",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-016",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-016",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-016 仅属于 train。"
+    },
+    {
+      "id": "q-016-2",
+      "group_id": "positive-016",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "线上产品演示的新时间是什么",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-016",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-016",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-016 仅属于 train。"
+    },
+    {
+      "id": "q-017-1",
+      "group_id": "positive-017",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "暑期营什么时候截止报名",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-017",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-017",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-017 仅属于 train。"
+    },
+    {
+      "id": "q-017-2",
+      "group_id": "positive-017",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "五月二十号中午还能报名吗",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-017",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-017",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-017 仅属于 train。"
+    },
+    {
+      "id": "q-018-1",
+      "group_id": "positive-018",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "行政每月什么时候查消防",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-018",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-018",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-018 仅属于 train。"
+    },
+    {
+      "id": "q-018-2",
+      "group_id": "positive-018",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "消防通道例行检查安排",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-018",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-018",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-018 仅属于 train。"
+    },
+    {
+      "id": "q-019-1",
+      "group_id": "positive-019",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "花园轮值从哪天开始",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-019",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-019",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-019 仅属于 train。"
+    },
+    {
+      "id": "q-019-2",
+      "group_id": "positive-019",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "社区每户周末要浇几次水",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-019",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-019",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-019 仅属于 train。"
+    },
+    {
+      "id": "q-020-1",
+      "group_id": "positive-020",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "客服培训日期",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-020",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-020",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-020 仅属于 train。"
+    },
+    {
+      "id": "q-020-2",
+      "group_id": "positive-020",
+      "split": "train",
+      "bucket": "schedule",
+      "query": "培训在哪两天下午举行",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-020",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-020",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-020 仅属于 train。"
+    },
+    {
+      "id": "q-021-1",
+      "group_id": "positive-021",
+      "split": "train",
+      "bucket": "travel",
+      "query": "湖州调研怎么去园区",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-021",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-021",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-021 仅属于 train。"
+    },
+    {
+      "id": "q-021-2",
+      "group_id": "positive-021",
+      "split": "train",
+      "bucket": "travel",
+      "query": "高铁到哪个站后有接驳",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-021",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-021",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-021 仅属于 train。"
+    },
+    {
+      "id": "q-022-1",
+      "group_id": "positive-022",
+      "split": "train",
+      "bucket": "travel",
+      "query": "海边露营能带什么炉具",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-022",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-022",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-022 仅属于 train。"
+    },
+    {
+      "id": "q-022-2",
+      "group_id": "positive-022",
+      "split": "train",
+      "bucket": "travel",
+      "query": "露营地可以点篝火吗",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-022",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-022",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-022 仅属于 train。"
+    },
+    {
+      "id": "q-023-1",
+      "group_id": "positive-023",
+      "split": "train",
+      "bucket": "travel",
+      "query": "成都参会住在哪里附近",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-023",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-023",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-023 仅属于 train。"
+    },
+    {
+      "id": "q-023-2",
+      "group_id": "positive-023",
+      "split": "train",
+      "bucket": "travel",
+      "query": "从住宿走到会场需要多久",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-023",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-023",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-023 仅属于 train。"
+    },
+    {
+      "id": "q-024-1",
+      "group_id": "positive-024",
+      "split": "train",
+      "bucket": "travel",
+      "query": "骑行路线多长",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-024",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-024",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-024 仅属于 train。"
+    },
+    {
+      "id": "q-024-2",
+      "group_id": "positive-024",
+      "split": "train",
+      "bucket": "travel",
+      "query": "骑到青石桥中途可以补给吗",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-024",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-024",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-024 仅属于 train。"
+    },
+    {
+      "id": "q-025-1",
+      "group_id": "positive-025",
+      "split": "train",
+      "bucket": "travel",
+      "query": "返程机票怎么预订",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-025",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-025",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-025 仅属于 train。"
+    },
+    {
+      "id": "q-025-2",
+      "group_id": "positive-025",
+      "split": "train",
+      "bucket": "travel",
+      "query": "出差回程选什么舱位，有何限制",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-025",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-025",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-025 仅属于 train。"
+    },
+    {
+      "id": "q-026-1",
+      "group_id": "positive-026",
+      "split": "train",
+      "bucket": "travel",
+      "query": "山区民宿有电梯吗",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-026",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-026",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-026 仅属于 train。"
+    },
+    {
+      "id": "q-026-2",
+      "group_id": "positive-026",
+      "split": "train",
+      "bucket": "travel",
+      "query": "行李很重入住前要做什么",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-026",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-026",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-026 仅属于 train。"
+    },
+    {
+      "id": "q-027-1",
+      "group_id": "positive-027",
+      "split": "train",
+      "bucket": "travel",
+      "query": "自然博物馆哪天不开门",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-027",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-027",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-027 仅属于 train。"
+    },
+    {
+      "id": "q-027-2",
+      "group_id": "positive-027",
+      "split": "train",
+      "bucket": "travel",
+      "query": "团队参观最早哪天可以去",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-027",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-027",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-027 仅属于 train。"
+    },
+    {
+      "id": "q-028-1",
+      "group_id": "positive-028",
+      "split": "train",
+      "bucket": "travel",
+      "query": "机场拼车在哪里集合",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-028",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-028",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-028 仅属于 train。"
+    },
+    {
+      "id": "q-028-2",
+      "group_id": "positive-028",
+      "split": "train",
+      "bucket": "travel",
+      "query": "最早一班去机场几点走",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-028",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-028",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-028 仅属于 train。"
+    },
+    {
+      "id": "q-029-1",
+      "group_id": "positive-029",
+      "split": "train",
+      "bucket": "travel",
+      "query": "徒步要自己带什么",
+      "purpose": "lexical",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-029",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-029",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-029 仅属于 train。"
+    },
+    {
+      "id": "q-029-2",
+      "group_id": "positive-029",
+      "split": "train",
+      "bucket": "travel",
+      "query": "急救用品由谁准备",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-029",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-029",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-029 仅属于 train。"
+    },
+    {
+      "id": "q-030-1",
+      "group_id": "positive-030",
+      "split": "train",
+      "bucket": "travel",
+      "query": "布展车辆从哪里进",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-030",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-030",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-030 仅属于 train。"
+    },
+    {
+      "id": "q-030-2",
+      "group_id": "positive-030",
+      "split": "train",
+      "bucket": "travel",
+      "query": "进场前多久报车牌",
+      "purpose": "paraphrase",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-030",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-quality-030",
+        "transcript_revision": "rev-1",
+        "turn_id": "utt-1"
+      },
+      "notes": "人工编写的合成中文问法；概念组 positive-030 仅属于 train。"
+    },
+    {
+      "id": "q-neg-001",
+      "group_id": "neg-fin-01",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "采购预算是否已获董事会批准",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-fin-01，split=train。"
+    },
+    {
+      "id": "q-neg-002",
+      "group_id": "neg-fin-02",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "报销时是否能用纸质出租车票",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-fin-02，split=train。"
+    },
+    {
+      "id": "q-neg-003",
+      "group_id": "neg-fin-03",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "维修费用由哪家保险公司承担",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-fin-03，split=train。"
+    },
+    {
+      "id": "q-neg-004",
+      "group_id": "neg-fin-04",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "项目奖金什么时候发到工资卡",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-fin-04，split=train。"
+    },
+    {
+      "id": "q-neg-005",
+      "group_id": "neg-sch-01",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "新品发布会具体是哪一天",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-sch-01，split=train。"
+    },
+    {
+      "id": "q-neg-006",
+      "group_id": "neg-sch-02",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "值班人员是否需要夜间留宿",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-sch-02，split=train。"
+    },
+    {
+      "id": "q-neg-007",
+      "group_id": "neg-sch-03",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "年度总结会安排在哪个酒店",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-sch-03，split=train。"
+    },
+    {
+      "id": "q-neg-008",
+      "group_id": "neg-sch-04",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "什么时候开始暑假轮休",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-sch-04，split=train。"
+    },
+    {
+      "id": "q-neg-009",
+      "group_id": "neg-trv-01",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "湖州园区接驳车是否接受宠物",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-trv-01，split=train。"
+    },
+    {
+      "id": "q-neg-010",
+      "group_id": "neg-trv-02",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "参会酒店早餐几点供应",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-trv-02，split=train。"
+    },
+    {
+      "id": "q-neg-011",
+      "group_id": "neg-trv-03",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "徒步路线上是否可以租登山杖",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-trv-03，split=train。"
+    },
+    {
+      "id": "q-neg-012",
+      "group_id": "neg-trv-04",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "去机场拼车要支付多少油费",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-trv-04，split=train。"
+    },
+    {
+      "id": "q-neg-013",
+      "group_id": "neg-hlt-01",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "年度体检是否包括牙齿洁治",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-hlt-01，split=train。"
+    },
+    {
+      "id": "q-neg-014",
+      "group_id": "neg-hlt-02",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "急救箱里有没有儿童退烧药",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-hlt-02，split=train。"
+    },
+    {
+      "id": "q-neg-015",
+      "group_id": "neg-hlt-03",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "跑步恢复后参加半马是哪天",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-hlt-03，split=train。"
+    },
+    {
+      "id": "q-neg-016",
+      "group_id": "neg-hlt-04",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "舞蹈教室附近有没有按摩店",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-hlt-04，split=train。"
+    },
+    {
+      "id": "q-neg-017",
+      "group_id": "neg-hom-01",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "净水器安装师傅的联系电话",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-hom-01，split=train。"
+    },
+    {
+      "id": "q-neg-018",
+      "group_id": "neg-hom-02",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "访客停车每小时收多少钱",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-hom-02，split=train。"
+    },
+    {
+      "id": "q-neg-019",
+      "group_id": "neg-hom-03",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "阳台防水工程什么时候开工",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-hom-03，split=train。"
+    },
+    {
+      "id": "q-neg-020",
+      "group_id": "neg-hom-04",
+      "split": "train",
+      "bucket": "no_evidence",
+      "query": "物业是否提供上门清洁服务",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "notes": "负例：在已加载的合成语料中没有相应事实；独立问题组 neg-hom-04，split=train。"
+    }
+  ]
+}

@@ -2,10 +2,13 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sort"
 	"strings"
 	"time"
+
+	"recordingmcp/internal/plane"
 )
 
 // WorldlineThreadList is a read-only projection grouped by exact normalized
@@ -21,6 +24,7 @@ type WorldlineThreadList struct {
 
 type WorldlineThread struct {
 	ID                  string     `json:"id"`
+	ManualGroup         bool       `json:"manual_group,omitempty"`
 	Title               string     `json:"title"`
 	MacroTopicID        string     `json:"macro_topic_id"`
 	MacroTopicTitle     string     `json:"macro_topic_title"`
@@ -86,6 +90,10 @@ func (s *WorldlineService) Threads(ctx context.Context, scope string, q Worldlin
 		return WorldlineThreadList{}, err
 	}
 	built := buildWorldlineThreadDetails(topics)
+	if err := s.applyThreadAliases(ctx, scope, built); err != nil {
+		return WorldlineThreadList{}, err
+	}
+	built = activeThreadBuilds(built)
 	if err := s.applySemanticSuggestions(ctx, scope, built); err != nil {
 		return WorldlineThreadList{}, err
 	}
@@ -156,12 +164,16 @@ func (s *WorldlineService) Thread(ctx context.Context, scope, id string, q World
 		q.Status = "all"
 	}
 	built := buildWorldlineThreadDetails(topics)
+	if err := s.applyThreadAliases(ctx, scope, built); err != nil {
+		return WorldlineThreadDetail{}, err
+	}
+	built = activeThreadBuilds(built)
 	if err := s.applySemanticSuggestions(ctx, scope, built); err != nil {
 		return WorldlineThreadDetail{}, err
 	}
 	built = filterThreadBuilds(built, q)
 	for _, thread := range built {
-		if thread.thread.ID != id {
+		if thread.thread.ID != id && !thread.legacyIDs[id] {
 			continue
 		}
 		result := WorldlineThreadDetail{Version: version, Thread: thread.thread, EntriesTotal: len(thread.entries), UnknownEntriesTotal: len(thread.unknown), Entries: pageThreadEntries(thread.entries, entriesOffset, limit), UnknownEntries: pageThreadEntries(thread.unknown, unknownOffset, limit)}
@@ -176,12 +188,451 @@ func (s *WorldlineService) Thread(ctx context.Context, scope, id string, q World
 	return WorldlineThreadDetail{}, errors.New("worldline thread not found")
 }
 
+// applyThreadAliases overlays source-backed, reversible display names and
+// manual groups. Grouping only combines thread projections; claims and people
+// remain source records and legacy IDs stay resolvable through legacyIDs.
+func (s *WorldlineService) applyThreadAliases(ctx context.Context, scope string, built []threadBuild) error {
+	events, err := s.Time.History(ctx, scope)
+	if err != nil {
+		return err
+	}
+	byID := map[string]*threadBuild{}
+	originalTitles := map[string]string{}
+	sources, err := s.readSources(ctx)
+	if err != nil {
+		return err
+	}
+	currentNotes := map[string]string{}
+	for _, source := range sources {
+		if id, ok := source.claim.Metadata["source_note_id"].(string); ok {
+			currentNotes[id] = source.claim.Version
+		}
+	}
+	for i := range built {
+		if built[i].legacyIDs == nil {
+			built[i].legacyIDs = map[string]bool{built[i].thread.ID: true}
+		}
+		built[i].legacyIDs[built[i].thread.ID] = true
+		byID[built[i].thread.ID] = &built[i]
+		originalTitles[built[i].thread.ID] = built[i].thread.Title
+		for legacy := range built[i].legacyIDs {
+			byID[legacy] = &built[i]
+			originalTitles[legacy] = built[i].thread.Title
+		}
+	}
+	for _, ev := range events {
+		if ev.Type != "worldline.thread_group" || ev.SourceStatus != "current" || !feedbackSourcesCurrent(ev, currentNotes) {
+			continue
+		}
+		targets := stringMap(ev.StructuredData["legacy_thread_targets"])
+		for legacy, target := range targets {
+			if b := byID[target]; b != nil {
+				byID[legacy] = b
+				b.legacyIDs[legacy] = true
+				originalTitles[legacy] = b.thread.Title
+			}
+		}
+	}
+	latestGroups := map[string]plane.Event{}
+	for _, ev := range events {
+		if ev.Type == "worldline.thread_group" && ev.SourceStatus == "current" && feedbackSourcesCurrent(ev, currentNotes) {
+			gid, _ := ev.StructuredData["group_id"].(string)
+			if gid != "" {
+				prior, ok := latestGroups[gid]
+				if !ok || eventRecordedAfter(ev, prior) {
+					latestGroups[gid] = ev
+				}
+			}
+		}
+	}
+	groupIDs := make([]string, 0, len(latestGroups))
+	for gid := range latestGroups {
+		groupIDs = append(groupIDs, gid)
+	}
+	activeGroupIDs := map[string]bool{}
+	for gid, ev := range latestGroups {
+		action, _ := ev.StructuredData["action"].(string)
+		if ev.SourceStatus == "current" && feedbackSourcesCurrent(ev, currentNotes) && action == "group" {
+			activeGroupIDs[gid] = true
+		}
+	}
+	sort.Slice(groupIDs, func(i, j int) bool {
+		a, b := latestGroups[groupIDs[i]], latestGroups[groupIDs[j]]
+		if eventRecordedAfter(a, b) {
+			return false
+		}
+		if eventRecordedAfter(b, a) {
+			return true
+		}
+		return groupIDs[i] < groupIDs[j]
+	})
+	for _, gid := range groupIDs {
+		ev := latestGroups[gid]
+		if ev.SourceStatus != "current" {
+			continue
+		}
+		action, _ := ev.StructuredData["action"].(string)
+		if action != "group" {
+			continue
+		}
+		ids := stringSlice(ev.StructuredData["thread_ids"])
+		var base *threadBuild
+		for _, id := range ids {
+			b := byID[id]
+			if b == nil {
+				continue
+			}
+			if base == nil {
+				base = b
+				continue
+			}
+			if b == base || b.suppressed {
+				continue
+			}
+			for _, entry := range b.entries {
+				if !base.seen[entry.ID] {
+					base.entries = append(base.entries, entry)
+					base.seen[entry.ID] = true
+				}
+			}
+			for _, entry := range b.unknown {
+				if !base.seen[entry.ID] {
+					base.unknown = append(base.unknown, entry)
+					base.seen[entry.ID] = true
+				}
+			}
+			for id := range b.titles {
+				base.titles[id] = true
+			}
+			for conv := range b.conversations {
+				base.conversations[conv] = true
+			}
+			for old := range b.legacyIDs {
+				base.legacyIDs[old] = true
+				byID[old] = base
+			}
+			b.suppressed = true
+		}
+		if base == nil {
+			continue
+		}
+		oldID := base.thread.ID
+		base.legacyIDs[oldID] = true
+		base.legacyIDs[gid] = true
+		byID[gid] = base
+		title, _ := ev.StructuredData["title"].(string)
+		base.thread.ID = gid
+		base.thread.ManualGroup = true
+		base.groupedAt = worldlineEventTime(ev)
+		if strings.TrimSpace(title) != "" {
+			base.thread.Title = title
+		}
+		base.thread.SourceTopicIDs = base.thread.SourceTopicIDs[:0]
+		for sourceID := range base.titles {
+			base.thread.SourceTopicIDs = append(base.thread.SourceTopicIDs, sourceID)
+		}
+		sort.Strings(base.thread.SourceTopicIDs)
+		originalTitles[gid] = base.thread.Title
+	}
+	for _, ev := range events {
+		if ev.Type != "worldline.thread_alias" || ev.SourceStatus != "current" || !feedbackSourcesCurrent(ev, currentNotes) {
+			continue
+		}
+		id, _ := ev.StructuredData["thread_id"].(string)
+		title, _ := ev.StructuredData["title"].(string)
+		if strings.HasPrefix(id, "thread-group-") && !activeGroupIDs[id] {
+			continue
+		}
+		if b := byID[id]; b != nil {
+			for _, legacy := range stringSlice(ev.StructuredData["legacy_thread_ids"]) {
+				b.legacyIDs[legacy] = true
+				byID[legacy] = b
+				if _, ok := originalTitles[legacy]; !ok {
+					originalTitles[legacy] = b.thread.Title
+				}
+			}
+		}
+		if b := byID[id]; b != nil {
+			if !b.groupedAt.IsZero() && worldlineEventTime(ev).Before(b.groupedAt) && id != b.thread.ID {
+				continue
+			}
+			if strings.TrimSpace(title) == "" {
+				b.thread.Title = originalTitles[id]
+			} else {
+				b.thread.Title = title
+			}
+		}
+	}
+	return nil
+}
+
+// RenameThread appends a reversible alias event. Facts, source topic IDs and
+// speaker identities remain untouched; an empty title restores the source name.
+func (s *WorldlineService) RenameThread(ctx context.Context, scope, id, title, expectedVersion, requestID string) (string, error) {
+	if strings.TrimSpace(scope) == "" || strings.TrimSpace(requestID) == "" {
+		return "", errors.New("profile scope and request_id required")
+	}
+	if len([]rune(strings.TrimSpace(title))) > 120 {
+		return "", errors.New("title must be at most 120 characters")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	events, err := s.Time.History(ctx, scope)
+	if err != nil {
+		return "", err
+	}
+	payload, _ := json.Marshal(struct{ ID, Title string }{id, strings.TrimSpace(title)})
+	eventID := "wl-alias-" + shortHash(scope+"\x00"+requestID)
+	for _, e := range events {
+		if e.ID == eventID {
+			if e.StructuredData["request_payload_hash"] == shortHash(string(payload)) {
+				return worldlineVersionFromEvents(s, ctx, scope), nil
+			}
+			return "", errors.New("request_id conflict: existing rename payload differs")
+		}
+	}
+	topics, _, currentVersion, err := s.project(ctx, scope)
+	if err != nil {
+		return "", err
+	}
+	if currentVersion != expectedVersion {
+		return currentVersion, errors.New("worldline version conflict")
+	}
+	built := buildWorldlineThreadDetails(topics)
+	if err := s.applyThreadAliases(ctx, scope, built); err != nil {
+		return "", err
+	}
+	var target *threadBuild
+	for i := range built {
+		if built[i].thread.ID == id {
+			target = &built[i]
+			break
+		}
+	}
+	if target == nil {
+		return currentVersion, errors.New("worldline thread not found")
+	}
+	refs := []EvidenceReference{}
+	noteIDs := []string{}
+	noteVersions := map[string]string{}
+	conversations := map[string]bool{}
+	for _, entry := range append(append([]WorldlineThreadEntry{}, target.entries...), target.unknown...) {
+		refs = append(refs, evidenceRefs(entry.Evidence)...)
+		for _, conversation := range entry.ConversationIDs {
+			conversations[conversation] = true
+		}
+		if nid, ok := entry.Claim.Metadata["source_note_id"].(string); ok {
+			noteIDs = append(noteIDs, nid)
+			v, _ := entry.Claim.Metadata["source_note_version"].(string)
+			noteVersions[nid] = v
+		}
+	}
+	refs = uniqueEvidenceRefs(refs)
+	noteIDs = uniqueSorted(noteIDs)
+	if len(refs) == 0 {
+		return currentVersion, errors.New("rename requires current source evidence")
+	}
+	now := time.Now().UTC()
+	legacyIDs := make([]string, 0, len(target.legacyIDs))
+	for old := range target.legacyIDs {
+		if old != id {
+			legacyIDs = append(legacyIDs, old)
+		}
+	}
+	sort.Strings(legacyIDs)
+	data := map[string]any{"scope": scope, "origin": "worldline", "thread_id": id, "title": strings.TrimSpace(title), "request_id": requestID, "legacy_thread_ids": legacyIDs, "source_topic_ids": target.thread.SourceTopicIDs, "request_payload_hash": shortHash(string(payload)), "source_note_ids": noteIDs, "source_note_versions": noteVersions, "references": evidenceStrings(refs)}
+	conversationList := make([]string, 0, len(conversations))
+	for c := range conversations {
+		conversationList = append(conversationList, c)
+	}
+	sort.Strings(conversationList)
+	ev := plane.Event{ID: eventID, Type: "worldline.thread_alias", Timestamp: now, ObservedAt: now, RecordedAt: &now, Source: "local-web", Content: "worldline thread alias", Confidence: 1, StructuredData: data}
+	if len(conversationList) == 1 {
+		ev.ConversationID = conversationList[0]
+	}
+	if err = s.appendWorldlineMutation(ctx, scope, expectedVersion, shortHash(string(payload)), ev); err != nil {
+		return "", err
+	}
+	_, _, v, err := s.project(ctx, scope)
+	return v, err
+}
+
+func worldlineVersionFromEvents(s *WorldlineService, ctx context.Context, scope string) string {
+	_, _, v, _ := s.project(ctx, scope)
+	return v
+}
+
+// GroupThreads manually groups topical projections under a stable ID. The
+// source claims and speaker identities are never rewritten or merged.
+func (s *WorldlineService) GroupThreads(ctx context.Context, scope string, threadIDs []string, title, action, groupID, expectedVersion, requestID string) (string, error) {
+	if s == nil || s.Time == nil || strings.TrimSpace(scope) == "" || strings.TrimSpace(requestID) == "" {
+		return "", errors.New("worldline service, profile scope, and request_id required")
+	}
+	if action != "group" && action != "revoke" {
+		return "", errors.New("group action must be group or revoke")
+	}
+	if action == "group" && (len(uniqueSorted(threadIDs)) < 2 || strings.TrimSpace(title) == "" || len([]rune(strings.TrimSpace(title))) > 120) {
+		return "", errors.New("group requires at least two threads and a title of at most 120 characters")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	events, err := s.Time.History(ctx, scope)
+	if err != nil {
+		return "", err
+	}
+	payload, _ := json.Marshal(struct {
+		Action         string
+		ThreadIDs      []string
+		Title, GroupID string
+	}{action, threadIDs, strings.TrimSpace(title), groupID})
+	eventID := "wl-group-" + shortHash(scope+"\x00"+requestID)
+	for _, ev := range events {
+		if ev.ID == eventID {
+			if ev.StructuredData["request_payload_hash"] == shortHash(string(payload)) {
+				return worldlineVersionFromEvents(s, ctx, scope), nil
+			}
+			return "", errors.New("request_id conflict: existing group payload differs")
+		}
+	}
+	topics, _, version, err := s.project(ctx, scope)
+	if err != nil {
+		return "", err
+	}
+	if version != expectedVersion {
+		return version, errors.New("worldline version conflict")
+	}
+	built := buildWorldlineThreadDetails(topics)
+	if err := s.applyThreadAliases(ctx, scope, built); err != nil {
+		return "", err
+	}
+	built = activeThreadBuilds(built)
+	refs := []EvidenceReference{}
+	notes := map[string]string{}
+	convs := map[string]bool{}
+	legacyTargets := map[string]string{}
+	if action == "group" {
+		found := map[string]*threadBuild{}
+		for _, id := range threadIDs {
+			for i := range built {
+				if built[i].thread.ID == id || built[i].legacyIDs[id] {
+					found[id] = &built[i]
+					break
+				}
+			}
+			if found[id] == nil {
+				return version, errors.New("worldline thread not found")
+			}
+		}
+		for _, b := range found {
+			for old := range b.legacyIDs {
+				legacyTargets[old] = b.thread.ID
+			}
+			legacyTargets[b.thread.ID] = b.thread.ID
+			for _, entry := range append(append([]WorldlineThreadEntry{}, b.entries...), b.unknown...) {
+				refs = append(refs, evidenceRefs(entry.Evidence)...)
+				for _, c := range entry.ConversationIDs {
+					convs[c] = true
+				}
+				if id, ok := entry.Claim.Metadata["source_note_id"].(string); ok {
+					v, _ := entry.Claim.Metadata["source_note_version"].(string)
+					notes[id] = v
+				}
+			}
+		}
+		groupID = "thread-group-" + shortHash(scope+"\x00"+requestID)
+		if len(threadIDs) > 0 {
+			legacyTargets[groupID] = uniqueSorted(threadIDs)[0]
+		}
+	} else {
+		if strings.TrimSpace(groupID) == "" {
+			return version, errors.New("group_id required to revoke")
+		}
+		for _, ev := range events {
+			gid, _ := ev.StructuredData["group_id"].(string)
+			if ev.Type == "worldline.thread_group" && gid == groupID {
+				for old, target := range stringMap(ev.StructuredData["legacy_thread_targets"]) {
+					legacyTargets[old] = target
+				}
+				vals, _ := sourceReferences(ev)
+				for _, v := range vals {
+					if at := strings.LastIndex(v, "@"); at > 0 {
+						refs = append(refs, EvidenceReference{TurnID: v[:at], Revision: v[at+1:]})
+					}
+				}
+				for id, v := range stringMap(ev.StructuredData["source_note_versions"]) {
+					notes[id] = v
+				}
+				for _, c := range stringSlice(ev.StructuredData["source_conversation_ids"]) {
+					convs[c] = true
+				}
+			}
+		}
+	}
+	refs = uniqueEvidenceRefs(refs)
+	if len(refs) == 0 {
+		return version, errors.New("group change requires current source evidence")
+	}
+	checked, _, err := s.Time.validateEvidence(ctx, refs)
+	if err != nil {
+		return version, err
+	}
+	convIDs := make([]string, 0, len(convs))
+	for c := range convs {
+		convIDs = append(convIDs, c)
+	}
+	sort.Strings(convIDs)
+	now := time.Now().UTC()
+	legacyIDs := make([]string, 0, len(legacyTargets))
+	for old := range legacyTargets {
+		legacyIDs = append(legacyIDs, old)
+	}
+	sort.Strings(legacyIDs)
+	data := map[string]any{"scope": scope, "origin": "worldline", "action": action, "thread_ids": uniqueSorted(threadIDs), "legacy_thread_ids": legacyIDs, "legacy_thread_targets": legacyTargets, "group_id": groupID, "title": strings.TrimSpace(title), "request_id": requestID, "request_payload_hash": shortHash(string(payload)), "source_note_ids": mapKeys(notes), "source_note_versions": notes, "source_conversation_ids": convIDs, "references": checked}
+	ev := plane.Event{ID: eventID, Type: "worldline.thread_group", Timestamp: now, ObservedAt: now, RecordedAt: &now, Source: "local-web", Content: "worldline thread group " + action, Confidence: 1, StructuredData: data}
+	if len(convIDs) == 1 {
+		ev.ConversationID = convIDs[0]
+	}
+	if err = s.appendWorldlineMutation(ctx, scope, expectedVersion, shortHash(string(payload)), ev); err != nil {
+		return version, err
+	}
+	return worldlineVersionFromEvents(s, ctx, scope), nil
+}
+
+func mapKeys(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
 type threadBuild struct {
 	thread           WorldlineThread
 	entries, unknown []WorldlineThreadEntry
 	seen             map[string]bool
 	conversations    map[string]bool
 	titles           map[string]bool
+	legacyIDs        map[string]bool
+	suppressed       bool
+	groupedAt        time.Time
+}
+
+func worldlineEventTime(ev plane.Event) time.Time {
+	if ev.RecordedAt != nil {
+		return ev.RecordedAt.UTC()
+	}
+	return ev.Timestamp.UTC()
+}
+
+func activeThreadBuilds(input []threadBuild) []threadBuild {
+	out := make([]threadBuild, 0, len(input))
+	for _, b := range input {
+		if !b.suppressed {
+			out = append(out, b)
+		}
+	}
+	return out
 }
 
 func filterThreadBuilds(input []threadBuild, q WorldlineQuery) []threadBuild {
@@ -199,7 +650,7 @@ func filterThreadBuilds(input []threadBuild, q WorldlineQuery) []threadBuild {
 		b.thread.UnknownEntryCount = len(b.unknown)
 		b.thread.SemanticReviewCount = 0
 		for _, entry := range append(append([]WorldlineThreadEntry{}, b.entries...), b.unknown...) {
-			if entry.SemanticSuggestion != nil && entry.SemanticSuggestion.Status == "review_required" {
+			if entry.SemanticSuggestion != nil && entry.SemanticSuggestion.RequiresReview {
 				b.thread.SemanticReviewCount++
 			}
 		}
@@ -274,9 +725,9 @@ func buildWorldlineThreadDetails(topics []WorldlineTopic) []threadBuild {
 				}
 				g := groups[key]
 				if g == nil {
-					id := "thread-" + shortHash(key)
+					id := "thread-" + shortHash(key) // legacy title-derived ID, retained as a redirect
 					macro := macroTopic(key)
-					g = &threadBuild{thread: WorldlineThread{ID: id, Title: title, MacroTopicID: "topic-" + shortHash("macro:"+macro), MacroTopicTitle: macro, SourceTopicIDs: []string{}}, seen: map[string]bool{}, conversations: map[string]bool{}, titles: map[string]bool{}}
+					g = &threadBuild{thread: WorldlineThread{ID: id, Title: title, MacroTopicID: "topic-" + shortHash("macro:"+macro), MacroTopicTitle: macro, SourceTopicIDs: []string{}}, seen: map[string]bool{}, conversations: map[string]bool{}, titles: map[string]bool{}, legacyIDs: map[string]bool{id: true}}
 					groups[key] = g
 				}
 				if title < g.thread.Title {
@@ -330,6 +781,12 @@ func buildWorldlineThreadDetails(topics []WorldlineTopic) []threadBuild {
 			g.thread.SourceTopicIDs = append(g.thread.SourceTopicIDs, id)
 		}
 		sort.Strings(g.thread.SourceTopicIDs)
+		if len(g.thread.SourceTopicIDs) > 0 {
+			legacyID := g.thread.ID
+			g.thread.ID = "thread-topic-" + shortHash("source-topic:"+g.thread.SourceTopicIDs[0])
+			g.legacyIDs[g.thread.ID] = true
+			g.legacyIDs[legacyID] = true
+		}
 		g.thread.ConversationCount = len(g.conversations)
 		g.thread.EntryCount = len(g.entries) + len(g.unknown)
 		g.thread.DatedEntryCount = len(g.entries)

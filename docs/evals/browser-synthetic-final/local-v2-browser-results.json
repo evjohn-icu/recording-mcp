@@ -1,0 +1,118 @@
+{
+  "base_url": "http://127.0.0.1:51319",
+  "synthetic_fixture": true,
+  "cases": [
+    {
+      "name": "login-alpha-timeline",
+      "status": "PASS",
+      "detail": "24 timeline rows"
+    },
+    {
+      "name": "profile-switch-isolation",
+      "status": "PASS",
+      "detail": "beta: 0 rows; alpha rows=24"
+    },
+    {
+      "name": "processing-status-generator-off-worker-absent",
+      "status": "PASS",
+      "detail": "API=200; generator_enabled=False; worker_absent=True; generator_ui_unknown=True; 后台处理\n未检测到工作进程\n候选生成器状态未知\n\nembed：queued（0/3）"
+    },
+    {
+      "name": "detail-transcript",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "audio-play-current-time",
+      "status": "PASS",
+      "detail": "0.068359"
+    },
+    {
+      "name": "evidence-panel",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "correction-error-retry-retains-input",
+      "status": "PASS",
+      "detail": "2 fields; first draft retained=True"
+    },
+    {
+      "name": "transcript-version-conflict-draft-retention",
+      "status": "PASS",
+      "detail": "competing status=200; original-index merge retained=True; turns=2"
+    },
+    {
+      "name": "speaker-propose-confirm-revoke",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "fact-source-report-history-and-conflict",
+      "status": "PASS",
+      "detail": "competing status=200; conflict shown=True; report draft retained=True"
+    },
+    {
+      "name": "annotation-version-conflict-draft-retention",
+      "status": "PASS",
+      "detail": "competing status=200; conflict draft retained=True"
+    },
+    {
+      "name": "annotation-edit-sibling-preservation",
+      "status": "PASS",
+      "detail": "unchanged sibling summaries=True; 1 siblings checked"
+    },
+    {
+      "name": "suppression-preview-confirm-ui",
+      "status": "PASS",
+      "detail": "POST=200/complete; note removed=True; source retained=True; retention notice=True"
+    },
+    {
+      "name": "suppression-pending-reload-retry",
+      "status": "PASS",
+      "detail": "synthetic server-list entry reappeared after reload and retry cleared the tracker"
+    },
+    {
+      "name": "annotation-history-ui",
+      "status": "PASS",
+      "detail": "5 revisions"
+    },
+    {
+      "name": "search-ui",
+      "status": "PASS",
+      "detail": "query entered through UI; rows=0; state=['没有匹配的结果']"
+    },
+    {
+      "name": "search-result-open-ui",
+      "status": "PASS",
+      "detail": "matched corrected transcript text and opened its recording"
+    },
+    {
+      "name": "narrow-390-keyboard-search",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "forget-preview-confirm-complete",
+      "status": "PASS",
+      "detail": "POST=200; status=complete; original turn GET=404; key writes=['recording-forget:alpha']"
+    },
+    {
+      "name": "profile-retirement-synthetic",
+      "status": "PASS",
+      "detail": "retired=beta; remaining profiles=['alpha']"
+    }
+  ],
+  "js_errors": [],
+  "console_errors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: net::ERR_FAILED",
+    "Failed to load resource: the server responded with a status of 409 (Conflict)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 409 (Conflict)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+  ],
+  "forget_flow": "PASS"
+}

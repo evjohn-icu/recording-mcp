@@ -152,6 +152,98 @@ func registerWorldlineRoutes(mux *http.ServeMux, service *app.WorldlineService, 
 		version, err := service.Feedback(r.Context(), profile, req)
 		if err != nil {
 			status, code := http.StatusBadRequest, "invalid_worldline_feedback"
+			if strings.Contains(err.Error(), "version conflict") || strings.Contains(err.Error(), "conflicting event ID") {
+				status, code = http.StatusConflict, "worldline_version_conflict"
+			}
+			writeJSON(w, status, errorBody{Error: errorDetail{Code: code, Message: err.Error()}})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"version": version})
+	})
+	mux.HandleFunc("POST /api/worldline/threads/{id}/rename", func(w http.ResponseWriter, r *http.Request) {
+		profile := scope(r)
+		if strings.TrimSpace(profile) == "" {
+			writeForbidden(w, "profile_scope_required", "profile scope required")
+			return
+		}
+		if !requireJSON(w, r) {
+			return
+		}
+		var req struct {
+			Title           string `json:"title"`
+			ExpectedVersion string `json:"expected_version"`
+			RequestID       string `json:"request_id"`
+		}
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxRequestBody))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
+			writeBadRequest(w, "invalid worldline rename request")
+			return
+		}
+		version, err := service.RenameThread(r.Context(), profile, r.PathValue("id"), req.Title, req.ExpectedVersion, req.RequestID)
+		if err != nil {
+			status, code := http.StatusBadRequest, "worldline_rename_failed"
+			if strings.Contains(err.Error(), "version conflict") || strings.Contains(err.Error(), "conflicting event ID") {
+				status, code = http.StatusConflict, "worldline_version_conflict"
+			}
+			writeJSON(w, status, errorBody{Error: errorDetail{Code: code, Message: err.Error()}})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"version": version})
+	})
+	mux.HandleFunc("POST /api/worldline/threads/group", func(w http.ResponseWriter, r *http.Request) {
+		profile := scope(r)
+		if strings.TrimSpace(profile) == "" {
+			writeForbidden(w, "profile_scope_required", "profile scope required")
+			return
+		}
+		if !requireJSON(w, r) {
+			return
+		}
+		var req struct {
+			ThreadIDs       []string `json:"thread_ids"`
+			Title           string   `json:"title"`
+			Action          string   `json:"action"`
+			GroupID         string   `json:"group_id"`
+			ExpectedVersion string   `json:"expected_version"`
+			RequestID       string   `json:"request_id"`
+		}
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxRequestBody))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
+			writeBadRequest(w, "invalid worldline grouping request")
+			return
+		}
+		version, err := service.GroupThreads(r.Context(), profile, req.ThreadIDs, req.Title, req.Action, req.GroupID, req.ExpectedVersion, req.RequestID)
+		if err != nil {
+			status, code := http.StatusBadRequest, "worldline_group_failed"
+			if strings.Contains(err.Error(), "version conflict") || strings.Contains(err.Error(), "conflicting event ID") {
+				status, code = http.StatusConflict, "worldline_version_conflict"
+			}
+			writeJSON(w, status, errorBody{Error: errorDetail{Code: code, Message: err.Error()}})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"version": version})
+	})
+	mux.HandleFunc("POST /api/worldline/semantic-review", func(w http.ResponseWriter, r *http.Request) {
+		profile := scope(r)
+		if strings.TrimSpace(profile) == "" {
+			writeForbidden(w, "profile_scope_required", "profile scope required")
+			return
+		}
+		if !requireJSON(w, r) {
+			return
+		}
+		var req app.WorldlineSemanticReview
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxRequestBody))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
+			writeBadRequest(w, "invalid semantic review")
+			return
+		}
+		version, err := service.ReviewSemanticRelation(r.Context(), profile, req)
+		if err != nil {
+			status, code := http.StatusBadRequest, "worldline_semantic_review_failed"
 			if strings.Contains(err.Error(), "version conflict") {
 				status, code = http.StatusConflict, "worldline_version_conflict"
 			}
@@ -184,6 +276,44 @@ func registerWorldlineRoutes(mux *http.ServeMux, service *app.WorldlineService, 
 			return
 		}
 		writeJSON(w, http.StatusOK, result)
+	})
+	mux.HandleFunc("POST /api/worldline/analysis", func(w http.ResponseWriter, r *http.Request) {
+		profile := scope(r)
+		if strings.TrimSpace(profile) == "" {
+			writeForbidden(w, "profile_scope_required", "profile scope required")
+			return
+		}
+		if !requireJSON(w, r) {
+			return
+		}
+		var req struct {
+			RequestID string `json:"request_id"`
+		}
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxRequestBody))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
+			writeBadRequest(w, "invalid worldline analysis request")
+			return
+		}
+		job, err := service.EnqueueAnalysis(r.Context(), profile, req.RequestID)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errorBody{Error: errorDetail{Code: "worldline_analysis_enqueue_failed", Message: err.Error()}})
+			return
+		}
+		writeJSON(w, http.StatusAccepted, job)
+	})
+	mux.HandleFunc("GET /api/worldline/analysis/{id}", func(w http.ResponseWriter, r *http.Request) {
+		profile := scope(r)
+		if strings.TrimSpace(profile) == "" {
+			writeForbidden(w, "profile_scope_required", "profile scope required")
+			return
+		}
+		job, err := service.AnalysisStatus(r.Context(), profile, r.PathValue("id"))
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, errorBody{Error: errorDetail{Code: "worldline_job_not_found", Message: err.Error()}})
+			return
+		}
+		writeJSON(w, http.StatusOK, job)
 	})
 }
 

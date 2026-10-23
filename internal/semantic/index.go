@@ -28,14 +28,16 @@ type Indexer struct {
 // a second run over unchanged data reports Skipped equal to the first run's
 // Notes+Turns.
 type IndexReport struct {
-	Notes        int    `json:"notes"`
-	Turns        int    `json:"turns"`
-	Skipped      int    `json:"skipped"`
-	Pruned       int    `json:"pruned"`
-	ProviderID   string `json:"provider_id"`
-	Model        string `json:"model"`
-	SidecarBuilt bool   `json:"sidecar_built,omitempty"`
-	SidecarPath  string `json:"sidecar_path,omitempty"`
+	Notes         int    `json:"notes"`
+	Turns         int    `json:"turns"`
+	Skipped       int    `json:"skipped"`
+	Pruned        int    `json:"pruned"`
+	EmbedRequests int    `json:"embed_requests"`
+	EmbeddedItems int    `json:"embedded_items"`
+	ProviderID    string `json:"provider_id"`
+	Model         string `json:"model"`
+	SidecarBuilt  bool   `json:"sidecar_built,omitempty"`
+	SidecarPath   string `json:"sidecar_path,omitempty"`
 }
 
 type artifact struct {
@@ -114,6 +116,8 @@ func (ix *Indexer) indexBatch(ctx context.Context, arts []artifact, rep *IndexRe
 	for i, p := range todo {
 		texts[i] = p.text
 	}
+	rep.EmbedRequests++
+	rep.EmbeddedItems += len(texts)
 	vectors, err := ix.Provider.Embed(ctx, texts)
 	if err != nil {
 		return err

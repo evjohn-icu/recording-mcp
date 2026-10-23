@@ -16,6 +16,7 @@ type questionEval struct {
 	hits             int
 	goldFound        int
 	recall           float64
+	precisionAt5     float64
 	staleLeakage     float64
 	staleItems       int
 	relationAssisted int
@@ -133,10 +134,16 @@ func evaluateQuestion(q Question, pkg contextbuild.Package, staleTurns, knownTur
 		first = first[:5]
 	}
 	found := map[string]bool{}
+	relevantItems := 0
 	for _, item := range first {
+		itemRelevant := false
 		for _, id := range evidenceIDs(item, noteEvidence) {
 			found[id] = true
+			for _, gold := range q.GoldEvidenceTurnIDs {
+				if id == gold { itemRelevant = true; break }
+			}
 		}
+		if itemRelevant { relevantItems++ }
 	}
 	for _, gold := range q.GoldEvidenceTurnIDs {
 		if found[gold] {
@@ -146,6 +153,7 @@ func evaluateQuestion(q Question, pkg contextbuild.Package, staleTurns, knownTur
 	if n := len(q.GoldEvidenceTurnIDs); n > 0 {
 		ev.recall = float64(ev.goldFound) / float64(n)
 	}
+	if len(first) > 0 { ev.precisionAt5 = float64(relevantItems) / float64(len(first)) }
 
 	// Stale or mixed-staleness items still have to be scanned for invalid
 	// references: staleness and reference validity are independent checks.

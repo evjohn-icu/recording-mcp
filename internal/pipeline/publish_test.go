@@ -236,6 +236,56 @@ func TestPublishHandlerCommitsAndReplays(t *testing.T) {
 	}
 }
 
+func TestPublishHandlerRecoversAfterAnnotationCommit(t *testing.T) {
+	ctx := context.Background()
+	db, store := openTestDBAndStore(t)
+	conv := "conv-publish-recovery"
+	seedTwoTurns(t, db, conv)
+	insertValidated(t, db, conv, "run-recovery")
+	h := &PublishHandler{DB: db, Store: store}
+	current, version, err := store.CurrentAnnotations(ctx, conv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged, sortedIDs := mergeCandidates(current, mustCandidates(t, db, conv))
+	merged, err = rebuildAutomaticTopicMembership(ctx, db, conv, merged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newVersion := "auto-" + sha256Hex(strings.Join(sortedIDs, "|"), 12)
+	merged.Title, _ = conversationTitle(ctx, db, conv)
+	merged.ConversationID, merged.AnnotationVersion, merged.AnnotationBasis = conv, newVersion, autoBasis
+	if err := store.ApplyAnnotations(ctx, conv, version, merged); err != nil {
+		t.Fatalf("simulate committed annotations: %v", err)
+	}
+	job := claimPublishJob(t, db, conv, "run-recovery")
+	if _, err := h.Execute(ctx, job); err != nil {
+		t.Fatalf("recover publish: %v", err)
+	}
+	var pubs, embeds, curates int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM publication_runs WHERE conversation_id=? AND status='committed'`, conv).Scan(&pubs); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM processing_jobs WHERE idempotency_key=?`, "embed|"+conv+"|"+newVersion).Scan(&embeds); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM processing_jobs WHERE idempotency_key=?`, "curate|"+conv+"|"+newVersion).Scan(&curates); err != nil {
+		t.Fatal(err)
+	}
+	if pubs != 1 || embeds != 1 || curates != 1 {
+		t.Fatalf("recovery did not reconcile side effects: publications=%d embeds=%d curates=%d", pubs, embeds, curates)
+	}
+}
+
+func mustCandidates(t *testing.T, db *sql.DB, conv string) []Candidate {
+	t.Helper()
+	cs, err := ListCandidates(context.Background(), db, conv, "validated")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cs
+}
+
 func TestPublishHandlerNoCandidatesIsNoop(t *testing.T) {
 	ctx := context.Background()
 	db, store := openTestDBAndStore(t)

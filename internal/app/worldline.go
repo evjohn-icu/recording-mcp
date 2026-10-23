@@ -1590,7 +1590,7 @@ func worldlineVersion(sources []worldlineSource, events []plane.Event) string {
 		}
 	}
 	for _, event := range events {
-		if event.Type == "worldline.feedback" || event.Type == "worldline.semantic" || event.Type == "fact.observed" || event.Type == "topic.fact" || event.Type == "fact.corrected" || event.Type == "fact.retracted" {
+		if event.Type == "worldline.feedback" || event.Type == "worldline.semantic" || event.Type == "worldline.semantic_review" || event.Type == "worldline.thread_alias" || event.Type == "worldline.thread_group" || event.Type == "fact.observed" || event.Type == "topic.fact" || event.Type == "fact.corrected" || event.Type == "fact.retracted" {
 			parts = append(parts, "event:"+event.ID)
 		}
 	}

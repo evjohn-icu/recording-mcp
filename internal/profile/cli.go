@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -13,6 +14,37 @@ const DefaultPasswordEnv = "MEMORY_PROFILE_PASSWORD"
 type CLI struct {
 	fs                      *flag.FlagSet
 	name, root, passwordEnv *string
+}
+
+// WorldlinePlane resolves the trusted event-plane location and matching API
+// scope for context-worker. Legacy databases require an explicit sidecar path;
+// profile paths are derived only from the verified profile registry.
+func (c *CLI) WorldlinePlane(dbPath, legacyEventsPath string) (scope, eventsPath string, err error) {
+	if c == nil || strings.TrimSpace(*c.name) == "" {
+		if strings.TrimSpace(legacyEventsPath) == "" {
+			return "", "", fmt.Errorf("--worldline-events-db is required for a legacy database")
+		}
+		if strings.TrimSpace(dbPath) == "" {
+			return "", "", fmt.Errorf("database path required")
+		}
+		eventsPath, e := filepath.Abs(legacyEventsPath)
+		if e != nil {
+			return "", "", e
+		}
+		return "local", eventsPath, nil
+	}
+	if _, _, err = c.Resolve(dbPath, ""); err != nil {
+		return "", "", err
+	}
+	manager, e := Open(*c.root)
+	if e != nil {
+		return "", "", e
+	}
+	paths, e := manager.Resolve(*c.name)
+	if e != nil {
+		return "", "", e
+	}
+	return *c.name, paths.Plane, nil
 }
 
 // RegisterCLI adds --profile, --profiles-root and --profile-password-env.

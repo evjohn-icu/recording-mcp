@@ -44,6 +44,9 @@ func run() error {
 	profileCLI := profile.RegisterCLI(flag.CommandLine)
 	workerID := flag.String("worker-id", defaultWorkerID(), "worker identity recorded on claims")
 	stages := flag.String("stages", "extract,publish,curate,embed", "comma-separated stage names to claim")
+	worldlineEventsDB := flag.String("worldline-events-db", "", "explicit event-plane path required for worldline jobs using a legacy database")
+	worldlineDecisionURL := flag.String("worldline-decision-url", "", "loopback JEV endpoint used for Worldline private-source relation analysis")
+	worldlineDecisionModel := flag.String("worldline-decision-model", "jev-style-2b-v2", "JEV model for Worldline relation analysis")
 	lease := flag.Duration("lease", 30*time.Second, "lease duration held while executing a job")
 	poll := flag.Duration("poll", time.Second, "idle poll interval")
 	once := flag.Bool("once", false, "claim and process at most one job, then exit")
@@ -138,11 +141,33 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	profileSelected := flag.Lookup("profile") != nil && strings.TrimSpace(flag.Lookup("profile").Value.String()) != ""
+	explicitStages := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "stages" {
+			explicitStages = true
+		}
+	})
+	jobStages := workerStages(*stages, profileSelected, explicitStages)
+	if containsStage(jobStages, "worldline") {
+		scope, eventsPath, e := profileCLI.WorldlinePlane(*dbPath, *worldlineEventsDB)
+		if e != nil {
+			return e
+		}
+		var worldlineEngine decision.Engine
+		if strings.TrimSpace(*worldlineDecisionURL) != "" {
+			worldlineEngine, e = decision.NewLocalSystemOneClient(*worldlineDecisionURL, *worldlineDecisionModel)
+			if e != nil {
+				return fmt.Errorf("worldline decision: %w", e)
+			}
+		}
+		inner = routeWorldlineJobs(inner, &WorldlineJobExecutor{Store: store, Scope: scope, EventsPath: eventsPath, Engine: worldlineEngine})
+	}
 
 	cfg := worker.Config{
 		DB:               db,
 		WorkerID:         *workerID,
-		Stages:           parseStages(*stages),
+		Stages:           jobStages,
 		Lease:            *lease,
 		ProcessorVersion: "worker-v1",
 		PollInterval:     *poll,
@@ -151,6 +176,15 @@ func run() error {
 			inner:  inner,
 		},
 	}
+	heartbeat := process.Heartbeat{WorkerID: cfg.WorkerID, PID: os.Getpid(), Stages: cfg.Stages, GeneratorEnabled: gen != nil}
+	if err := process.WriteHeartbeat(ctx, db, heartbeat, time.Now()); err != nil {
+		return fmt.Errorf("write worker heartbeat: %w", err)
+	}
+	defer func() {
+		if err := process.RemoveHeartbeat(context.Background(), db, cfg.WorkerID); err != nil {
+			logger.Printf("remove worker heartbeat failed: %v", err)
+		}
+	}()
 
 	if *once {
 		ran, err := worker.RunOnce(ctx, cfg)
@@ -162,7 +196,23 @@ func run() error {
 		}
 		return nil
 	}
-	logger.Printf("worker %s started stages=%v lease=%s poll=%s", cfg.WorkerID, cfg.Stages, cfg.Lease, cfg.PollInterval)
+	logger.Printf("worker %s started stages=%v lease=%s poll=%s generator_enabled=%t", cfg.WorkerID, cfg.Stages, cfg.Lease, cfg.PollInterval, gen != nil)
+	beatCtx, cancelBeat := context.WithCancel(ctx)
+	defer cancelBeat()
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-beatCtx.Done():
+				return
+			case now := <-ticker.C:
+				if err := process.WriteHeartbeat(beatCtx, db, heartbeat, now); err != nil {
+					logger.Printf("worker heartbeat failed: %v", err)
+				}
+			}
+		}
+	}()
 	return worker.Run(ctx, cfg)
 }
 
@@ -315,6 +365,23 @@ func parseStages(raw string) []string {
 		if trimmed := strings.TrimSpace(part); trimmed != "" {
 			stages = append(stages, trimmed)
 		}
+	}
+	return stages
+}
+
+func containsStage(stages []string, want string) bool {
+	for _, stage := range stages {
+		if stage == want {
+			return true
+		}
+	}
+	return false
+}
+
+func workerStages(raw string, profileSelected, explicitStages bool) []string {
+	stages := parseStages(raw)
+	if profileSelected && !explicitStages && !containsStage(stages, "worldline") {
+		stages = append(stages, "worldline")
 	}
 	return stages
 }

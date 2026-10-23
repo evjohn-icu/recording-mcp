@@ -97,6 +97,17 @@ token 只可交换一次、10 分钟有效。不要把 `--addr` 改成公网地�
 
 按 Topic 展示的甘特式世界线、录音时间准备与本地副本启动见 [Topic 世界线](docs/worldline.md)，合成浏览器检查见 [世界线验证记录](docs/worldline-validation.md)。未知事实时间与录音提及时间分开展示。 本机真实决策模型启用见 [本地 JEV 接入](docs/worldline-jev.md)。
 
+先创建 profile，再启动 Profile Web 与处理 worker。Profile 密码从环境变量读取：
+
+```sh
+make build && make web
+export MEMORY_PROFILE_PASSWORD='替换为本地强密码'
+bin/context-profile create --profiles-root ./data/profiles --name home
+scripts/local-start.sh home
+```
+
+`scripts/local-start.sh PROFILE [port] [profiles-root]` 默认只监听 `127.0.0.1:8788`；profile 数据默认位于 `data/profiles/`，也可通过 `RECORDING_PROFILES_ROOT` 或第三个参数指定根目录。生成器默认关闭，因此不会生成新的 AI 摘要或候选；需要时通过 `GENERATOR_PROVIDER`、`GENERATOR_ENDPOINT`、`GENERATOR_MODEL` 和 `GENERATOR_KEY_ENV` 显式配置，密钥值留在对应环境变量中。可选的 Worldline 决策端点使用 `WORLDLINE_DECISION_URL` 和 `WORLDLINE_DECISION_MODEL`。脚本不会自动提供或启用外部模型服务；事件数据库始终使用 profile 自己管理的路径。
+
 ## MCP 客户端与 Web 运行限制
 
 MCP 客户端里 `tools/list` 可见 27 个工具（19 个记忆工具 + 8 个事件原型工具）。调用 `get_current_context`：

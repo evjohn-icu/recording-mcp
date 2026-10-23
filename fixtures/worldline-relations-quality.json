@@ -1,0 +1,2406 @@
+{
+  "fixture_version": "worldline-relations-quality-v1",
+  "synthetic_only": true,
+  "cases": [
+    {
+      "id": "rel-001",
+      "group": "conversation-001",
+      "split": "calibration",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "甲每周二在社区图书馆读书。",
+          "source": "合成对话甲001",
+          "excerpt": "甲每周二在社区图书馆读书。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "甲每周二到社区图书馆看书。",
+          "source": "合成对话乙001",
+          "excerpt": "甲每周二到社区图书馆看书。"
+        }
+      }
+    },
+    {
+      "id": "rel-002",
+      "group": "conversation-002",
+      "split": "calibration",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "蓝色雨伞放在门厅鞋柜旁。",
+          "source": "合成对话甲002",
+          "excerpt": "蓝色雨伞放在门厅鞋柜旁。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "门厅鞋柜边放着那把蓝伞。",
+          "source": "合成对话乙002",
+          "excerpt": "门厅鞋柜边放着那把蓝伞。"
+        }
+      }
+    },
+    {
+      "id": "rel-003",
+      "group": "conversation-003",
+      "split": "calibration",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小林把阳台的薄荷移到窗台。",
+          "source": "合成对话甲003",
+          "excerpt": "小林把阳台的薄荷移到窗台。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "小林将阳台薄荷盆搬去了窗台。",
+          "source": "合成对话乙003",
+          "excerpt": "小林将阳台薄荷盆搬去了窗台。"
+        }
+      }
+    },
+    {
+      "id": "rel-004",
+      "group": "conversation-004",
+      "split": "calibration",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "工作室周五下午不开门。",
+          "source": "合成对话甲004",
+          "excerpt": "工作室周五下午不开门。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "周五下午工作室暂停营业。",
+          "source": "合成对话乙004",
+          "excerpt": "周五下午工作室暂停营业。"
+        }
+      }
+    },
+    {
+      "id": "rel-005",
+      "group": "conversation-005",
+      "split": "calibration",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "阿禾报名了五月的陶艺课。",
+          "source": "合成对话甲005",
+          "excerpt": "阿禾报名了五月的陶艺课。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "阿禾已经登记参加五月陶艺课程。",
+          "source": "合成对话乙005",
+          "excerpt": "阿禾已经登记参加五月陶艺课程。"
+        }
+      }
+    },
+    {
+      "id": "rel-006",
+      "group": "conversation-006",
+      "split": "calibration",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "储藏室的灯需要换成暖光灯。",
+          "source": "合成对话甲006",
+          "excerpt": "储藏室的灯需要换成暖光灯。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "储物间灯泡应更换为暖色。",
+          "source": "合成对话乙006",
+          "excerpt": "储物间灯泡应更换为暖色。"
+        }
+      }
+    },
+    {
+      "id": "rel-007",
+      "group": "conversation-007",
+      "split": "calibration",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "周末家里要给猫剪指甲。",
+          "source": "合成对话甲007",
+          "excerpt": "周末家里要给猫剪指甲。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "这周末准备替猫咪修剪指甲。",
+          "source": "合成对话乙007",
+          "excerpt": "这周末准备替猫咪修剪指甲。"
+        }
+      }
+    },
+    {
+      "id": "rel-008",
+      "group": "conversation-008",
+      "split": "calibration",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "林叔的旧相机不能使用闪光灯。",
+          "source": "合成对话甲008",
+          "excerpt": "林叔的旧相机不能使用闪光灯。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "林叔那台老相机不要开闪光。",
+          "source": "合成对话乙008",
+          "excerpt": "林叔那台老相机不要开闪光。"
+        }
+      }
+    },
+    {
+      "id": "rel-009",
+      "group": "conversation-009",
+      "split": "calibration",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "豆浆机清洗后要晾干杯盖。",
+          "source": "合成对话甲009",
+          "excerpt": "豆浆机清洗后要晾干杯盖。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "洗完豆浆机，把盖子放着晾干。",
+          "source": "合成对话乙009",
+          "excerpt": "洗完豆浆机，把盖子放着晾干。"
+        }
+      }
+    },
+    {
+      "id": "rel-010",
+      "group": "conversation-010",
+      "split": "calibration",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小区东门的快递柜晚上十点锁门。",
+          "source": "合成对话甲010",
+          "excerpt": "小区东门的快递柜晚上十点锁门。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "东门快递柜到夜里十点停止使用。",
+          "source": "合成对话乙010",
+          "excerpt": "东门快递柜到夜里十点停止使用。"
+        }
+      }
+    },
+    {
+      "id": "rel-011",
+      "group": "conversation-011",
+      "split": "calibration",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "若宁每天午饭后散步十五分钟。",
+          "source": "合成对话甲011",
+          "excerpt": "若宁每天午饭后散步十五分钟。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "若宁饭后通常会走十五分钟。",
+          "source": "合成对话乙011",
+          "excerpt": "若宁饭后通常会走十五分钟。"
+        }
+      }
+    },
+    {
+      "id": "rel-012",
+      "group": "conversation-012",
+      "split": "calibration",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "会议材料要用蓝色文件夹归档。",
+          "source": "合成对话甲012",
+          "excerpt": "会议材料要用蓝色文件夹归档。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "把会议资料放进蓝文件夹整理。",
+          "source": "合成对话乙012",
+          "excerpt": "把会议资料放进蓝文件夹整理。"
+        }
+      }
+    },
+    {
+      "id": "rel-013",
+      "group": "conversation-013",
+      "split": "test",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "窗边那盆兰花需要少浇水。",
+          "source": "合成对话甲013",
+          "excerpt": "窗边那盆兰花需要少浇水。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "窗台上的兰花应控制浇水量。",
+          "source": "合成对话乙013",
+          "excerpt": "窗台上的兰花应控制浇水量。"
+        }
+      }
+    },
+    {
+      "id": "rel-014",
+      "group": "conversation-014",
+      "split": "test",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "外婆把药盒放在床头抽屉。",
+          "source": "合成对话甲014",
+          "excerpt": "外婆把药盒放在床头抽屉。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "床头柜抽屉里收着外婆的药盒。",
+          "source": "合成对话乙014",
+          "excerpt": "床头柜抽屉里收着外婆的药盒。"
+        }
+      }
+    },
+    {
+      "id": "rel-015",
+      "group": "conversation-015",
+      "split": "test",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "星期三的合唱排练改到小礼堂。",
+          "source": "合成对话甲015",
+          "excerpt": "星期三的合唱排练改到小礼堂。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "周三合唱团在小礼堂排练。",
+          "source": "合成对话乙015",
+          "excerpt": "周三合唱团在小礼堂排练。"
+        }
+      }
+    },
+    {
+      "id": "rel-016",
+      "group": "conversation-016",
+      "split": "test",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小吴已经归还借来的测温仪。",
+          "source": "合成对话甲016",
+          "excerpt": "小吴已经归还借来的测温仪。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "借给小吴的温度计已还回来了。",
+          "source": "合成对话乙016",
+          "excerpt": "借给小吴的温度计已还回来了。"
+        }
+      }
+    },
+    {
+      "id": "rel-017",
+      "group": "conversation-017",
+      "split": "test",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "仓库钥匙挂在值班室白板旁。",
+          "source": "合成对话甲017",
+          "excerpt": "仓库钥匙挂在值班室白板旁。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "值班室白板边挂着仓库钥匙。",
+          "source": "合成对话乙017",
+          "excerpt": "值班室白板边挂着仓库钥匙。"
+        }
+      }
+    },
+    {
+      "id": "rel-018",
+      "group": "conversation-018",
+      "split": "test",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "每月初给鱼缸过滤器换棉。",
+          "source": "合成对话甲018",
+          "excerpt": "每月初给鱼缸过滤器换棉。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "鱼缸滤棉要在每月月初更换。",
+          "source": "合成对话乙018",
+          "excerpt": "鱼缸滤棉要在每月月初更换。"
+        }
+      }
+    },
+    {
+      "id": "rel-019",
+      "group": "conversation-019",
+      "split": "test",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "阿岚订了两张周日的戏票。",
+          "source": "合成对话甲019",
+          "excerpt": "阿岚订了两张周日的戏票。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "阿岚买好周日演出的两张票。",
+          "source": "合成对话乙019",
+          "excerpt": "阿岚买好周日演出的两张票。"
+        }
+      }
+    },
+    {
+      "id": "rel-020",
+      "group": "conversation-020",
+      "split": "test",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "厨房窗户的纱网有一道小裂口。",
+          "source": "合成对话甲020",
+          "excerpt": "厨房窗户的纱网有一道小裂口。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "厨房纱窗破了个小口子。",
+          "source": "合成对话乙020",
+          "excerpt": "厨房纱窗破了个小口子。"
+        }
+      }
+    },
+    {
+      "id": "rel-021",
+      "group": "conversation-021",
+      "split": "test",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "邮局旁的面包店七点开始营业。",
+          "source": "合成对话甲021",
+          "excerpt": "邮局旁的面包店七点开始营业。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "邮局边那家烘焙店早上七点开门。",
+          "source": "合成对话乙021",
+          "excerpt": "邮局边那家烘焙店早上七点开门。"
+        }
+      }
+    },
+    {
+      "id": "rel-022",
+      "group": "conversation-022",
+      "split": "test",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "老陈把工具箱借给了邻居。",
+          "source": "合成对话甲022",
+          "excerpt": "老陈把工具箱借给了邻居。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "邻居借走了老陈的工具箱。",
+          "source": "合成对话乙022",
+          "excerpt": "邻居借走了老陈的工具箱。"
+        }
+      }
+    },
+    {
+      "id": "rel-023",
+      "group": "conversation-023",
+      "split": "test",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "客厅地毯要送去清洗。",
+          "source": "合成对话甲023",
+          "excerpt": "客厅地毯要送去清洗。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "客厅那块毯子需要拿去洗。",
+          "source": "合成对话乙023",
+          "excerpt": "客厅那块毯子需要拿去洗。"
+        }
+      }
+    },
+    {
+      "id": "rel-024",
+      "group": "conversation-024",
+      "split": "test",
+      "expected": "text_similarity",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小陶的绿围巾落在校车上。",
+          "source": "合成对话甲024",
+          "excerpt": "小陶的绿围巾落在校车上。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "小陶把绿色围巾遗忘在校车里。",
+          "source": "合成对话乙024",
+          "excerpt": "小陶把绿色围巾遗忘在校车里。"
+        }
+      }
+    },
+    {
+      "id": "rel-025",
+      "group": "conversation-025",
+      "split": "calibration",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小禾买了两株迷迭香。",
+          "source": "合成对话甲025",
+          "excerpt": "小禾买了两株迷迭香。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "两株迷迭香放在厨房南窗，那里上午有日照。",
+          "source": "合成对话乙025",
+          "excerpt": "两株迷迭香放在厨房南窗，那里上午有日照。"
+        }
+      }
+    },
+    {
+      "id": "rel-026",
+      "group": "conversation-026",
+      "split": "calibration",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "青桥读书会下月讨论《海边的房间》。",
+          "source": "合成对话甲026",
+          "excerpt": "青桥读书会下月讨论《海边的房间》。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "主持人请成员带一段最喜欢的章节参加讨论。",
+          "source": "合成对话乙026",
+          "excerpt": "主持人请成员带一段最喜欢的章节参加讨论。"
+        }
+      }
+    },
+    {
+      "id": "rel-027",
+      "group": "conversation-027",
+      "split": "calibration",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "屋顶水箱本周做了清洁。",
+          "source": "合成对话甲027",
+          "excerpt": "屋顶水箱本周做了清洁。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "维修记录写明清洁后水箱盖已重新锁好。",
+          "source": "合成对话乙027",
+          "excerpt": "维修记录写明清洁后水箱盖已重新锁好。"
+        }
+      }
+    },
+    {
+      "id": "rel-028",
+      "group": "conversation-028",
+      "split": "calibration",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "彤彤开始学手语。",
+          "source": "合成对话甲028",
+          "excerpt": "彤彤开始学手语。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "她先跟着社区周六的初级班学习。",
+          "source": "合成对话乙028",
+          "excerpt": "她先跟着社区周六的初级班学习。"
+        }
+      }
+    },
+    {
+      "id": "rel-029",
+      "group": "conversation-029",
+      "split": "calibration",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "陈师傅修好了西侧走廊的壁灯。",
+          "source": "合成对话甲029",
+          "excerpt": "陈师傅修好了西侧走廊的壁灯。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "更换的是灯座，原来的灯罩保留下来。",
+          "source": "合成对话乙029",
+          "excerpt": "更换的是灯座，原来的灯罩保留下来。"
+        }
+      }
+    },
+    {
+      "id": "rel-030",
+      "group": "conversation-030",
+      "split": "calibration",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "家里的乌龟最近食量变少。",
+          "source": "合成对话甲030",
+          "excerpt": "家里的乌龟最近食量变少。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "它仍会晒背，但这周没有碰青菜。",
+          "source": "合成对话乙030",
+          "excerpt": "它仍会晒背，但这周没有碰青菜。"
+        }
+      }
+    },
+    {
+      "id": "rel-031",
+      "group": "conversation-031",
+      "split": "calibration",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小区准备增加自行车架。",
+          "source": "合成对话甲031",
+          "excerpt": "小区准备增加自行车架。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "物业把车架位置选在南门内侧。",
+          "source": "合成对话乙031",
+          "excerpt": "物业把车架位置选在南门内侧。"
+        }
+      }
+    },
+    {
+      "id": "rel-032",
+      "group": "conversation-032",
+      "split": "calibration",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "周宁报名参加十公里徒步。",
+          "source": "合成对话甲032",
+          "excerpt": "周宁报名参加十公里徒步。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "她计划穿旧登山鞋，避免新鞋磨脚。",
+          "source": "合成对话乙032",
+          "excerpt": "她计划穿旧登山鞋，避免新鞋磨脚。"
+        }
+      }
+    },
+    {
+      "id": "rel-033",
+      "group": "conversation-033",
+      "split": "calibration",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "儿童剧《纸月亮》加演一场。",
+          "source": "合成对话甲033",
+          "excerpt": "儿童剧《纸月亮》加演一场。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "加演时间是六月八日下午三点。",
+          "source": "合成对话乙033",
+          "excerpt": "加演时间是六月八日下午三点。"
+        }
+      }
+    },
+    {
+      "id": "rel-034",
+      "group": "conversation-034",
+      "split": "calibration",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "储物柜里的面粉受潮结块。",
+          "source": "合成对话甲034",
+          "excerpt": "储物柜里的面粉受潮结块。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "那袋面粉是上个月做饼干后剩下的。",
+          "source": "合成对话乙034",
+          "excerpt": "那袋面粉是上个月做饼干后剩下的。"
+        }
+      }
+    },
+    {
+      "id": "rel-035",
+      "group": "conversation-035",
+      "split": "calibration",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "工作室新添一台扫描仪。",
+          "source": "合成对话甲035",
+          "excerpt": "工作室新添一台扫描仪。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "扫描仪支持双面进纸，放在前台右侧。",
+          "source": "合成对话乙035",
+          "excerpt": "扫描仪支持双面进纸，放在前台右侧。"
+        }
+      }
+    },
+    {
+      "id": "rel-036",
+      "group": "conversation-036",
+      "split": "calibration",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "周末公园有鸟类观察活动。",
+          "source": "合成对话甲036",
+          "excerpt": "周末公园有鸟类观察活动。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "领队要求大家不播放鸟叫录音。",
+          "source": "合成对话乙036",
+          "excerpt": "领队要求大家不播放鸟叫录音。"
+        }
+      }
+    },
+    {
+      "id": "rel-037",
+      "group": "conversation-037",
+      "split": "test",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小程学会了修补棉衣。",
+          "source": "合成对话甲037",
+          "excerpt": "小程学会了修补棉衣。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "她先在袖口内侧练习藏针缝法。",
+          "source": "合成对话乙037",
+          "excerpt": "她先在袖口内侧练习藏针缝法。"
+        }
+      }
+    },
+    {
+      "id": "rel-038",
+      "group": "conversation-038",
+      "split": "test",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "老楼电梯完成年度检修。",
+          "source": "合成对话甲038",
+          "excerpt": "老楼电梯完成年度检修。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "检修单特别注明紧急电话测试正常。",
+          "source": "合成对话乙038",
+          "excerpt": "检修单特别注明紧急电话测试正常。"
+        }
+      }
+    },
+    {
+      "id": "rel-039",
+      "group": "conversation-039",
+      "split": "test",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小剧场的木地板需要养护。",
+          "source": "合成对话甲039",
+          "excerpt": "小剧场的木地板需要养护。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "师傅建议先清空舞台再打蜡。",
+          "source": "合成对话乙039",
+          "excerpt": "师傅建议先清空舞台再打蜡。"
+        }
+      }
+    },
+    {
+      "id": "rel-040",
+      "group": "conversation-040",
+      "split": "test",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小区花坛种下了金盏菊。",
+          "source": "合成对话甲040",
+          "excerpt": "小区花坛种下了金盏菊。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "志愿者在花坛边立了请勿踩踏的牌子。",
+          "source": "合成对话乙040",
+          "excerpt": "志愿者在花坛边立了请勿踩踏的牌子。"
+        }
+      }
+    },
+    {
+      "id": "rel-041",
+      "group": "conversation-041",
+      "split": "test",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "蒸汽熨斗开始漏水。",
+          "source": "合成对话甲041",
+          "excerpt": "蒸汽熨斗开始漏水。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "漏水只在水箱装满后出现，空箱时没有。",
+          "source": "合成对话乙041",
+          "excerpt": "漏水只在水箱装满后出现，空箱时没有。"
+        }
+      }
+    },
+    {
+      "id": "rel-042",
+      "group": "conversation-042",
+      "split": "test",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "阿哲把旧地图捐给校史室。",
+          "source": "合成对话甲042",
+          "excerpt": "阿哲把旧地图捐给校史室。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "地图背面有他祖父手写的街道名称。",
+          "source": "合成对话乙042",
+          "excerpt": "地图背面有他祖父手写的街道名称。"
+        }
+      }
+    },
+    {
+      "id": "rel-043",
+      "group": "conversation-043",
+      "split": "test",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "周五晚餐改成素食。",
+          "source": "合成对话甲043",
+          "excerpt": "周五晚餐改成素食。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "厨房会另外准备花生过敏者可吃的菜。",
+          "source": "合成对话乙043",
+          "excerpt": "厨房会另外准备花生过敏者可吃的菜。"
+        }
+      }
+    },
+    {
+      "id": "rel-044",
+      "group": "conversation-044",
+      "split": "test",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "民乐团添了一把中阮。",
+          "source": "合成对话甲044",
+          "excerpt": "民乐团添了一把中阮。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "新乐器由团员从南京借来演出两周。",
+          "source": "合成对话乙044",
+          "excerpt": "新乐器由团员从南京借来演出两周。"
+        }
+      }
+    },
+    {
+      "id": "rel-045",
+      "group": "conversation-045",
+      "split": "test",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小区儿童区更换了滑梯。",
+          "source": "合成对话甲045",
+          "excerpt": "小区儿童区更换了滑梯。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "新滑梯旁铺了橡胶缓冲垫。",
+          "source": "合成对话乙045",
+          "excerpt": "新滑梯旁铺了橡胶缓冲垫。"
+        }
+      }
+    },
+    {
+      "id": "rel-046",
+      "group": "conversation-046",
+      "split": "test",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "果园今年试种黄桃。",
+          "source": "合成对话甲046",
+          "excerpt": "果园今年试种黄桃。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "试种地块靠近北侧蓄水池。",
+          "source": "合成对话乙046",
+          "excerpt": "试种地块靠近北侧蓄水池。"
+        }
+      }
+    },
+    {
+      "id": "rel-047",
+      "group": "conversation-047",
+      "split": "test",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "方言课堂开始收集老歌。",
+          "source": "合成对话甲047",
+          "excerpt": "方言课堂开始收集老歌。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "学员要注明歌曲从哪位长辈那里学到。",
+          "source": "合成对话乙047",
+          "excerpt": "学员要注明歌曲从哪位长辈那里学到。"
+        }
+      }
+    },
+    {
+      "id": "rel-048",
+      "group": "conversation-048",
+      "split": "test",
+      "expected": "complementary_context",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "社区修复了旧钟楼的指针。",
+          "source": "合成对话甲048",
+          "excerpt": "社区修复了旧钟楼的指针。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "钟楼机芯仍待后续检查，暂时不会报时。",
+          "source": "合成对话乙048",
+          "excerpt": "钟楼机芯仍待后续检查，暂时不会报时。"
+        }
+      }
+    },
+    {
+      "id": "rel-049",
+      "group": "conversation-049",
+      "split": "calibration",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "账本记着三月十二日收到供应商八百元。",
+          "source": "合成对话甲049",
+          "excerpt": "账本记着三月十二日收到供应商八百元。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "邮件写的是三月十二日向供应商支付八百元。",
+          "source": "合成对话乙049",
+          "excerpt": "邮件写的是三月十二日向供应商支付八百元。"
+        }
+      }
+    },
+    {
+      "id": "rel-050",
+      "group": "conversation-050",
+      "split": "calibration",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "陈列室周二闭馆。",
+          "source": "合成对话甲050",
+          "excerpt": "陈列室周二闭馆。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "值班便笺记着周二照常开放。",
+          "source": "合成对话乙050",
+          "excerpt": "值班便笺记着周二照常开放。"
+        }
+      }
+    },
+    {
+      "id": "rel-051",
+      "group": "conversation-051",
+      "split": "calibration",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小满说展览在六月结束。",
+          "source": "合成对话甲051",
+          "excerpt": "小满说展览在六月结束。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "宣传单标注展览七月才结束。",
+          "source": "合成对话乙051",
+          "excerpt": "宣传单标注展览七月才结束。"
+        }
+      }
+    },
+    {
+      "id": "rel-052",
+      "group": "conversation-052",
+      "split": "calibration",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "储物间尚有四箱纸杯。",
+          "source": "合成对话甲052",
+          "excerpt": "储物间尚有四箱纸杯。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "盘点表记录纸杯只剩一箱。",
+          "source": "合成对话乙052",
+          "excerpt": "盘点表记录纸杯只剩一箱。"
+        }
+      }
+    },
+    {
+      "id": "rel-053",
+      "group": "conversation-053",
+      "split": "calibration",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "阿青把钥匙交给了值班员。",
+          "source": "合成对话甲053",
+          "excerpt": "阿青把钥匙交给了值班员。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "交接记录显示钥匙仍在阿青手里。",
+          "source": "合成对话乙053",
+          "excerpt": "交接记录显示钥匙仍在阿青手里。"
+        }
+      }
+    },
+    {
+      "id": "rel-054",
+      "group": "conversation-054",
+      "split": "calibration",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "蓝车停在北门外。",
+          "source": "合成对话甲054",
+          "excerpt": "蓝车停在北门外。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "保安记录写蓝车停在南门外。",
+          "source": "合成对话乙054",
+          "excerpt": "保安记录写蓝车停在南门外。"
+        }
+      }
+    },
+    {
+      "id": "rel-055",
+      "group": "conversation-055",
+      "split": "calibration",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "手工课收取材料费三十元。",
+          "source": "合成对话甲055",
+          "excerpt": "手工课收取材料费三十元。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "报名单上的材料费是三十五元。",
+          "source": "合成对话乙055",
+          "excerpt": "报名单上的材料费是三十五元。"
+        }
+      }
+    },
+    {
+      "id": "rel-056",
+      "group": "conversation-056",
+      "split": "calibration",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "园丁说桂花树上周移栽。",
+          "source": "合成对话甲056",
+          "excerpt": "园丁说桂花树上周移栽。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "施工日志记载移栽日期是本周一。",
+          "source": "合成对话乙056",
+          "excerpt": "施工日志记载移栽日期是本周一。"
+        }
+      }
+    },
+    {
+      "id": "rel-057",
+      "group": "conversation-057",
+      "split": "calibration",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "会议决定由小顾负责订场地。",
+          "source": "合成对话甲057",
+          "excerpt": "会议决定由小顾负责订场地。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "群消息说订场地交给小邱办理。",
+          "source": "合成对话乙057",
+          "excerpt": "群消息说订场地交给小邱办理。"
+        }
+      }
+    },
+    {
+      "id": "rel-058",
+      "group": "conversation-058",
+      "split": "calibration",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "仓库温度计显示十八度。",
+          "source": "合成对话甲058",
+          "excerpt": "仓库温度计显示十八度。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "巡检表同一时段记为二十八度。",
+          "source": "合成对话乙058",
+          "excerpt": "巡检表同一时段记为二十八度。"
+        }
+      }
+    },
+    {
+      "id": "rel-059",
+      "group": "conversation-059",
+      "split": "calibration",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "阿姨确认包裹已经送到。",
+          "source": "合成对话甲059",
+          "excerpt": "阿姨确认包裹已经送到。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "快递状态仍显示包裹在转运站。",
+          "source": "合成对话乙059",
+          "excerpt": "快递状态仍显示包裹在转运站。"
+        }
+      }
+    },
+    {
+      "id": "rel-060",
+      "group": "conversation-060",
+      "split": "calibration",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "剧团取消了周日午场。",
+          "source": "合成对话甲060",
+          "excerpt": "剧团取消了周日午场。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "售票页面仍开放周日午场选座。",
+          "source": "合成对话乙060",
+          "excerpt": "售票页面仍开放周日午场选座。"
+        }
+      }
+    },
+    {
+      "id": "rel-061",
+      "group": "conversation-061",
+      "split": "test",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "茶水间纸巾由物业补充。",
+          "source": "合成对话甲061",
+          "excerpt": "茶水间纸巾由物业补充。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "清洁安排表写的是各办公室自行补充。",
+          "source": "合成对话乙061",
+          "excerpt": "清洁安排表写的是各办公室自行补充。"
+        }
+      }
+    },
+    {
+      "id": "rel-062",
+      "group": "conversation-062",
+      "split": "test",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "路灯故障报修时间是周一。",
+          "source": "合成对话甲062",
+          "excerpt": "路灯故障报修时间是周一。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "维修单上报修日期是周三。",
+          "source": "合成对话乙062",
+          "excerpt": "维修单上报修日期是周三。"
+        }
+      }
+    },
+    {
+      "id": "rel-063",
+      "group": "conversation-063",
+      "split": "test",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小周借走相机两天。",
+          "source": "合成对话甲063",
+          "excerpt": "小周借走相机两天。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "归还记录称相机借出了一周。",
+          "source": "合成对话乙063",
+          "excerpt": "归还记录称相机借出了一周。"
+        }
+      }
+    },
+    {
+      "id": "rel-064",
+      "group": "conversation-064",
+      "split": "test",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "花盆里的土已经完全干透。",
+          "source": "合成对话甲064",
+          "excerpt": "花盆里的土已经完全干透。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "照料记录说盆土昨天仍然潮湿。",
+          "source": "合成对话乙064",
+          "excerpt": "照料记录说盆土昨天仍然潮湿。"
+        }
+      }
+    },
+    {
+      "id": "rel-065",
+      "group": "conversation-065",
+      "split": "test",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "练习室预约到晚上九点。",
+          "source": "合成对话甲065",
+          "excerpt": "练习室预约到晚上九点。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "门禁记录显示预约结束时间为八点。",
+          "source": "合成对话乙065",
+          "excerpt": "门禁记录显示预约结束时间为八点。"
+        }
+      }
+    },
+    {
+      "id": "rel-066",
+      "group": "conversation-066",
+      "split": "test",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "展柜里放着一枚铜币。",
+          "source": "合成对话甲066",
+          "excerpt": "展柜里放着一枚铜币。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "馆藏卡片称展柜陈列的是银币。",
+          "source": "合成对话乙066",
+          "excerpt": "馆藏卡片称展柜陈列的是银币。"
+        }
+      }
+    },
+    {
+      "id": "rel-067",
+      "group": "conversation-067",
+      "split": "test",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "车票买的是靠窗座位。",
+          "source": "合成对话甲067",
+          "excerpt": "车票买的是靠窗座位。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "订单截图显示座位在过道边。",
+          "source": "合成对话乙067",
+          "excerpt": "订单截图显示座位在过道边。"
+        }
+      }
+    },
+    {
+      "id": "rel-068",
+      "group": "conversation-068",
+      "split": "test",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "老街修路期间行人可通行。",
+          "source": "合成对话甲068",
+          "excerpt": "老街修路期间行人可通行。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "施工告示称整段老街禁止行人进入。",
+          "source": "合成对话乙068",
+          "excerpt": "施工告示称整段老街禁止行人进入。"
+        }
+      }
+    },
+    {
+      "id": "rel-069",
+      "group": "conversation-069",
+      "split": "test",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "校医说小雨不需要复诊。",
+          "source": "合成对话甲069",
+          "excerpt": "校医说小雨不需要复诊。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "复诊单上写着小雨下周必须复查。",
+          "source": "合成对话乙069",
+          "excerpt": "复诊单上写着小雨下周必须复查。"
+        }
+      }
+    },
+    {
+      "id": "rel-070",
+      "group": "conversation-070",
+      "split": "test",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "花店预留了白色百合。",
+          "source": "合成对话甲070",
+          "excerpt": "花店预留了白色百合。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "取花单登记为黄色郁金香。",
+          "source": "合成对话乙070",
+          "excerpt": "取花单登记为黄色郁金香。"
+        }
+      }
+    },
+    {
+      "id": "rel-071",
+      "group": "conversation-071",
+      "split": "test",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "文件已由主任签字。",
+          "source": "合成对话甲071",
+          "excerpt": "文件已由主任签字。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "流转记录仍标示等待主任签批。",
+          "source": "合成对话乙071",
+          "excerpt": "流转记录仍标示等待主任签批。"
+        }
+      }
+    },
+    {
+      "id": "rel-072",
+      "group": "conversation-072",
+      "split": "test",
+      "expected": "review_required",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "巡演第一站定在嘉兴。",
+          "source": "合成对话甲072",
+          "excerpt": "巡演第一站定在嘉兴。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "行程表把第一站列为湖州。",
+          "source": "合成对话乙072",
+          "excerpt": "行程表把第一站列为湖州。"
+        }
+      }
+    },
+    {
+      "id": "rel-073",
+      "group": "conversation-073",
+      "split": "calibration",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小敏买了一把折叠伞。",
+          "source": "合成对话甲073",
+          "excerpt": "小敏买了一把折叠伞。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "社区棋社把周末比赛改到二楼。",
+          "source": "合成对话乙073",
+          "excerpt": "社区棋社把周末比赛改到二楼。"
+        }
+      }
+    },
+    {
+      "id": "rel-074",
+      "group": "conversation-074",
+      "split": "calibration",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "桥下咖啡摊新增燕麦奶。",
+          "source": "合成对话甲074",
+          "excerpt": "桥下咖啡摊新增燕麦奶。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "林老师的自行车链条需要上油。",
+          "source": "合成对话乙074",
+          "excerpt": "林老师的自行车链条需要上油。"
+        }
+      }
+    },
+    {
+      "id": "rel-075",
+      "group": "conversation-075",
+      "split": "calibration",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小区池塘发现一只白鹭。",
+          "source": "合成对话甲075",
+          "excerpt": "小区池塘发现一只白鹭。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "打印室的订书机卡住了。",
+          "source": "合成对话乙075",
+          "excerpt": "打印室的订书机卡住了。"
+        }
+      }
+    },
+    {
+      "id": "rel-076",
+      "group": "conversation-076",
+      "split": "calibration",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "晓峰读完一本海洋科普书。",
+          "source": "合成对话甲076",
+          "excerpt": "晓峰读完一本海洋科普书。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "食堂周四供应南瓜粥。",
+          "source": "合成对话乙076",
+          "excerpt": "食堂周四供应南瓜粥。"
+        }
+      }
+    },
+    {
+      "id": "rel-077",
+      "group": "conversation-077",
+      "split": "calibration",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "门卫收到一盆绿萝。",
+          "source": "合成对话甲077",
+          "excerpt": "门卫收到一盆绿萝。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "合唱队练习了新的开场曲。",
+          "source": "合成对话乙077",
+          "excerpt": "合唱队练习了新的开场曲。"
+        }
+      }
+    },
+    {
+      "id": "rel-078",
+      "group": "conversation-078",
+      "split": "calibration",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "阳台晾衣架换了滑轮。",
+          "source": "合成对话甲078",
+          "excerpt": "阳台晾衣架换了滑轮。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "邮差通知巷口门牌将重新编号。",
+          "source": "合成对话乙078",
+          "excerpt": "邮差通知巷口门牌将重新编号。"
+        }
+      }
+    },
+    {
+      "id": "rel-079",
+      "group": "conversation-079",
+      "split": "calibration",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "妈妈订了生日蛋糕。",
+          "source": "合成对话甲079",
+          "excerpt": "妈妈订了生日蛋糕。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "博物馆延长了古钟展期。",
+          "source": "合成对话乙079",
+          "excerpt": "博物馆延长了古钟展期。"
+        }
+      }
+    },
+    {
+      "id": "rel-080",
+      "group": "conversation-080",
+      "split": "calibration",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "摄影社去山顶看日出。",
+          "source": "合成对话甲080",
+          "excerpt": "摄影社去山顶看日出。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "浴室水龙头的垫圈老化。",
+          "source": "合成对话乙080",
+          "excerpt": "浴室水龙头的垫圈老化。"
+        }
+      }
+    },
+    {
+      "id": "rel-081",
+      "group": "conversation-081",
+      "split": "calibration",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小顾开始收集邮票。",
+          "source": "合成对话甲081",
+          "excerpt": "小顾开始收集邮票。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "青少年篮球赛需要两名裁判。",
+          "source": "合成对话乙081",
+          "excerpt": "青少年篮球赛需要两名裁判。"
+        }
+      }
+    },
+    {
+      "id": "rel-082",
+      "group": "conversation-082",
+      "split": "calibration",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "茶馆添置了四张木凳。",
+          "source": "合成对话甲082",
+          "excerpt": "茶馆添置了四张木凳。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "航模课取消了周末的室外飞行。",
+          "source": "合成对话乙082",
+          "excerpt": "航模课取消了周末的室外飞行。"
+        }
+      }
+    },
+    {
+      "id": "rel-083",
+      "group": "conversation-083",
+      "split": "calibration",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "院子里种下两棵石榴树。",
+          "source": "合成对话甲083",
+          "excerpt": "院子里种下两棵石榴树。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "小区广播测试定在下午三点。",
+          "source": "合成对话乙083",
+          "excerpt": "小区广播测试定在下午三点。"
+        }
+      }
+    },
+    {
+      "id": "rel-084",
+      "group": "conversation-084",
+      "split": "calibration",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "钢琴调音师预约下周上门。",
+          "source": "合成对话甲084",
+          "excerpt": "钢琴调音师预约下周上门。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "垃圾分类点更换了标识牌。",
+          "source": "合成对话乙084",
+          "excerpt": "垃圾分类点更换了标识牌。"
+        }
+      }
+    },
+    {
+      "id": "rel-085",
+      "group": "conversation-085",
+      "split": "test",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "旅行箱的轮子掉了一颗螺丝。",
+          "source": "合成对话甲085",
+          "excerpt": "旅行箱的轮子掉了一颗螺丝。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "图书馆招募儿童故事志愿者。",
+          "source": "合成对话乙085",
+          "excerpt": "图书馆招募儿童故事志愿者。"
+        }
+      }
+    },
+    {
+      "id": "rel-086",
+      "group": "conversation-086",
+      "split": "test",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "外公开始练习书法。",
+          "source": "合成对话甲086",
+          "excerpt": "外公开始练习书法。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "巷口修鞋铺改为周一休息。",
+          "source": "合成对话乙086",
+          "excerpt": "巷口修鞋铺改为周一休息。"
+        }
+      }
+    },
+    {
+      "id": "rel-087",
+      "group": "conversation-087",
+      "split": "test",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "宿舍楼新增饮水机。",
+          "source": "合成对话甲087",
+          "excerpt": "宿舍楼新增饮水机。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "小云报名参加了篆刻体验课。",
+          "source": "合成对话乙087",
+          "excerpt": "小云报名参加了篆刻体验课。"
+        }
+      }
+    },
+    {
+      "id": "rel-088",
+      "group": "conversation-088",
+      "split": "test",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "蓝莓果酱需要冷藏保存。",
+          "source": "合成对话甲088",
+          "excerpt": "蓝莓果酱需要冷藏保存。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "车站广场的喷泉正在维修。",
+          "source": "合成对话乙088",
+          "excerpt": "车站广场的喷泉正在维修。"
+        }
+      }
+    },
+    {
+      "id": "rel-089",
+      "group": "conversation-089",
+      "split": "test",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "木工班做了一个鸟食盒。",
+          "source": "合成对话甲089",
+          "excerpt": "木工班做了一个鸟食盒。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "钟表店收到一批新挂钟。",
+          "source": "合成对话乙089",
+          "excerpt": "钟表店收到一批新挂钟。"
+        }
+      }
+    },
+    {
+      "id": "rel-090",
+      "group": "conversation-090",
+      "split": "test",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "姐妹俩计划去看皮影戏。",
+          "source": "合成对话甲090",
+          "excerpt": "姐妹俩计划去看皮影戏。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "菜市场南口新增共享雨伞柜。",
+          "source": "合成对话乙090",
+          "excerpt": "菜市场南口新增共享雨伞柜。"
+        }
+      }
+    },
+    {
+      "id": "rel-091",
+      "group": "conversation-091",
+      "split": "test",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "老赵整理了家庭照片。",
+          "source": "合成对话甲091",
+          "excerpt": "老赵整理了家庭照片。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "篮球馆地板周末要重新划线。",
+          "source": "合成对话乙091",
+          "excerpt": "篮球馆地板周末要重新划线。"
+        }
+      }
+    },
+    {
+      "id": "rel-092",
+      "group": "conversation-092",
+      "split": "test",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "缝纫机踏板发出异响。",
+          "source": "合成对话甲092",
+          "excerpt": "缝纫机踏板发出异响。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "社区合唱节征集主持人。",
+          "source": "合成对话乙092",
+          "excerpt": "社区合唱节征集主持人。"
+        }
+      }
+    },
+    {
+      "id": "rel-093",
+      "group": "conversation-093",
+      "split": "test",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小岛邮局开通了周日取件。",
+          "source": "合成对话甲093",
+          "excerpt": "小岛邮局开通了周日取件。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "阳光房的窗帘换成米色。",
+          "source": "合成对话乙093",
+          "excerpt": "阳光房的窗帘换成米色。"
+        }
+      }
+    },
+    {
+      "id": "rel-094",
+      "group": "conversation-094",
+      "split": "test",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "菜园里结出第一批番茄。",
+          "source": "合成对话甲094",
+          "excerpt": "菜园里结出第一批番茄。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "儿童医院大厅更新了导诊屏。",
+          "source": "合成对话乙094",
+          "excerpt": "儿童医院大厅更新了导诊屏。"
+        }
+      }
+    },
+    {
+      "id": "rel-095",
+      "group": "conversation-095",
+      "split": "test",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "志愿者给流浪猫做了窝。",
+          "source": "合成对话甲095",
+          "excerpt": "志愿者给流浪猫做了窝。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "理发店推出了预约取号服务。",
+          "source": "合成对话乙095",
+          "excerpt": "理发店推出了预约取号服务。"
+        }
+      }
+    },
+    {
+      "id": "rel-096",
+      "group": "conversation-096",
+      "split": "test",
+      "expected": "unrelated",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "书架上多了一套诗集。",
+          "source": "合成对话甲096",
+          "excerpt": "书架上多了一套诗集。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "消防演习改在东侧停车场举行。",
+          "source": "合成对话乙096",
+          "excerpt": "消防演习改在东侧停车场举行。"
+        }
+      }
+    },
+    {
+      "id": "rel-097",
+      "group": "conversation-097",
+      "split": "calibration",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小叶说那件事后来变了。",
+          "source": "合成对话甲097",
+          "excerpt": "小叶说那件事后来变了。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "后来好像又不一样了。",
+          "source": "合成对话乙097",
+          "excerpt": "后来好像又不一样了。"
+        }
+      }
+    },
+    {
+      "id": "rel-098",
+      "group": "conversation-098",
+      "split": "calibration",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "录音中提到“他把那个放回去”。",
+          "source": "合成对话甲098",
+          "excerpt": "录音中提到“他把那个放回去”。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "转写只有“那个……放那边了”，物品和地点不清。",
+          "source": "合成对话乙098",
+          "excerpt": "转写只有“那个……放那边了”，物品和地点不清。"
+        }
+      }
+    },
+    {
+      "id": "rel-099",
+      "group": "conversation-099",
+      "split": "calibration",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "旧笔记写着小桥“可能搬过”。",
+          "source": "合成对话甲099",
+          "excerpt": "旧笔记写着小桥“可能搬过”。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "新便笺说小桥也许换了地方，具体所指缺失。",
+          "source": "合成对话乙099",
+          "excerpt": "新便笺说小桥也许换了地方，具体所指缺失。"
+        }
+      }
+    },
+    {
+      "id": "rel-100",
+      "group": "conversation-100",
+      "split": "calibration",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "阿禾提到药量似乎增加。",
+          "source": "合成对话甲100",
+          "excerpt": "阿禾提到药量似乎增加。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "剪辑片段只剩“每天……毫克”，数值被截断。",
+          "source": "合成对话乙100",
+          "excerpt": "剪辑片段只剩“每天……毫克”，数值被截断。"
+        }
+      }
+    },
+    {
+      "id": "rel-101",
+      "group": "conversation-101",
+      "split": "calibration",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "有人说周末活动改了时间。",
+          "source": "合成对话甲101",
+          "excerpt": "有人说周末活动改了时间。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "消息称活动时间变动，但没有给出新时间。",
+          "source": "合成对话乙101",
+          "excerpt": "消息称活动时间变动，但没有给出新时间。"
+        }
+      }
+    },
+    {
+      "id": "rel-102",
+      "group": "conversation-102",
+      "split": "calibration",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "记录者认为老王已经同意。",
+          "source": "合成对话甲102",
+          "excerpt": "记录者认为老王已经同意。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "原话被遮挡，只听见“我想他会……”。",
+          "source": "合成对话乙102",
+          "excerpt": "原话被遮挡，只听见“我想他会……”。"
+        }
+      }
+    },
+    {
+      "id": "rel-103",
+      "group": "conversation-103",
+      "split": "calibration",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "会议里提到那份文件需要处理。",
+          "source": "合成对话甲103",
+          "excerpt": "会议里提到那份文件需要处理。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "摘要说文件已处理，但没有原文或处理状态。",
+          "source": "合成对话乙103",
+          "excerpt": "摘要说文件已处理，但没有原文或处理状态。"
+        }
+      }
+    },
+    {
+      "id": "rel-104",
+      "group": "conversation-104",
+      "split": "calibration",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "陈姐说“她后来回来了”。",
+          "source": "合成对话甲104",
+          "excerpt": "陈姐说“她后来回来了”。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "上下文缺失，无法确定“她”指谁或回到哪里。",
+          "source": "合成对话乙104",
+          "excerpt": "上下文缺失，无法确定“她”指谁或回到哪里。"
+        }
+      }
+    },
+    {
+      "id": "rel-105",
+      "group": "conversation-105",
+      "split": "calibration",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "孩子的身高记录看起来有变化。",
+          "source": "合成对话甲105",
+          "excerpt": "孩子的身高记录看起来有变化。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "两张记录没有日期，也没标明单位。",
+          "source": "合成对话乙105",
+          "excerpt": "两张记录没有日期，也没标明单位。"
+        }
+      }
+    },
+    {
+      "id": "rel-106",
+      "group": "conversation-106",
+      "split": "calibration",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "语音里听到店铺可能关门。",
+          "source": "合成对话甲106",
+          "excerpt": "语音里听到店铺可能关门。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "后半段噪声覆盖，无法辨认是否真的关门。",
+          "source": "合成对话乙106",
+          "excerpt": "后半段噪声覆盖，无法辨认是否真的关门。"
+        }
+      }
+    },
+    {
+      "id": "rel-107",
+      "group": "conversation-107",
+      "split": "calibration",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "小组说项目进度不太一样。",
+          "source": "合成对话甲107",
+          "excerpt": "小组说项目进度不太一样。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "没有说明哪一项进度、前后状态或日期。",
+          "source": "合成对话乙107",
+          "excerpt": "没有说明哪一项进度、前后状态或日期。"
+        }
+      }
+    },
+    {
+      "id": "rel-108",
+      "group": "conversation-108",
+      "split": "calibration",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "便签写着“给小周那个”。",
+          "source": "合成对话甲108",
+          "excerpt": "便签写着“给小周那个”。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "另一条只写“已交”，物品和接收者不明。",
+          "source": "合成对话乙108",
+          "excerpt": "另一条只写“已交”，物品和接收者不明。"
+        }
+      }
+    },
+    {
+      "id": "rel-109",
+      "group": "conversation-109",
+      "split": "test",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "转写称窗户好像没关。",
+          "source": "合成对话甲109",
+          "excerpt": "转写称窗户好像没关。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "复核音频时关键几个字听不清。",
+          "source": "合成对话乙109",
+          "excerpt": "复核音频时关键几个字听不清。"
+        }
+      }
+    },
+    {
+      "id": "rel-110",
+      "group": "conversation-110",
+      "split": "test",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "口述提及上周有人来过。",
+          "source": "合成对话甲110",
+          "excerpt": "口述提及上周有人来过。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "另一个片段说前些天有人出现，身份无法确认。",
+          "source": "合成对话乙110",
+          "excerpt": "另一个片段说前些天有人出现，身份无法确认。"
+        }
+      }
+    },
+    {
+      "id": "rel-111",
+      "group": "conversation-111",
+      "split": "test",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "某个箱子似乎挪过位置。",
+          "source": "合成对话甲111",
+          "excerpt": "某个箱子似乎挪过位置。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "模糊照片看不出箱子是否为同一个。",
+          "source": "合成对话乙111",
+          "excerpt": "模糊照片看不出箱子是否为同一个。"
+        }
+      }
+    },
+    {
+      "id": "rel-112",
+      "group": "conversation-112",
+      "split": "test",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "录音称小猫最近不舒服。",
+          "source": "合成对话甲112",
+          "excerpt": "录音称小猫最近不舒服。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "另一条说“它好多了”，但无法确认是不是同一只猫。",
+          "source": "合成对话乙112",
+          "excerpt": "另一条说“它好多了”，但无法确认是不是同一只猫。"
+        }
+      }
+    },
+    {
+      "id": "rel-113",
+      "group": "conversation-113",
+      "split": "test",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "讲者提到价格“差不多”。",
+          "source": "合成对话甲113",
+          "excerpt": "讲者提到价格“差不多”。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "账单照片模糊，金额无法读取。",
+          "source": "合成对话乙113",
+          "excerpt": "账单照片模糊，金额无法读取。"
+        }
+      }
+    },
+    {
+      "id": "rel-114",
+      "group": "conversation-114",
+      "split": "test",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "有人说预约可能取消。",
+          "source": "合成对话甲114",
+          "excerpt": "有人说预约可能取消。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "日历上没有预约条目，无法确定原计划。",
+          "source": "合成对话乙114",
+          "excerpt": "日历上没有预约条目，无法确定原计划。"
+        }
+      }
+    },
+    {
+      "id": "rel-115",
+      "group": "conversation-115",
+      "split": "test",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "句子只留下“她不再……”。",
+          "source": "合成对话甲115",
+          "excerpt": "句子只留下“她不再……”。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "后续录音仅有“现在还在”，对象不明。",
+          "source": "合成对话乙115",
+          "excerpt": "后续录音仅有“现在还在”，对象不明。"
+        }
+      }
+    },
+    {
+      "id": "rel-116",
+      "group": "conversation-116",
+      "split": "test",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "记录称灯有时闪烁。",
+          "source": "合成对话甲116",
+          "excerpt": "记录称灯有时闪烁。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "维修摘要只有“检查过”，没有检查结果。",
+          "source": "合成对话乙116",
+          "excerpt": "维修摘要只有“检查过”，没有检查结果。"
+        }
+      }
+    },
+    {
+      "id": "rel-117",
+      "group": "conversation-117",
+      "split": "test",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "谈话提到某个日期已经调整。",
+          "source": "合成对话甲117",
+          "excerpt": "谈话提到某个日期已经调整。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "日期部分被截掉，无法比较原值和新值。",
+          "source": "合成对话乙117",
+          "excerpt": "日期部分被截掉，无法比较原值和新值。"
+        }
+      }
+    },
+    {
+      "id": "rel-118",
+      "group": "conversation-118",
+      "split": "test",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "老人说“那个地方以前有树”。",
+          "source": "合成对话甲118",
+          "excerpt": "老人说“那个地方以前有树”。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "另一人说那里现在没有，地点未指明。",
+          "source": "合成对话乙118",
+          "excerpt": "另一人说那里现在没有，地点未指明。"
+        }
+      }
+    },
+    {
+      "id": "rel-119",
+      "group": "conversation-119",
+      "split": "test",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "手写记录似乎写了“已寄”。",
+          "source": "合成对话甲119",
+          "excerpt": "手写记录似乎写了“已寄”。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "收件信息和日期均被污渍遮住。",
+          "source": "合成对话乙119",
+          "excerpt": "收件信息和日期均被污渍遮住。"
+        }
+      }
+    },
+    {
+      "id": "rel-120",
+      "group": "conversation-120",
+      "split": "test",
+      "expected": "insufficient_evidence",
+      "state": {
+        "left": {
+          "title": "社区日常记录",
+          "summary": "一句话提到“还剩一些”。",
+          "source": "合成对话甲120",
+          "excerpt": "一句话提到“还剩一些”。"
+        },
+        "right": {
+          "title": "社区日常记录",
+          "summary": "另一段没有数量或物品名称，无法判断是否相关。",
+          "source": "合成对话乙120",
+          "excerpt": "另一段没有数量或物品名称，无法判断是否相关。"
+        }
+      }
+    }
+  ]
+}

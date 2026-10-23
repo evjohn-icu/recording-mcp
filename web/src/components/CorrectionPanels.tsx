@@ -72,9 +72,14 @@ export function CorrectionPanel({ turnId, onChanged, onSuccess }: { turnId: stri
           return <div key={item.id}><h5>轮次 {item.original_index}：当前版本与草稿</h5><DiffView before={item.text} after={mine} beforeLabel="服务器当前版本" afterLabel="保留的草稿" />{old === item.text && <small>基准文本未变</small>}</div>
         })}
         <button type="button" disabled={saving} onClick={() => {
-          const oldByIndex = new Map(source.result.turns.map((turn) => [turn.original_index, texts[turn.id] ?? turn.text]))
+          const oldByIndex = new Map(source.result.turns.map((turn) => [turn.original_index, { base: turn.text, draft: texts[turn.id] ?? turn.text }]))
           const currentIndices = new Set(conflict.turns.map((turn) => turn.original_index))
-          const merged = Object.fromEntries(conflict.turns.map((turn) => [turn.id, oldByIndex.get(turn.original_index) ?? turn.text]))
+          // Preserve edits; unchanged fields adopt the current server text.
+          // The full merged segment still requires explicit user review.
+          const merged = Object.fromEntries(conflict.turns.map((turn) => {
+            const old = oldByIndex.get(turn.original_index)
+            return [turn.id, old && old.draft !== old.base ? old.draft : turn.text]
+          }))
           const orphaned = source.result.turns
             .filter((turn) => !currentIndices.has(turn.original_index))
             .map((turn) => ({ originalIndex: turn.original_index, text: texts[turn.id] ?? turn.text }))

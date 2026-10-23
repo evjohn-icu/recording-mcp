@@ -4,10 +4,15 @@ import { ApiError, getItem } from '../api/client'
 import {
   getWorldline,
   getWorldlineTopic,
-  generateWorldline,
+  startWorldlineAnalysis,
+  getWorldlineAnalysis,
   getWorldlineThreads,
   getWorldlineThread,
   submitWorldlineFeedback,
+  renameWorldlineThread,
+  groupWorldlineThreads,
+  revokeWorldlineThreadGroup,
+  reviewWorldlineSemantic,
   type WorldlineAction,
   type WorldlineClaim,
   type WorldlineFeedback,
@@ -49,6 +54,16 @@ function dateTimeLocal(value?: string | null): string {
 
 function toRFC3339(value: string): string | undefined {
   return value ? new Date(value).toISOString() : undefined
+}
+
+function waitForSignal(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => signal.removeEventListener('abort', onAbort)
+    const timer = window.setTimeout(() => { cleanup(); resolve() }, ms)
+    const onAbort = () => { window.clearTimeout(timer); cleanup(); reject(new DOMException('Aborted', 'AbortError')) }
+    if (signal.aborted) onAbort()
+    else signal.addEventListener('abort', onAbort, { once: true })
+  })
 }
 
 function allClaims(data: WorldlineResponse | null): WorldlineClaim[] {
@@ -165,8 +180,9 @@ export function WorldlinePage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [generationState, setGenerationState] = useState<'idle' | 'running' | 'complete' | 'failed'>('idle')
   const [generationError, setGenerationError] = useState('')
-  const [generationResult, setGenerationResult] = useState<Awaited<ReturnType<typeof generateWorldline>> | null>(null)
+  const [generationResult, setGenerationResult] = useState<Awaited<ReturnType<typeof startWorldlineAnalysis>> | null>(null)
   const generationRequestID = useRef('')
+  const generationAbort = useRef<AbortController | null>(null)
   const [extraTopics, setExtraTopics] = useState<Record<string, WorldlineTopic>>({})
   const [loadingTopic, setLoadingTopic] = useState('')
   const topicLoadGeneration = useRef(0)
@@ -177,6 +193,8 @@ export function WorldlinePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const { play } = useAudio()
+
+  useEffect(() => () => { generationAbort.current?.abort(); generationAbort.current = null }, [])
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
@@ -240,6 +258,9 @@ export function WorldlinePage() {
 
   function doSearch(event: React.FormEvent) { event.preventDefault(); setOffset(0); setQuery(search.trim()) }
   async function runGeneration() {
+    generationAbort.current?.abort()
+    const controller = new AbortController()
+    generationAbort.current = controller
     if (!generationRequestID.current) {
       generationRequestID.current = typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? `worldline-${crypto.randomUUID()}`
@@ -248,16 +269,23 @@ export function WorldlinePage() {
     setGenerationError('')
     setGenerationState('running')
     try {
-      const result = await generateWorldline(generationRequestID.current)
-      if (result.status !== 'complete') throw new Error('整理尚未完成，请重试。')
+      let result = await startWorldlineAnalysis(generationRequestID.current, controller.signal)
+      const deadline = Date.now() + 10 * 60 * 1000
+      while (result.status === 'queued' || result.status === 'running' || result.status === 'retry_wait') {
+        if (Date.now() >= deadline) throw new Error('任务仍在队列中；可以重试查看状态。')
+        await waitForSignal(1000, controller.signal)
+        result = await getWorldlineAnalysis(result.job_id, controller.signal)
+      }
+      if (result.status !== 'complete') { if (result.status === 'failed' || result.status === 'cancelled') generationRequestID.current = ''; throw new Error(result.status === 'cancelled' ? '整理任务已取消。' : (result.error || '整理失败，请重试。')) }
       generationRequestID.current = ''
       setGenerationResult(result)
       setGenerationState('complete')
       setRefreshKey((value) => value + 1)
     } catch (cause) {
+      if (controller.signal.aborted) { if (generationAbort.current === controller) { setGenerationState('idle'); setGenerationError('已停止等待；后台任务会继续运行，继续整理将恢复查看它。') }; return }
       setGenerationState('failed')
       setGenerationError(cause instanceof Error ? cause.message : '整理失败，请重试。')
-    }
+    } finally { if (generationAbort.current === controller) generationAbort.current = null }
   }
   function pan(direction: -1 | 1) {
     if (zoom === 'all') return
@@ -304,7 +332,7 @@ export function WorldlinePage() {
         <div className="wl-metrics" aria-label="时间线统计">
           {viewMode === 'threads' ? <><span><b>{threadStats.total || '—'}</b>具体主题</span><span><b>{threadStats.total ? threadStats.crossConversation : '—'}</b>跨会话主题</span></> : <><span><b>{data?.stats.topics ?? '—'}</b>主题</span><span><b>{data?.stats.claims ?? '—'}</b>主张</span><span><b>{data?.stats.unknown_time ?? '—'}</b>时间未知</span><span><b>{data?.stats.conflicts ?? '—'}</b>冲突</span></>}
         </div>
-        <button type="button" className="wl-generate-button" disabled={generationState === 'running'} onClick={() => void runGeneration()}>{generationState === 'running' ? '整理中…' : generationState === 'failed' ? '重试整理' : '整理世界线'}</button>
+        <button type="button" className="wl-generate-button" disabled={generationState === 'running'} onClick={() => void runGeneration()}>{generationState === 'running' ? '整理中…' : generationState === 'failed' ? '重试整理' : '整理世界线'}</button>{generationState==='running'&&<button type="button" className="secondary-button" onClick={()=>generationAbort.current?.abort()}>停止等待</button>}
         <span className="wl-generation-status" role={generationError ? 'alert' : 'status'}>
           {generationError || (generationState === 'running' ? '正在整理并核对来源…' : generationState === 'complete' ? generationSemanticLabel(generationResult) : '整理会读取已有来源；语义建议需人工核对，不会自动改写事实。')}
         </span>
@@ -377,6 +405,7 @@ function WorldlineThreadsView({ query, refreshKey, zoom, setZoom, windowCenter, 
   const [data, setData] = useState<WorldlineThreadsResponse | null>(null)
   const [details, setDetails] = useState<Record<string, WorldlineThreadDetail>>({})
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [groupSelection, setGroupSelection] = useState<string[]>([])
   const [selected, setSelected] = useState<{ thread: WorldlineThreadSummary; entry: WorldlineThreadEntry } | null>(null)
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -500,6 +529,21 @@ function WorldlineThreadsView({ query, refreshKey, zoom, setZoom, windowCenter, 
     if (await loadMore(thread)) setVisibleEntries((previous) => ({ ...previous, [thread.id]: visible + 5 }))
   }
 
+  async function renameThread(thread: WorldlineThreadSummary) {
+    const next = window.prompt('主题别名（留空可恢复来源名称）', thread.title)
+    if (next === null || !data) return
+    const requestID = `worldline-rename-${crypto.randomUUID()}`
+    try { await renameWorldlineThread(thread.id, next, data.version, requestID); onRetry() }
+    catch (cause) { setError(cause instanceof Error ? cause.message : '重命名失败') }
+  }
+
+  async function groupSelectedThreads() {
+    if(!data||groupSelection.length<2)return
+    const title=window.prompt('新分组名称',groupSelection.map(id=>data.threads.find(t=>t.id===id)?.title).filter(Boolean).join(' + '));if(title===null)return
+    try{await groupWorldlineThreads(groupSelection,title,data.version,`worldline-group-${crypto.randomUUID()}`);setGroupSelection([]);onRetry()}catch(cause){setError(cause instanceof Error?cause.message:'分组失败')}
+  }
+  async function revokeGroup(thread:WorldlineThreadSummary){if(!data)return;try{await revokeWorldlineThreadGroup(thread.id,data.version,`worldline-ungroup-${crypto.randomUUID()}`);onRetry()}catch(cause){setError(cause instanceof Error?cause.message:'撤销分组失败')}}
+
   function feedbackTarget(thread: WorldlineThreadSummary, entry: WorldlineThreadEntry, action: WorldlineAction, version: string) {
     const claim = entry.claim
     const lane: WorldlineLane = { id: entry.lane_id, title: thread.title, source_topic_ids: thread.source_topic_ids, subject: 'unknown', category: entry.category || 'unclassified', claims: [claim] }
@@ -518,6 +562,7 @@ function WorldlineThreadsView({ query, refreshKey, zoom, setZoom, windowCenter, 
   return <div className={`wl-thread-content ${selected ? 'has-selection' : ''}`}>
     <div className={`wl-thread-main ${selected ? 'has-selection' : ''}`}>
       <div className="wl-thread-explainer"><strong>当时这样说过，不代表事实生效</strong><span>按具体主题串联多次对话；主题分类仅帮助浏览。同主题不代表同一说话人。</span></div>
+      <div className="wl-thread-group-controls"><span>{groupSelection.length} 个主题已选</span><button type="button" disabled={groupSelection.length<2} onClick={() => void groupSelectedThreads()}>手动分组</button><button type="button" className="secondary-button" onClick={() => setGroupSelection([])}>清除选择</button></div>
       <div className="wl-thread-legend"><span><i className="wl-thread-marker" />录音提及</span><span><i className="wl-thread-unknown-marker" />提及时间未知</span><span>事实适用时间请切换到“事实适用时间”视图确认</span></div>
       <div className="wl-thread-time-controls"><div className="wl-zoom" aria-label="提及时间缩放"><button type="button" className={zoom === 'all' ? 'selected' : ''} onClick={() => { setZoom('all'); setWindowCenter(null) }}>全范围</button><button type="button" className={zoom === 'day' ? 'selected' : ''} onClick={() => { setZoom('day'); setWindowCenter(allStart + (allEnd - allStart) / 2) }}>日</button><button type="button" className={zoom === 'week' ? 'selected' : ''} onClick={() => { setZoom('week'); setWindowCenter(allStart + (allEnd - allStart) / 2) }}>周</button><button type="button" className={zoom === 'month' ? 'selected' : ''} onClick={() => { setZoom('month'); setWindowCenter(allStart + (allEnd - allStart) / 2) }}>月</button></div><div className="wl-pan"><button aria-label="向前浏览提及" type="button" disabled={zoom === 'all'} onClick={() => setWindowCenter((windowCenter ?? allStart + (allEnd - allStart) / 2) - panStep)}>←</button><button aria-label="向后浏览提及" type="button" disabled={zoom === 'all'} onClick={() => setWindowCenter((windowCenter ?? allStart + (allEnd - allStart) / 2) + panStep)}>→</button></div></div>
       <div className="wl-thread-board-wrap">
@@ -533,12 +578,12 @@ function WorldlineThreadsView({ query, refreshKey, zoom, setZoom, windowCenter, 
               const unknownValidity = [...entries, ...unknownEntries].filter((entry) => !dateValue(entry.claim.valid_from) && !dateValue(entry.claim.valid_until))
               const isExpanded = expanded[thread.id] ?? false
               return <article className={`wl-thread-row ${isExpanded ? 'is-expanded' : ''}`} key={thread.id}>
-                <div className="wl-thread-label"><button type="button" className="wl-thread-toggle" aria-expanded={isExpanded} onClick={() => setExpanded((current) => ({ ...current, [thread.id]: !isExpanded }))}><span className="wl-chevron">{isExpanded ? '⌄' : '›'}</span><span>{thread.title}</span></button>{(thread.semantic_review_count || 0) > 0 && <small className="wl-thread-review-count">{thread.semantic_review_count} 处关系待核对</small>}<small>{thread.conversation_count} 段会话 · {thread.entry_count} 条提及</small><small>{unknownValidity.length ? `适用时间未知 ${unknownValidity.length} 条` : '适用时间见主张详情'}</small></div>
+                <div className="wl-thread-label"><label><input type="checkbox" aria-label={`选择主题 ${thread.title} 用于分组`} checked={groupSelection.includes(thread.id)} onChange={(event) => setGroupSelection((current) => event.target.checked ? [...current,thread.id] : current.filter(id=>id!==thread.id))}/></label><button type="button" className="wl-thread-toggle" aria-expanded={isExpanded} onClick={() => setExpanded((current) => ({ ...current, [thread.id]: !isExpanded }))}><span className="wl-chevron">{isExpanded ? '⌄' : '›'}</span><span>{thread.title}</span></button>{thread.manual_group&&<button type="button" className="secondary-button" onClick={() => void revokeGroup(thread)}>撤销分组</button>}<button type="button" className="secondary-button" onClick={() => void renameThread(thread)}>重命名</button>{(thread.semantic_review_count || 0) > 0 && <small className="wl-thread-review-count">{thread.semantic_review_count} 处关系待核对</small>}<small>{thread.conversation_count} 段会话 · {thread.entry_count} 条提及</small><small>{unknownValidity.length ? `适用时间未知 ${unknownValidity.length} 条` : '适用时间见主张详情'}</small></div>
                 <div className="wl-thread-track">{Array.from({ length: 5 }, (_, index) => <i key={index} className="wl-grid-line" style={{ left: `${index * 25}%` }} />)}{entries.map((entry, index) => { const left = position(entry.mentioned_at); return left === null ? null : <button key={entry.id} type="button" className={`wl-thread-marker relation-${entry.relation}`} style={{ left: `${left}%`, top: `${12 + (index % 3) * 11}px` }} title={`${dayLabel(Date.parse(entry.mentioned_at!), true)} · ${entry.summary} · 当时这样说过，不代表事实生效`} aria-label={`${thread.title}，${dayLabel(Date.parse(entry.mentioned_at!), true)}提及：${entry.summary}；不代表事实生效`} onClick={() => selectEntry(thread, entry)} /> })}</div>
                 {isExpanded && <div className="wl-thread-expanded">
                   {detailErrors[thread.id] && <p className="wl-inline-error" role="alert">{detailErrors[thread.id]} <button className="link-button" onClick={() => void loadMore(thread)}>重试</button></p>}
                   {!detail && !detailErrors[thread.id] && <p className="wl-muted">正在载入来源片段…</p>}
-                  {entries.length > 0 ? <ol className="wl-thread-entries">{entries.slice(0, visibleEntries[thread.id] ?? 5).map((entry) => <li key={entry.id} className={selected?.entry.id === entry.id ? 'selected' : ''}><button type="button" onClick={() => selectEntry(thread, entry)}><time>{entry.mentioned_at ? dayLabel(Date.parse(entry.mentioned_at), true) : '提及日期未知'}</time><span className="wl-relation-label">{relationLabel(entry.relation)}</span><strong>{entry.summary}</strong><small>同主题不代表同一说话人 · {entry.conversation_ids.length || 1} 段来源会话</small><blockquote>{entry.evidence[0]?.text || entry.summary}</blockquote></button>{entry.semantic_suggestion && <SemanticSuggestionCard entry={entry} threadEntries={allThreadEntries} onSelect={(source) => selectEntry(thread, source)} />}</li>)}</ol> : <p className="wl-muted">目前没有带明确提及日期的来源。</p>}
+                  {entries.length > 0 ? <ol className="wl-thread-entries">{entries.slice(0, visibleEntries[thread.id] ?? 5).map((entry) => <li key={entry.id} className={selected?.entry.id === entry.id ? 'selected' : ''}><button type="button" onClick={() => selectEntry(thread, entry)}><time>{entry.mentioned_at ? dayLabel(Date.parse(entry.mentioned_at), true) : '提及日期未知'}</time><span className="wl-relation-label">{relationLabel(entry.relation)}</span><strong>{entry.summary}</strong><small>同主题不代表同一说话人 · {entry.conversation_ids.length || 1} 段来源会话</small><blockquote>{entry.evidence[0]?.text || entry.summary}</blockquote></button>{entry.semantic_suggestion && <SemanticSuggestionCard entry={entry} threadID={thread.id} threadEntries={allThreadEntries} version={data.version} onSelect={(source) => selectEntry(thread, source)} onReviewed={onRetry} />}</li>)}</ol> : <p className="wl-muted">目前没有带明确提及日期的来源。</p>}
                   {visibleEntries[thread.id] < entries.length && <button className="secondary-button wl-thread-more" type="button" onClick={() => setVisibleEntries((previous) => ({ ...previous, [thread.id]: (previous[thread.id] ?? 5) + 5 }))}>再显示 5 条提及</button>}
                   {unknownEntries.length > 0 && <section className="wl-thread-unknown"><h3>提及时间未知 <span>{detail?.unknown_entries_total ?? unknownEntries.length}</span></h3>{unknownEntries.slice(0, visibleUnknownEntries[thread.id] ?? 5).map((entry) => <button key={entry.id} type="button" onClick={() => selectEntry(thread, entry)}><strong>{entry.summary}</strong><small>提及时间未知；适用时间{dateValue(entry.claim.valid_from) || dateValue(entry.claim.valid_until) ? '另见详情' : '也未知'}</small></button>)}</section>}
                   {visibleUnknownEntries[thread.id] < unknownEntries.length && <button className="secondary-button wl-thread-more" type="button" onClick={() => setVisibleUnknownEntries((previous) => ({ ...previous, [thread.id]: (previous[thread.id] ?? 5) + 5 }))}>再显示 5 条未定位提及</button>}
@@ -565,22 +610,40 @@ function relationLabel(relation: string): string {
   return labels[relation] || '来源提及'
 }
 
-function SemanticSuggestionCard({ entry, threadEntries, onSelect }: {
+function reviewStatusLabel(status?: string): string { return ({ accept:'已接受',reject:'已拒绝',insufficient:'证据不足',reopen:'重新核对' } as Record<string,string>)[status || ''] || '已处理' }
+
+function SemanticSuggestionCard({ entry, threadID, threadEntries, version, onSelect, onReviewed }: {
   entry: WorldlineThreadEntry
+  threadID: string
   threadEntries: WorldlineThreadEntry[]
+  version: string
   onSelect: (source: WorldlineThreadEntry) => void
+  onReviewed: () => void
 }) {
   const suggestion = entry.semantic_suggestion
+  const [pendingDecision, setPendingDecision] = useState<'accept'|'reject'|'insufficient'|'reopen'|null>(null)
+  const [reviewError, setReviewError] = useState('')
+  const [draftDecision, setDraftDecision] = useState<'accept'|'reject'|'insufficient'|'reopen'|null>(null)
+  const reviewRequest = useRef<{ decision: string; id: string } | null>(null)
+  const [reviewVersion, setReviewVersion] = useState(version)
+  const [sourceDiffs, setSourceDiffs] = useState<Array<{label:string;before:string;after:string;evidence?:string}>>([])
+  useEffect(() => setReviewVersion(version), [version])
   if (!suggestion) return null
+  const reviewableSuggestion = suggestion
   const sources = (suggestion.source_claim_ids || []).slice(0, 2).map((claimID) => threadEntries.find((candidate) => candidate.claim_id === claimID))
   const sourceDetails = [
     { label: '较早来源', summary: suggestion.earlier_summary, evidence: suggestion.earlier_evidence || [], entry: sources[0] },
     { label: '较新来源', summary: suggestion.later_summary, evidence: suggestion.later_evidence || [], entry: sources[1] },
   ]
+  async function decide(decision: 'accept'|'reject'|'insufficient'|'reopen') { if (!reviewableSuggestion.suggestion_id) return; if (!reviewRequest.current || reviewRequest.current.decision!==decision) reviewRequest.current={decision,id:`worldline-review-${crypto.randomUUID()}`};setDraftDecision(decision);setPendingDecision(decision);setReviewError('');try { await reviewWorldlineSemantic(reviewableSuggestion.suggestion_id,decision,reviewVersion,reviewRequest.current.id);reviewRequest.current=null;setDraftDecision(null);setSourceDiffs([]);onReviewed() } catch (cause) { setReviewError(cause instanceof Error ? cause.message : '复核提交失败；当前选择仍保留，可重试。');if(cause instanceof ApiError&&cause.status===409){try{const [latestList,latestDetail]=await Promise.all([getWorldlineThreads({limit:1}),getWorldlineThread(threadID,{limit:500})]);setReviewVersion(latestList.version);const current=[...latestDetail.entries,...latestDetail.unknown_entries];setSourceDiffs([{label:'较早来源',before:reviewableSuggestion.earlier_summary||'',after:current.find(x=>x.claim_id===reviewableSuggestion.source_claim_ids[0])?.summary||'当前来源已不存在',evidence:current.find(x=>x.claim_id===reviewableSuggestion.source_claim_ids[0])?.evidence[0]?.text},{label:'较新来源',before:reviewableSuggestion.later_summary||'',after:current.find(x=>x.claim_id===reviewableSuggestion.source_claim_ids[1])?.summary||'当前来源已不存在',evidence:current.find(x=>x.claim_id===reviewableSuggestion.source_claim_ids[1])?.evidence[0]?.text}])}catch{setReviewError('版本已变化，当前决定仍保留；刷新页面后可查看最新来源。')}}} finally { setPendingDecision(null) } }
   return <section className="wl-semantic-suggestion" aria-label="语义建议，待人工核对">
-    <header><strong>语义建议 · 待核对</strong><span>{relationLabel(suggestion.relation)}</span></header>
+    <header><strong>语义建议 · {suggestion.requires_review ? '待核对' : reviewStatusLabel(suggestion.review_status)}</strong><span>{relationLabel(suggestion.relation)}</span></header>
     <p>这只是对来源关系的建议，不表示事实成立，也不会自动修改主题或记录。</p>
     <small>模型：{suggestion.model || '未返回模型名称'}</small>
+    {reviewError && <p className="wl-inline-error" role="alert">{reviewError}</p>}
+    {sourceDiffs.length>0&&<div className="wl-semantic-sources" aria-label="最新来源对比">{sourceDiffs.map(source=><div key={source.label}><span>{source.label} · 最新来源</span><small>建议时：{source.before||'未提供'}</small><strong>当前：{source.after}</strong>{source.evidence&&<blockquote>{source.evidence}</blockquote>}</div>)}</div>}
+    {draftDecision && reviewError && <button type="button" disabled={pendingDecision!==null} onClick={() => void decide(draftDecision)}>重试{reviewStatusLabel(draftDecision)}决定</button>}
+    {suggestion.requires_review ? <div className="wl-review-actions"><button type="button" disabled={pendingDecision!==null} onClick={() => void decide('accept')}>接受关系建议</button><button type="button" disabled={pendingDecision!==null} onClick={() => void decide('reject')}>拒绝</button><button type="button" disabled={pendingDecision!==null} onClick={() => void decide('insufficient')}>证据不足</button></div> : <button type="button" disabled={pendingDecision!==null} onClick={() => void decide('reopen')}>重新打开核对</button>}
     <div className="wl-semantic-sources">
       {sourceDetails.map((source, index) => <div key={source.label}>
         <span>{source.label}</span>
@@ -594,7 +657,7 @@ function SemanticSuggestionCard({ entry, threadEntries, onSelect }: {
   </section>
 }
 
-function generationSemanticLabel(result: Awaited<ReturnType<typeof generateWorldline>> | null): string {
+function generationSemanticLabel(result: Awaited<ReturnType<typeof startWorldlineAnalysis>> | null): string {
   if (!result?.semantic_status) return '整理完成；语义引擎状态未返回，不能确认是否生成了建议。'
   if (result.semantic_status === 'not_configured') return '整理完成；语义引擎未配置，未生成语义建议。'
   if (result.semantic_status === 'failed') return '整理完成；语义评估失败，未确认建议结果。'
@@ -671,7 +734,7 @@ function ClaimInspector({ claim, topic, lane, play, onClose, onFeedback, mention
         const disabledReason = audio === 'available' ? '' : audio === 'offset_unknown' ? '缺少音频定位时间' : audio === 'out_of_range' ? '来源时间超出录音范围' : audio === 'deleted' ? '录音音频已删除' : audio === 'missing' ? '本机找不到音频文件' : audio === 'unverified' || !audio ? '正在核验本地音频状态' : '此来源没有可用音频'
         return <article key={`${item.turn_id}:${item.revision}`}><blockquote>“{item.text}”</blockquote><footer><span className="wl-source-actions"><button type="button" className="wl-text-button" disabled={audio !== 'available'} title={disabledReason || '播放来源音频'} onClick={() => play(item.turn_id, item.offset_ms === undefined ? undefined : { startMs: item.offset_ms, endMs: null })}>▶ 播放原文</button>{audio !== 'available' && <small>{disabledReason}</small>}</span><Link to={`/c/${encodeURIComponent(item.conversation_id)}`}>打开录音详情 ↗</Link></footer></article>
       })}{claim.evidence.length > 3 && <button type="button" className="wl-text-button" onClick={() => setShowAllEvidence((v) => !v)}>{showAllEvidence ? '收起来源' : `查看全部 ${claim.evidence.length} 个来源`}</button>}</section>
-      <div className="wl-inspector-actions"><button type="button" onClick={() => onFeedback('review', topic, lane, claim)}>复核</button><button type="button" className="secondary-button" onClick={() => onFeedback('correct', topic, lane, claim)}>修正记录</button>{!mentionContext && lane.category === 'facts' && claim.evidence.length > 0 && <button type="button" className="secondary-button" onClick={() => onFeedback('change', topic, lane, claim)}>记录现实变化</button>}<button type="button" className="secondary-button" onClick={() => onFeedback('set_time', topic, lane, claim)}>设置适用时间</button>{!mentionContext && <button type="button" className="secondary-button" onClick={() => onFeedback('move_claim', topic, lane, claim)}>移动到主题</button>}</div>
+      <div className="wl-inspector-actions"><button type="button" onClick={() => onFeedback('review', topic, lane, claim)}>复核</button><button type="button" className="secondary-button" onClick={() => onFeedback('correct', topic, lane, claim)}>修正记录</button>{lane.category === 'facts' && claim.evidence.length > 0 && <button type="button" className="secondary-button" onClick={() => onFeedback('change', topic, lane, claim)}>记录现实变化</button>}<button type="button" className="secondary-button" onClick={() => onFeedback('set_time', topic, lane, claim)}>设置适用时间</button>{!mentionContext && <button type="button" className="secondary-button" onClick={() => onFeedback('move_claim', topic, lane, claim)}>移动到主题</button>}</div>
     </div>
   </aside>
 }

@@ -179,8 +179,9 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/systemone", s.ServeSystemOne)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok\n"))
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "model": *model, "weights_version": *weights})
 	})
 	log.Printf("context-decision listening on http://%s/v1/systemone (model=%s weights=%s, deterministic sandbox judgments)", *addr, *model, *weights)
 	if err := http.ListenAndServe(*addr, mux); err != nil {

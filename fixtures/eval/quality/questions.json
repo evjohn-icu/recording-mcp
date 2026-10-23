@@ -1,0 +1,785 @@
+{
+  "description": "60 authored classic checks, one evidence-grounded Chinese query per positive synthetic fact.",
+  "questions": [
+    {
+      "id": "classic-utt-1-seg-quality-001",
+      "query": "西桥门店备用金是多少",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-001",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-002",
+      "query": "展示柜采购怎么付款",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-002",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-003",
+      "query": "差旅报销要交哪些材料",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-003",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-004",
+      "query": "工牌押金什么时候退",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-004",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-005",
+      "query": "读书会场地费多少钱",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-005",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-006",
+      "query": "摄影器材维修预算上限",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-006",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-007",
+      "query": "市集摊位费交给谁",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-007",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-008",
+      "query": "团建餐费报销标准",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-008",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-009",
+      "query": "工作室每月能打印多少页",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-009",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-010",
+      "query": "志愿活动保险谁买",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-010",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-011",
+      "query": "产品评审几点开始",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-011",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-012",
+      "query": "周一站会安排",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-012",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-013",
+      "query": "合唱团哪天排练",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-013",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-014",
+      "query": "季度盘点截止时间",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-014",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-015",
+      "query": "读书分享什么时候举行",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-015",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-016",
+      "query": "供应商演示改到何时",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-016",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-017",
+      "query": "暑期营什么时候截止报名",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-017",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-018",
+      "query": "行政每月什么时候查消防",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-018",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-019",
+      "query": "花园轮值从哪天开始",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-019",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-020",
+      "query": "客服培训日期",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-020",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-021",
+      "query": "湖州调研怎么去园区",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-021",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-022",
+      "query": "海边露营能带什么炉具",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-022",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-023",
+      "query": "成都参会住在哪里附近",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-023",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-024",
+      "query": "骑行路线多长",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-024",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-025",
+      "query": "返程机票怎么预订",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-025",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-026",
+      "query": "山区民宿有电梯吗",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-026",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-027",
+      "query": "自然博物馆哪天不开门",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-027",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-028",
+      "query": "机场拼车在哪里集合",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-028",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-029",
+      "query": "徒步要自己带什么",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-029",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-030",
+      "query": "布展车辆从哪里进",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-030",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-031",
+      "query": "眼科复查是什么时候",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-031",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-032",
+      "query": "恢复跑步怎么安排",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-032",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-033",
+      "query": "急救箱在哪里",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-033",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-034",
+      "query": "体检报告去哪里看",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-034",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-035",
+      "query": "午休头痛先怎么办",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-035",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-036",
+      "query": "舞蹈排练怎么热身",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-036",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-037",
+      "query": "冷藏药盒温度范围",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-037",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-038",
+      "query": "体检周六能做吗",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-038",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-039",
+      "query": "球馆地板湿了怎么办",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-039",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-040",
+      "query": "活动提供什么饮品",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-040",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-041",
+      "query": "书房窗帘轨道多长",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-041",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-042",
+      "query": "楼道灯谁负责维修",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-042",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-043",
+      "query": "阳台花盆怎么防漏水",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-043",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-044",
+      "query": "净水器用什么滤芯",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-044",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-045",
+      "query": "访客车停哪个区域",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-045",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-046",
+      "query": "垃圾分类点几点关",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-046",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-047",
+      "query": "路由器放在哪儿",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-047",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-048",
+      "query": "周末几点能装修",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-048",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-049",
+      "query": "晾衣绳什么时候能用",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-049",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-050",
+      "query": "备用钥匙放在哪里",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-050",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-051",
+      "query": "机器人材料包何时发",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-051",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-052",
+      "query": "英语角讨论什么主题",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-052",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-053",
+      "query": "绘本课在哪上",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-053",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-054",
+      "query": "编程结课交哪些文件",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-054",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-055",
+      "query": "美术课自己带什么",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-055",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-056",
+      "query": "研讨间一次能用多久",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-056",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-057",
+      "query": "科学展怎么报名",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-057",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-058",
+      "query": "合唱彩排用什么伴奏",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-058",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-059",
+      "query": "家长会从哪里进",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-059",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    },
+    {
+      "id": "classic-utt-1-seg-quality-060",
+      "query": "观察作业要记录什么",
+      "purpose": "authored_quality_corpus_smoke",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-quality-060",
+          "transcript_revision": "rev-1",
+          "turn_id": "utt-1"
+        }
+      ],
+      "notes": "独立合成事实的基线检索问句。"
+    }
+  ]
+}

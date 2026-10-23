@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"recordingmcp/internal/asrinput"
+	"recordingmcp/internal/process"
 )
 
 func TestForgetTurnTombstoneIsGranularAndIdempotent(t *testing.T) {
@@ -18,6 +20,13 @@ func TestForgetTurnTombstoneIsGranularAndIdempotent(t *testing.T) {
 	defer s.Close()
 	tr, a := synthetic()
 	if _, err = s.Import(ctx, tr, a, "x.wav", strings.Repeat("a", 64)); err != nil {
+		t.Fatal(err)
+	}
+	jobID, _, err := process.Enqueue(ctx, s.DB(), process.Spec{Stage: "embed", InputSnapshotID: a.ConversationID, IdempotencyKey: "forget-retry", PayloadJSON: `{"conversation_id":"` + a.ConversationID + `"}`}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.DB().Exec(`INSERT INTO processing_retry_requests(request_id,job_id,expected_attempt,created_at) VALUES('forget-request',?,0,?)`, jobID, time.Now().UnixMilli()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = s.PreviewForget(ctx, ForgetRequest{Scope: "turn", TurnID: turnKey(a.RecordingID, "seg01-turn0001")}); err == nil {
@@ -48,6 +57,10 @@ func TestForgetTurnTombstoneIsGranularAndIdempotent(t *testing.T) {
 	}
 	if err = s.GuardForgotten(ctx, a.RecordingID, 1); err == nil {
 		t.Fatal("segment-level guard did not fence source")
+	}
+	var retryRows int
+	if err = s.DB().QueryRow(`SELECT COUNT(*) FROM processing_retry_requests WHERE job_id=?`, jobID).Scan(&retryRows); err != nil || retryRows != 0 {
+		t.Fatalf("forgotten processing retry request retained: rows=%d err=%v", retryRows, err)
 	}
 }
 

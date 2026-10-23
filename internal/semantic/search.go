@@ -51,6 +51,9 @@ type SemanticRetriever interface {
 type SQLiteRetriever struct {
 	DB       *sql.DB
 	Provider Provider
+	// MinimumSimilarity overrides the default admission threshold when set.
+	// A nil value preserves the historical 0.05 cutoff.
+	MinimumSimilarity *float64
 }
 
 var _ SemanticRetriever = (*SQLiteRetriever)(nil)
@@ -132,7 +135,11 @@ func (r *SQLiteRetriever) searchVector(ctx context.Context, queryVec Vector, opt
 		if err != nil {
 			return nil, err
 		}
-		if score < minSemanticScore {
+		minimumScore := minSemanticScore
+		if r.MinimumSimilarity != nil {
+			minimumScore = *r.MinimumSimilarity
+		}
+		if score < minimumScore {
 			continue
 		}
 		h := SemanticHit{Kind: kind, ArtifactID: id, ConversationID: conv, Score: score}

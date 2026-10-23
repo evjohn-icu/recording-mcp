@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"recordingmcp/internal/contextbuild"
@@ -37,6 +38,8 @@ type Options struct {
 	SemanticProviderConfigured bool
 	// LexicalOnly skips semantic indexing and the hybrid pass.
 	LexicalOnly bool
+	// MinimumSimilarity optionally overrides semantic admission for calibration.
+	MinimumSimilarity *float64
 }
 
 // Report is the machine-readable evaluation report.
@@ -79,12 +82,29 @@ type Metrics struct {
 	// Retrieval latency is tracked separately for each retrieval mode. Values
 	// are fractional milliseconds so fast deterministic builds are not rounded
 	// down to zero.
-	RetrievalLexicalLatencyMSAvg   float64 `json:"retrieval_lexical_latency_ms_avg"`
-	RetrievalLexicalLatencyMSMax   float64 `json:"retrieval_lexical_latency_ms_max"`
-	RetrievalLexicalLatencyMSTotal float64 `json:"retrieval_lexical_latency_ms_total"`
-	RetrievalHybridLatencyMSAvg    float64 `json:"retrieval_hybrid_latency_ms_avg"`
-	RetrievalHybridLatencyMSMax    float64 `json:"retrieval_hybrid_latency_ms_max"`
-	RetrievalHybridLatencyMSTotal  float64 `json:"retrieval_hybrid_latency_ms_total"`
+	RetrievalLexicalLatencyMSAvg   float64                           `json:"retrieval_lexical_latency_ms_avg"`
+	RetrievalLexicalLatencyMSMax   float64                           `json:"retrieval_lexical_latency_ms_max"`
+	RetrievalLexicalLatencyMSTotal float64                           `json:"retrieval_lexical_latency_ms_total"`
+	RetrievalHybridLatencyMSAvg    float64                           `json:"retrieval_hybrid_latency_ms_avg"`
+	RetrievalHybridLatencyMSMax    float64                           `json:"retrieval_hybrid_latency_ms_max"`
+	RetrievalHybridLatencyMSTotal  float64                           `json:"retrieval_hybrid_latency_ms_total"`
+	RetrievalLexicalLatencyMSP50   float64                           `json:"retrieval_lexical_latency_ms_p50"`
+	RetrievalLexicalLatencyMSP95   float64                           `json:"retrieval_lexical_latency_ms_p95"`
+	RetrievalHybridLatencyMSP50    float64                           `json:"retrieval_hybrid_latency_ms_p50"`
+	RetrievalHybridLatencyMSP95    float64                           `json:"retrieval_hybrid_latency_ms_p95"`
+	RetrievalLexicalMRRAt10        float64                           `json:"retrieval_lexical_mrr_at_10"`
+	RetrievalHybridMRRAt10         float64                           `json:"retrieval_hybrid_mrr_at_10"`
+	RetrievalLexicalPrecisionAt5   float64                           `json:"retrieval_lexical_precision_at_5"`
+	RetrievalHybridPrecisionAt5    float64                           `json:"retrieval_hybrid_precision_at_5"`
+	RetrievalRequests              int                               `json:"retrieval_requests"`
+	SemanticQueryEmbedRequests     int                               `json:"semantic_query_embed_requests"`
+	SemanticIndexEmbedRequests     int                               `json:"semantic_index_embed_requests"`
+	SemanticIndexEmbeddedItems     int                               `json:"semantic_index_embedded_items"`
+	SemanticIndexDurationMS        float64                           `json:"semantic_index_duration_ms"`
+	SemanticProviderEmbedRequests  int                               `json:"semantic_provider_embed_requests"`
+	SemanticProviderEmbedItems     int                               `json:"semantic_provider_embed_items"`
+	SemanticProviderEmbedErrors    int                               `json:"semantic_provider_embed_errors"`
+	RetrievalBuckets               map[string]RetrievalBucketMetrics `json:"retrieval_buckets,omitempty"`
 	// ModelCalls is the number of rerank invocations; the harness configures no
 	// reranker, so the deterministic assembly runs untouched.
 	ModelCalls int `json:"model_calls"`
@@ -122,6 +142,24 @@ type Metrics struct {
 	Projection ProjectionMetrics `json:"projection"`
 }
 
+// RetrievalBucketMetrics reports independently auditable per-split, per-mode,
+// per-bucket denominators and quality/latency outcomes.
+type RetrievalBucketMetrics struct {
+	Questions            int     `json:"questions"`
+	AnswerableQuestions  int     `json:"answerable_questions"`
+	NoEvidenceQuestions  int     `json:"no_evidence_questions"`
+	RecallAt5            float64 `json:"recall_at_5"`
+	MRRAt10              float64 `json:"mrr_at_10"`
+	PrecisionAt5         float64 `json:"precision_at_5"`
+	FalsePositiveQueries int     `json:"false_positive_queries"`
+	FalsePositiveRate    float64 `json:"false_positive_rate"`
+	LatencyMSP50         float64 `json:"latency_ms_p50"`
+	LatencyMSP95         float64 `json:"latency_ms_p95"`
+	StaleItems           int     `json:"stale_items"`
+	AmbientItems         int     `json:"ambient_items"`
+	ScopeEscapes         int     `json:"scope_escapes"`
+}
+
 // ProjectionMetrics scores the projection pass. Ran reports whether the pass
 // executed at all (a disabled pass leaves the other fields at their zero value
 // rather than claiming the projection is nondeterministic). The honesty
@@ -142,6 +180,9 @@ type ProjectionMetrics struct {
 // QuestionResult is one question's evaluation.
 type QuestionResult struct {
 	ID                  string   `json:"id"`
+	GroupID             string   `json:"group_id,omitempty"`
+	Split               string   `json:"split,omitempty"`
+	Bucket              string   `json:"bucket,omitempty"`
 	Purpose             string   `json:"purpose"`
 	Query               string   `json:"query"`
 	Mode                string   `json:"mode,omitempty"`
@@ -153,11 +194,15 @@ type QuestionResult struct {
 	GoldEvidenceFound   int      `json:"gold_evidence_found"`
 	RecallAt5           float64  `json:"recall_at_5"`
 	StaleLeakage        float64  `json:"stale_leakage"`
+	StaleItems          int      `json:"stale_items"`
 	RelationAssisted    int      `json:"relation_assisted"`
 	AmbientItems        int      `json:"ambient_items,omitempty"`
 	ScopeEscapes        int      `json:"scope_escapes,omitempty"`
 	ContextCoverage     *float64 `json:"context_coverage,omitempty"`
 	LatencyMS           float64  `json:"latency_ms"`
+	ReciprocalRank      float64  `json:"reciprocal_rank_at_10"`
+	PrecisionAt5        float64  `json:"precision_at_5"`
+	Rank                int      `json:"rank_at_10,omitempty"`
 	ExpectStaleExcluded bool     `json:"expect_stale_excluded"`
 }
 
@@ -249,13 +294,21 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 	} else if provider == nil && !opts.SemanticProviderConfigured {
 		provider = semantic.NewHashProvider(semantic.DefaultHashDims)
 	}
+	var providerAccounting *accountingProvider
 	var retriever semantic.SemanticRetriever
 	if provider != nil {
+		providerAccounting = &accountingProvider{inner: provider}
+		provider = providerAccounting
 		indexer := &semantic.Indexer{DB: db, Provider: provider}
-		if _, err := indexer.IndexAll(ctx); err != nil {
+		indexStarted := time.Now()
+		indexReport, err := indexer.IndexAll(ctx)
+		report.Metrics.SemanticIndexDurationMS = float64(time.Since(indexStarted)) / float64(time.Millisecond)
+		report.Metrics.SemanticIndexEmbedRequests = indexReport.EmbedRequests
+		report.Metrics.SemanticIndexEmbeddedItems = indexReport.EmbeddedItems
+		if err != nil {
 			return Report{}, fmt.Errorf("semantic index: %w", err)
 		}
-		retriever = &semantic.SQLiteRetriever{DB: db, Provider: provider}
+		retriever = &semantic.SQLiteRetriever{DB: db, Provider: provider, MinimumSimilarity: opts.MinimumSimilarity}
 	}
 	retrievalQuestions, err := LoadRetrievalQuestions(ctx, db, opts.RetrievalPath)
 	if err != nil {
@@ -387,6 +440,11 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 	top1Hits, top1Questions := 0, 0
 	var lexicalLatencyTotal, lexicalLatencyMax float64
 	var hybridLatencyTotal, hybridLatencyMax float64
+	var lexicalMrrTotal, hybridMrrTotal float64
+	lexicalMrrCount, hybridMrrCount := 0, 0
+	var lexicalPrecisionTotal, hybridPrecisionTotal float64
+	lexicalPrecisionCount, hybridPrecisionCount := 0, 0
+	var lexicalLatencies, hybridLatencies []float64
 	lexicalLatencyQuestions, hybridLatencyQuestions := 0, 0
 	startMemo := map[string]*time.Time{}
 	for _, q := range retrievalQuestions {
@@ -413,6 +471,7 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 		}
 		var lexicalFound, hybridFound map[string]bool
 		for _, m := range modes {
+			report.Metrics.RetrievalRequests++
 			started := time.Now()
 			pkg, err := contextbuild.Build(ctx, contextbuild.Deps{Store: store, DB: db, Semantic: m.semantic}, contextbuild.Request{
 				Purpose:        q.Purpose,
@@ -430,6 +489,7 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 				return Report{}, fmt.Errorf("retrieval question %q (%s): build: %w", q.ID, m.mode, err)
 			}
 			evaluated := evaluateQuestion(asQuestion, pkg, staleTurns, knownTurns, noteEvidence)
+			rank := reciprocalRankAt10(q.GoldEvidenceTurnIDs, pkg, noteEvidence)
 			report.Metrics.InvalidEvidenceRefs += evaluated.invalidRefs
 			report.Metrics.RetrievalInvalidEvidenceRefs += evaluated.invalidRefs
 			switch m.mode {
@@ -452,6 +512,9 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 			}
 			report.PerQuestion = append(report.PerQuestion, QuestionResult{
 				ID:                  q.ID,
+				GroupID:             q.GroupID,
+				Split:               q.Split,
+				Bucket:              q.Bucket,
 				Purpose:             q.Purpose,
 				Query:               q.Query,
 				Mode:                m.mode,
@@ -463,10 +526,14 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 				GoldEvidenceFound:   evaluated.goldFound,
 				RecallAt5:           evaluated.recall,
 				StaleLeakage:        evaluated.staleLeakage,
+				StaleItems:          evaluated.staleItems,
 				RelationAssisted:    evaluated.relationAssisted,
 				AmbientItems:        ambient,
 				ScopeEscapes:        escapes,
 				LatencyMS:           latency,
+				ReciprocalRank:      rank.Value,
+				PrecisionAt5:        evaluated.precisionAt5,
+				Rank:                rank.Rank,
 				ExpectStaleExcluded: q.ExpectStaleExcluded,
 			})
 			found := foundGoldSet(asQuestion, pkg, noteEvidence)
@@ -477,6 +544,13 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 					lexicalRecallQuestions++
 				}
 				lexicalLatencyTotal += latency
+				lexicalLatencies = append(lexicalLatencies, latency)
+				if !q.Unanswerable {
+					lexicalMrrTotal += rank.Value
+					lexicalMrrCount++
+					lexicalPrecisionTotal += evaluated.precisionAt5
+					lexicalPrecisionCount++
+				}
 				lexicalLatencyQuestions++
 				if latency > lexicalLatencyMax {
 					lexicalLatencyMax = latency
@@ -488,6 +562,13 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 					hybridRecallQuestions++
 				}
 				hybridLatencyTotal += latency
+				hybridLatencies = append(hybridLatencies, latency)
+				if !q.Unanswerable {
+					hybridMrrTotal += rank.Value
+					hybridMrrCount++
+					hybridPrecisionTotal += evaluated.precisionAt5
+					hybridPrecisionCount++
+				}
 				hybridLatencyQuestions++
 				if latency > hybridLatencyMax {
 					hybridLatencyMax = latency
@@ -530,12 +611,29 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 		report.Metrics.RetrievalLexicalLatencyMSTotal = lexicalLatencyTotal
 		report.Metrics.RetrievalLexicalLatencyMSMax = lexicalLatencyMax
 		report.Metrics.RetrievalLexicalLatencyMSAvg = lexicalLatencyTotal / float64(lexicalLatencyQuestions)
+		report.Metrics.RetrievalLexicalLatencyMSP50 = percentile(lexicalLatencies, .50)
+		report.Metrics.RetrievalLexicalLatencyMSP95 = percentile(lexicalLatencies, .95)
 	}
 	if hybridLatencyQuestions > 0 {
 		report.Metrics.RetrievalHybridLatencyMSTotal = hybridLatencyTotal
 		report.Metrics.RetrievalHybridLatencyMSMax = hybridLatencyMax
 		report.Metrics.RetrievalHybridLatencyMSAvg = hybridLatencyTotal / float64(hybridLatencyQuestions)
+		report.Metrics.RetrievalHybridLatencyMSP50 = percentile(hybridLatencies, .50)
+		report.Metrics.RetrievalHybridLatencyMSP95 = percentile(hybridLatencies, .95)
 	}
+	if lexicalMrrCount > 0 {
+		report.Metrics.RetrievalLexicalMRRAt10 = lexicalMrrTotal / float64(lexicalMrrCount)
+	}
+	if hybridMrrCount > 0 {
+		report.Metrics.RetrievalHybridMRRAt10 = hybridMrrTotal / float64(hybridMrrCount)
+	}
+	if lexicalPrecisionCount > 0 {
+		report.Metrics.RetrievalLexicalPrecisionAt5 = lexicalPrecisionTotal / float64(lexicalPrecisionCount)
+	}
+	if hybridPrecisionCount > 0 {
+		report.Metrics.RetrievalHybridPrecisionAt5 = hybridPrecisionTotal / float64(hybridPrecisionCount)
+	}
+	calcRetrievalBuckets(&report)
 	if ambientReturnedTotal > 0 {
 		report.Metrics.AmbientLeakage = float64(ambientHitsTotal) / float64(ambientReturnedTotal)
 	}
@@ -588,7 +686,110 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 		}
 		report.Metrics.Projection = metrics
 	}
+	if providerAccounting != nil {
+		requests, items, embedErrors := providerAccounting.snapshot()
+		report.Metrics.SemanticProviderEmbedRequests = requests
+		report.Metrics.SemanticProviderEmbedItems = items
+		report.Metrics.SemanticProviderEmbedErrors = embedErrors
+		report.Metrics.SemanticQueryEmbedRequests = requests - report.Metrics.SemanticIndexEmbedRequests
+	}
 	return report, nil
+}
+
+type rankedHit struct {
+	Rank  int
+	Value float64
+}
+
+func reciprocalRankAt10(goldIDs []string, pkg contextbuild.Package, noteEvidence map[string][]string) rankedHit {
+	if len(goldIDs) == 0 {
+		return rankedHit{}
+	}
+	gold := make(map[string]bool, len(goldIDs))
+	for _, id := range goldIDs {
+		gold[id] = true
+	}
+	items := pkg.Items
+	if len(items) > 10 {
+		items = items[:10]
+	}
+	for i, item := range items {
+		for _, id := range evidenceIDs(item, noteEvidence) {
+			if gold[id] {
+				return rankedHit{Rank: i + 1, Value: 1 / float64(i+1)}
+			}
+		}
+	}
+	return rankedHit{}
+}
+
+func percentile(values []float64, p float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := append([]float64(nil), values...)
+	sort.Float64s(sorted)
+	idx := int(float64(len(sorted))*p+.999999) - 1 // nearest-rank percentile
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(sorted) {
+		idx = len(sorted) - 1
+	}
+	return sorted[idx]
+}
+
+func calcRetrievalBuckets(report *Report) {
+	type aggregate struct {
+		metric                   RetrievalBucketMetrics
+		recall, mrr, precision    float64
+		latency                  []float64
+		falseQueries, negQueries int
+	}
+	aggs := map[string]*aggregate{}
+	for _, result := range report.PerQuestion {
+		if result.Mode == "" || result.Split == "" || result.Bucket == "" {
+			continue
+		}
+		key := result.Split + "/" + result.Mode + "/" + result.Bucket
+		a := aggs[key]
+		if a == nil {
+			a = &aggregate{}
+			aggs[key] = a
+		}
+		a.metric.Questions++
+		a.metric.StaleItems += result.StaleItems
+		a.metric.AmbientItems += result.AmbientItems
+		a.metric.ScopeEscapes += result.ScopeEscapes
+		a.latency = append(a.latency, result.LatencyMS)
+		if result.Unanswerable {
+			a.metric.NoEvidenceQuestions++
+			a.negQueries++
+			if result.ReturnedItems > 0 {
+				a.falseQueries++
+			}
+		} else {
+			a.metric.AnswerableQuestions++
+			a.recall += result.RecallAt5
+			a.mrr += result.ReciprocalRank
+			a.precision += result.PrecisionAt5
+		}
+	}
+	report.Metrics.RetrievalBuckets = map[string]RetrievalBucketMetrics{}
+	for key, a := range aggs {
+		if a.metric.AnswerableQuestions > 0 {
+			a.metric.RecallAt5 = a.recall / float64(a.metric.AnswerableQuestions)
+			a.metric.MRRAt10 = a.mrr / float64(a.metric.AnswerableQuestions)
+			a.metric.PrecisionAt5 = a.precision / float64(a.metric.AnswerableQuestions)
+		}
+		a.metric.FalsePositiveQueries = a.falseQueries
+		if a.negQueries > 0 {
+			a.metric.FalsePositiveRate = float64(a.falseQueries) / float64(a.negQueries)
+		}
+		a.metric.LatencyMSP50 = percentile(a.latency, .50)
+		a.metric.LatencyMSP95 = percentile(a.latency, .95)
+		report.Metrics.RetrievalBuckets[key] = a.metric
+	}
 }
 
 // topicScope wraps an optional pinned topic id into the request shape.

@@ -96,6 +96,19 @@ export interface ProcessingStatus {
   indexing_status: IndexingStatus
 }
 
+export interface ProcessingJob {
+  id: string; stage: string; input_snapshot_id: string; status: string
+  attempt_count: number; max_attempts: number; worker_id: string
+}
+export interface WorkerHeartbeat {
+  worker_id: string; pid: number; stages: string[]; generator_enabled: boolean
+  last_seen_at: string; alive: boolean
+}
+export interface ProcessingSnapshot {
+  status: ProcessingStatus; jobs: ProcessingJob[]; workers: WorkerHeartbeat[]
+  generator_enabled: boolean
+}
+
 export interface ConversationView {
   conversation_id: string
   title: string

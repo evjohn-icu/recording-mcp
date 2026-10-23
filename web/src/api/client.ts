@@ -19,6 +19,7 @@ import type {
   TurnParams,
   TemporalEvent,
   TemporalState,
+  ProcessingSnapshot,
 } from './types'
 
 let csrfToken: string | null = null
@@ -113,6 +114,10 @@ export function loginProfile(profile: string, password: string): Promise<{ csrf_
   return request('/api/profiles/login', { method: 'POST', body: JSON.stringify({ profile, password }) })
 }
 export function authInfo(): Promise<AuthInfo> { return request('/api/auth-info') }
+export function getProcessing(conversationId: string, signal?: AbortSignal): Promise<ProcessingSnapshot> { return request(`/api/conversations/${encodeURIComponent(conversationId)}/processing`, { signal }) }
+export function retryProcessing(conversationId: string, jobId: string, expectedAttempt: number, requestId: string): Promise<unknown> {
+  return request(`/api/conversations/${encodeURIComponent(conversationId)}/processing/retry`, { method: 'POST', body: JSON.stringify({ job_id: jobId, expected_attempt: expectedAttempt, request_id: requestId }) })
+}
 export function logout(): Promise<void> { return request('/api/logout', { method: 'POST', body: '{}' }) }
 export function getTranscriptSource(turnId: string): Promise<TranscriptSource> { return request(`/api/turns/${encodeURIComponent(turnId)}/transcript-source`) }
 export function getTranscriptSegment(conversationId: string, recordingId: string, segmentId: string): Promise<TranscriptSource['result']> {

@@ -1,4 +1,4 @@
-.PHONY: build test demo e2e-cloud web web-demo
+.PHONY: build test demo e2e-cloud web web-demo spec-validate python-test ci
 
 build:
 	go build -o bin/recording-mcp ./cmd/server
@@ -34,3 +34,17 @@ e2e-cloud:
 # PORT may be overridden, for example: make web-demo PORT=8790.
 web-demo: build web
 	sh scripts/web-demo.sh $(PORT)
+
+# OpenSpec validates artifact structure; the test map checks that scenario IDs
+# point to existing automated checks. Neither proves tests were written first.
+spec-validate:
+	npx openspec validate --all
+	python3 scripts/check_spec_test_map.py
+
+python-test:
+	python3 -m unittest discover -s scripts -p 'test_*.py' -v
+
+ci: spec-validate python-test
+	go vet ./...
+	go test -race -count=1 ./...
+	make build

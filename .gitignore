@@ -1,4 +1,5 @@
 /bin/
+/node_modules/
 /data/
 *.db
 *.db-shm
@@ -15,7 +16,10 @@ __pycache__/
 .env
 .env.*
 !.env.example
-.pi/
+# Keep only repository workflow instructions; ignore Pi credentials and local settings.
+/.pi/*
+!/.pi/skills/
+!/.pi/prompts/
 
 # cloud sync workspaces
 data/e2e/

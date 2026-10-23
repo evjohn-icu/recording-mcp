@@ -68,7 +68,7 @@ unset MEMORY_PROFILE_PASSWORD
 
 停止新服务后可运行旧二进制并访问旧录音页；准备的数据均位于独立资料库，原库不需要恢复。不要通过恢复删除前快照绕过遗忘屏障。当前改动未自动提交、推送或部署。
 
-后续工作：异名 Topic 的可解释语义归并（当前具体标题精确分组，八类为确定性容器）；确认主体后的跨会话事实合并；大规模查询性能验证；在取得原文件后核实结束时间。首轮保守处理无确认身份的来源，不自动把同名人物或相似陈述合并成事实变化。
+后续工作：确认主体后的跨会话事实合并；大规模查询性能验证；在取得原文件后核实结束时间。语义关系仍是可审计建议，不会自动改写事实或合并身份。
 
 构建与回归结果：`make build` **PASS**；`go test ./...` **PASS**；`go test -race ./...` **PASS**；最终遗忘清理及时间/搜索过滤修复后的 `go test -race ./internal/app ./internal/web` **PASS**；`git diff --check` **PASS**。这些检查不代表重新验证了外部 Provider、真实 ASR 准确率或大规模检索性能。
 
@@ -85,3 +85,19 @@ unset MEMORY_PROFILE_PASSWORD
 对全部 34 个跨会话 Topic 的本地明细核验（145 条陈述）：145 条都有提及日期，来源证据非空；关系为 25 次首次提及、97 次后续提及、23 条计划。这批数据未触发保守的明确变化措辞规则，因此**不宣称已识别出真实事实变化或矛盾**。这轮交付解决跨会话排列和原文核对；更广泛的语义理解仍需后续可解释评测。
 
 第二轮验证：`go test ./...`、`go test -race ./...`、`make build` 均 **PASS**；未登录访问两个新线程接口均返回 401（**PASS**）。真实 Chromium 首屏 8 个具体 Topic、默认展开 5 条提及，首次可见约 1.907 秒；点击陈述可播放真实 1.5 秒原文片段，播放时钟前进且无解码/页面错误（**PASS**）。这是浏览器媒体管线验证，不代表物理扬声器听音检查。原 DB 哈希及 25,113 个源文件再次校验无变化（**PASS**）。
+
+## 稳定主题、关系复核与队列分析
+
+具体主题的 ID 由来源 Topic 身份生成，因此手动改名和来源标题变化不会改变当前主题 ID。旧标题派生的线程 ID 作为重定向保留。用户可把不同来源 Topic 手动组成一个展示分组，也可撤销；这只组合提及视图，不修改 claim、事实或说话人身份。改名、分组和撤销事件记录当前来源引用、来源 note 版本，并使用跨进程的 `expected_version` guard；来源被修改或遗忘后，旧呈现事件不再参与当前投影。
+
+每条语义关系建议都有独立的 suggestion ID、来源 claim、turn/revision、model、weights 和 rubric 版本。复核记录支持接受、拒绝、证据不足和重新打开；这些操作只改变复核状态，不会把关系建议转成事实。列表中的待复核计数跟随最新状态。相同 request ID 的原请求可安全重试；不同内容复用 request ID 会冲突。复核提交遇到版本冲突时保留决定，取回当前来源摘要和证据供对照后再重试。
+
+`POST /api/worldline/analysis` 将固定的来源对和版本引用写入现有 processing 队列，`GET /api/worldline/analysis/{job_id}` 返回状态及进度。worker 只读取本次启动时解析好的 profile event-plane 路径，拒绝 payload 中不匹配的 profile scope。profile worker 默认启用 Worldline stage；legacy 数据库必须显式配置 `--worldline-events-db` 后才能领取该 stage。决策 endpoint 只接受 loopback HTTP，不使用代理或重定向。原有同步 `POST /api/worldline/generate` 保留用于兼容。
+
+分析以不超过 128 对、每批最多 45 秒执行；每对完成后先将带来源引用、speaker 快照、model/weights 与 rubric 的结果写入 event plane。worker 重启或 lease 重试后按来源、model、weights 和 rubric 命中已保存结果并继续未完成的尾部；source note、turn revision 或 speaker identity 已变化的对会跳过，不发布过期建议。队列 payload 保存 source snapshot、来源会话、turn/revision 和 note 版本，不保存转录文本。以上 Worldline 行为复用 event plane 与 processing queue，没有新增 Worldline 专用数据库表。
+
+本次本地实现验证：`go test ./internal/app ./internal/web ./internal/profile ./cmd/context-worker ./cmd/context-web ./internal/decision -count=1` **PASS**；`cd web && npm run typecheck` **PASS**。app 测试包含 300 对合成候选的重启续跑、缓存仅失效变更来源对、旧线程 ID 解析、改名与分组撤销、首 100 项后的改名、复核接受/重新打开/幂等重试/过期身份拒绝，以及两个 service 实例竞争同一版本时恰好一个写入成功。该验证使用合成测试输入，没有访问私有资料或调用模型服务。
+
+Detail 页处理状态另有合成 Chromium 回归 `python3.14 scripts/processing-poll-browser.py`：pending 状态持续轮询、终态停止轮询、空 `jobs`/`workers` 数组不崩溃、无存活 worker 时显示“候选生成器状态未知”，重试请求发生一次网络失败后仍复用原 `request_id`，且成功后重启状态轮询均 **PASS**。该脚本用生产构建预览与 mock API，不连接本地资料库。
+
+最终 managed browser run `python3.14 scripts/run-local-browser-tests.py --artifacts /tmp/recording-worldline-browser-final --browser /usr/bin/google-chrome` **PASS**：合成 profile/browser 20 项通过，Worldline mock browser 22 项通过，processing poll 回归通过（pending 连续查询、终态等待超过 10 秒仍无新查询、两次 retry 复用同一 request ID、无页面脚本错误）。runner 使用 `vite preview` 提供已构建 bundle，避免 API route mock 拦截开发服务器的 `/src/api/` 模块。

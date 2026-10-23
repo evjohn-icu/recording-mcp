@@ -1,0 +1,94 @@
+{
+  "synthetic_only": true,
+  "checks": [
+    {
+      "name": "mention-axis-and-thread-lanes-align",
+      "status": "PASS"
+    },
+    {
+      "name": "semantic-review-count-is-not-presented-as-fact-conflict",
+      "status": "PASS"
+    },
+    {
+      "name": "semantic-suggestion-is-review-only-and-opens-source-side",
+      "status": "PASS",
+      "model": "synthetic/mock-engine"
+    },
+    {
+      "name": "default-topic-thread-mentions-stay-distinct-from-valid-time",
+      "status": "PASS"
+    },
+    {
+      "name": "semantic-review-409-preserves-choice-and-compares-updated-sources",
+      "status": "PASS"
+    },
+    {
+      "name": "semantic-review-reopen",
+      "status": "PASS"
+    },
+    {
+      "name": "topic-rename-ui-request",
+      "status": "PASS"
+    },
+    {
+      "name": "topic-group-ui-request",
+      "status": "PASS"
+    },
+    {
+      "name": "topic-group-revoke-ui-request",
+      "status": "PASS"
+    },
+    {
+      "name": "generation-error-retry-keeps-request-id",
+      "status": "PASS"
+    },
+    {
+      "name": "unconfigured-engine-is-explicit",
+      "status": "PASS"
+    },
+    {
+      "name": "all-concrete-topics-are-searchable-and-paged",
+      "status": "PASS"
+    },
+    {
+      "name": "dated-claim-inspector-source",
+      "status": "PASS"
+    },
+    {
+      "name": "merge-destinations-match-subject-and-category",
+      "status": "PASS"
+    },
+    {
+      "name": "409-draft-retained-and-retry-contract",
+      "status": "PASS"
+    },
+    {
+      "name": "undated-claim-remains-in-separate-panel",
+      "status": "PASS"
+    },
+    {
+      "name": "topic-detail-pagination-adds-new-source-lane",
+      "status": "PASS"
+    },
+    {
+      "name": "validity-detail-pagination-preserves-search-and-status",
+      "status": "PASS"
+    },
+    {
+      "name": "zoom-and-pan-controls",
+      "status": "PASS"
+    },
+    {
+      "name": "empty-state",
+      "status": "PASS"
+    },
+    {
+      "name": "responsive-390-no-page-overflow",
+      "status": "PASS"
+    },
+    {
+      "name": "mobile-mention-axis-and-thread-lanes-align",
+      "status": "PASS"
+    }
+  ]
+}

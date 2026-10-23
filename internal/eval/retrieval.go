@@ -25,6 +25,9 @@ type retrievalScope struct {
 // scope carries the question's explicit hard filters.
 type authoredRetrievalQuestion struct {
 	ID                    string         `json:"id"`
+	GroupID               string         `json:"group_id"`
+	Split                 string         `json:"split"`
+	Bucket                string         `json:"bucket"`
 	Query                 string         `json:"query"`
 	Purpose               string         `json:"purpose"`
 	GoldTurnRefs          []TurnRef      `json:"gold_turn_refs"`
@@ -42,6 +45,9 @@ type authoredRetrievalQuestion struct {
 // RetrievalQuestion is one resolved retrieval question.
 type RetrievalQuestion struct {
 	ID                    string
+	GroupID               string
+	Split                 string
+	Bucket                string
 	Query                 string
 	Purpose               string
 	Notes                 string
@@ -101,6 +107,9 @@ func LoadRetrievalQuestions(ctx context.Context, db *sql.DB, path string) ([]Ret
 		}
 		q := RetrievalQuestion{
 			ID:                    aq.ID,
+			GroupID:               aq.GroupID,
+			Split:                 aq.Split,
+			Bucket:                aq.Bucket,
 			Query:                 aq.Query,
 			Purpose:               aq.Purpose,
 			Notes:                 aq.Notes,
@@ -109,6 +118,15 @@ func LoadRetrievalQuestions(ctx context.Context, db *sql.DB, path string) ([]Ret
 			Unanswerable:          aq.Unanswerable,
 			ExpectAmbientExcluded: aq.ExpectAmbientExcluded,
 			ExpectStaleExcluded:   aq.ExpectStaleExcluded,
+		}
+		if q.GroupID == "" {
+			q.GroupID = q.ID
+		}
+		if q.Split == "" {
+			q.Split = "legacy"
+		}
+		if q.Bucket == "" {
+			q.Bucket = q.Purpose
 		}
 		for _, ref := range aq.GoldTurnRefs {
 			id, err := resolveTurnRef(ctx, db, ref)

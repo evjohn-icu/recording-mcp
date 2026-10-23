@@ -1,0 +1,2165 @@
+{
+  "description": "160-question retrieval quality benchmark synthetic corpus: 60 distinct positive facts across finance, schedules, travel, health, home, and education; no private or user-derived content. Fixed source ids and timestamps.",
+  "conversations": [
+    {
+      "conversation_id": "conv-quality-001",
+      "description": "合成检索评测：finance主题独立样例 001",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-001",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-001",
+            "conversation_id": "conv-quality-001",
+            "segment_id": "seg-quality-001",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/001"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "财务把西桥门店的月度备用金定为八千元，月底凭票核销。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-002",
+      "description": "合成检索评测：finance主题独立样例 002",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-002",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-002",
+            "conversation_id": "conv-quality-002",
+            "segment_id": "seg-quality-002",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-02T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/002"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "三月采购的展示柜先付六成，验收合格后再结清尾款。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-003",
+      "description": "合成检索评测：finance主题独立样例 003",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-003",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-003",
+            "conversation_id": "conv-quality-003",
+            "segment_id": "seg-quality-003",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-03T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/003"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "项目差旅报销需要同时提交行程单和电子发票。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-004",
+      "description": "合成检索评测：finance主题独立样例 004",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-004",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-004",
+            "conversation_id": "conv-quality-004",
+            "segment_id": "seg-quality-004",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-04T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/004"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "新员工的工牌押金在离职交回工牌后五个工作日内退还。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-005",
+      "description": "合成检索评测：finance主题独立样例 005",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-005",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-005",
+            "conversation_id": "conv-quality-005",
+            "segment_id": "seg-quality-005",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/005"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "云桥读书会的场地费每季度一千二百元，由三位组织者均摊。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-006",
+      "description": "合成检索评测：finance主题独立样例 006",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-006",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-006",
+            "conversation_id": "conv-quality-006",
+            "segment_id": "seg-quality-006",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-06T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/006"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "摄影器材维修预算上限为两千五百元，超出需重新审批。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-007",
+      "description": "合成检索评测：finance主题独立样例 007",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-007",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-007",
+            "conversation_id": "conv-quality-007",
+            "segment_id": "seg-quality-007",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-07T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/007"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "社区市集摊位费统一由志愿者协会收取，不收现金。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-008",
+      "description": "合成检索评测：finance主题独立样例 008",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-008",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-008",
+            "conversation_id": "conv-quality-008",
+            "segment_id": "seg-quality-008",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-08T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/008"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "团建餐费按每人一百六十元封顶，酒水不计入公司报销。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-009",
+      "description": "合成检索评测：finance主题独立样例 009",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-009",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-009",
+            "conversation_id": "conv-quality-009",
+            "segment_id": "seg-quality-009",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-09T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/009"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "工作室的打印额度每月三百页，彩印按黑白页数的三倍扣减。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-010",
+      "description": "合成检索评测：finance主题独立样例 010",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-010",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-010",
+            "conversation_id": "conv-quality-010",
+            "segment_id": "seg-quality-010",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-10T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/010"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "志愿活动保险由主办方统一购买，个人不需要垫付。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-011",
+      "description": "合成检索评测：schedule主题独立样例 011",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-011",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-011",
+            "conversation_id": "conv-quality-011",
+            "segment_id": "seg-quality-011",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-11T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/011"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "周五的产品评审改到下午四点半，在二号会议室进行。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-012",
+      "description": "合成检索评测：schedule主题独立样例 012",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-012",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-012",
+            "conversation_id": "conv-quality-012",
+            "segment_id": "seg-quality-012",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-12T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/012"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "每周一上午先做十五分钟站会，再分配本周值班任务。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-013",
+      "description": "合成检索评测：schedule主题独立样例 013",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-013",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-013",
+            "conversation_id": "conv-quality-013",
+            "segment_id": "seg-quality-013",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-13T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/013"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "社区合唱团六月十二日晚上七点在文化馆排练。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-014",
+      "description": "合成检索评测：schedule主题独立样例 014",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-014",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-014",
+            "conversation_id": "conv-quality-014",
+            "segment_id": "seg-quality-014",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-14T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/014"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "季度盘点需要在九月二十八日下午五点前完成并上传清单。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-015",
+      "description": "合成检索评测：schedule主题独立样例 015",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-015",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-015",
+            "conversation_id": "conv-quality-015",
+            "segment_id": "seg-quality-015",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-15T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/015"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "小组读书分享固定在隔周周三午休后，时长四十五分钟。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-016",
+      "description": "合成检索评测：schedule主题独立样例 016",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-016",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-016",
+            "conversation_id": "conv-quality-016",
+            "segment_id": "seg-quality-016",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-16T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/016"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "供应商演示原定周二，现调整为周四上午十点线上进行。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-017",
+      "description": "合成检索评测：schedule主题独立样例 017",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-017",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-017",
+            "conversation_id": "conv-quality-017",
+            "segment_id": "seg-quality-017",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-17T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/017"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "暑期营报名将在五月二十日中午十二点关闭。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-018",
+      "description": "合成检索评测：schedule主题独立样例 018",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-018",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-018",
+            "conversation_id": "conv-quality-018",
+            "segment_id": "seg-quality-018",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-18T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/018"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "每月最后一个工作日由行政检查消防通道和应急灯。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-019",
+      "description": "合成检索评测：schedule主题独立样例 019",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-019",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-019",
+            "conversation_id": "conv-quality-019",
+            "segment_id": "seg-quality-019",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-19T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/019"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "花园浇水轮值表从本周六开始，每户负责一个周末。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-020",
+      "description": "合成检索评测：schedule主题独立样例 020",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-020",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-020",
+            "conversation_id": "conv-quality-020",
+            "segment_id": "seg-quality-020",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-20T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/020"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "客服培训改为四月八日和九日两天下午，线上链接会另发。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-021",
+      "description": "合成检索评测：travel主题独立样例 021",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-021",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-021",
+            "conversation_id": "conv-quality-021",
+            "segment_id": "seg-quality-021",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-21T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/021"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "去湖州调研优先坐高铁到湖州站，站外有接驳车去园区。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-022",
+      "description": "合成检索评测：travel主题独立样例 022",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-022",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-022",
+            "conversation_id": "conv-quality-022",
+            "segment_id": "seg-quality-022",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-22T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/022"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "海边露营只允许携带小型气罐，明火和烟花都禁止。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-023",
+      "description": "合成检索评测：travel主题独立样例 023",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-023",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-023",
+            "conversation_id": "conv-quality-023",
+            "segment_id": "seg-quality-023",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-23T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/023"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "团队去成都参会住在锦河路附近，步行到会场约十分钟。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-024",
+      "description": "合成检索评测：travel主题独立样例 024",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-024",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-024",
+            "conversation_id": "conv-quality-024",
+            "segment_id": "seg-quality-024",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-24T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/024"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "周末骑行路线全长二十四公里，途中在青石桥补水一次。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-025",
+      "description": "合成检索评测：travel主题独立样例 025",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-025",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-025",
+            "conversation_id": "conv-quality-025",
+            "segment_id": "seg-quality-025",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-25T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/025"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "出差返程机票由本人在差旅系统预订，选择可改签的经济舱。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-026",
+      "description": "合成检索评测：travel主题独立样例 026",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-026",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-026",
+            "conversation_id": "conv-quality-026",
+            "segment_id": "seg-quality-026",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-26T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/026"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "山区民宿没有电梯，带大件行李的客人可以提前联系店主。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-027",
+      "description": "合成检索评测：travel主题独立样例 027",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-027",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-027",
+            "conversation_id": "conv-quality-027",
+            "segment_id": "seg-quality-027",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-27T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/027"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "自然博物馆周一闭馆，参观团队请安排周二至周日的时段。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-028",
+      "description": "合成检索评测：travel主题独立样例 028",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-028",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-028",
+            "conversation_id": "conv-quality-028",
+            "segment_id": "seg-quality-028",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-28T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/028"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "去机场的拼车在东门集合，早班车六点二十分准时出发。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-029",
+      "description": "合成检索评测：travel主题独立样例 029",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-029",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-029",
+            "conversation_id": "conv-quality-029",
+            "segment_id": "seg-quality-029",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/029"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "徒步活动需要自备饮水和防晒帽，领队会携带急救包。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-030",
+      "description": "合成检索评测：travel主题独立样例 030",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-030",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-030",
+            "conversation_id": "conv-quality-030",
+            "segment_id": "seg-quality-030",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-02T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/030"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "展会布展车辆从北侧货运入口进场，车牌需提前一天登记。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-031",
+      "description": "合成检索评测：health主题独立样例 031",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-031",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-031",
+            "conversation_id": "conv-quality-031",
+            "segment_id": "seg-quality-031",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-03T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/031"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "眼科复查预约在四月十六日上午九点，需要携带旧眼镜。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-032",
+      "description": "合成检索评测：health主题独立样例 032",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-032",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-032",
+            "conversation_id": "conv-quality-032",
+            "segment_id": "seg-quality-032",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-04T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/032"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "跑步恢复期先隔天慢跑，每次不超过二十分钟。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-033",
+      "description": "合成检索评测：health主题独立样例 033",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-033",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-033",
+            "conversation_id": "conv-quality-033",
+            "segment_id": "seg-quality-033",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/033"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "办公室急救箱放在茶水间入口右侧的白色柜子里。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-034",
+      "description": "合成检索评测：health主题独立样例 034",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-034",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-034",
+            "conversation_id": "conv-quality-034",
+            "segment_id": "seg-quality-034",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-06T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/034"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "体检报告由医院小程序推送，纸质版需要到一楼服务台领取。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-035",
+      "description": "合成检索评测：health主题独立样例 035",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-035",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-035",
+            "conversation_id": "conv-quality-035",
+            "segment_id": "seg-quality-035",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-07T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/035"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "午休后容易头痛时先补水并休息，持续不适再联系校医。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-036",
+      "description": "合成检索评测：health主题独立样例 036",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-036",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-036",
+            "conversation_id": "conv-quality-036",
+            "segment_id": "seg-quality-036",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-08T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/036"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "舞蹈排练前要做十分钟踝关节热身，旧伤同学可降低跳跃强度。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-037",
+      "description": "合成检索评测：health主题独立样例 037",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-037",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-037",
+            "conversation_id": "conv-quality-037",
+            "segment_id": "seg-quality-037",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-09T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/037"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "药品冷藏盒温度保持在二至八摄氏度，每周记录一次。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-038",
+      "description": "合成检索评测：health主题独立样例 038",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-038",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-038",
+            "conversation_id": "conv-quality-038",
+            "segment_id": "seg-quality-038",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-10T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/038"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "公司年度体检可以预约周六上午，家属不包含在员工名额内。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-039",
+      "description": "合成检索评测：health主题独立样例 039",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-039",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-039",
+            "conversation_id": "conv-quality-039",
+            "segment_id": "seg-quality-039",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-11T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/039"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "羽毛球馆的地面湿滑时暂停使用，管理员先擦干再开放。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-040",
+      "description": "合成检索评测：health主题独立样例 040",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-040",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-040",
+            "conversation_id": "conv-quality-040",
+            "segment_id": "seg-quality-040",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-12T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/040"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "讲座现场备有无糖茶和温水，过敏餐食请提前三天登记。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-041",
+      "description": "合成检索评测：home主题独立样例 041",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-041",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-041",
+            "conversation_id": "conv-quality-041",
+            "segment_id": "seg-quality-041",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-13T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/041"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "书房窗帘轨道尺寸是一米八，安装时预留两厘米余量。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-042",
+      "description": "合成检索评测：home主题独立样例 042",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-042",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-042",
+            "conversation_id": "conv-quality-042",
+            "segment_id": "seg-quality-042",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-14T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/042"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "楼道感应灯由物业每两个月检查一次，坏灯可在小程序报修。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-043",
+      "description": "合成检索评测：home主题独立样例 043",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-043",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-043",
+            "conversation_id": "conv-quality-043",
+            "segment_id": "seg-quality-043",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-15T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/043"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "阳台花盆底部需要垫托盘，避免浇水流到楼下。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-044",
+      "description": "合成检索评测：home主题独立样例 044",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-044",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-044",
+            "conversation_id": "conv-quality-044",
+            "segment_id": "seg-quality-044",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-16T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/044"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "厨房净水器滤芯型号为Q7，通常每十个月更换一次。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-045",
+      "description": "合成检索评测：home主题独立样例 045",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-045",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-045",
+            "conversation_id": "conv-quality-045",
+            "segment_id": "seg-quality-045",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-17T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/045"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "地下车库访客车位在B区靠近电梯的三十六号到四十号。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-046",
+      "description": "合成检索评测：home主题独立样例 046",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-046",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-046",
+            "conversation_id": "conv-quality-046",
+            "segment_id": "seg-quality-046",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-18T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/046"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "小区垃圾分类点晚上十点关闭，厨余垃圾需要单独投放。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-047",
+      "description": "合成检索评测：home主题独立样例 047",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-047",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-047",
+            "conversation_id": "conv-quality-047",
+            "segment_id": "seg-quality-047",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-19T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/047"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "家用路由器放在客厅电视柜上层，弱信号房间加一台有线节点。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-048",
+      "description": "合成检索评测：home主题独立样例 048",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-048",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-048",
+            "conversation_id": "conv-quality-048",
+            "segment_id": "seg-quality-048",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-20T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/048"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "周末装修施工时间是上午九点到中午十二点，午后不得使用电钻。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-049",
+      "description": "合成检索评测：home主题独立样例 049",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-049",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-049",
+            "conversation_id": "conv-quality-049",
+            "segment_id": "seg-quality-049",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-21T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/049"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "楼顶晾衣绳只在晴天开放使用，雨天要收回防止锈蚀。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-050",
+      "description": "合成检索评测：home主题独立样例 050",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-050",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-050",
+            "conversation_id": "conv-quality-050",
+            "segment_id": "seg-quality-050",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-22T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/050"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "门口备用钥匙交由物业前台保管，领取时需要登记住户姓名。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-051",
+      "description": "合成检索评测：education主题独立样例 051",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-051",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-051",
+            "conversation_id": "conv-quality-051",
+            "segment_id": "seg-quality-051",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-23T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/051"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "机器人社团的材料包周三发放，缺件请在周五前登记。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-052",
+      "description": "合成检索评测：education主题独立样例 052",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-052",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-052",
+            "conversation_id": "conv-quality-052",
+            "segment_id": "seg-quality-052",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-24T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/052"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "英语角本周主题是介绍家乡，每人准备两分钟的口头分享。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-053",
+      "description": "合成检索评测：education主题独立样例 053",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-053",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-053",
+            "conversation_id": "conv-quality-053",
+            "segment_id": "seg-quality-053",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-25T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/053"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "儿童绘本课改用蓝色教室，家长在门口扫码签到。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-054",
+      "description": "合成检索评测：education主题独立样例 054",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-054",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-054",
+            "conversation_id": "conv-quality-054",
+            "segment_id": "seg-quality-054",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-26T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/054"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "编程营结课作品需提交源代码和一页项目说明，不收视频。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-055",
+      "description": "合成检索评测：education主题独立样例 055",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-055",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-055",
+            "conversation_id": "conv-quality-055",
+            "segment_id": "seg-quality-055",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-27T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/055"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "美术班颜料由教室统一提供，学生自带围裙和水彩笔。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-056",
+      "description": "合成检索评测：education主题独立样例 056",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-056",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-056",
+            "conversation_id": "conv-quality-056",
+            "segment_id": "seg-quality-056",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-28T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/056"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "图书馆研讨间每次可预约九十分钟，最多容纳六人。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-057",
+      "description": "合成检索评测：education主题独立样例 057",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-057",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-057",
+            "conversation_id": "conv-quality-057",
+            "segment_id": "seg-quality-057",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/057"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "科学展报名表需要指导老师签字，电子提交截止十月三日。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-058",
+      "description": "合成检索评测：education主题独立样例 058",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-058",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-058",
+            "conversation_id": "conv-quality-058",
+            "segment_id": "seg-quality-058",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-02T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/058"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "合唱比赛彩排时只使用钢琴伴奏，正式演出才加入弦乐四重奏。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-059",
+      "description": "合成检索评测：education主题独立样例 059",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-059",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-059",
+            "conversation_id": "conv-quality-059",
+            "segment_id": "seg-quality-059",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-03T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/059"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "家长会签到台设在操场西侧，入场后按班级领取座位卡。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-quality-060",
+      "description": "合成检索评测：education主题独立样例 060",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality",
+            "provider_request_id": "req-060",
+            "device_id": "device-quality-1",
+            "recording_id": "rec-quality-060",
+            "conversation_id": "conv-quality-060",
+            "segment_id": "seg-quality-060",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-04T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality/060"
+          },
+          "turns": [
+            {
+              "id": "utt-1",
+              "original_index": 1,
+              "text": "自然观察作业记录三种树叶的形状，不要求采摘植物。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:device-quality-1:1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

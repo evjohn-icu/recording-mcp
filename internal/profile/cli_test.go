@@ -108,3 +108,33 @@ func TestCLIDoesNotCreateMissingProfile(t *testing.T) {
 		t.Fatalf("missing profile was created: %v", err)
 	}
 }
+
+func TestCLIWorldlinePlaneUsesTrustedProfileOrExplicitLegacyPlane(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "profiles")
+	m, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := m.Create("alice", "correct horse battery staple")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLI_PROFILE_TEST_PASSWORD", "correct horse battery staple")
+	fs := flag.NewFlagSet("profile", flag.ContinueOnError)
+	cli := RegisterCLI(fs)
+	if err := fs.Parse([]string{"--profile=alice", "--profiles-root=" + root, "--profile-password-env=CLI_PROFILE_TEST_PASSWORD"}); err != nil {
+		t.Fatal(err)
+	}
+	scope, path, err := cli.WorldlinePlane("", "")
+	if err != nil || scope != "alice" || path != want.Plane {
+		t.Fatalf("profile plane=(%q,%q,%v)", scope, path, err)
+	}
+	legacy := RegisterCLI(flag.NewFlagSet("legacy", flag.ContinueOnError))
+	if _, _, err := legacy.WorldlinePlane("memory.db", ""); err == nil {
+		t.Fatal("legacy plane should require explicit path")
+	}
+	scope, path, err = legacy.WorldlinePlane("memory.db", "events.db")
+	if err != nil || scope != "local" {
+		t.Fatalf("legacy plane=(%q,%q,%v)", scope, path, err)
+	}
+}

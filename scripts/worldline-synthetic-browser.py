@@ -1,12 +1,14 @@
 import asyncio
 import json
+import os
 import traceback
 from pathlib import Path
 from urllib.parse import urlparse, unquote, parse_qs
 from playwright.async_api import async_playwright
 
-BASE = 'http://127.0.0.1:5173'
-OUT = Path('/tmp/worldline-synthetic-browser.json')
+BASE = os.environ.get('BASE_URL', 'http://127.0.0.1:5173').rstrip('/')
+OUT = Path(os.environ.get('BROWSER_ARTIFACT_DIR', '/tmp')) / 'worldline-synthetic-browser.json'
+BROWSER_PATH = os.environ.get('BROWSER_PATH')
 
 FIXTURE = {
     'version': 'projection-v1',
@@ -30,6 +32,8 @@ FIXTURE = {
     }],
 }
 
+REVIEW_STATE = {'accepted': False, 'source_changed': False, 'accept_conflict_sent': False}
+
 def thread_entry(claim, macro_id='macro:work', lane_id='topic:atlas:facts', relation='subsequent_mention'):
     evidence = claim['evidence']
     result = {
@@ -49,8 +53,11 @@ def thread_entry(claim, macro_id='macro:work', lane_id='topic:atlas:facts', rela
             'later_summary': 'Atlas 项目预算为 20 万元',
             'earlier_evidence': [{'turn_id': 'turn:role', 'revision': 'r2', 'conversation_id': 'conv:role', 'recording_id': 'recording:role', 'text': '从七月开始，Mina 会负责设计审查。'}],
             'later_evidence': [{'turn_id': 'turn:budget', 'revision': 'r4', 'conversation_id': 'conv:budget', 'recording_id': 'recording:budget', 'text': 'Atlas 今年的项目预算大概是二十万元。', 'offset_ms': 12000}],
-            'reason': 'synthetic browser fixture only', 'requires_review': True,
+            'reason': 'synthetic browser fixture only', 'requires_review': not REVIEW_STATE['accepted'],
+            'review_status': 'accepted' if REVIEW_STATE['accepted'] else 'review_required', 'suggestion_id': 'suggestion:atlas-budget',
         }
+        if REVIEW_STATE['source_changed']:
+            result['semantic_suggestion']['later_summary'] = 'Atlas 项目预算更新为 23 万元'
     elif claim['id'] == 'claim:role':
         result['semantic_suggestion'] = {
             'status': 'review_required', 'relation': 'insufficient_evidence', 'model': 'synthetic/mock-engine',
@@ -79,8 +86,13 @@ async def main():
     feedback_posts = []
     generation_posts = []
     topic_detail_requests = []
+    thread_mutations = []
+    semantic_review_posts = []
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, executable_path='/usr/bin/google-chrome', args=['--no-sandbox', '--no-proxy-server'])
+        browser_options = {'headless': True, 'args': ['--no-sandbox', '--no-proxy-server']}
+        if BROWSER_PATH:
+            browser_options['executable_path'] = BROWSER_PATH
+        browser = await p.chromium.launch(**browser_options)
         page = await browser.new_page(viewport={'width': 1280, 'height': 900})
         page.on('console', lambda msg: print('console', msg.type, msg.text) if msg.type == 'error' else None)
         page.on('pageerror', lambda err: print('pageerror', repr(err)))
@@ -97,6 +109,32 @@ async def main():
             if path == '/api/suppressions':
                 await route.fulfill(json={'operations': []})
                 return
+            if path == '/api/worldline/threads/group' and request.method == 'POST':
+                payload = request.post_data_json
+                thread_mutations.append(payload)
+                if payload.get('action') == 'group':
+                    for thread in THREADS:
+                        if thread['id'] in payload.get('thread_ids', []): thread['manual_group'] = True
+                elif payload.get('action') == 'revoke':
+                    for thread in THREADS:
+                        if thread['id'] == payload.get('group_id'): thread.pop('manual_group', None)
+                await route.fulfill(json={'version': 'projection-v2'})
+                return
+            if path.startswith('/api/worldline/threads/') and path.endswith('/rename') and request.method == 'POST':
+                thread_mutations.append(request.post_data_json | {'path': path})
+                await route.fulfill(json={'version': 'projection-v2'})
+                return
+            if path == '/api/worldline/semantic-review' and request.method == 'POST':
+                payload = request.post_data_json
+                semantic_review_posts.append(payload)
+                if payload.get('decision') == 'accept' and not REVIEW_STATE['accept_conflict_sent']:
+                    REVIEW_STATE['accept_conflict_sent'] = True
+                    REVIEW_STATE['source_changed'] = True
+                    await route.fulfill(status=409, json={'error': {'code': 'conflict', 'message': 'stale projection'}})
+                else:
+                    REVIEW_STATE['accepted'] = payload.get('decision') == 'accept'
+                    await route.fulfill(json={'version': 'projection-v2'})
+                return
             if path == '/api/worldline/feedback':
                 payload = request.post_data_json
                 feedback_posts.append(payload)
@@ -105,15 +143,25 @@ async def main():
                 else:
                     await route.fulfill(status=200, json={'version': 'projection-v2'})
                 return
-            if path == '/api/worldline/generate':
+            if path == '/api/worldline/analysis':
                 generation_posts.append(request.post_data_json)
+                await route.fulfill(status=202, json={'job_id': 'synthetic-worldline-job', 'request_id': generation_posts[-1]['request_id'], 'status': 'queued', 'attempt': 1})
+                return
+            if path == '/api/worldline/analysis/synthetic-worldline-job':
                 if len(generation_posts) == 1:
+                    # A transient GET transport/API failure leaves the same
+                    # idempotency key available for the explicit user retry.
                     await route.fulfill(status=503, json={'error': {'code': 'temporary', 'message': 'synthetic retry'}})
+                elif len(generation_posts) == 2:
+                    await route.fulfill(json={'job_id': 'synthetic-worldline-job', 'request_id': generation_posts[-1]['request_id'], 'status': 'complete', 'attempt': 2, 'version': 'projection-v1', 'semantic_status': 'evaluated', 'semantic_model': 'synthetic/mock-engine', 'semantic_candidate_pair_count': 1, 'semantic_pair_count': 1, 'semantic_suggestion_count': 1})
                 else:
-                    if len(generation_posts) == 2:
-                        await route.fulfill(json={'job_id': 'synthetic-worldline-job', 'status': 'complete', 'version': 'projection-v1', 'semantic_status': 'evaluated', 'semantic_model': 'synthetic/mock-engine', 'semantic_candidate_pair_count': 1, 'semantic_pair_count': 1, 'semantic_suggestion_count': 1})
-                    else:
-                        await route.fulfill(json={'job_id': 'synthetic-worldline-job-2', 'status': 'complete', 'version': 'projection-v1', 'semantic_status': 'not_configured', 'semantic_pair_count': 0, 'semantic_suggestion_count': 0})
+                    await route.fulfill(json={'job_id': 'synthetic-worldline-job', 'request_id': generation_posts[-1]['request_id'], 'status': 'complete', 'attempt': 1, 'version': 'projection-v1', 'semantic_status': 'not_configured', 'semantic_pair_count': 0, 'semantic_suggestion_count': 0})
+                return
+            if path == '/api/worldline/semantic-review':
+                payload = request.post_data_json
+                feedback_posts.append(payload)
+                await route.fulfill(status=409 if payload.get('decision') == 'accept' and len(feedback_posts) == 1 else 200,
+                                    json={'error': {'code': 'conflict', 'message': 'stale projection'}} if payload.get('decision') == 'accept' and len(feedback_posts) == 1 else {'version': 'projection-v2'})
                 return
             if path == '/api/worldline/topics/macro%3Awork' or path == '/api/worldline/topics/macro:work':
                 topic_detail_requests.append({key: values[0] for key, values in parse_qs(urlparse(request.url).query).items()})
@@ -143,7 +191,7 @@ async def main():
                 if thread_id == 'thread:atlas':
                     entries = [
                         thread_entry(FIXTURE['topics'][0]['lanes'][0]['claims'][0]),
-                        thread_entry(FIXTURE['topics'][0]['lanes'][0]['claims'][1]),
+                        thread_entry({**FIXTURE['topics'][0]['lanes'][0]['claims'][1], 'summary': 'Atlas 项目预算更新为 23 万元'} if REVIEW_STATE['source_changed'] else FIXTURE['topics'][0]['lanes'][0]['claims'][1]),
                         thread_entry(FIXTURE['topics'][0]['lanes'][1]['claims'][0], lane_id='topic:atlas:plans', relation='plan'),
                     ]
                     unknown_entries = [UNKNOWN_MENTION]
@@ -182,7 +230,7 @@ async def main():
             await page.goto(BASE, wait_until='networkidle')
             await page.get_by_role('heading', name='主题世界线').wait_for()
             await page.get_by_role('heading', name='适用时间未知').wait_for()
-            await page.screenshot(path='/tmp/worldline-synthetic.png', full_page=True)
+            await page.screenshot(path=str(OUT.with_suffix('.png')), full_page=True)
             await page.get_by_text('当时这样说过，不代表事实生效').first.wait_for()
             axis_box = await page.locator('.wl-thread-board .wl-axis-track').first.bounding_box()
             lane_box = await page.locator('.wl-thread-row .wl-thread-track').first.bounding_box()
@@ -213,6 +261,45 @@ async def main():
             await thread_inspector.get_by_text('当时这样说过，不代表事实生效').wait_for()
             assert await thread_inspector.get_by_text('同主题不代表同一说话人').count() == 1
             result['checks'].append({'name': 'default-topic-thread-mentions-stay-distinct-from-valid-time', 'status': 'PASS'})
+            # Exercise semantic review's conflict/rebase path, retaining the
+            # chosen decision and rendering current source text before retry.
+            review_suggestion = page.locator('.wl-semantic-suggestion').first
+            await review_suggestion.get_by_role('button', name='接受关系建议').click()
+            await review_suggestion.get_by_role('alert').wait_for()
+            await review_suggestion.get_by_text('当前：Atlas 项目预算更新为 23 万元').wait_for()
+            retry_review = review_suggestion.get_by_role('button', name='重试已接受决定')
+            await retry_review.wait_for()
+            await retry_review.click()
+            await page.locator('.wl-semantic-suggestion').first.get_by_role('button', name='重新打开核对').wait_for()
+            assert len(semantic_review_posts) == 2
+            assert semantic_review_posts[0]['request_id'] == semantic_review_posts[1]['request_id']
+            result['checks'].append({'name': 'semantic-review-409-preserves-choice-and-compares-updated-sources', 'status': 'PASS'})
+            await page.locator('.wl-semantic-suggestion').first.get_by_role('button', name='重新打开核对').click()
+            await page.locator('.wl-semantic-suggestion').first.get_by_role('button', name='接受关系建议').wait_for()
+            assert semantic_review_posts[-1]['decision'] == 'reopen'
+            result['checks'].append({'name': 'semantic-review-reopen', 'status': 'PASS'})
+            # Rename, group two synthetic topics, then revoke that group.
+            atlas_row = page.locator('.wl-thread-row').filter(has_text='Atlas 项目').first
+            async def accept_prompt(dialog): await dialog.accept('合成主题别名')
+            page.once('dialog', accept_prompt)
+            await atlas_row.get_by_role('button', name='重命名').click()
+            await page.wait_for_timeout(100)
+            assert thread_mutations[-1]['title'] == '合成主题别名'
+            result['checks'].append({'name': 'topic-rename-ui-request', 'status': 'PASS'})
+            await page.get_by_label('选择主题 Atlas 项目 用于分组').check()
+            await page.get_by_label('选择主题 生活与居住安排 用于分组').check()
+            async def accept_group_prompt(dialog): await dialog.accept('合成分组')
+            page.once('dialog', accept_group_prompt)
+            await page.get_by_role('button', name='手动分组').click()
+            await page.wait_for_timeout(150)
+            group_request = next(post for post in thread_mutations if post.get('action') == 'group')
+            assert len(group_request['thread_ids']) == 2 and group_request['title'] == '合成分组'
+            result['checks'].append({'name': 'topic-group-ui-request', 'status': 'PASS'})
+            atlas_row = page.locator('.wl-thread-row').filter(has_text='Atlas 项目').first
+            await atlas_row.get_by_role('button', name='撤销分组').click()
+            await page.wait_for_timeout(150)
+            assert any(post.get('action') == 'revoke' and post.get('group_id') == 'thread:atlas' for post in thread_mutations)
+            result['checks'].append({'name': 'topic-group-revoke-ui-request', 'status': 'PASS'})
             await page.get_by_role('button', name='整理世界线').click()
             await page.get_by_role('alert').filter(has_text='synthetic retry').wait_for()
             await page.get_by_role('button', name='重试整理').click()
@@ -294,10 +381,14 @@ async def main():
         except Exception as e:
             result['error'] = repr(e)
             result['checks'].append({'name': 'browser-run', 'status': 'FAIL', 'detail': repr(e), 'traceback': traceback.format_exc()})
-            await page.screenshot(path='/tmp/worldline-synthetic-browser.png', full_page=True)
+            await page.screenshot(path=str(OUT.with_suffix('.png')), full_page=True)
         finally:
             await browser.close()
+    failed = [check for check in result['checks'] if check.get('status') != 'PASS']
+    OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
     print(json.dumps(result, ensure_ascii=False, indent=2))
+    if result.get('error') or failed:
+        raise SystemExit(1)
 
 asyncio.run(main())

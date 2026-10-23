@@ -68,8 +68,8 @@ func TestApplyFreshDatabase(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 17 {
-		t.Fatalf("Version() = %d, want 17", got)
+	if got := mustVersion(t, ctx, db); got != len(migrations) {
+		t.Fatalf("Version() = %d, want latest schema", got)
 	}
 	names := tableNames(t, db)
 	for _, want := range []string{
@@ -123,15 +123,15 @@ func TestApplyIdempotent(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("second Apply: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 17 {
-		t.Fatalf("Version() = %d, want 17 after repeated Apply", got)
+	if got := mustVersion(t, ctx, db); got != len(migrations) {
+		t.Fatalf("Version() = %d, want latest schema after repeated Apply", got)
 	}
 	var applied int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&applied); err != nil {
 		t.Fatal(err)
 	}
-	if applied != 17 {
-		t.Fatalf("schema_migrations rows = %d, want 17", applied)
+	if applied != len(migrations) {
+		t.Fatalf("schema_migrations rows = %d, want latest schema", applied)
 	}
 }
 
@@ -151,8 +151,8 @@ func TestApplyOnLegacyDatabasePreservesData(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply on legacy database: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 17 {
-		t.Fatalf("Version() = %d, want 17", got)
+	if got := mustVersion(t, ctx, db); got != len(migrations) {
+		t.Fatalf("Version() = %d, want latest schema", got)
 	}
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM conversations WHERE id='conv-1'`).Scan(&count); err != nil {
@@ -177,7 +177,7 @@ func TestApplyOnSingleVersionDatabaseOnlyAppliesLater(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (3,4,5,6,7,8,9,10,11,12,13,14,15,16,17)`); err != nil {
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18)`); err != nil {
 		t.Fatal(err)
 	}
 	// Re-running Apply must re-create the (dropped) v3..v12 objects only.
@@ -209,8 +209,8 @@ func TestApplyOnSingleVersionDatabaseOnlyAppliesLater(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("re-Apply after partial rollback: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 17 {
-		t.Fatalf("Version() = %d, want 17", got)
+	if got := mustVersion(t, ctx, db); got != len(migrations) {
+		t.Fatalf("Version() = %d, want latest schema", got)
 	}
 	names := tableNames(t, db)
 	for _, want := range []string{"decision_runs", "decision_answers", "memory_candidates", "publication_runs", "analysis_coverage", "memory_links", "annotation_history", "derived_artifacts", "derived_artifact_sources", "speaker_bindings", "speaker_binding_events", "turn_classes", "sync_state", "sync_events", "sync_recordings", "sync_chunks"} {
@@ -234,8 +234,8 @@ func TestApplySucceedsWithPreexistingLazyAnnotationHistory(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("Apply with preexisting annotation_history: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 17 {
-		t.Fatalf("Version() = %d, want 17", got)
+	if got := mustVersion(t, ctx, db); got != len(migrations) {
+		t.Fatalf("Version() = %d, want latest schema", got)
 	}
 	// annotation_history references conversations, so seed the parent row the
 	// adopted table points at; without it the foreign key rejects the insert
@@ -283,7 +283,7 @@ func TestDerivedArtifactBackfillMarksSupersededEvidence(t *testing.T) {
 	// pre-existing rows, like a database upgraded from an older build. v11
 	// through v15 are included so the ledger maximum drops below v8;
 	// re-running them is a no-op.
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (8,9,10,11,12,13,14,15,16,17)`); err != nil {
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (8,9,10,11,12,13,14,15,16,17,18)`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`DROP TABLE derived_artifact_sources`); err != nil {
@@ -313,8 +313,8 @@ func TestDerivedArtifactBackfillMarksSupersededEvidence(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatalf("re-Apply for backfill: %v", err)
 	}
-	if got := mustVersion(t, ctx, db); got != 17 {
-		t.Fatalf("Version() = %d, want 17", got)
+	if got := mustVersion(t, ctx, db); got != len(migrations) {
+		t.Fatalf("Version() = %d, want latest schema", got)
 	}
 	for _, want := range []struct {
 		kind, id string

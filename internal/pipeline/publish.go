@@ -104,6 +104,10 @@ func (h *PublishHandler) publish(ctx context.Context, conversationID, expectedVe
 	}
 
 	merged, candidateIDs := mergeCandidates(current, candidates)
+	merged, err = rebuildAutomaticTopicMembership(ctx, h.DB, conversationID, merged)
+	if err != nil {
+		return "", fmt.Errorf("pipeline: rebuild current topic membership: %w", err)
+	}
 	version := "auto-" + sha256Hex(strings.Join(candidateIDs, "|"), 12)
 	if strings.TrimSpace(merged.Title) == "" {
 		title, err := conversationTitle(ctx, h.DB, conversationID)
@@ -123,6 +127,9 @@ func (h *PublishHandler) publish(ctx context.Context, conversationID, expectedVe
 				return "", fmt.Errorf("pipeline: publish %s: %w (recording publication run: %v)", conversationID, err, recErr)
 			}
 			return "", fmt.Errorf("pipeline: publish %s: %w", conversationID, err)
+		}
+		if err := h.reconcilePublication(ctx, conversationID, expected, version, candidateIDs); err != nil {
+			return "", err
 		}
 		return "publish:" + version, nil
 	}
@@ -146,27 +153,31 @@ func (h *PublishHandler) publish(ctx context.Context, conversationID, expectedVe
 		return "", fmt.Errorf("pipeline: publish %s: %w", conversationID, err)
 	}
 
-	rec := PublicationRun{
-		ID:               publicationRunID(conversationID, candidateIDs, "committed"),
-		ConversationID:   conversationID,
-		ExpectedVersion:  expected,
-		CommittedVersion: version,
-		CandidateIDs:     candidateIDs,
-		Status:           "committed",
-	}
-	if err := InsertPublicationRun(ctx, h.DB, rec, time.Now()); err != nil {
-		return "", fmt.Errorf("pipeline: record publication run: %w", err)
-	}
-	// The published view changed, so the semantic index must see it before the
-	// next retrieval. publish:noop does not enqueue: freshly ingested turns are
-	// covered by the embed job enqueued at ingest time.
-	if err := EnqueueEmbed(ctx, h.DB, conversationID, "embed|"+conversationID+"|"+version); err != nil {
-		return "", err
-	}
-	if err := enqueueCurate(ctx, h.DB, conversationID, version); err != nil {
+	if err := h.reconcilePublication(ctx, conversationID, expected, version, candidateIDs); err != nil {
 		return "", err
 	}
 	return "publish:" + version, nil
+}
+
+// reconcilePublication completes the durable side effects associated with an
+// annotation version. ApplyAnnotations commits independently, so a process
+// crash between that commit and these writes is repaired when the publish job
+// is retried and its deterministic merge matches current annotations.
+func (h *PublishHandler) reconcilePublication(ctx context.Context, conversationID, expected, version string, candidateIDs []string) error {
+	rec := PublicationRun{ID: publicationRunID(conversationID, candidateIDs, "committed"), ConversationID: conversationID, ExpectedVersion: expected, CommittedVersion: version, CandidateIDs: candidateIDs, Status: "committed"}
+	if err := InsertPublicationRun(ctx, h.DB, rec, time.Now()); err != nil {
+		return fmt.Errorf("pipeline: record publication run: %w", err)
+	}
+	// Always reconcile these idempotent jobs. A publish retry may observe an
+	// already committed annotation write whose enqueue steps did not run before
+	// the previous process stopped.
+	if err := EnqueueEmbed(ctx, h.DB, conversationID, "embed|"+conversationID+"|"+version); err != nil {
+		return err
+	}
+	if err := enqueueCurate(ctx, h.DB, conversationID, version); err != nil {
+		return err
+	}
+	return nil
 }
 
 // mergeCandidates folds validated candidates into the current annotation view.

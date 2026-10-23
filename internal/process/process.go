@@ -40,16 +40,16 @@ type Spec struct {
 
 // Job is a snapshot of a processing job row.
 type Job struct {
-	ID              string
-	Stage           string
-	InputSnapshotID string
-	Status          string
-	PayloadJSON     string
-	WorkerID        string
-	LeaseToken      string
-	AttemptCount    int
-	MaxAttempts     int
-	LeaseExpiresAt  time.Time
+	ID              string    `json:"id"`
+	Stage           string    `json:"stage"`
+	InputSnapshotID string    `json:"input_snapshot_id"`
+	Status          string    `json:"status"`
+	PayloadJSON     string    `json:"-"`
+	WorkerID        string    `json:"worker_id,omitempty"`
+	LeaseToken      string    `json:"-"`
+	AttemptCount    int       `json:"attempt_count"`
+	MaxAttempts     int       `json:"max_attempts"`
+	LeaseExpiresAt  time.Time `json:"lease_expires_at,omitempty"`
 }
 
 // ClaimOptions configures a Claim call.
@@ -495,4 +495,27 @@ func List(ctx context.Context, db *sql.DB, status string, limit int) ([]*Job, er
 		return nil, err
 	}
 	return jobs, nil
+}
+
+// ListForConversation selects jobs by their payload conversation id before
+// applying the limit. Extract jobs snapshot an attachment id, while all later
+// stages snapshot the conversation id itself.
+func ListForConversation(ctx context.Context, db *sql.DB, conversationID string, limit int) ([]*Job, error) {
+	if limit <= 0 {
+		limit = defaultListLimit
+	}
+	rows, err := db.QueryContext(ctx, `SELECT `+jobColumns+` FROM processing_jobs WHERE input_snapshot_id=? OR json_extract(payload_json,'$.conversation_id')=? ORDER BY created_at DESC,rowid DESC LIMIT ?`, conversationID, conversationID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var jobs []*Job
+	for rows.Next() {
+		j, e := scanJob(rows)
+		if e != nil {
+			return nil, e
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, rows.Err()
 }

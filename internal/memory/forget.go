@@ -203,7 +203,7 @@ func (s *Store) previewTarget(ctx context.Context, q queryer, t forgetTarget) (F
 	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM memory_embeddings WHERE conversation_id=?`, t.conversationID).Scan(&p.Vectors); err != nil {
 		return p, err
 	}
-	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM processing_jobs WHERE input_snapshot_id IN (SELECT id FROM source_attachments WHERE conversation_id=?) OR input_snapshot_id=?`, t.conversationID, t.conversationID).Scan(&p.Jobs); err != nil {
+	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM processing_jobs j WHERE `+forgetJobScope("j"), t.conversationID, t.conversationID, t.conversationID).Scan(&p.Jobs); err != nil {
 		return p, err
 	}
 	p.AudioFiles, err = previewAudioFiles(ctx, q, t)
@@ -336,9 +336,9 @@ func forgetStateHash(ctx context.Context, q queryer, conversationID string) (str
 		{"speaker_bindings", `SELECT * FROM speaker_bindings WHERE recording_id IN (SELECT id FROM recordings WHERE conversation_id=?) ORDER BY id`},
 		{"speaker_events", `SELECT e.* FROM speaker_binding_events e JOIN speaker_bindings b ON b.id=e.binding_id WHERE b.recording_id IN (SELECT id FROM recordings WHERE conversation_id=?) ORDER BY e.id`},
 		{"links", `SELECT * FROM memory_links WHERE from_id IN (SELECT id FROM turns WHERE conversation_id=? UNION SELECT id FROM notes WHERE conversation_id=?) OR to_id IN (SELECT id FROM turns WHERE conversation_id=? UNION SELECT id FROM notes WHERE conversation_id=?) ORDER BY id`},
-		{"jobs", `SELECT id,stage,input_snapshot_id,idempotency_key,payload_json FROM processing_jobs WHERE input_snapshot_id IN (SELECT id FROM source_attachments WHERE conversation_id=?) OR input_snapshot_id=? ORDER BY id`},
-		{"attempts", `SELECT a.id,a.job_id,a.attempt,a.error_json,a.result_ref,a.usage_json FROM processing_attempts a JOIN processing_jobs j ON j.id=a.job_id WHERE j.input_snapshot_id IN (SELECT id FROM source_attachments WHERE conversation_id=?) OR j.input_snapshot_id=? ORDER BY a.id`},
-		{"decision_runs", `SELECT * FROM decision_runs WHERE input_snapshot_id IN (SELECT id FROM source_attachments WHERE conversation_id=?) OR input_snapshot_id=? OR job_id IN (SELECT id FROM processing_jobs WHERE input_snapshot_id IN (SELECT id FROM source_attachments WHERE conversation_id=?) OR input_snapshot_id=?) ORDER BY id`},
+		{"jobs", `SELECT j.id,j.stage,j.input_snapshot_id,j.idempotency_key,j.payload_json FROM processing_jobs j WHERE ` + forgetJobScope("j") + ` ORDER BY j.id`},
+		{"attempts", `SELECT a.id,a.job_id,a.attempt,a.error_json,a.result_ref,a.usage_json FROM processing_attempts a JOIN processing_jobs j ON j.id=a.job_id WHERE ` + forgetJobScope("j") + ` ORDER BY a.id`},
+		{"decision_runs", `SELECT * FROM decision_runs WHERE input_snapshot_id IN (SELECT id FROM source_attachments WHERE conversation_id=?) OR input_snapshot_id=? OR job_id IN (SELECT j.id FROM processing_jobs j WHERE ` + forgetJobScope("j") + `) ORDER BY id`},
 		{"sync_recordings", `SELECT * FROM sync_recordings WHERE recording_id IN (SELECT json_extract(source_json,'$.recording_id') FROM source_attachments WHERE conversation_id=?) ORDER BY recording_id`},
 		{"sync_events", `SELECT * FROM sync_events WHERE recording_id IN (SELECT json_extract(source_json,'$.recording_id') FROM source_attachments WHERE conversation_id=?) ORDER BY event_id`},
 		{"sync_chunks", `SELECT * FROM sync_chunks WHERE recording_id IN (SELECT json_extract(source_json,'$.recording_id') FROM source_attachments WHERE conversation_id=?) ORDER BY recording_id,seq`},
@@ -909,7 +909,7 @@ func (s *Store) redactForgetDatabase(ctx context.Context, tombstoneID string) er
 	if err != nil {
 		return err
 	}
-	jobIDs, err := idsFromQuery(ctx, tx, `SELECT id FROM processing_jobs WHERE input_snapshot_id IN (SELECT id FROM source_attachments WHERE conversation_id=?) OR input_snapshot_id=?`, conv, conv)
+	jobIDs, err := idsFromQuery(ctx, tx, `SELECT j.id FROM processing_jobs j WHERE `+forgetJobScope("j"), conv, conv, conv)
 	if err != nil {
 		return err
 	}
@@ -1400,6 +1400,9 @@ func scrubAttempts(ctx context.Context, tx *sql.Tx, jobs []string) error {
 }
 func scrubJobs(ctx context.Context, tx *sql.Tx, jobs []string) error {
 	for _, id := range jobs {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM processing_retry_requests WHERE job_id=?`, id); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `UPDATE processing_jobs SET payload_json='{}',status='cancelled',lease_token=NULL,lease_expires_at=NULL,worker_id=NULL,updated_at=? WHERE id=?`, time.Now().UnixMilli(), id); err != nil {
 			return err
 		}

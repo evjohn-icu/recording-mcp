@@ -28,6 +28,12 @@ func TestWorldlineSemanticQuestionAllowsAbstention(t *testing.T) {
 	}
 }
 
+func TestWorldlineSemanticReviewDecisionCanBeReopened(t *testing.T) {
+	for _, tc := range []struct{ decision string; want bool }{{"accept",false},{"reject",false},{"insufficient",false},{"reopen",true}} {
+		if got:=semanticReviewRequiresReview(tc.decision); got!=tc.want { t.Errorf("decision %s requires review=%v want %v",tc.decision,got,tc.want) }
+	}
+}
+
 func TestSemanticAppendPurgesEventsWhenSourcesChangeBeforePostcheck(t *testing.T) {
 	events := []plane.Event{{ID: "suggestion-a"}, {ID: "suggestion-b"}}
 	var purged []string

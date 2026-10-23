@@ -3,6 +3,7 @@ package contextbuild
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -14,14 +15,16 @@ import (
 // fakeSemantic is an in-test SemanticRetriever: no embeddings, just a fixed
 // hit list, so a test can inject hits the retrieval SQL would never return.
 type fakeSemantic struct {
-	hits []semantic.SemanticHit
+	hits  []semantic.SemanticHit
+	ready bool
+	err   error
 }
 
 func (f *fakeSemantic) Search(ctx context.Context, query string, opts semantic.SearchOptions) ([]semantic.SemanticHit, error) {
-	return f.hits, nil
+	return f.hits, f.err
 }
 
-func (f *fakeSemantic) Ready() bool { return len(f.hits) > 0 }
+func (f *fakeSemantic) Ready() bool { return f.ready || len(f.hits) > 0 }
 
 func (f *fakeSemantic) Describe() string { return "fake/test" }
 
@@ -312,6 +315,35 @@ func TestLexicalOnlyFallbackWhenSemanticUnavailable(t *testing.T) {
 	}
 	if !strings.Contains(degraded.DegradeReason, "semantic backend not configured") {
 		t.Fatalf("degrade reason = %q", degraded.DegradeReason)
+	}
+}
+
+func TestSemanticOutageIsDistinctFromSuccessfulEmptyResult(t *testing.T) {
+	f := newFixture(t)
+	start := "2026-03-01T10:00:00Z"
+	f.conversation("conv:a", "Alpha", "rec:a")
+	f.recording("rec:a", "conv:a", &start)
+	f.turn("t:1", "conv:a", "rec:a", 0, 1000, nil, "unrelated stored information")
+	query := Request{Query: "no matching stored phrase"}
+
+	backendFailure := errors.New("semantic backend unavailable")
+	_, outageErr := Build(context.Background(), Deps{
+		Store: f.store, DB: f.db,
+		Semantic: &fakeSemantic{ready: true, err: backendFailure},
+	}, query)
+	if !errors.Is(outageErr, backendFailure) {
+		t.Fatalf("semantic outage must remain an explicit failure, got %v", outageErr)
+	}
+
+	empty, err := Build(context.Background(), Deps{
+		Store: f.store, DB: f.db,
+		Semantic: &fakeSemantic{ready: true},
+	}, query)
+	if err != nil {
+		t.Fatalf("successful empty semantic search: %v", err)
+	}
+	if len(empty.Items) != 0 || !hasGap(empty, "no_matches") || hasGap(empty, "semantic_unavailable") {
+		t.Fatalf("successful no-match result was confused with an outage: %+v", empty)
 	}
 }
 

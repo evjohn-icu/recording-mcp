@@ -954,6 +954,46 @@ func TestExtractHandlerNilGeneratorRecordsCoverage(t *testing.T) {
 	}
 }
 
+func TestExtractHandlerNilGeneratorPreservesExistingCandidates(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	start := int64(100)
+	seedConversation(t, db, "conv-nogen-existing", []struct {
+		id      string
+		seg     int
+		start   *int64
+		orig    int
+		speaker *string
+	}{
+		{id: "t1", seg: 0, start: &start, orig: 1},
+		{id: "t2", seg: 1, start: nil, orig: 2},
+	})
+	ids, err := InsertCandidates(ctx, db, "conv-nogen-existing", "old-run", "old-job", "old-generator", []ValidatedDraft{{
+		CandidateDraft: CandidateDraft{Kind: "observation", Summary: "已有候选摘要", TopicTitle: "已有主题", EvidenceTurnIDs: []string{"t1"}},
+		Status:         "validated",
+	}}, time.Now())
+	if err != nil || len(ids) != 1 {
+		t.Fatalf("seed existing candidate ids=%v err=%v", ids, err)
+	}
+	job := enqueueExtractWithPayload(t, db,
+		`{"conversation_id":"conv-nogen-existing","turn_ids":["t1","t2"]}`,
+		"extract:conv-nogen-existing")
+	handler := &ExtractHandler{DB: db, Engine: decision.Synthetic{}, ProcessorVersion: "extract-v1"}
+	if _, err := handler.Execute(ctx, job); err != nil {
+		t.Fatalf("execute with generator disabled: %v", err)
+	}
+	candidates, err := ListCandidates(ctx, db, "conv-nogen-existing", "validated")
+	if err != nil {
+		t.Fatalf("list candidates: %v", err)
+	}
+	if len(candidates) != 1 || candidates[0].ID != ids[0] || candidates[0].Summary != "已有候选摘要" {
+		t.Fatalf("generator-off changed existing candidates: %+v", candidates)
+	}
+	if n := countPublishJobs(t, db, "conv-nogen-existing"); n != 0 {
+		t.Fatalf("publish jobs=%d, want 0 with generation off", n)
+	}
+}
+
 func TestExtractHandlerNilEngineNilGeneratorSucceeds(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()

@@ -121,6 +121,8 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("POST /api/profile/password", s.handleProfilePasswordChange)
 	mux.HandleFunc("GET /api/conversations", s.handleConversations)
 	mux.HandleFunc("GET /api/conversations/{id}", s.handleConversation)
+	mux.HandleFunc("GET /api/conversations/{id}/processing", s.handleProcessing)
+	mux.HandleFunc("POST /api/conversations/{id}/processing/retry", s.handleProcessingRetry)
 	mux.HandleFunc("GET /api/conversations/{id}/turns", s.handleTurns)
 	mux.HandleFunc("GET /api/conversations/{id}/annotations/history", s.handleHistory)
 	mux.HandleFunc("PUT /api/conversations/{id}/notes/{rowID}", s.handleEditNote)

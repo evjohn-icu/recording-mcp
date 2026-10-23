@@ -17,6 +17,8 @@ import (
 )
 
 const maxWorldlineSemanticPairs = 128
+const worldlineSemanticRubricVersion = "worldline-semantic-v2"
+const worldlineSemanticBatchSize = 128
 
 type WorldlineSemanticSuggestion struct {
 	Status                string              `json:"status"`
@@ -37,6 +39,8 @@ type WorldlineSemanticSuggestion struct {
 	CandidatePairID       string              `json:"candidate_pair_id"`
 	Reason                string              `json:"reason"`
 	RequiresReview        bool                `json:"requires_review"`
+	ReviewStatus          string              `json:"review_status,omitempty"`
+	SuggestionID          string              `json:"suggestion_id"`
 	RecordedAt            *time.Time          `json:"recorded_at,omitempty"`
 }
 
@@ -48,6 +52,9 @@ type worldlineSemanticSummary struct {
 	Truncated          bool
 	Model              string
 	WeightsVersion     string
+	CompletedPairCount int
+	RemainingPairCount int
+	FailedPairCount    int
 }
 
 type semanticPair struct {
@@ -61,13 +68,15 @@ type semanticPair struct {
 }
 
 type semanticPairEvidence struct {
-	EntryID          string               `json:"entry_id"`
-	ClaimID          string               `json:"claim_id"`
-	Summary          string               `json:"summary"`
-	EvidenceCount    int                  `json:"evidence_count"`
-	SourceRefs       []EvidenceReference  `json:"source_refs"`
-	ExcerptTruncated bool                 `json:"excerpt_truncated"`
-	Sources          []semanticSourceText `json:"source_excerpts"`
+	EntryID            string               `json:"entry_id"`
+	ClaimID            string               `json:"claim_id"`
+	Summary            string               `json:"summary"`
+	EvidenceCount      int                  `json:"evidence_count"`
+	SourceRefs         []EvidenceReference  `json:"source_refs"`
+	SourceNoteVersions []string             `json:"source_note_versions,omitempty"`
+	SourceSubjects     map[string]string    `json:"source_subjects,omitempty"`
+	ExcerptTruncated   bool                 `json:"excerpt_truncated"`
+	Sources            []semanticSourceText `json:"source_excerpts"`
 }
 
 type semanticSourceText struct {
@@ -75,6 +84,7 @@ type semanticSourceText struct {
 	Revision  string `json:"revision"`
 	Text      string `json:"text"`
 	Truncated bool   `json:"truncated"`
+	SubjectID string `json:"subject_id,omitempty"`
 }
 
 func (s *WorldlineService) evaluateWorldlineSemantics(ctx context.Context, scope string, topics []WorldlineTopic) (worldlineSemanticSummary, error) {
@@ -203,6 +213,358 @@ func (s *WorldlineService) evaluateWorldlineSemantics(ctx context.Context, scope
 		}
 	}
 	return worldlineSemanticSummary{Status: "evaluated", CandidatePairCount: totalCandidates, PairCount: len(pairs), SuggestionCount: suggestions, Truncated: totalCandidates > len(pairs), Model: model, WeightsVersion: weights}, nil
+}
+
+type worldlineModelIdentity interface {
+	ModelIdentity(context.Context) (model, weights string, err error)
+}
+
+type cachedWorldlinePair struct {
+	Pair      semanticPair    `json:"pair"`
+	Answer    decision.Answer `json:"answer"`
+	InputHash string          `json:"input_hash"`
+	Model     string          `json:"model"`
+	Weights   string          `json:"weights_version"`
+}
+
+// runDurableWorldlinePairs evaluates a frozen finite candidate list and writes
+// each answer to the event plane before moving to the next pair. A new worker
+// can therefore reuse completed results after a lease expires or process exits.
+func (s *WorldlineService) runDurableWorldlinePairs(ctx context.Context, scope, jobID string, attempt int, pairs []semanticPair) (worldlineSemanticSummary, error) {
+	return s.runDurableWorldlinePairsGuarded(ctx, scope, jobID, attempt, pairs, nil)
+}
+
+func (s *WorldlineService) runDurableWorldlinePairsGuarded(ctx context.Context, scope, jobID string, attempt int, pairs []semanticPair, guard func(context.Context) error) (worldlineSemanticSummary, error) {
+	checkLease := func() error {
+		if guard == nil {
+			return nil
+		}
+		return guard(ctx)
+	}
+	if err := checkLease(); err != nil {
+		return worldlineSemanticSummary{}, err
+	}
+	if s == nil || s.Time == nil || s.Time.Events == nil {
+		return worldlineSemanticSummary{}, errors.New("worldline service unavailable")
+	}
+	if len(pairs) == 0 {
+		return worldlineSemanticSummary{Status: "no_candidates"}, nil
+	}
+	if s.DecisionEngine == nil {
+		return worldlineSemanticSummary{Status: "not_configured", CandidatePairCount: len(pairs), RemainingPairCount: len(pairs)}, nil
+	}
+	currentTopics, _, _, err := s.project(ctx, scope)
+	if err != nil {
+		return worldlineSemanticSummary{}, err
+	}
+	currentNotes, currentSubjects := currentWorldlineSources(currentTopics)
+	events, err := s.Time.History(ctx, scope)
+	if err != nil {
+		return worldlineSemanticSummary{}, err
+	}
+	caches := map[string]cachedWorldlinePair{}
+	for _, event := range events {
+		if event.Type != "worldline.semantic_cache" || event.SourceStatus != "current" {
+			continue
+		}
+		key, _ := event.StructuredData["cache_key"].(string)
+		if key == "" {
+			continue
+		}
+		raw, e := json.Marshal(event.StructuredData["result"])
+		if e != nil {
+			continue
+		}
+		var result cachedWorldlinePair
+		if json.Unmarshal(raw, &result) == nil {
+			caches[key] = result
+		}
+	}
+	model, weights, known := "", "", false
+	if identity, ok := s.DecisionEngine.(worldlineModelIdentity); ok {
+		if m, w, e := identity.ModelIdentity(ctx); e == nil {
+			model, weights, known = m, w, validCacheIdentity(m, w)
+		}
+	}
+	criteria := worldlineSemanticCriteria()
+	completed, failed, suggestions := 0, 0, 0
+	for batchStart := 0; batchStart < len(pairs); batchStart += worldlineSemanticBatchSize {
+		batchEnd := min(batchStart+worldlineSemanticBatchSize, len(pairs))
+		batchCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+		for index := batchStart; index < batchEnd; index++ {
+			if err := checkLease(); err != nil {
+				cancel()
+				return worldlineSemanticSummary{}, err
+			}
+			pair := pairs[index]
+			refs, subjects, sourceErr := s.validateDurablePairSources(batchCtx, scope, pair, currentNotes, currentSubjects)
+			if sourceErr != nil {
+				failed++
+				if err := checkLease(); err != nil {
+					cancel()
+					return worldlineSemanticSummary{}, err
+				}
+				if err := s.recordDurablePairFailure(ctx, scope, jobID, attempt, index, pair, "stale_source"); err != nil {
+					cancel()
+					return worldlineSemanticSummary{}, err
+				}
+				continue
+			}
+			var answer decision.Answer
+			inputHash := ""
+			cacheHit := false
+			if known {
+				key := worldlinePairCacheKey(pair, model, weights)
+				if cached, ok := caches[key]; ok {
+					answer, inputHash, cacheHit = cached.Answer, cached.InputHash, true
+				}
+			}
+			if !cacheHit {
+				state, e := worldlinePairState(scope, pair)
+				if e != nil {
+					cancel()
+					return worldlineSemanticSummary{}, e
+				}
+				result, e := s.DecisionEngine.Evaluate(batchCtx, state, []decision.Question{worldlineSemanticQuestion(pair.ID)})
+				if e != nil {
+					_ = s.recordDurablePairFailure(ctx, scope, jobID, attempt, index, pair, "evaluation_failed")
+					cancel()
+					return worldlineSemanticSummary{}, fmt.Errorf("worldline semantic evaluation: %w", e)
+				}
+				actualModel, actualWeights := strings.TrimSpace(result.Model), strings.TrimSpace(result.WeightsVersion)
+				if actualModel == "" || actualWeights == "" || strings.Contains(strings.ToLower(actualModel), "synthetic") || strings.Contains(strings.ToLower(actualWeights), "synthetic") || strings.Contains(strings.ToLower(actualModel), "sandbox") || strings.Contains(strings.ToLower(actualWeights), "sandbox") {
+					cancel()
+					return worldlineSemanticSummary{}, errors.New("worldline semantic evaluation requires an identified non-synthetic JEV model and weights version")
+				}
+				if model == "" {
+					model, weights = actualModel, actualWeights
+				} else if model != actualModel || weights != actualWeights {
+					cancel()
+					return worldlineSemanticSummary{}, errors.New("worldline semantic model identity changed during one generation")
+				}
+				if len(result.InputHash) != 64 {
+					cancel()
+					return worldlineSemanticSummary{}, errors.New("worldline semantic engine returned an invalid input hash")
+				}
+				if _, e := hex.DecodeString(result.InputHash); e != nil {
+					cancel()
+					return worldlineSemanticSummary{}, errors.New("worldline semantic engine returned an invalid input hash")
+				}
+				if len(result.Answers) != 1 {
+					cancel()
+					return worldlineSemanticSummary{}, errors.New("worldline semantic engine returned an incomplete pair result")
+				}
+				gotAnswer, ok := result.Answers[pair.ID]
+				if !ok {
+					cancel()
+					return worldlineSemanticSummary{}, fmt.Errorf("worldline semantic result missing pair %s", pair.ID)
+				}
+				answer = gotAnswer
+				if e := validateWorldlineSemanticAnswer(answer, criteria); e != nil {
+					cancel()
+					return worldlineSemanticSummary{}, e
+				}
+				inputHash = result.InputHash
+				known = true
+				if cached, ok := caches[worldlinePairCacheKey(pair, model, weights)]; ok {
+					answer, inputHash, cacheHit = cached.Answer, cached.InputHash, true
+				}
+			}
+			if err := validateWorldlineSemanticAnswer(answer, criteria); err != nil {
+				cancel()
+				return worldlineSemanticSummary{}, err
+			}
+			if !cacheHit {
+				key := worldlinePairCacheKey(pair, model, weights)
+				if err := checkLease(); err != nil {
+					cancel()
+					return worldlineSemanticSummary{}, err
+				}
+				result := cachedWorldlinePair{Pair: pair, Answer: answer, InputHash: inputHash, Model: model, Weights: weights}
+				if err := s.persistDurablePairResult(ctx, scope, key, result, refs, subjects, guard); err != nil {
+					cancel()
+					return worldlineSemanticSummary{}, err
+				}
+				caches[key] = result
+			}
+			completed++
+			suggestions++
+		}
+		cancel()
+	}
+	if err := checkLease(); err != nil {
+		return worldlineSemanticSummary{}, err
+	}
+	status := "evaluated"
+	if failed > 0 {
+		status = "partial"
+	}
+	return worldlineSemanticSummary{Status: status, CandidatePairCount: len(pairs), PairCount: len(pairs), SuggestionCount: suggestions, Model: model, WeightsVersion: weights, CompletedPairCount: completed, RemainingPairCount: len(pairs) - completed - failed, FailedPairCount: failed}, nil
+}
+
+func validCacheIdentity(model, weights string) bool {
+	model, weights = strings.ToLower(strings.TrimSpace(model)), strings.ToLower(strings.TrimSpace(weights))
+	return model != "" && weights != "" && !strings.Contains(model, "synthetic") && !strings.Contains(weights, "synthetic") && !strings.Contains(model, "sandbox") && !strings.Contains(weights, "sandbox")
+}
+
+func worldlinePairState(scope string, pair semanticPair) (string, error) {
+	state, err := json.Marshal(struct {
+		Scope         string       `json:"scope"`
+		RubricVersion string       `json:"rubric_version"`
+		Pair          semanticPair `json:"pair"`
+	}{scope, worldlineSemanticRubricVersion, pair})
+	return string(state), err
+}
+
+func worldlinePairCacheKey(pair semanticPair, model, weights string) string {
+	return worldlinePairCacheKeyForRubric(pair, model, weights, worldlineSemanticRubricVersion)
+}
+
+func worldlinePairCacheKeyForRubric(pair semanticPair, model, weights, rubric string) string {
+	body, _ := json.Marshal(struct {
+		Rubric  string       `json:"rubric"`
+		Model   string       `json:"model"`
+		Weights string       `json:"weights"`
+		Pair    semanticPair `json:"pair"`
+	}{rubric, model, weights, pair})
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:])
+}
+
+func currentWorldlineSources(topics []WorldlineTopic) (map[string]string, map[string]string) {
+	notes, subjects := map[string]string{}, map[string]string{}
+	for _, topic := range topics {
+		for _, lane := range topic.Lanes {
+			for _, claim := range lane.Claims {
+				if id, ok := claim.Metadata["source_note_id"].(string); ok {
+					version, _ := claim.Metadata["source_note_version"].(string)
+					notes[id] = version
+				}
+				for _, ev := range claim.Evidence {
+					subjects[ev.TurnID+"@"+ev.Revision] = ev.SubjectID
+				}
+			}
+		}
+	}
+	return notes, subjects
+}
+
+func (s *WorldlineService) validateDurablePairSources(ctx context.Context, scope string, pair semanticPair, currentNotes, currentSubjects map[string]string) ([]string, map[string]string, error) {
+	refs := uniqueEvidenceRefs(append(append([]EvidenceReference{}, pair.Earlier.SourceRefs...), pair.Later.SourceRefs...))
+	if len(refs) == 0 {
+		return nil, nil, errors.New("worldline pair has no source evidence")
+	}
+	validated, _, err := s.Time.validateEvidence(ctx, refs)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, raw := range append(append([]string{}, pair.Earlier.SourceNoteVersions...), pair.Later.SourceNoteVersions...) {
+		at := strings.LastIndex(raw, "@")
+		if at <= 0 || at == len(raw)-1 || currentNotes[raw[:at]] != raw[at+1:] {
+			return nil, nil, errors.New("worldline source note version is stale")
+		}
+	}
+	subjects := map[string]string{}
+	for _, ref := range refs {
+		key := ref.TurnID + "@" + ref.Revision
+		subject, ok := currentSubjects[key]
+		if !ok {
+			return nil, nil, errors.New("worldline source evidence is no longer projected")
+		}
+		subjects[key] = subject
+	}
+	return validated, subjects, nil
+}
+
+func (s *WorldlineService) persistDurablePairResult(ctx context.Context, scope, key string, result cachedWorldlinePair, refs []string, subjects map[string]string, guard func(context.Context) error) error {
+	cacheID := "wl-pair-cache-" + shortHash(scope+"\x00"+key)
+	refsCopy := append([]string{}, refs...)
+	notes := map[string]string{}
+	for _, raw := range append(append([]string{}, result.Pair.Earlier.SourceNoteVersions...), result.Pair.Later.SourceNoteVersions...) {
+		at := strings.LastIndex(raw, "@")
+		if at > 0 {
+			notes[raw[:at]] = raw[at+1:]
+		}
+	}
+	now := time.Now().UTC()
+	cacheData := map[string]any{"scope": scope, "origin": "worldline", "cache_key": key, "result": map[string]any{"answer": result.Answer, "input_hash": result.InputHash, "model": result.Model, "weights_version": result.Weights}, "references": refsCopy, "source_note_ids": mapKeys(notes), "source_note_versions": notes}
+	cacheEvent := plane.Event{ID: cacheID, Type: "worldline.semantic_cache", Timestamp: now, ObservedAt: now, Source: "local-web", Content: "durable pair result", Confidence: 1, StructuredData: cacheData}
+	answer := result.Answer
+	status := "review_required"
+	if answer.Choice == "insufficient_evidence" {
+		status = "insufficient_evidence"
+	}
+	structure := map[string]any{"scope": scope, "origin": "worldline", "semantic_status": status, "relation": answer.Choice, "confidence": answer.Confidence, "distribution": answer.Distribution, "model": result.Model, "weights_version": result.Weights, "input_hash": result.InputHash, "rubric_version": worldlineSemanticRubricVersion, "identity_status": result.Pair.IdentityStatus, "candidate_pair_id": result.Pair.ID, "thread_id": result.Pair.ThreadID(), "entry_id": result.Pair.Later.EntryID, "source_claim_ids": []string{result.Pair.Earlier.ClaimID, result.Pair.Later.ClaimID}, "source_note_ids": mapKeys(notes), "source_note_versions": notes, "references": refsCopy, "source_subjects": subjects, "earlier_claim_id": result.Pair.Earlier.ClaimID, "later_claim_id": result.Pair.Later.ClaimID, "earlier_references": evidenceStrings(result.Pair.Earlier.SourceRefs), "later_references": evidenceStrings(result.Pair.Later.SourceRefs), "reason": "decision_engine_pairwise_relation_suggestion; human review required"}
+	suggestionID := "wl-semantic-" + shortHash(scope+"\x00"+key+"\x00"+semanticEventID(scope, result.Pair.ID, result.InputHash, result.Model, result.Weights, answer))
+	suggestion := plane.Event{ID: suggestionID, Type: "worldline.semantic", Timestamp: now, ObservedAt: now, Source: "local-web", Content: "semantic relation suggestion; review required", Confidence: answer.Confidence, StructuredData: structure}
+	return appendSemanticEventsWithCheck(ctx, []plane.Event{cacheEvent, suggestion}, func(c context.Context, es []plane.Event) error { _, err := s.Time.Events.Ingest(c, es); return err }, func(c context.Context) error {
+		if guard != nil {
+			if err := guard(c); err != nil {
+				return err
+			}
+		}
+		return s.verifyDurablePairSources(c, result.Pair)
+	}, func(c context.Context, ids []string) error { return s.Time.PurgeContent(c, ids) })
+}
+
+func (s *WorldlineService) verifyDurablePairSources(ctx context.Context, pair semanticPair) error {
+	refs := uniqueEvidenceRefs(append(append([]EvidenceReference{}, pair.Earlier.SourceRefs...), pair.Later.SourceRefs...))
+	if _, _, err := s.Time.validateEvidence(ctx, refs); err != nil {
+		return err
+	}
+	for _, raw := range append(append([]string{}, pair.Earlier.SourceNoteVersions...), pair.Later.SourceNoteVersions...) {
+		at := strings.LastIndex(raw, "@")
+		if at <= 0 {
+			return errors.New("invalid source note version")
+		}
+		id, want := raw[:at], raw[at+1:]
+		var annotationVersion, kind, summary, topics string
+		err := s.Time.Store.DB().QueryRowContext(ctx, `SELECT n.annotation_version,n.kind,n.summary,n.topic_ids_json FROM notes n LEFT JOIN derived_artifacts da ON da.kind='note' AND da.artifact_id=n.id WHERE n.id=? AND COALESCE(da.stale,0)=0`, id).Scan(&annotationVersion, &kind, &summary, &topics)
+		if err != nil {
+			return errors.New("worldline source note changed or was removed")
+		}
+		got := annotationVersion + "-" + shortHash(kind+"\x00"+summary+"\x00"+topics)
+		if got != want {
+			return errors.New("worldline source note version changed")
+		}
+	}
+	for _, ref := range refs {
+		key := ref.TurnID + "@" + ref.Revision
+		expected, hasExpected := pair.Earlier.SourceSubjects[key]
+		if later, ok := pair.Later.SourceSubjects[key]; ok {
+			if hasExpected && expected != later {
+				return errors.New("pair contains conflicting source speaker identities")
+			}
+			expected, hasExpected = later, true
+		}
+		if !hasExpected {
+			continue
+		}
+		var recording, scoped string
+		err := s.Time.Store.DB().QueryRowContext(ctx, `SELECT t.recording_id,COALESCE(t.speaker_scoped_id,'') FROM turns t JOIN attachment_turns at ON at.turn_id=t.id JOIN source_attachments a ON a.id=at.attachment_id AND a.active=1 WHERE t.id=? AND a.transcript_revision=?`, ref.TurnID, ref.Revision).Scan(&recording, &scoped)
+		if err != nil {
+			return err
+		}
+		current := ""
+		if scoped != "" {
+			projection, e := s.Time.Store.SpeakerProjection(ctx, recording, ref.Revision)
+			if e != nil {
+				return e
+			}
+			current = projection[scoped]
+		}
+		if current != expected {
+			return errors.New("worldline speaker identity changed")
+		}
+	}
+	return nil
+}
+
+func (s *WorldlineService) recordDurablePairFailure(ctx context.Context, scope, jobID string, attempt, index int, pair semanticPair, kind string) error {
+	refs := evidenceStrings(append(append([]EvidenceReference{}, pair.Earlier.SourceRefs...), pair.Later.SourceRefs...))
+	event := plane.Event{ID: fmt.Sprintf("wl-pair-failure-%s-%d-%d", shortHash(jobID), attempt, index), Type: "worldline.semantic_failure", Timestamp: time.Now().UTC(), Source: "local-web", Content: "pair processing failed", Confidence: 1, StructuredData: map[string]any{"scope": scope, "origin": "worldline", "job_id": jobID, "pair_id": pair.ID, "failure_kind": kind, "references": refs, "source_note_ids": []string{}}}
+	_, err := s.Time.Events.Ingest(ctx, []plane.Event{event})
+	return err
 }
 
 // appendSemanticEventsWithCheck closes the race where source deletion or
@@ -396,20 +758,30 @@ func collectWorldlineSemanticPairs(topics []WorldlineTopic, limit int) ([]semant
 func semanticPairEntry(entry WorldlineThreadEntry) semanticPairEvidence {
 	sources := []semanticSourceText{}
 	refs := []EvidenceReference{}
+	subjects := map[string]string{}
 	truncated := len(entry.Evidence) > 3
 	for i, ev := range entry.Evidence {
 		refs = append(refs, EvidenceReference{TurnID: ev.TurnID, Revision: ev.Revision})
+		subjects[ev.TurnID+"@"+ev.Revision] = ev.SubjectID
 		if i >= 3 {
 			continue
 		}
 		text := clipSemanticText(ev.Text, 800)
 		wasTruncated := len([]rune(strings.TrimSpace(ev.Text))) > 800
 		truncated = truncated || wasTruncated
-		sources = append(sources, semanticSourceText{TurnID: ev.TurnID, Revision: ev.Revision, Text: text, Truncated: wasTruncated})
+		sources = append(sources, semanticSourceText{TurnID: ev.TurnID, Revision: ev.Revision, Text: text, Truncated: wasTruncated, SubjectID: ev.SubjectID})
 	}
 	summary := clipSemanticText(entry.Summary, 800)
 	truncated = truncated || len([]rune(strings.TrimSpace(entry.Summary))) > 800
-	return semanticPairEvidence{EntryID: entry.ID, ClaimID: entry.ClaimID, Summary: summary, EvidenceCount: len(entry.Evidence), SourceRefs: uniqueEvidenceRefs(refs), ExcerptTruncated: truncated, Sources: sources}
+	return semanticPairEvidence{EntryID: entry.ID, ClaimID: entry.ClaimID, Summary: summary, EvidenceCount: len(entry.Evidence), SourceRefs: uniqueEvidenceRefs(refs), SourceNoteVersions: claimSourceNoteVersions(entry.Claim), SourceSubjects: subjects, ExcerptTruncated: truncated, Sources: sources}
+}
+
+func claimSourceNoteVersions(claim WorldlineClaim) []string {
+	if id, ok := claim.Metadata["source_note_id"].(string); ok && strings.TrimSpace(id) != "" {
+		version, _ := claim.Metadata["source_note_version"].(string)
+		return []string{id + "@" + version}
+	}
+	return []string{}
 }
 
 func entriesSpanConversations(a, b WorldlineThreadEntry) bool {
@@ -558,7 +930,16 @@ func (s *WorldlineService) applySemanticSuggestions(ctx context.Context, scope s
 		return err
 	}
 	latest := map[string]plane.Event{}
+	reviews := map[string]plane.Event{}
 	for _, event := range events {
+		if event.Type == "worldline.semantic_review" && event.SourceStatus == "current" {
+			sid, _ := event.StructuredData["suggestion_id"].(string)
+			prior, ok := reviews[sid]
+			if sid != "" && (!ok || eventRecordedAfter(event, prior)) {
+				reviews[sid] = event
+			}
+			continue
+		}
 		if event.Type != "worldline.semantic" || event.SourceStatus != "current" || !feedbackSourcesCurrent(event, currentNotes) || !semanticSourceSubjectsCurrent(event, currentSubjects) {
 			continue
 		}
@@ -574,10 +955,19 @@ func (s *WorldlineService) applySemanticSuggestions(ctx context.Context, scope s
 	}
 	for entryID, event := range latest {
 		entry := byEntry[entryID]
-		entry.SemanticSuggestion = semanticSuggestionFromEvent(event, claimsByID)
+		suggestion := semanticSuggestionFromEvent(event, claimsByID)
+		if review, ok := reviews[event.ID]; ok {
+			status, _ := review.StructuredData["decision"].(string)
+			suggestion.ReviewStatus = status
+			suggestion.SuggestionID = event.ID
+			suggestion.RequiresReview = semanticReviewRequiresReview(status)
+		}
+		entry.SemanticSuggestion = suggestion
 	}
 	return nil
 }
+
+func semanticReviewRequiresReview(status string) bool { return status == "reopen" }
 
 func semanticSourceSubjectsCurrent(event plane.Event, current map[string]string) bool {
 	stored := stringMap(event.StructuredData["source_subjects"])
@@ -643,7 +1033,7 @@ func semanticSuggestionFromEvent(event plane.Event, claimsByID map[string]Worldl
 	}
 	identity, _ := data["identity_status"].(string)
 	pairID, _ := data["candidate_pair_id"].(string)
-	suggestion := &WorldlineSemanticSuggestion{Status: status, Relation: relation, Confidence: confidence, Distribution: distribution, Model: model, WeightsVersion: weights, InputHash: inputHash, SourceSnapshotVersion: snapshot, SourceClaimIDs: claimIDs, SourceEvidence: evidence, IdentityStatus: identity, CandidatePairID: pairID, Reason: reason, RequiresReview: true, RecordedAt: recorded}
+	suggestion := &WorldlineSemanticSuggestion{Status: status, Relation: relation, Confidence: confidence, Distribution: distribution, Model: model, WeightsVersion: weights, InputHash: inputHash, SourceSnapshotVersion: snapshot, SourceClaimIDs: claimIDs, SourceEvidence: evidence, IdentityStatus: identity, CandidatePairID: pairID, Reason: reason, RequiresReview: true, SuggestionID: event.ID, RecordedAt: recorded}
 	if len(claimIDs) >= 2 {
 		if claim, ok := claimsByID[claimIDs[0]]; ok {
 			suggestion.EarlierSummary = claim.Summary

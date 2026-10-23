@@ -15,3 +15,8 @@ func currentTopicMembershipSQL() string {
 	AND NOT EXISTS(SELECT 1 FROM note_evidence ne JOIN turn_classes tc ON tc.turn_id=ne.turn_id
 	WHERE ne.note_id=n.id AND ne.ordinal=0 AND tc.class='ambient')`
 }
+
+// CurrentTopicMembershipSQL exposes the canonical current-state membership
+// relation for callers that need to rebuild derived topic links. Historical
+// links remain in storage for audit; callers must not treat them as current.
+func CurrentTopicMembershipSQL() string { return currentTopicMembershipSQL() }

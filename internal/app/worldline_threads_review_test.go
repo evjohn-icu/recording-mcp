@@ -2,16 +2,17 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"recordingmcp/internal/asrinput"
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/plane"
 )
-
 
 func TestWorldlineThreadsExactTitleAndRepeatedSummaryDoNotInferPersonOrFact(t *testing.T) {
 	started := testStartedAt
@@ -110,6 +111,224 @@ func TestWorldlineThreadsExactTitleAndRepeatedSummaryDoNotInferPersonOrFact(t *t
 	}
 	if len(seenConversations) != 2 {
 		t.Fatalf("cross-session evidence not retained individually: %v", seenConversations)
+	}
+}
+
+func TestWorldlineThreadRenameIsReversibleAndLegacyIDStillResolves(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	events, err := plane.Open(t.TempDir() + "/events.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer events.Close()
+	svc := &WorldlineService{Time: &TimeService{Store: f.store, Events: events}}
+	before, err := svc.Threads(ctx, "profile-alias", WorldlineQuery{Limit: 100})
+	if err != nil || before.Total == 0 {
+		t.Fatalf("threads: %+v %v", before, err)
+	}
+	legacy := before.Threads[0]
+	legacyTitleID := "thread-" + shortHash(normalizeTopicTitle(legacy.Title))
+	version, err := svc.RenameThread(ctx, "profile-alias", legacy.ID, "手动别名", before.Version, "rename-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay, err := svc.RenameThread(ctx, "profile-alias", legacy.ID, "手动别名", before.Version, "rename-1"); err != nil || replay != version {
+		t.Fatalf("same rename request did not replay: version=%q err=%v", replay, err)
+	}
+	if _, err := svc.RenameThread(ctx, "profile-alias", legacy.ID, "另一个标题", before.Version, "rename-1"); err == nil || !strings.Contains(err.Error(), "request_id conflict") {
+		t.Fatalf("different payload reused request id: %v", err)
+	}
+	after, err := svc.Threads(ctx, "profile-alias", WorldlineQuery{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var renamed WorldlineThread
+	for _, th := range after.Threads {
+		if th.ID == legacy.ID {
+			renamed = th
+		}
+	}
+	if renamed.ID != legacy.ID || renamed.Title != "手动别名" {
+		t.Fatalf("rename changed identity or failed: %+v", renamed)
+	}
+	if _, err := svc.Time.Store.DB().Exec(`UPDATE topics SET title='来源标题更新' WHERE id=?`, legacy.SourceTopicIDs[0]); err != nil {
+		t.Fatal(err)
+	}
+	currentList, err := svc.Threads(ctx, "profile-alias", WorldlineQuery{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if currentList.Threads[0].ID != legacy.ID || currentList.Threads[0].Title != "手动别名" {
+		t.Fatalf("source rename changed stable alias identity: %+v", currentList.Threads[0])
+	}
+	if _, err := svc.Thread(ctx, "profile-alias", legacyTitleID, WorldlineQuery{Limit: 100}, 0, 0, 100); err != nil {
+		t.Fatalf("pre-stable legacy ID no longer redirects: %v", err)
+	}
+	if _, err := svc.Thread(ctx, "profile-alias", legacy.ID, WorldlineQuery{Limit: 100}, 0, 0, 100); err != nil {
+		t.Fatalf("legacy thread ID no longer resolves: %v", err)
+	}
+	if _, err := svc.RenameThread(ctx, "profile-alias", legacy.ID, "", currentList.Version, "rename-2"); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := svc.Threads(ctx, "profile-alias", WorldlineQuery{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, th := range restored.Threads {
+		if th.ID == legacy.ID && th.Title != "来源标题更新" {
+			t.Fatalf("empty alias should restore source title: %+v", th)
+		}
+	}
+}
+
+func TestWorldlineManualThreadGroupCanBeRevokedWithoutMergingClaims(t *testing.T) {
+	f := newFixture(t)
+	if _, err := f.store.DB().Exec(`INSERT INTO topics(id,title) VALUES('topic:b','另一个来源标题')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.store.DB().Exec(`UPDATE notes SET topic_ids_json='["topic:b"]' WHERE summary='第二条归纳'`); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	events, err := plane.Open(t.TempDir() + "/events.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer events.Close()
+	svc := &WorldlineService{Time: &TimeService{Store: f.store, Events: events}}
+	before, err := svc.Threads(ctx, "profile-group", WorldlineQuery{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.Total != 2 {
+		t.Fatalf("setup should have two source threads: %+v", before)
+	}
+	ids := []string{before.Threads[0].ID, before.Threads[1].ID}
+	wantEntries := before.Threads[0].EntryCount + before.Threads[1].EntryCount
+	version, err := svc.GroupThreads(ctx, "profile-group", ids, "人工分组", "group", "", before.Version, "group-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	grouped, err := svc.Threads(ctx, "profile-group", WorldlineQuery{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if grouped.Total != 1 || !grouped.Threads[0].ManualGroup || grouped.Threads[0].EntryCount != wantEntries {
+		t.Fatalf("manual grouping changed the wrong projection: %+v", grouped)
+	}
+	for _, id := range ids {
+		if _, err := svc.Thread(ctx, "profile-group", id, WorldlineQuery{Limit: 100}, 0, 0, 100); err != nil {
+			t.Fatalf("old thread ID %s did not resolve: %v", id, err)
+		}
+	}
+	if _, err := svc.GroupThreads(ctx, "profile-group", nil, "", "revoke", grouped.Threads[0].ID, version, "ungroup-1"); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := svc.Threads(ctx, "profile-group", WorldlineQuery{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restored.Total != 2 {
+		t.Fatalf("revoke did not restore source topics: %+v", restored)
+	}
+}
+
+func TestWorldlineMutationVersionIsAtomicAcrossServiceInstances(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	path := t.TempDir() + "/events.db"
+	events1, err := plane.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer events1.Close()
+	events2, err := plane.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer events2.Close()
+	s1 := &WorldlineService{Time: &TimeService{Store: f.store, Events: events1}}
+	s2 := &WorldlineService{Time: &TimeService{Store: f.store, Events: events2}}
+	list, err := s1.Threads(ctx, "profile-cas", WorldlineQuery{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := list.Threads[0].ID
+	start := make(chan struct{})
+	errs := make([]error, 2)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		<-start
+		_, errs[0] = s1.RenameThread(ctx, "profile-cas", id, "名字甲", list.Version, "cas-a")
+	}()
+	go func() {
+		defer wg.Done()
+		<-start
+		_, errs[1] = s2.RenameThread(ctx, "profile-cas", id, "名字乙", list.Version, "cas-b")
+	}()
+	close(start)
+	wg.Wait()
+	success, conflict := 0, 0
+	for _, e := range errs {
+		if e == nil {
+			success++
+		} else if strings.Contains(e.Error(), "conflict") || strings.Contains(e.Error(), "version conflict") {
+			conflict++
+		} else {
+			t.Fatalf("unexpected mutation error: %v", e)
+		}
+	}
+	if success != 1 || conflict != 1 {
+		t.Fatalf("CAS outcomes success=%d conflict=%d errs=%v", success, conflict, errs)
+	}
+}
+
+func TestWorldlineRenameCanTargetThreadBeyondFirstHundred(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	turn := f.turnRowID(t, "seg-a", "t-1")
+	tx, err := f.store.DB().Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 105; i++ {
+		id := fmt.Sprintf("topic-bulk-%03d", i)
+		note := fmt.Sprintf("note-bulk-%03d", i)
+		if _, err = tx.Exec(`INSERT INTO topics(id,title) VALUES(?,?)`, id, fmt.Sprintf("单独主题%03d", i)); err != nil {
+			tx.Rollback()
+			t.Fatal(err)
+		}
+		if _, err = tx.Exec(`INSERT INTO notes(id,conversation_id,kind,summary,topic_ids_json,claim_mode,interpretation_note,annotation_version) VALUES(?,?,'observation','批量来源',?,'inference','','bulk-v1')`, note, f.conversationID, `["`+id+`"]`); err != nil {
+			tx.Rollback()
+			t.Fatal(err)
+		}
+		if _, err = tx.Exec(`INSERT INTO note_evidence(note_id,turn_id,ordinal) VALUES(?,?,0)`, note, turn); err != nil {
+			tx.Rollback()
+			t.Fatal(err)
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	events, err := plane.Open(t.TempDir() + "/events.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer events.Close()
+	svc := &WorldlineService{Time: &TimeService{Store: f.store, Events: events}}
+	page, err := svc.Threads(ctx, "profile-bulk", WorldlineQuery{Limit: 100, Offset: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Threads) < 1 {
+		t.Fatal("expected page after offset 100")
+	}
+	target := page.Threads[len(page.Threads)-1]
+	if _, err := svc.RenameThread(ctx, "profile-bulk", target.ID, "第105个主题的别名", page.Version, "rename-beyond-100"); err != nil {
+		t.Fatalf("rename beyond first page failed: %v", err)
 	}
 }
 

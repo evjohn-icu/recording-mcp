@@ -108,3 +108,50 @@ func TestRunLexicalOnlySkipsHybrid(t *testing.T) {
 		t.Error("retrieval questions not loaded")
 	}
 }
+
+func TestRunAuthoredQualityFixtureReportsAccountingBucketsAndMRR(t *testing.T) {
+	base := filepath.Join("..", "..", "fixtures", "eval", "quality")
+	report, err := Run(t.Context(), Options{
+		DBPath:         filepath.Join(t.TempDir(), "quality.db"),
+		CorpusPath:     filepath.Join(base, "corpus.json"),
+		QuestionsPath:  filepath.Join(base, "questions.json"),
+		LinksPath:      filepath.Join(base, "links.json"),
+		RetrievalPath:  filepath.Join(base, "retrieval.json"),
+		ProjectionPath: "",
+	})
+	if err != nil {
+		t.Fatalf("Run quality fixture: %v", err)
+	}
+	if report.RetrievalQuestions != 160 {
+		t.Fatalf("retrieval questions=%d, want 160", report.RetrievalQuestions)
+	}
+	m := report.Metrics
+	if m.RetrievalRequests != 320 || m.SemanticQueryEmbedRequests != 160 {
+		t.Errorf("request accounting = retrieval:%d semantic-query:%d, want 320/160", m.RetrievalRequests, m.SemanticQueryEmbedRequests)
+	}
+	if m.SemanticProviderEmbedRequests != m.SemanticIndexEmbedRequests+m.SemanticQueryEmbedRequests || m.SemanticProviderEmbedErrors != 0 {
+		t.Errorf("provider calls do not reconcile with index/query calls: %+v", m)
+	}
+	if m.SemanticIndexEmbedRequests == 0 || m.SemanticIndexEmbeddedItems == 0 || m.SemanticIndexDurationMS <= 0 {
+		t.Errorf("index accounting missing: requests=%d items=%d ms=%f", m.SemanticIndexEmbedRequests, m.SemanticIndexEmbeddedItems, m.SemanticIndexDurationMS)
+	}
+	if m.RetrievalHybridLatencyMSP50 <= 0 || m.RetrievalHybridLatencyMSP95 < m.RetrievalHybridLatencyMSP50 {
+		t.Errorf("hybrid latency percentiles invalid: p50=%f p95=%f", m.RetrievalHybridLatencyMSP50, m.RetrievalHybridLatencyMSP95)
+	}
+	if m.RetrievalHybridMRRAt10 <= 0 {
+		t.Error("hybrid MRR@10 is zero")
+	}
+	if m.RetrievalHybridPrecisionAt5 <= 0 {
+		t.Error("hybrid precision@5 is zero")
+	}
+	if _, ok := m.RetrievalBuckets["test/hybrid/education"]; !ok {
+		t.Errorf("test education bucket missing from %d buckets", len(m.RetrievalBuckets))
+	}
+	if _, ok := m.RetrievalBuckets["/lexical/"]; ok {
+		t.Error("classic evaluation rows leaked into retrieval bucket aggregation")
+	}
+	noEvidence := m.RetrievalBuckets["test/hybrid/no_evidence"]
+	if noEvidence.NoEvidenceQuestions != 10 || noEvidence.LatencyMSP95 <= 0 {
+		t.Errorf("no-evidence bucket lost its denominator/latency: %+v", noEvidence)
+	}
+}
