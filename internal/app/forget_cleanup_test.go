@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"recordingmcp/internal/asrinput"
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/plane"
 )
@@ -70,6 +71,66 @@ func TestForgetTurnCompletesAudioCleanupAndPreservesNeighbors(t *testing.T) {
 	}
 	if _, err := f.svc.RetryForget(ctx, result.TombstoneID); err != nil {
 		t.Fatalf("cleanup retry: %v", err)
+	}
+}
+
+func TestForgetPurgesMultiConversationWorldlineFeedbackWithoutConversationID(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	turnID := f.turnRowID(t, "seg-a", "t-1")
+
+	other := sampleSegment("independent-session", 0, nil, []asrinput.Turn{
+		turnWithTimes("other-turn", 1, "synthetic independent evidence", 0, 1000, 1000),
+	})
+	other.Source.DeviceID = "device:independent"
+	other.Source.RecordingID = "recording:independent"
+	other.Source.ConversationID = "conversation:independent"
+	other.Source.ProviderRequestID = "request:independent"
+	report, err := f.store.IngestTranscript(ctx, other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var otherTurnID string
+	if err := f.store.DB().QueryRow(`SELECT id FROM turns WHERE conversation_id=? AND original_turn_id=?`, report.ConversationID, originalTurnID("independent-session", "other-turn")).Scan(&otherTurnID); err != nil {
+		t.Fatal(err)
+	}
+
+	events, err := plane.Open(filepath.Join(t.TempDir(), "events.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer events.Close()
+	f.svc.ForgetPlane = events
+	stamp := time.Now().UTC()
+	if _, err := events.Ingest(ctx, []plane.Event{
+		{ID: "multi-session-feedback", Type: "worldline.feedback", Timestamp: stamp, ObservedAt: stamp, Source: "local-web", Content: "summary based on both sessions", Confidence: 1, StructuredData: map[string]any{"scope": "profile-a", "action": "review", "references": []string{turnID + "@rev-1", otherTurnID + "@rev-1"}}},
+		{ID: "independent-feedback", Type: "worldline.feedback", Timestamp: stamp, ObservedAt: stamp, Source: "local-web", Content: "summary based only on independent session", Confidence: 1, StructuredData: map[string]any{"scope": "profile-a", "action": "review", "references": []string{otherTurnID + "@rev-1"}}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	preview, err := f.svc.PreviewForget(ctx, memory.ForgetRequest{Scope: "turn", TurnID: turnID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := f.svc.CommitForget(ctx, memory.ForgetRequest{Scope: "turn", TurnID: turnID, ExpectedState: preview.ExpectedState})
+	if err != nil || result.CleanupPending {
+		t.Fatalf("forget result=%+v err=%v", result, err)
+	}
+
+	rows, err := events.Search(ctx, plane.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, event := range rows {
+		got[event.ID] = event.Content
+	}
+	if got["multi-session-feedback"] != "[purged]" {
+		t.Fatalf("multi-session feedback retained deleted source content: %+v", got)
+	}
+	if got["independent-feedback"] != "summary based only on independent session" {
+		t.Fatalf("independent feedback was unnecessarily purged: %+v", got)
 	}
 }
 

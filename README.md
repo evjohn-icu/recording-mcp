@@ -95,6 +95,8 @@ token 只可交换一次、10 分钟有效。不要把 `--addr` 改成公网地�
 
 启动与旧数据库迁入见 [本地 v2 使用说明](docs/local-v2.md)；测试、浏览器验证、性能门槛及未完成项见 [交付验证记录](docs/local-v2-verification.md)。实验 ANN 未达到百万规模验收门槛，本地 profile 也不等于远程多租户或磁盘加密。
 
+按 Topic 展示的甘特式世界线、录音时间准备与本地副本启动见 [Topic 世界线](docs/worldline.md)，合成浏览器检查见 [世界线验证记录](docs/worldline-validation.md)。未知事实时间与录音提及时间分开展示。 本机真实决策模型启用见 [本地 JEV 接入](docs/worldline-jev.md)。
+
 ## MCP 客户端与 Web 运行限制
 
 MCP 客户端里 `tools/list` 可见 27 个工具（19 个记忆工具 + 8 个事件原型工具）。调用 `get_current_context`：

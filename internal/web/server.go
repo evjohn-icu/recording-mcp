@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"recordingmcp/internal/app"
+	"recordingmcp/internal/decision"
 )
 
 // contentSecurityPolicy is the exact policy the frontend is built for: one
@@ -24,7 +25,8 @@ type Config struct {
 	Service *app.Service
 	// TimeService is optional and uses the authenticated session profile as its
 	// event scope (or "local" in legacy bootstrap mode).
-	TimeService *app.TimeService
+	TimeService       *app.TimeService
+	WorldlineDecision decision.Engine
 	// WebDir is the built frontend directory (web/dist). Empty disables static
 	// serving while the API keeps working.
 	WebDir string
@@ -131,12 +133,14 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /api/auth-info", s.handleAuthInfo)
 	if cfg.TimeService != nil {
-		RegisterTimeRoutes(mux, cfg.TimeService, func(r *http.Request) string {
+		profileScope := func(r *http.Request) string {
 			if sess, ok := sessionOf(r); ok && strings.TrimSpace(sess.profile) != "" {
 				return sess.profile
 			}
 			return "local"
-		})
+		}
+		RegisterTimeRoutes(mux, cfg.TimeService, profileScope)
+		registerWorldlineRoutes(mux, &app.WorldlineService{Time: cfg.TimeService, DecisionEngine: cfg.WorldlineDecision}, profileScope)
 	}
 	s.registerCorrectionRoutes(mux)
 	s.registerForgetRoutes(mux)

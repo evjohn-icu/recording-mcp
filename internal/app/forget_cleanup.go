@@ -59,15 +59,23 @@ func (s *Service) CleanupForget(ctx context.Context, id string) error {
 		}
 		chosen := map[string]bool{}
 		for _, e := range events {
-			if e.ConversationID != conversationID {
+			conversationMatches := e.ConversationID != "" && e.ConversationID == conversationID
+			refs, malformed := sourceReferences(e)
+			// Events built from evidence spanning conversations have no single
+			// ConversationID. A missing referenced turn means at least one of
+			// their source copies was removed; purge the mixed derived payload.
+			// For events without a precise locator, retain the existing
+			// conversation-scoped conservative rule below.
+			if !conversationMatches && (len(refs) == 0 || malformed) {
 				continue
 			}
-			refs, malformed := sourceReferences(e)
 			// Legacy copies without precise provenance cannot safely retain
 			// content from the affected conversation. Explicit independent
 			// evidence is preserved, even when its revision is stale.
 			if len(refs) == 0 || malformed {
-				chosen[e.ID] = true
+				if conversationMatches {
+					chosen[e.ID] = true
+				}
 				continue
 			}
 			for _, ref := range refs {

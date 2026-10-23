@@ -1,0 +1,882 @@
+{
+  "experiment": "worldline-decision-experiment-v2",
+  "synthetic_only": true,
+  "started_at": "2026-10-23T08:23:40.697368+00:00",
+  "endpoint": "http://127.0.0.1:8765/v1/systemone",
+  "requested_model": "jev-style-2b-v2",
+  "seed": 20261023,
+  "case_order": [
+    "alias-04",
+    "alias-16",
+    "alias-05",
+    "support-14",
+    "support-06",
+    "alias-06",
+    "alias-11",
+    "support-16",
+    "support-08",
+    "alias-15",
+    "support-12",
+    "support-07",
+    "support-09",
+    "support-05",
+    "support-11",
+    "alias-02",
+    "support-03",
+    "alias-09",
+    "support-04",
+    "support-10",
+    "alias-10",
+    "alias-07",
+    "support-15",
+    "alias-03",
+    "alias-14",
+    "alias-01",
+    "support-13",
+    "support-02",
+    "alias-08",
+    "alias-12",
+    "support-01",
+    "alias-13",
+    "support-17",
+    "alias-17"
+  ],
+  "warmup": {
+    "id": "worldline-synthetic-warmup",
+    "actual_label": "same_topic",
+    "latency_ms": 391.61
+  },
+  "model_load_time_ms": null,
+  "model_load_time_note": "Model/process startup is outside the HTTP client; supply --model-load-ms measured separately.",
+  "actual_models": [
+    "jev-style-2b-v2"
+  ],
+  "weights_versions": [
+    ""
+  ],
+  "fixture_version": "worldline-decision-experiment-v2",
+  "total": 34,
+  "valid_answers": 34,
+  "invalid_or_failed": 0,
+  "accuracy": 0.5,
+  "latency_ms": {
+    "mean": 132.78,
+    "p50": 132.87,
+    "max": 161.23
+  },
+  "confusion": {
+    "alias_topic": {
+      "different_topic -> different_topic": 2,
+      "different_topic -> related_topic": 3,
+      "insufficient_evidence -> different_topic": 1,
+      "insufficient_evidence -> insufficient_evidence": 2,
+      "insufficient_evidence -> same_topic": 1,
+      "related_topic -> same_topic": 4,
+      "same_topic -> same_topic": 4
+    },
+    "summary_support": {
+      "insufficient_evidence -> insufficient_evidence": 1,
+      "insufficient_evidence -> supported": 1,
+      "no_evidence -> no_evidence": 1,
+      "plan_not_fact -> plan_not_fact": 4,
+      "supported -> supported": 3,
+      "unsupported -> supported": 1,
+      "wrong_subject -> supported": 3,
+      "wrong_time -> supported": 3
+    }
+  },
+  "errors_by_expected_label": {
+    "alias_topic": {
+      "same_topic": 0,
+      "related_topic": 4,
+      "different_topic": 3,
+      "insufficient_evidence": 2
+    },
+    "summary_support": {
+      "supported": 0,
+      "plan_not_fact": 0,
+      "wrong_subject": 3,
+      "wrong_time": 3,
+      "no_evidence": 0,
+      "unsupported": 1,
+      "insufficient_evidence": 1
+    }
+  },
+  "misclassifications": [
+    {
+      "id": "alias-05",
+      "task": "alias_topic",
+      "expected": "related_topic",
+      "latency_ms": 109.35,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.48695711382586704,
+        "related_topic": 0.251348661728703,
+        "different_topic": 0.21335020454823841,
+        "insufficient_evidence": 0.04834401989719155
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-14",
+      "task": "summary_support",
+      "expected": "unsupported",
+      "latency_ms": 155.85,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.5176942214617026,
+        "plan_not_fact": 0.13109246215477935,
+        "wrong_subject": 0.041999683309091776,
+        "wrong_time": 0.015817135156335843,
+        "no_evidence": 0.041204317877603015,
+        "unsupported": 0.14160102517220707,
+        "insufficient_evidence": 0.11059115486828026
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-06",
+      "task": "alias_topic",
+      "expected": "related_topic",
+      "latency_ms": 119.58,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.5816512646278758,
+        "related_topic": 0.22510445047664945,
+        "different_topic": 0.15316366713484814,
+        "insufficient_evidence": 0.0400806177606266
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-08",
+      "task": "summary_support",
+      "expected": "wrong_subject",
+      "latency_ms": 153.26,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.5597330657168192,
+        "plan_not_fact": 0.10285699795922579,
+        "wrong_subject": 0.04380423793203871,
+        "wrong_time": 0.015112313910577404,
+        "no_evidence": 0.037135140859315,
+        "unsupported": 0.12845935196193956,
+        "insufficient_evidence": 0.1128988916600843
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-15",
+      "task": "alias_topic",
+      "expected": "insufficient_evidence",
+      "latency_ms": 126.8,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.46359595070612425,
+        "related_topic": 0.22404614365615177,
+        "different_topic": 0.24559859981302049,
+        "insufficient_evidence": 0.0667593058247035
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-12",
+      "task": "summary_support",
+      "expected": "wrong_time",
+      "latency_ms": 145.46,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.2857717839341049,
+        "plan_not_fact": 0.2368141616411432,
+        "wrong_subject": 0.06479883485499015,
+        "wrong_time": 0.07462312866468125,
+        "no_evidence": 0.05096733078462412,
+        "unsupported": 0.16260251748681828,
+        "insufficient_evidence": 0.12442224263363809
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-07",
+      "task": "summary_support",
+      "expected": "wrong_subject",
+      "latency_ms": 153.49,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.6239898955406566,
+        "plan_not_fact": 0.09784394102244236,
+        "wrong_subject": 0.03709680547383516,
+        "wrong_time": 0.011985389188428959,
+        "no_evidence": 0.03179025629133638,
+        "unsupported": 0.11474559843368029,
+        "insufficient_evidence": 0.08254811404962016
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-09",
+      "task": "summary_support",
+      "expected": "wrong_subject",
+      "latency_ms": 155.96,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.571691556142868,
+        "plan_not_fact": 0.09901857562223326,
+        "wrong_subject": 0.04614550802909066,
+        "wrong_time": 0.015947612935383694,
+        "no_evidence": 0.035470323012206165,
+        "unsupported": 0.1246993842457215,
+        "insufficient_evidence": 0.10702704001249674
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-11",
+      "task": "summary_support",
+      "expected": "wrong_time",
+      "latency_ms": 153.41,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.3462352790908946,
+        "plan_not_fact": 0.19808919985155227,
+        "wrong_subject": 0.07135680609046509,
+        "wrong_time": 0.08170743489212039,
+        "no_evidence": 0.04426218845717084,
+        "unsupported": 0.13968160053564105,
+        "insufficient_evidence": 0.11866749108215581
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-09",
+      "task": "alias_topic",
+      "expected": "different_topic",
+      "latency_ms": 115.78,
+      "actual_label": "related_topic",
+      "distribution": {
+        "same_topic": 0.2891460013597452,
+        "related_topic": 0.3718171946861808,
+        "different_topic": 0.3004836793164658,
+        "insufficient_evidence": 0.03855312463760823
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-10",
+      "task": "summary_support",
+      "expected": "wrong_time",
+      "latency_ms": 161.23,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.4339412909458295,
+        "plan_not_fact": 0.17234968723597527,
+        "wrong_subject": 0.058713787919316425,
+        "wrong_time": 0.09488309161104524,
+        "no_evidence": 0.04031127745679633,
+        "unsupported": 0.11740949144738175,
+        "insufficient_evidence": 0.08239137338365547
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-07",
+      "task": "alias_topic",
+      "expected": "related_topic",
+      "latency_ms": 110.69,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.48532317732385344,
+        "related_topic": 0.2645262810706693,
+        "different_topic": 0.19361352618977018,
+        "insufficient_evidence": 0.05653701541570707
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-14",
+      "task": "alias_topic",
+      "expected": "insufficient_evidence",
+      "latency_ms": 110.8,
+      "actual_label": "different_topic",
+      "distribution": {
+        "same_topic": 0.20878013395563666,
+        "related_topic": 0.2818595048420253,
+        "different_topic": 0.310111704986473,
+        "insufficient_evidence": 0.199248656215865
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-08",
+      "task": "alias_topic",
+      "expected": "related_topic",
+      "latency_ms": 112.9,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.49545903077770015,
+        "related_topic": 0.27660312757846517,
+        "different_topic": 0.18742872792242302,
+        "insufficient_evidence": 0.04050911372141164
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-12",
+      "task": "alias_topic",
+      "expected": "different_topic",
+      "latency_ms": 107.79,
+      "actual_label": "related_topic",
+      "distribution": {
+        "same_topic": 0.2525001536020324,
+        "related_topic": 0.4045560056711588,
+        "different_topic": 0.3066127499990046,
+        "insufficient_evidence": 0.036331090727804105
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-17",
+      "task": "summary_support",
+      "expected": "insufficient_evidence",
+      "latency_ms": 145.42,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.34570540976431213,
+        "plan_not_fact": 0.1403350654573178,
+        "wrong_subject": 0.05130030999343274,
+        "wrong_time": 0.02099024793166,
+        "no_evidence": 0.04802846454671061,
+        "unsupported": 0.1679180809753594,
+        "insufficient_evidence": 0.22572242133120737
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-17",
+      "task": "alias_topic",
+      "expected": "different_topic",
+      "latency_ms": 116.21,
+      "actual_label": "related_topic",
+      "distribution": {
+        "same_topic": 0.14947339210402497,
+        "related_topic": 0.39533170654339045,
+        "different_topic": 0.38968248383289933,
+        "insufficient_evidence": 0.06551241751968524
+      },
+      "misclassified": true
+    }
+  ],
+  "invalid_results": [],
+  "cases": [
+    {
+      "id": "alias-04",
+      "task": "alias_topic",
+      "expected": "same_topic",
+      "latency_ms": 123.45,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.7809540393211748,
+        "related_topic": 0.08816343118994296,
+        "different_topic": 0.10415093336705634,
+        "insufficient_evidence": 0.02673159612182596
+      }
+    },
+    {
+      "id": "alias-16",
+      "task": "alias_topic",
+      "expected": "insufficient_evidence",
+      "latency_ms": 116.57,
+      "actual_label": "insufficient_evidence",
+      "distribution": {
+        "same_topic": 0.20166036952393962,
+        "related_topic": 0.297367482722092,
+        "different_topic": 0.19479827562287202,
+        "insufficient_evidence": 0.30617387213109626
+      }
+    },
+    {
+      "id": "alias-05",
+      "task": "alias_topic",
+      "expected": "related_topic",
+      "latency_ms": 109.35,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.48695711382586704,
+        "related_topic": 0.251348661728703,
+        "different_topic": 0.21335020454823841,
+        "insufficient_evidence": 0.04834401989719155
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-14",
+      "task": "summary_support",
+      "expected": "unsupported",
+      "latency_ms": 155.85,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.5176942214617026,
+        "plan_not_fact": 0.13109246215477935,
+        "wrong_subject": 0.041999683309091776,
+        "wrong_time": 0.015817135156335843,
+        "no_evidence": 0.041204317877603015,
+        "unsupported": 0.14160102517220707,
+        "insufficient_evidence": 0.11059115486828026
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-06",
+      "task": "summary_support",
+      "expected": "plan_not_fact",
+      "latency_ms": 148.93,
+      "actual_label": "plan_not_fact",
+      "distribution": {
+        "supported": 0.30816455320705427,
+        "plan_not_fact": 0.45728911814678974,
+        "wrong_subject": 0.040825928239922,
+        "wrong_time": 0.011684471108102196,
+        "no_evidence": 0.02703498334280168,
+        "unsupported": 0.09486611301100306,
+        "insufficient_evidence": 0.060134832944326984
+      }
+    },
+    {
+      "id": "alias-06",
+      "task": "alias_topic",
+      "expected": "related_topic",
+      "latency_ms": 119.58,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.5816512646278758,
+        "related_topic": 0.22510445047664945,
+        "different_topic": 0.15316366713484814,
+        "insufficient_evidence": 0.0400806177606266
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-11",
+      "task": "alias_topic",
+      "expected": "different_topic",
+      "latency_ms": 114.9,
+      "actual_label": "different_topic",
+      "distribution": {
+        "same_topic": 0.14896448532331116,
+        "related_topic": 0.4026485428742424,
+        "different_topic": 0.4207095264793828,
+        "insufficient_evidence": 0.027677445323063734
+      }
+    },
+    {
+      "id": "support-16",
+      "task": "summary_support",
+      "expected": "insufficient_evidence",
+      "latency_ms": 144.72,
+      "actual_label": "insufficient_evidence",
+      "distribution": {
+        "supported": 0.25383202034488933,
+        "plan_not_fact": 0.09010337369999108,
+        "wrong_subject": 0.05232947063437833,
+        "wrong_time": 0.015403524876176031,
+        "no_evidence": 0.04293238805470851,
+        "unsupported": 0.1658769268148272,
+        "insufficient_evidence": 0.3795222955750295
+      }
+    },
+    {
+      "id": "support-08",
+      "task": "summary_support",
+      "expected": "wrong_subject",
+      "latency_ms": 153.26,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.5597330657168192,
+        "plan_not_fact": 0.10285699795922579,
+        "wrong_subject": 0.04380423793203871,
+        "wrong_time": 0.015112313910577404,
+        "no_evidence": 0.037135140859315,
+        "unsupported": 0.12845935196193956,
+        "insufficient_evidence": 0.1128988916600843
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-15",
+      "task": "alias_topic",
+      "expected": "insufficient_evidence",
+      "latency_ms": 126.8,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.46359595070612425,
+        "related_topic": 0.22404614365615177,
+        "different_topic": 0.24559859981302049,
+        "insufficient_evidence": 0.0667593058247035
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-12",
+      "task": "summary_support",
+      "expected": "wrong_time",
+      "latency_ms": 145.46,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.2857717839341049,
+        "plan_not_fact": 0.2368141616411432,
+        "wrong_subject": 0.06479883485499015,
+        "wrong_time": 0.07462312866468125,
+        "no_evidence": 0.05096733078462412,
+        "unsupported": 0.16260251748681828,
+        "insufficient_evidence": 0.12442224263363809
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-07",
+      "task": "summary_support",
+      "expected": "wrong_subject",
+      "latency_ms": 153.49,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.6239898955406566,
+        "plan_not_fact": 0.09784394102244236,
+        "wrong_subject": 0.03709680547383516,
+        "wrong_time": 0.011985389188428959,
+        "no_evidence": 0.03179025629133638,
+        "unsupported": 0.11474559843368029,
+        "insufficient_evidence": 0.08254811404962016
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-09",
+      "task": "summary_support",
+      "expected": "wrong_subject",
+      "latency_ms": 155.96,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.571691556142868,
+        "plan_not_fact": 0.09901857562223326,
+        "wrong_subject": 0.04614550802909066,
+        "wrong_time": 0.015947612935383694,
+        "no_evidence": 0.035470323012206165,
+        "unsupported": 0.1246993842457215,
+        "insufficient_evidence": 0.10702704001249674
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-05",
+      "task": "summary_support",
+      "expected": "plan_not_fact",
+      "latency_ms": 155.52,
+      "actual_label": "plan_not_fact",
+      "distribution": {
+        "supported": 0.22284423229000686,
+        "plan_not_fact": 0.568809574856337,
+        "wrong_subject": 0.04176638215897872,
+        "wrong_time": 0.011932215702036592,
+        "no_evidence": 0.024300577538669287,
+        "unsupported": 0.07991214927647604,
+        "insufficient_evidence": 0.050434868177495505
+      }
+    },
+    {
+      "id": "support-11",
+      "task": "summary_support",
+      "expected": "wrong_time",
+      "latency_ms": 153.41,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.3462352790908946,
+        "plan_not_fact": 0.19808919985155227,
+        "wrong_subject": 0.07135680609046509,
+        "wrong_time": 0.08170743489212039,
+        "no_evidence": 0.04426218845717084,
+        "unsupported": 0.13968160053564105,
+        "insufficient_evidence": 0.11866749108215581
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-02",
+      "task": "alias_topic",
+      "expected": "same_topic",
+      "latency_ms": 114.69,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.7615815004380341,
+        "related_topic": 0.09797508557977735,
+        "different_topic": 0.11230135410507204,
+        "insufficient_evidence": 0.028142059877116488
+      }
+    },
+    {
+      "id": "support-03",
+      "task": "summary_support",
+      "expected": "supported",
+      "latency_ms": 149.07,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.5849201934090916,
+        "plan_not_fact": 0.17257918163754016,
+        "wrong_subject": 0.03493409332463893,
+        "wrong_time": 0.013310059036688967,
+        "no_evidence": 0.028916836637972402,
+        "unsupported": 0.08700731800853195,
+        "insufficient_evidence": 0.07833231794553595
+      }
+    },
+    {
+      "id": "alias-09",
+      "task": "alias_topic",
+      "expected": "different_topic",
+      "latency_ms": 115.78,
+      "actual_label": "related_topic",
+      "distribution": {
+        "same_topic": 0.2891460013597452,
+        "related_topic": 0.3718171946861808,
+        "different_topic": 0.3004836793164658,
+        "insufficient_evidence": 0.03855312463760823
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-04",
+      "task": "summary_support",
+      "expected": "plan_not_fact",
+      "latency_ms": 148.78,
+      "actual_label": "plan_not_fact",
+      "distribution": {
+        "supported": 0.21055389131765143,
+        "plan_not_fact": 0.6022494084794866,
+        "wrong_subject": 0.03831335395936537,
+        "wrong_time": 0.010597331227643201,
+        "no_evidence": 0.01937649246999946,
+        "unsupported": 0.07431793359743186,
+        "insufficient_evidence": 0.04459158894842209
+      }
+    },
+    {
+      "id": "support-10",
+      "task": "summary_support",
+      "expected": "wrong_time",
+      "latency_ms": 161.23,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.4339412909458295,
+        "plan_not_fact": 0.17234968723597527,
+        "wrong_subject": 0.058713787919316425,
+        "wrong_time": 0.09488309161104524,
+        "no_evidence": 0.04031127745679633,
+        "unsupported": 0.11740949144738175,
+        "insufficient_evidence": 0.08239137338365547
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-10",
+      "task": "alias_topic",
+      "expected": "different_topic",
+      "latency_ms": 120.33,
+      "actual_label": "different_topic",
+      "distribution": {
+        "same_topic": 0.22492661408638145,
+        "related_topic": 0.3594413038730053,
+        "different_topic": 0.3876388895143317,
+        "insufficient_evidence": 0.02799319252628156
+      }
+    },
+    {
+      "id": "alias-07",
+      "task": "alias_topic",
+      "expected": "related_topic",
+      "latency_ms": 110.69,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.48532317732385344,
+        "related_topic": 0.2645262810706693,
+        "different_topic": 0.19361352618977018,
+        "insufficient_evidence": 0.05653701541570707
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-15",
+      "task": "summary_support",
+      "expected": "plan_not_fact",
+      "latency_ms": 146.01,
+      "actual_label": "plan_not_fact",
+      "distribution": {
+        "supported": 0.27145387847717517,
+        "plan_not_fact": 0.5300908773655976,
+        "wrong_subject": 0.03458984718283997,
+        "wrong_time": 0.009560215412824664,
+        "no_evidence": 0.024559748696070176,
+        "unsupported": 0.08139352670775818,
+        "insufficient_evidence": 0.04835190615773434
+      }
+    },
+    {
+      "id": "alias-03",
+      "task": "alias_topic",
+      "expected": "same_topic",
+      "latency_ms": 118.53,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.799617259281117,
+        "related_topic": 0.0921496853382015,
+        "different_topic": 0.08182482875543608,
+        "insufficient_evidence": 0.02640822662524533
+      }
+    },
+    {
+      "id": "alias-14",
+      "task": "alias_topic",
+      "expected": "insufficient_evidence",
+      "latency_ms": 110.8,
+      "actual_label": "different_topic",
+      "distribution": {
+        "same_topic": 0.20878013395563666,
+        "related_topic": 0.2818595048420253,
+        "different_topic": 0.310111704986473,
+        "insufficient_evidence": 0.199248656215865
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-01",
+      "task": "alias_topic",
+      "expected": "same_topic",
+      "latency_ms": 111.09,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.7525566671527412,
+        "related_topic": 0.10056803081661606,
+        "different_topic": 0.11165868606205752,
+        "insufficient_evidence": 0.035216615968585205
+      }
+    },
+    {
+      "id": "support-13",
+      "task": "summary_support",
+      "expected": "no_evidence",
+      "latency_ms": 132.87,
+      "actual_label": "no_evidence",
+      "distribution": {
+        "supported": 0.2271383166257637,
+        "plan_not_fact": 0.1371188413804891,
+        "wrong_subject": 0.07726636053283868,
+        "wrong_time": 0.019883878632464363,
+        "no_evidence": 0.22795338515882602,
+        "unsupported": 0.16780424276711559,
+        "insufficient_evidence": 0.14283497490250247
+      }
+    },
+    {
+      "id": "support-02",
+      "task": "summary_support",
+      "expected": "supported",
+      "latency_ms": 150.88,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.618185182153142,
+        "plan_not_fact": 0.13696966124736176,
+        "wrong_subject": 0.03789021297689118,
+        "wrong_time": 0.011327359549470896,
+        "no_evidence": 0.02923286037597977,
+        "unsupported": 0.09325459501514803,
+        "insufficient_evidence": 0.07314012868200641
+      }
+    },
+    {
+      "id": "alias-08",
+      "task": "alias_topic",
+      "expected": "related_topic",
+      "latency_ms": 112.9,
+      "actual_label": "same_topic",
+      "distribution": {
+        "same_topic": 0.49545903077770015,
+        "related_topic": 0.27660312757846517,
+        "different_topic": 0.18742872792242302,
+        "insufficient_evidence": 0.04050911372141164
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-12",
+      "task": "alias_topic",
+      "expected": "different_topic",
+      "latency_ms": 107.79,
+      "actual_label": "related_topic",
+      "distribution": {
+        "same_topic": 0.2525001536020324,
+        "related_topic": 0.4045560056711588,
+        "different_topic": 0.3066127499990046,
+        "insufficient_evidence": 0.036331090727804105
+      },
+      "misclassified": true
+    },
+    {
+      "id": "support-01",
+      "task": "summary_support",
+      "expected": "supported",
+      "latency_ms": 147.64,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.6965836947390862,
+        "plan_not_fact": 0.0861130897531293,
+        "wrong_subject": 0.03117542624954003,
+        "wrong_time": 0.012232923604219806,
+        "no_evidence": 0.0265928188590762,
+        "unsupported": 0.08237965177999707,
+        "insufficient_evidence": 0.06492239501495135
+      }
+    },
+    {
+      "id": "alias-13",
+      "task": "alias_topic",
+      "expected": "insufficient_evidence",
+      "latency_ms": 116.39,
+      "actual_label": "insufficient_evidence",
+      "distribution": {
+        "same_topic": 0.21469632821607498,
+        "related_topic": 0.1541852276371313,
+        "different_topic": 0.16140422782940744,
+        "insufficient_evidence": 0.46971421631738636
+      }
+    },
+    {
+      "id": "support-17",
+      "task": "summary_support",
+      "expected": "insufficient_evidence",
+      "latency_ms": 145.42,
+      "actual_label": "supported",
+      "distribution": {
+        "supported": 0.34570540976431213,
+        "plan_not_fact": 0.1403350654573178,
+        "wrong_subject": 0.05130030999343274,
+        "wrong_time": 0.02099024793166,
+        "no_evidence": 0.04802846454671061,
+        "unsupported": 0.1679180809753594,
+        "insufficient_evidence": 0.22572242133120737
+      },
+      "misclassified": true
+    },
+    {
+      "id": "alias-17",
+      "task": "alias_topic",
+      "expected": "different_topic",
+      "latency_ms": 116.21,
+      "actual_label": "related_topic",
+      "distribution": {
+        "same_topic": 0.14947339210402497,
+        "related_topic": 0.39533170654339045,
+        "different_topic": 0.38968248383289933,
+        "insufficient_evidence": 0.06551241751968524
+      },
+      "misclassified": true
+    }
+  ]
+}

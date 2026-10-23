@@ -106,9 +106,15 @@ func main() {
 	semanticKeyEnv := flag.String("semantic-key-env", "", "environment variable holding the embeddings API key (openai only)")
 	decisionURL := flag.String("decision-url", "", "optional Decision engine endpoint used to rerank hybrid search items (empty disables reranking)")
 	decisionModel := flag.String("decision-model", "jev-style-2b-v2", "model name sent to the Decision engine for reranking")
+	worldlineURL := flag.String("worldline-decision-url", "", "local loopback system_one endpoint for worldline semantic suggestions")
+	worldlineModel := flag.String("worldline-decision-model", "decision-v3-0.8b", "actual local decision model for worldline suggestions")
 	var devOrigins repeatedFlag
 	flag.Var(&devOrigins, "dev-origin", "additional allowed Origin header value for development (repeatable), e.g. http://127.0.0.1:5173")
 	flag.Parse()
+	worldlineEngine, worldlineErr := localWorldlineDecision(*worldlineURL, *worldlineModel)
+	if worldlineErr != nil {
+		log.Fatal(worldlineErr)
+	}
 	if flag.NArg() != 0 {
 		log.Fatalf("unexpected arguments: %v", flag.Args())
 	}
@@ -177,9 +183,10 @@ func main() {
 			svc.ManagedIndexDir = paths.Index
 			svc.ManagedBackupDir = paths.Backups
 			return web.New(web.Config{
-				Service:     svc,
-				TimeService: &app.TimeService{Store: store, Events: events},
-				WebDir:      *webDir, DevOrigins: devOrigins, Logger: log.Default(),
+				Service:           svc,
+				TimeService:       &app.TimeService{Store: store, Events: events},
+				WorldlineDecision: worldlineEngine,
+				WebDir:            *webDir, DevOrigins: devOrigins, Logger: log.Default(),
 				ProfileName: paths.Name, VerifyProfilePassword: verifier,
 				ChangeProfilePassword: func(oldPassword, newPassword string) error {
 					return manager.ChangePassword(paths.Name, oldPassword, newPassword)
@@ -303,6 +310,7 @@ func main() {
 	server, err := web.New(web.Config{
 		Service:               svc,
 		TimeService:           &app.TimeService{Store: store, Events: events},
+		WorldlineDecision:     worldlineEngine,
 		WebDir:                *webDir,
 		DevOrigins:            devOrigins,
 		Logger:                log.Default(),

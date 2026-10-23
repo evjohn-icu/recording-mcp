@@ -167,6 +167,11 @@ var migrations = []migration{
 	{version: 14, name: "permanent-forget", statements: forgetStatements},
 	{version: 15, name: "profile-retirement", statements: profileRetirementStatements},
 	{version: 16, name: "suppression-cleanup-operations", statements: suppressionCleanupStatements},
+	// Current-state checks resolve attachments from a turn; the existing
+	// primary key starts with attachment_id and cannot serve this lookup.
+	{version: 17, name: "attachment-turn-reverse-index", statements: []string{
+		`CREATE INDEX IF NOT EXISTS attachment_turns_by_turn ON attachment_turns(turn_id, attachment_id);`,
+	}},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`

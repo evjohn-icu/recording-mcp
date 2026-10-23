@@ -4,6 +4,7 @@ import { AuthGate } from './auth'
 import { PendingForget } from './components/ForgetAction'
 import { PendingSuppressions } from './components/PendingSuppressions'
 import { TimelinePage } from './pages/TimelinePage'
+import { WorldlinePage } from './pages/WorldlinePage'
 import { SearchPage } from './pages/SearchPage'
 import { DetailPage } from './pages/DetailPage'
 import { HistoryPage } from './pages/HistoryPage'
@@ -22,7 +23,8 @@ function AppShell() {
       <header className="app-header">
         <div className="brand">本地记忆</div>
         <nav className="app-nav" aria-label="主导航">
-          <Link to="/">时间线</Link>
+          <Link to="/">世界线</Link>
+          <Link to="/recordings">录音</Link>
           <Link to="/search">搜索</Link>
           <Link to="/history">事实变化</Link>
         </nav>
@@ -31,7 +33,8 @@ function AppShell() {
         <PendingForget profile={sessionStorage.getItem('recording-profile') || ''} />
         <PendingSuppressions />
         <Routes>
-          <Route path="/" element={<TimelinePage />} />
+          <Route path="/" element={<WorldlinePage />} />
+          <Route path="/recordings" element={<TimelinePage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/c/:conversationId" element={<DetailPage />} />
           <Route path="/history" element={<HistoryPage />} />
