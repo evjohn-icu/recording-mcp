@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"recordingmcp/internal/memory"
+	"strings"
 	"testing"
 )
 
@@ -56,5 +57,26 @@ func TestHighlightUnknownIDIs404AndBriefCannotSwitchProfiles(t *testing.T) {
 	status, raw := e.do(t, http.MethodPost, "/api/briefs/preview", `{"scope":{"kind":"conversation","conversation_ids":["conv:web"]},"profile":"other"}`, nil)
 	if status != 400 {
 		t.Fatalf("profile selector accepted: %d %s", status, raw)
+	}
+}
+
+func TestBriefPolishRoutesConsentAndCSRF(t *testing.T) {
+	e := newTestEnv(t, "")
+	status, raw := e.do(t, http.MethodGet, "/api/briefs/polish/config", "", nil)
+	if status != 200 || !strings.Contains(string(raw), `"enabled":false`) {
+		t.Fatalf("default config: %d %s", status, raw)
+	}
+	body := `{"request":{"scope":{"kind":"conversation","conversation_ids":["conv:web"]}},"snapshot_id":"x","consent":true}`
+	status, raw = e.do(t, http.MethodPost, "/api/briefs/polish", body, nil)
+	if status != 503 || !strings.Contains(string(raw), "polish_disabled") {
+		t.Fatalf("default enabled: %d %s", status, raw)
+	}
+	status, _ = e.do(t, http.MethodPost, "/api/briefs/polish", body, func(r *http.Request) { r.Header.Del("X-CSRF-Token"); r.Header.Del("X-CSRF") })
+	if status != 403 {
+		t.Fatalf("CSRF allowed: %d", status)
+	}
+	status, _ = e.do(t, http.MethodPost, "/api/briefs/polish", strings.TrimSuffix(body, "}")+`,"endpoint":"http://attacker"}`, nil)
+	if status != 400 {
+		t.Fatalf("client endpoint allowed: %d", status)
 	}
 }
