@@ -93,6 +93,30 @@ def run() -> int:
                         'BETA_PASSWORD': credentials['beta_password'], 'SECOND_PROFILE': 'beta',
                         'SECOND_PASSWORD': credentials['beta_password']})
             python = env.get('PYTHON') or shutil.which('python3.14') or sys.executable
+            # Memory Highlights and Brief include irreversible forget/revision
+            # operations. Give that flow its own freshly adopted profile so the
+            # existing local-v2 suite retains the pristine synthetic fixture.
+            feature_profiles = artifacts/'highlights-brief-profiles'
+            feature_fixture = subprocess.run([sys.executable, str(ROOT/'scripts/synthetic-profile-fixture.py'),
+                                              '--profiles-root', str(feature_profiles), '--db', str(fixture_dir/'synthetic-eval.db'),
+                                              '--audio-dir', str(fixture_dir/'synthetic-audio')],
+                                             cwd=ROOT, env=env, text=True, capture_output=True, check=True)
+            feature_credentials = __import__('json').loads(feature_fixture.stdout.splitlines()[-1])
+            feature_port = free_port()
+            feature_base = f'http://127.0.0.1:{feature_port}'
+            feature_log_path = artifacts/'highlights-brief-web.log'
+            feature_log = feature_log_path.open('w')
+            feature_server = subprocess.Popen([str(ROOT/'bin/context-web'), '--profiles-root', str(feature_profiles),
+                                                '--addr', f'127.0.0.1:{feature_port}', '--web-dir', str(ROOT/'web/dist'),
+                                                '--semantic-provider', 'hash'], cwd=ROOT, env=env,
+                                               stdout=feature_log, stderr=subprocess.STDOUT, start_new_session=True)
+            try:
+                wait_http(feature_base+'/api/auth-info', feature_server, feature_log_path)
+                feature_env = env | {'BASE_URL': feature_base, 'ALPHA_PASSWORD': feature_credentials['alpha_password']}
+                subprocess.run([python, str(ROOT/'scripts/highlights-brief-browser.py')], cwd=ROOT, env=feature_env, check=True)
+            finally:
+                _stop(feature_server)
+                feature_log.close()
             subprocess.run([python, str(ROOT/'scripts/local-v2-flow-browser.py')], cwd=ROOT, env=env, check=True)
         finally:
             _stop(profile_server)

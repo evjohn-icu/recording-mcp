@@ -22,6 +22,7 @@ import { getTranscriptSource, observeFact } from '../api/client'
 import { ForgetAction } from '../components/ForgetAction'
 import { SuppressAction } from '../components/SuppressAction'
 import type { ForgetRequest } from '../api/retention'
+import { HighlightPanel } from '../components/HighlightPanel'
 
 const INDEXING_LABELS: Record<string, string> = {
   pending: '语义索引待更新',
@@ -198,6 +199,7 @@ function RecordingTurns({
       <StateView loading={loading && turns.length === 0} error={turns.length === 0 ? error : undefined} onRetry={reload} empty={!loading && !error && turns.length === 0} emptyMessage="该录音没有转写片段">
         {turns.map((turn) => <TurnRow turn={turn} recordingId={recording.recording_id} onChanged={() => { reload(); onChanged() }} onCorrectionSuccess={() => setCorrectionSubmitted(true)} onOpenEvidence={onOpenEvidence} key={turn.id} />)}
       </StateView>
+      <HighlightPanel recordingId={recording.recording_id} conversationId={conversationId} turns={turns.map((turn) => ({ id: turn.id, global_start_ms: turn.global_start_ms, global_end_ms: turn.global_end_ms, text: turn.content || '' }))} onEvidence={onOpenEvidence} />
       {nextOffset !== null && (
         <>
           {error && turns.length > 0 && <p className="note-error" role="alert">后续片段加载失败：{error.message}</p>}

@@ -20,12 +20,14 @@ interface AudioTiming {
 
 interface AudioContextValue {
   turnId: string | null
+  actualPositionMs: number | null
   play: (turnId: string, timing?: AudioTiming) => void
   close: () => void
 }
 
 const AudioContext = createContext<AudioContextValue>({
   turnId: null,
+  actualPositionMs: null,
   play: () => undefined,
   close: () => undefined,
 })
@@ -39,17 +41,33 @@ export function AudioBar({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [timing, setTiming] = useState<AudioTiming | undefined>()
   const [currentTime, setCurrentTime] = useState(0)
+  const [clipStartMs, setClipStartMs] = useState<number | null>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
 
   useEffect(() => {
     if (!turnId || !audioRef.current) return
     setError(null)
     const audio = audioRef.current
-    void audio.play().catch((reason: unknown) => {
+    let active = true
+    const controller = new AbortController()
+    void fetch(getAudioURL(turnId), { method: 'HEAD', credentials: 'same-origin', signal: controller.signal }).then(async (response) => {
+      if (!response.ok) throw new Error('音频加载失败')
+      const headerStart = response.headers.get('X-Audio-Start-MS')
+      const start = headerStart === null ? Number.NaN : Number(headerStart)
+      if (active) setClipStartMs(Number.isFinite(start) ? start : null)
+      if (!active) return
+      audio.src = getAudioURL(turnId)
+      await audio.play()
+    }).catch((reason: unknown) => {
+      if (!active) return
       setError(reason instanceof DOMException && reason.name === 'NotAllowedError'
         ? '浏览器阻止了自动播放，请点击播放器的播放按钮'
         : '无法开始播放音频，请检查播放器后重试')
     })
+    return () => {
+      active = false
+      controller.abort()
+    }
   }, [turnId])
 
   const close = () => {
@@ -63,6 +81,7 @@ export function AudioBar({ children }: { children: ReactNode }) {
     setError(null)
     setTiming(undefined)
     setCurrentTime(0)
+    setClipStartMs(null)
   }
 
   const play = (id: string, segmentTiming?: AudioTiming) => {
@@ -76,13 +95,17 @@ export function AudioBar({ children }: { children: ReactNode }) {
       return
     }
     setError(null)
+    audioRef.current?.pause()
+    audioRef.current?.removeAttribute('src')
+    audioRef.current?.load()
     setTiming(segmentTiming)
     setCurrentTime(0)
+    setClipStartMs(null)
     setTurnId(id)
   }
 
   return (
-    <AudioContext.Provider value={{ turnId, play, close }}>
+    <AudioContext.Provider value={{ turnId, actualPositionMs: clipStartMs === null ? null : Math.floor(clipStartMs + currentTime * 1000), play, close }}>
       {children}
       {turnId && (
         <aside className="audio-bar" aria-label="音频播放条">
@@ -91,7 +114,6 @@ export function AudioBar({ children }: { children: ReactNode }) {
             ref={audioRef}
             controls
             autoPlay
-            src={getAudioURL(turnId)}
             onError={() => setError('音频加载或解码失败，无法播放（不一定表示文件缺失）')}
             onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
             onEnded={() => setTurnId(null)}

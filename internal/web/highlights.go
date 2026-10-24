@@ -17,6 +17,7 @@ func (s *Server) registerHighlightRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/highlights/{id}", s.handleHighlightDelete)
 	mux.HandleFunc("GET /api/highlights/{id}/audio", s.handleHighlightAudio)
 	mux.HandleFunc("POST /api/briefs/preview", s.handleBrief)
+	mux.HandleFunc("GET /api/briefs/people", s.handleBriefPeople)
 }
 func decodeHighlightBody(w http.ResponseWriter, r *http.Request, v any) bool {
 	if !requireJSON(w, r) {
@@ -111,4 +112,13 @@ func (s *Server) handleBrief(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, b)
+}
+
+func (s *Server) handleBriefPeople(w http.ResponseWriter, r *http.Request) {
+	people, e := s.svc.BriefPeople(r.Context())
+	if e != nil {
+		s.writeError(w, r, e, nil)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"people": people})
 }

@@ -33,6 +33,7 @@ export interface TranscriptSource {
   conversation_id: string
   recording_id: string
   segment_id: string
+  source_attachment_id: string
   result: { source: { transcript_revision: string }; turns: TranscriptTurn[] }
 }
 export interface SpeakerBinding {

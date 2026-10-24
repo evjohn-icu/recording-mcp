@@ -7,6 +7,7 @@ import { TimelinePage } from './pages/TimelinePage'
 import { WorldlinePage } from './pages/WorldlinePage'
 import { SearchPage } from './pages/SearchPage'
 import { DetailPage } from './pages/DetailPage'
+import { BriefPage } from './pages/BriefPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { installKeyboard } from './keyboard'
 import './styles.css'
@@ -26,6 +27,7 @@ function AppShell() {
           <Link to="/">世界线</Link>
           <Link to="/recordings">录音</Link>
           <Link to="/search">搜索</Link>
+          <Link to="/brief">上下文简报</Link>
           <Link to="/history">事实变化</Link>
         </nav>
       </header>
@@ -37,6 +39,7 @@ function AppShell() {
           <Route path="/recordings" element={<TimelinePage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/c/:conversationId" element={<DetailPage />} />
+          <Route path="/brief" element={<BriefPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="*" element={<p className="not-found">页面不存在</p>} />
         </Routes>
