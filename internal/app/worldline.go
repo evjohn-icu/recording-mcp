@@ -299,8 +299,7 @@ func (s *WorldlineService) readSources(ctx context.Context) ([]worldlineSource, 
 		JOIN turns t ON t.id=ne.turn_id JOIN attachment_turns at ON at.turn_id=t.id
 		JOIN source_attachments a ON a.id=at.attachment_id AND a.active=1
 		JOIN recordings r ON r.id=t.recording_id
-		WHERE NOT `+memory.NoteStalePredicate("n")+` AND `+memory.CurrentTurnPredicate("t")+`
-		AND NOT EXISTS(SELECT 1 FROM turn_classes tc WHERE tc.turn_id=t.id AND tc.class='ambient')
+		WHERE NOT `+memory.NoteStalePredicate("n")+` AND `+memory.CurrentSpeechTurnPredicate("t")+`
 		AND NOT EXISTS(SELECT 1 FROM note_evidence ne2 JOIN turn_classes tc2 ON tc2.turn_id=ne2.turn_id AND tc2.class='ambient' WHERE ne2.note_id=n.id)
 		ORDER BY n.id,ne.ordinal,a.transcript_revision`)
 	if err != nil {

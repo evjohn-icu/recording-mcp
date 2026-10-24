@@ -96,7 +96,7 @@ func (s *requestScope) allowsEvidence(ctx context.Context, db *sql.DB, turnID st
 	var item memory.Item
 	item.Kind = "turn"
 	item.ID = turnID
-	if err := db.QueryRowContext(ctx, `SELECT conversation_id FROM turns WHERE id=? AND `+memory.CurrentTurnPredicate("turns"), turnID).Scan(&item.ConversationID); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT conversation_id FROM turns WHERE id=? AND `+memory.CurrentSpeechTurnPredicate("turns"), turnID).Scan(&item.ConversationID); err != nil {
 		if err == sql.ErrNoRows {
 			return false, nil
 		}

@@ -50,3 +50,10 @@ func (s *Store) ItemAmbient(ctx context.Context, item Item) (bool, error) {
 		return ambient, err
 	}
 }
+
+// CurrentSpeechTurnPredicate is the shared evidence boundary used by Brief,
+// context retrieval and Worldline. Legacy current turns are retained, while
+// superseded revisions and ambient turns cannot become current evidence.
+func CurrentSpeechTurnPredicate(alias string) string {
+	return CurrentTurnPredicate(alias) + " AND NOT EXISTS(SELECT 1 FROM turn_classes speech_class WHERE speech_class.turn_id=" + alias + ".id AND speech_class.class='ambient')"
+}
