@@ -538,6 +538,9 @@ func (s *Store) SearchMemory(ctx context.Context, q MemorySearch) (SearchPage, e
 		return SearchPage{}, fmt.Errorf("invalid scope: %s", q.Scope)
 	}
 	limit := clampPageLimit(q.Limit)
+	// ConversationID is intentionally a v2-only scope. Preserve v1's historical
+	// behavior while shared source scanners support SQL scope pushdown.
+	q.ConversationID = ""
 	cur, err := decodeSearchCursor(q.Cursor)
 	if err != nil {
 		return SearchPage{}, err
@@ -590,7 +593,8 @@ func (s *Store) searchNotes(ctx context.Context, q MemorySearch, lower string) (
 	noteSQL := `SELECT n.id,n.conversation_id,n.summary,r.recording_started_at
  FROM notes n JOIN conversations c ON c.id=n.conversation_id
  LEFT JOIN recordings r ON r.id=c.recording_id
- WHERE (?='' OR EXISTS(SELECT 1 FROM json_each(n.topic_ids_json) WHERE value=?))`
+ WHERE (?='' OR EXISTS(SELECT 1 FROM json_each(n.topic_ids_json) WHERE value=?))
+ AND (?='' OR n.conversation_id=?)`
 	if !q.IncludeStale {
 		noteSQL += ` AND NOT ` + NoteStalePredicate("n")
 	}
@@ -600,7 +604,7 @@ func (s *Store) searchNotes(ctx context.Context, q MemorySearch, lower string) (
 		noteSQL += ` AND NOT EXISTS(SELECT 1 FROM note_evidence ne JOIN turn_classes tc ON tc.turn_id=ne.turn_id WHERE ne.note_id=n.id AND ne.ordinal=0 AND tc.class='ambient')`
 	}
 	noteSQL += ` ORDER BY n.id`
-	rows, err := s.db.QueryContext(ctx, noteSQL, q.TopicID, q.TopicID)
+	rows, err := s.db.QueryContext(ctx, noteSQL, q.TopicID, q.TopicID, q.ConversationID, q.ConversationID)
 	if err != nil {
 		return nil, err
 	}
@@ -666,7 +670,8 @@ func (s *Store) searchNotes(ctx context.Context, q MemorySearch, lower string) (
 func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) ([]SearchHit, error) {
 	turnSQL := `SELECT t.id,t.conversation_id,t.content,t.global_start_ms,r.recording_started_at,t.recording_id,t.speaker_scoped_id
  FROM turns t JOIN recordings r ON r.id=t.recording_id
- WHERE (?='' OR EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id AND tt.topic_id=?))`
+ WHERE (?='' OR EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id AND tt.topic_id=?))
+ AND (?='' OR t.conversation_id=?)`
 	if !q.IncludeStale {
 		turnSQL += ` AND ` + CurrentTurnPredicate("t")
 	}
@@ -674,7 +679,7 @@ func (s *Store) searchTurns(ctx context.Context, q MemorySearch, lower string) (
 		turnSQL += ` AND NOT EXISTS(SELECT 1 FROM turn_classes tc WHERE tc.turn_id=t.id AND tc.class='ambient')`
 	}
 	turnSQL += ` ORDER BY t.id`
-	rows, err := s.db.QueryContext(ctx, turnSQL, q.TopicID, q.TopicID)
+	rows, err := s.db.QueryContext(ctx, turnSQL, q.TopicID, q.TopicID, q.ConversationID, q.ConversationID)
 	if err != nil {
 		return nil, err
 	}

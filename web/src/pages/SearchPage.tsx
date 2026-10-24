@@ -83,6 +83,7 @@ function SearchPageContent() {
   const scope = (params.get('scope') as Scope | null) || 'both'
   const hybridEnabled = params.get('hybrid') === '1'
   const mode = hybridEnabled ? 'hybrid' : 'lexical'
+  const retrievalVersion = params.get('retrieval_version') === 'v2' ? 'v2' : 'v1'
   const filters: FilterValues = {
     startedAfter: params.get('started_after') || undefined,
     startedBefore: params.get('started_before') || undefined,
@@ -137,6 +138,7 @@ function SearchPageContent() {
             {
               q,
               mode,
+              retrieval_version: retrievalVersion,
               topic_id: filters.topicId,
               started_after: filters.startedAfter,
               started_before: filters.startedBefore,
@@ -145,7 +147,7 @@ function SearchPageContent() {
             signal,
           )
         : Promise.resolve<HybridView | undefined>(undefined),
-    [q, mode, filterKey, hybridEnabled],
+    [q, mode, retrievalVersion, filterKey, hybridEnabled],
   )
 
   const topics = useApi((signal) => getTopics(undefined, signal), [])
@@ -170,7 +172,7 @@ function SearchPageContent() {
   useEffect(() => {
     setExtraHits([])
     setNextCursor(undefined)
-  }, [q, scope, filterKey, hybridEnabled])
+  }, [q, scope, retrievalVersion, filterKey, hybridEnabled])
 
   function updateParams(next: Partial<Record<string, string | undefined>>) {
     const updated = new URLSearchParams(params)
@@ -231,6 +233,15 @@ function SearchPageContent() {
           />
           混合检索（实验）
         </label>
+        {hybridEnabled && (
+          <label>
+            检索版本
+            <select aria-label="检索版本" value={retrievalVersion} onChange={(event) => updateParams({ retrieval_version: event.target.value })}>
+              <option value="v1">v1（默认）</option>
+              <option value="v2">v2（实验；质量因查询而异）</option>
+            </select>
+          </label>
+        )}
       </div>
       <Filters value={filters} topics={topicList} onChange={updateFilters} />
       {hybridEnabled && hybrid.data && <Diagnostics hybrid={hybrid.data} />}

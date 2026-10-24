@@ -149,6 +149,7 @@ def run() -> int:
                         'BETA_PASSWORD': credentials['beta_password'], 'SECOND_PROFILE': 'beta',
                         'SECOND_PASSWORD': credentials['beta_password']})
             python = env.get('PYTHON') or shutil.which('python3.14') or sys.executable
+            subprocess.run([python, str(ROOT/'scripts/retrieval-version-browser.py')], cwd=ROOT, env=env, check=True)
             # Memory Highlights and Brief include irreversible forget/revision
             # operations. Give that flow its own freshly adopted profile so the
             # existing local-v2 suite retains the pristine synthetic fixture.

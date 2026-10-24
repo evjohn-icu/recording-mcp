@@ -341,6 +341,7 @@ export interface SearchParams {
 export interface HybridParams {
   q: string
   mode: 'hybrid' | 'lexical'
+  retrieval_version?: 'v1' | 'v2'
   topic_id?: string
   conversation_id?: string
   started_after?: string
