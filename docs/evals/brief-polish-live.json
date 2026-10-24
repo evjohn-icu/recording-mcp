@@ -1,0 +1,15 @@
+{
+  "synthetic_only": true,
+  "provider": "nexusdock-lt",
+  "model": "gpt-6-luna",
+  "checks": {
+    "deterministic_preview": true,
+    "explicit_consent_required": true,
+    "live_model_candidates": true,
+    "closed_current_evidence_proposed": true,
+    "snapshot_preserved": true,
+    "candidate_evidence_expands": true,
+    "no_page_errors": true
+  },
+  "passed": true
+}

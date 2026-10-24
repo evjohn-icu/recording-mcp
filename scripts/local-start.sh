@@ -35,6 +35,12 @@ if [ -n "${GENERATOR_ENDPOINT:-}" ]; then WORKER_ARGS+=(--generator-url "$GENERA
 if [ -n "${GENERATOR_MODEL:-}" ]; then WORKER_ARGS+=(--generator-model "$GENERATOR_MODEL"); fi
 if [ -n "${GENERATOR_KEY_ENV:-}" ]; then WORKER_ARGS+=(--generator-key-env "$GENERATOR_KEY_ENV"); fi
 WEB_ARGS=(--profile "$PROFILE" --profiles-root "$PROFILES_ROOT" --addr "127.0.0.1:$PORT" --web-dir "$ROOT/web/dist" --semantic-provider hash)
+# Brief polishing is independent of memory generation and only reaches Web.
+if [ -n "${BRIEF_POLISH_PI_PROVIDER:-}" ]; then WEB_ARGS+=(--brief-polish-pi-provider "$BRIEF_POLISH_PI_PROVIDER"); fi
+if [ -n "${BRIEF_POLISH_PI_MODELS_FILE:-}" ]; then WEB_ARGS+=(--brief-polish-pi-models-file "$BRIEF_POLISH_PI_MODELS_FILE"); fi
+if [ -n "${BRIEF_POLISH_ENDPOINT:-}" ]; then WEB_ARGS+=(--brief-polish-endpoint "$BRIEF_POLISH_ENDPOINT"); fi
+if [ -n "${BRIEF_POLISH_MODEL:-}" ]; then WEB_ARGS+=(--brief-polish-model "$BRIEF_POLISH_MODEL"); fi
+if [ -n "${BRIEF_POLISH_KEY_ENV:-}" ]; then WEB_ARGS+=(--brief-polish-key-env "$BRIEF_POLISH_KEY_ENV"); fi
 if [ -n "${WORLDLINE_DECISION_URL:-}" ]; then WORKER_ARGS+=(--worldline-decision-url "$WORLDLINE_DECISION_URL"); fi
 if [ -n "${WORLDLINE_DECISION_MODEL:-}" ]; then WORKER_ARGS+=(--worldline-decision-model "$WORLDLINE_DECISION_MODEL"); fi
 if [ -n "${WORLDLINE_DECISION_URL:-}" ]; then WEB_ARGS+=(--worldline-decision-url "$WORLDLINE_DECISION_URL"); fi

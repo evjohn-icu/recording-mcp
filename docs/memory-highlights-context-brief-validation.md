@@ -207,3 +207,20 @@ M	web/src/pages/DetailPage.tsx
 - `web/src/components/HighlightPanel.tsx`
 - `web/src/pages/BriefPage.tsx`
 - `web/src/styles.css`
+
+## Pi 配置与真实模型接入补充
+
+用户授权复用已有 Pi 配置。只检查模型端点/模型名与鉴权是否存在，不输出密钥；没有读取 Pi 会话、私人录音、真实 Profile 或数据库。之前 NOT_RUN 的「真实服务互通」已由以下合成验证补齐；真实私人资料/部署仍未执行。
+
+- `go test ./cmd/context-web -run TestBriefPolisherPiConfigUsesOnlyExplicitProvider` 首次 FAIL：未实现的配置函数；实现后普通与 race 通过。
+- `python3 -m unittest discover -s scripts -p 'test_local_start.py'` 首次 FAIL：启动脚本未转发新标志；修复后 4/4 PASS。原有退出传播/清理断言保留。
+- `go test ./cmd/context-web`、`go test -race ./cmd/context-web`、`go vet ./cmd/context-web`：PASS。
+- `go build -o bin/context-web ./cmd/context-web`：PASS。
+- `python3.14 scripts/verify-brief-polish-live.py --pi-provider nexusdock-lt --model gpt-6-luna`：PASS，7/7 检查：确定性生成、显式同意、真实模型返回、证据闭集与 proposed、快照未变、候选证据展开、无页面异常。
+- 产物：`/tmp/recording-brief-live-xs0lbiwr/`；报告复制到 `docs/evals/brief-polish-live.json`。测试服务已停止。
+
+本增量只更改模型启动配置，未修改 schema、默认模型行为或候选状态；不重复宣称跑过新的全量测试。最后一轮全量结果见 P2 前文，本增量执行上述相关测试与 spec 校验。额外文件：`scripts/verify-brief-polish-live.py`、`docs/evals/brief-polish-live.json`；修改 `cmd/context-web/brief_polish.go`、`cmd/context-web/brief_polish_test.go`、`cmd/context-web/main.go`、`scripts/local-start.sh`、`scripts/test_local_start.py`、`.env.example` 及运行文档/OpenSpec。
+
+独立审查发现 Pi API 模式未过滤；先增加 `TestBriefPolisherPiRejectsUnsupportedProtocol` 观察 FAIL，再拒绝非兼容 API 模式（包含模型级覆盖），普通/race/vet 与启动脚本 4 项测试复测 PASS。现有已实测的 Responses gateway 仍经 chat-completions 路径调用，未宣称实现 Responses wire。
+
+协议校验补强后的最终真实模型浏览器复测同样 7/7 PASS，退出 0；最终产物 `/tmp/recording-brief-live-8zx9d_ei/`，报告已同步到 `docs/evals/brief-polish-live.json`。

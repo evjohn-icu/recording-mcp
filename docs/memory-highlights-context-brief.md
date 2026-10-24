@@ -83,3 +83,26 @@ Highlights 可按标签筛选，显示录音绝对时间。409 冲突显示服�
 候选只在响应与浏览器内存中存在，不存数据库；前后重新构建快照检查修订、遗忘、绑定和范围。结构校验不能证明模型文本真实，必须人工对照关联证据。永久遗忘不能撤回已复制/下载或已明确发送到外部服务的内容。
 
 本增量无数据库迁移，schema 仍为 v19；没有新增 MCP 写工具、依赖或专门的检索性能调优。取消过期前端请求、复用证据索引与模型调用预算减少无用工作。
+
+### 复用 Pi 已保存的模型配置
+
+Web 现在支持显式选择 Pi 中已保存的 provider/model；默认读取 `~/.pi/agent/models.json`。以已验证的配置为例，给原来的启动命令添加环境变量：
+
+```bash
+BRIEF_POLISH_PI_PROVIDER=nexusdock-lt BRIEF_POLISH_MODEL=gpt-6-luna \
+  bash scripts/local-start.sh YOUR_PROFILE 8788 YOUR_PROFILES_ROOT
+```
+
+保持既有 `MEMORY_PROFILE_PASSWORD` 解锁流程。启动脚本不自动加载 `.env`。不使用 local-start 时，给 `bin/context-web` 原命令追加 `--brief-polish-pi-provider nexusdock-lt --brief-polish-model gpt-6-luna`。非默认配置文件用 `BRIEF_POLISH_PI_MODELS_FILE` 或 `--brief-polish-pi-models-file`。
+
+这只开启 Web 可选润色，不开启 worker 自动记忆提炼。Pi 的 `baseUrl` 后追加 `/chat/completions`；提供方需要兼容此协议，不能只凭 Pi 的 Responses 配置推断兼容。nexusdock-lt/gpt-6-luna 已通过实际合成测试。provider/model 的有效 API 模式必须为 `openai-completions` 或 `openai-responses`，其他协议会在启动时拒绝；Responses 标签仍需端点实际兼容 chat-completions。模型必须已列在所选 provider 下；密钥可为字面值或已有环境变量名，`!command` 密钥会被拒绝，绝不执行。密钥仅留在 Web 进程内存，不写命令行、仓库或日志。与独立 `--brief-polish-endpoint/--brief-polish-key-env` 配置互斥，默认不读 Pi 文件。
+
+可复现的真实模型冒烟检查（会发送合成文本到指定 provider，不访问现有 Profile）：
+
+```bash
+python3.14 scripts/verify-brief-polish-live.py \
+  --pi-provider nexusdock-lt --model gpt-6-luna \
+  --browser /usr/bin/google-chrome
+```
+
+脚本始终在新临时目录中生成 SQLite 和 Profile，启动 Web/worker 并通过真实浏览器登录、生成简报、显式同意、润色和展开证据；完成后停止测试服务。报告与截图保留在打印的临时目录，不包含密钥。需要已有 `make build web` 产物和 Playwright 环境；该网络测试不属于默认自动测试。

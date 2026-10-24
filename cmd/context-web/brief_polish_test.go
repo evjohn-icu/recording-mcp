@@ -38,7 +38,7 @@ func TestBriefPolisherPiConfigUsesOnlyExplicitProvider(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "models.json")
 	write := func(key string) {
 		t.Helper()
-		raw, _ := json.Marshal(map[string]any{"providers": map[string]any{"fixture": map[string]any{"baseUrl": "https://model.example.test/v1", "apiKey": key, "models": []map[string]string{{"id": "synthetic"}}}}})
+		raw, _ := json.Marshal(map[string]any{"providers": map[string]any{"fixture": map[string]any{"api": "openai-responses", "baseUrl": "https://model.example.test/v1", "apiKey": key, "models": []map[string]string{{"id": "synthetic"}}}}})
 		if e := os.WriteFile(path, raw, 0600); e != nil {
 			t.Fatal(e)
 		}
@@ -73,5 +73,20 @@ func TestBriefPolisherPiConfigUsesOnlyExplicitProvider(t *testing.T) {
 	}
 	if _, e = configuredPiBriefPolisher(path, "fixture", "synthetic"); e == nil || strings.Contains(e.Error(), "synthetic-secret") {
 		t.Fatal("invalid config exposed")
+	}
+}
+
+func TestBriefPolisherPiRejectsUnsupportedProtocol(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "models.json")
+	for _, raw := range []string{
+		`{"providers":{"p":{"api":"anthropic-messages","baseUrl":"https://example.test/v1","apiKey":"synthetic-secret","models":[{"id":"test"}]}}}`,
+		`{"providers":{"p":{"api":"openai-completions","baseUrl":"https://example.test/v1","apiKey":"synthetic-secret","models":[{"id":"test","api":"anthropic-messages"}]}}}`,
+	} {
+		if e := os.WriteFile(path, []byte(raw), 0600); e != nil {
+			t.Fatal(e)
+		}
+		if _, e := configuredPiBriefPolisher(path, "p", "test"); e == nil {
+			t.Fatal("unsupported protocol accepted")
+		}
 	}
 }

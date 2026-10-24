@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"recordingmcp/internal/app"
+	"recordingmcp/internal/contextbrief"
 	"recordingmcp/internal/contextbuild"
 	"recordingmcp/internal/decision"
 	"recordingmcp/internal/memory"
@@ -115,8 +116,22 @@ func main() {
 	briefPolishEndpoint := flag.String("brief-polish-endpoint", "", "optional chat-completions endpoint; empty disables brief polishing")
 	briefPolishModel := flag.String("brief-polish-model", "", "model used only for explicitly consented brief polishing")
 	briefPolishKeyEnv := flag.String("brief-polish-key-env", "", "environment variable containing optional brief model API key")
+	briefPolishPiProvider := flag.String("brief-polish-pi-provider", "", "explicit Pi provider for brief polishing; never executes key commands")
+	briefPolishPiModels := flag.String("brief-polish-pi-models-file", "", "Pi models.json path (only read with --brief-polish-pi-provider)")
 	flag.Parse()
-	briefPolisher, briefPolishErr := configuredBriefPolisher(*briefPolishEndpoint, *briefPolishModel, *briefPolishKeyEnv)
+	var briefPolisher contextbrief.Polisher
+	var briefPolishErr error
+	if *briefPolishPiProvider != "" {
+		if *briefPolishEndpoint != "" || *briefPolishKeyEnv != "" {
+			log.Fatal("brief polish: Pi provider and explicit endpoint/key settings are mutually exclusive")
+		}
+		briefPolisher, briefPolishErr = configuredPiBriefPolisher(*briefPolishPiModels, *briefPolishPiProvider, *briefPolishModel)
+	} else {
+		if *briefPolishPiModels != "" {
+			log.Fatal("brief polish: Pi models file requires explicit Pi provider")
+		}
+		briefPolisher, briefPolishErr = configuredBriefPolisher(*briefPolishEndpoint, *briefPolishModel, *briefPolishKeyEnv)
+	}
 	if briefPolishErr != nil {
 		log.Fatal(briefPolishErr)
 	}
