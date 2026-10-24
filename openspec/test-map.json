@@ -439,6 +439,13 @@
       "spec": "openspec/changes/2026-10-25-brief-polish-experience/specs/brief-polish/spec.md",
       "test_file": "scripts/highlights-brief-browser.py",
       "test_anchor": "main"
+    },
+    {
+      "id": "polish.pi-provider-config",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-brief-polish-experience/specs/brief-polish/spec.md",
+      "test_file": "cmd/context-web/brief_polish_test.go",
+      "test_anchor": "TestBriefPolisherPiConfigUsesOnlyExplicitProvider"
     }
   ]
 }

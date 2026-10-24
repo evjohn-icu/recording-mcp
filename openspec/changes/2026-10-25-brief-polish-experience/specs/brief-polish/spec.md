@@ -43,3 +43,10 @@
 #### Scenario: polish.highlight-conflict
 - **WHEN** 并发保存发生版本冲突
 - **THEN** 满足上述约束并由合成测试核验
+
+### Requirement: 显式复用本地模型配置
+系统 MUST 仅在启动参数明确指定 provider/model 时读取 Pi 模型配置；禁止执行命令式密钥，禁止将鉴权信息写入命令行或日志，默认不启用。
+
+#### Scenario: polish.pi-provider-config
+- **WHEN** 管理员显式指定 Pi provider 和已列出的模型
+- **THEN** 安全解析端点与字面值或环境变量密钥，配置无效则在打开 Profile 前失败；未指定时不读取 Pi 文件

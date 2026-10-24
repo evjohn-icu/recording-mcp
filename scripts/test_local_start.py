@@ -40,10 +40,10 @@ while True: time.sleep(1)
                 path = root / "bin" / name
                 path.write_text(textwrap.dedent(body))
                 path.chmod(0o755)
-            env = {k:v for k,v in os.environ.items() if not k.startswith(("GENERATOR_", "WORLDLINE_"))}
+            env = {k:v for k,v in os.environ.items() if not k.startswith(("GENERATOR_", "WORLDLINE_", "BRIEF_POLISH_"))}
             env.update(ARGS_LOG=str(log), STOP_MARKER=str(stopped), FAIL_CHILD=failing)
             if configured:
-                env.update(GENERATOR_PROVIDER="openai", GENERATOR_ENDPOINT="http://127.0.0.1:18080/v1/chat/completions", GENERATOR_MODEL="synthetic-config-only", WORLDLINE_DECISION_URL="http://127.0.0.1:18799/v1/systemone")
+                env.update(BRIEF_POLISH_PI_PROVIDER="fixture-provider", BRIEF_POLISH_MODEL="fixture-model", BRIEF_POLISH_PI_MODELS_FILE="/tmp/synthetic models.json", GENERATOR_PROVIDER="openai", GENERATOR_ENDPOINT="http://127.0.0.1:18080/v1/chat/completions", GENERATOR_MODEL="synthetic-config-only", WORLDLINE_DECISION_URL="http://127.0.0.1:18799/v1/systemone")
             proc = subprocess.run([str(root / "scripts" / "local-start.sh"), "fixture", "28771", str(root / "profiles with spaces")], env=env, capture_output=True, text=True, timeout=5)
             self.assertEqual(proc.returncode, 7 if failing == "worker" else 9, proc.stderr)
             self.assertTrue(stopped.exists(), "the surviving child was not stopped")
@@ -51,12 +51,17 @@ while True: time.sleep(1)
             self.assertIn("--profile fixture", args)
             self.assertIn("--profiles-root " + str(root / "profiles with spaces"), args)
             if configured:
+                self.assertIn("--brief-polish-pi-provider fixture-provider", args)
+                self.assertIn("--brief-polish-model fixture-model", args)
+                self.assertIn("--brief-polish-pi-models-file /tmp/synthetic models.json", args)
+                self.assertNotIn("--brief-polish", next(line for line in args.splitlines() if line.startswith("worker ")))
                 self.assertIn("--generator openai", args)
                 self.assertIn("--generator-url http://127.0.0.1:18080/v1/chat/completions", args)
                 self.assertIn("--generator-model synthetic-config-only", args)
                 self.assertEqual(args.count("--worldline-decision-url http://127.0.0.1:18799/v1/systemone"), 2)
             else:
                 self.assertIn("--generator off --embed-provider hash", args)
+                self.assertNotIn("--brief-polish", args)
 
     def test_worker_exit_stops_web_and_propagates_status(self):
         self.run_fake_pair("worker")

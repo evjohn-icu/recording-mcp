@@ -15,3 +15,5 @@
 
 # Open Questions
 无。
+
+复用 Pi 的 models.json 通过显式 CLI 参数选择 provider/model，默认路径仅在启用时解析。不支持命令式 apiKey，不执行配置中的脚本；只加载所选模型的端点和密钥。沿用 HTTPPolisher 的 HTTPS/loopback、大小和超时限制。local-start 仅向 Web 传递相应参数，不自动开启 worker 生成。
