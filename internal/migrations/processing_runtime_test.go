@@ -15,7 +15,7 @@ func TestProcessingRuntimeUpgradePreservesExistingSource(t *testing.T) {
 	for _, q := range []string{
 		`DROP TABLE processing_retry_requests`,
 		`DROP TABLE worker_heartbeats`,
-		`DELETE FROM schema_migrations WHERE version=18`,
+		`DELETE FROM schema_migrations WHERE version>=18`,
 		`INSERT INTO conversations(id,title,summary,annotation_version,annotation_basis,recording_id,source_sha256,transcript_version,duration_ms,transcript_json,annotations_json) VALUES('migration-source','keep','','','','rec','hash','v1',0,'{}','{}')`,
 	} {
 		if _, err := db.ExecContext(ctx, q); err != nil {

@@ -85,7 +85,7 @@ func TestApplyFreshDatabase(t *testing.T) {
 		"derived_artifacts", "derived_artifact_sources",
 		"speaker_bindings", "speaker_binding_events",
 		"memory_embeddings",
-		"sync_state", "sync_events", "sync_recordings", "sync_chunks", "profile_control", "suppression_cleanup_operations",
+		"sync_state", "sync_events", "sync_recordings", "sync_chunks", "profile_control", "suppression_cleanup_operations", "memory_highlights", "memory_highlight_requests",
 	} {
 		if !names[want] {
 			t.Errorf("missing table %q", want)
@@ -177,7 +177,7 @@ func TestApplyOnSingleVersionDatabaseOnlyAppliesLater(t *testing.T) {
 	if err := Apply(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18)`); err != nil {
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version >= 3`); err != nil {
 		t.Fatal(err)
 	}
 	// Re-running Apply must re-create the (dropped) v3..v12 objects only.
@@ -283,7 +283,7 @@ func TestDerivedArtifactBackfillMarksSupersededEvidence(t *testing.T) {
 	// pre-existing rows, like a database upgraded from an older build. v11
 	// through v15 are included so the ledger maximum drops below v8;
 	// re-running them is a no-op.
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version IN (8,9,10,11,12,13,14,15,16,17,18)`); err != nil {
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version >= 8`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`DROP TABLE derived_artifact_sources`); err != nil {

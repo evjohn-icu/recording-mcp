@@ -20,10 +20,11 @@ type TranscriptRevisionConflictError struct {
 
 // TranscriptSource identifies the active segment snapshot containing a turn.
 type TranscriptSource struct {
-	ConversationID string          `json:"conversation_id"`
-	RecordingID    string          `json:"recording_id"`
-	SegmentID      string          `json:"segment_id"`
-	Result         asrinput.Result `json:"result"`
+	SourceAttachmentID string          `json:"source_attachment_id"`
+	ConversationID     string          `json:"conversation_id"`
+	RecordingID        string          `json:"recording_id"`
+	SegmentID          string          `json:"segment_id"`
+	Result             asrinput.Result `json:"result"`
 }
 
 func (e *TranscriptRevisionConflictError) Error() string {
@@ -61,12 +62,12 @@ func (s *Store) TranscriptSourceForTurn(ctx context.Context, turnID string) (Tra
 	}
 	var out TranscriptSource
 	var raw string
-	err := s.db.QueryRowContext(ctx, `SELECT t.conversation_id,t.recording_id,a.segment_id,a.result_json
+	err := s.db.QueryRowContext(ctx, `SELECT t.conversation_id,t.recording_id,a.segment_id,a.id,a.result_json
 		FROM turns t JOIN attachment_turns at ON at.turn_id=t.id
 		JOIN source_attachments a ON a.id=at.attachment_id
 		WHERE t.id=? AND a.active=1
 		AND NOT EXISTS(SELECT 1 FROM turn_classes tc WHERE tc.turn_id=t.id AND tc.class='ambient')`, turnID).
-		Scan(&out.ConversationID, &out.RecordingID, &out.SegmentID, &raw)
+		Scan(&out.ConversationID, &out.RecordingID, &out.SegmentID, &out.SourceAttachmentID, &raw)
 	if errors.Is(err, sql.ErrNoRows) {
 		return TranscriptSource{}, ErrNotFound
 	}

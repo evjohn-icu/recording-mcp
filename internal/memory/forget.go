@@ -49,6 +49,7 @@ type ForgetPreview struct {
 	RecordingIDs            []string             `json:"recording_ids,omitempty"`
 	Turns                   int                  `json:"turns"`
 	Notes                   int                  `json:"notes"`
+	Highlights              int                  `json:"highlights"`
 	Attachments             int                  `json:"attachments"`
 	Candidates              int                  `json:"candidates"`
 	Vectors                 int                  `json:"vectors"`
@@ -194,6 +195,9 @@ func (s *Store) previewTarget(ctx context.Context, q queryer, t forgetTarget) (F
 	if err := q.QueryRowContext(ctx, `SELECT COUNT(DISTINCT n.id) FROM notes n JOIN note_evidence e ON e.note_id=n.id JOIN turns t ON t.id=e.turn_id WHERE `+where, args...).Scan(&p.Notes); err != nil {
 		return p, err
 	}
+	if err := countHighlightsForForget(ctx, q, t, &p.Highlights); err != nil {
+		return p, err
+	}
 	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM source_attachments a WHERE `+scopeAttachmentWhere(t), scopeAttachmentArgs(t)...).Scan(&p.Attachments); err != nil {
 		return p, fmt.Errorf("count attachments: %w", err)
 	}
@@ -325,6 +329,8 @@ func forgetStateHash(ctx context.Context, q queryer, conversationID string) (str
 		{"turns", `SELECT * FROM turns WHERE conversation_id=? ORDER BY id`},
 		{"attachments", `SELECT * FROM source_attachments WHERE conversation_id=? ORDER BY id`},
 		{"notes", `SELECT * FROM notes WHERE conversation_id=? ORDER BY id`},
+		{"highlights", `SELECT * FROM memory_highlights WHERE conversation_id=? ORDER BY id`},
+		{"highlight_requests", `SELECT request_id,conversation_id,recording_id,anchor_kind,start_ms,end_ms,turn_id,payload_sha256,highlight_id,status,created_at_ms FROM memory_highlight_requests WHERE conversation_id=? ORDER BY request_id`},
 		{"note_evidence", `SELECT ne.* FROM note_evidence ne JOIN notes n ON n.id=ne.note_id WHERE n.conversation_id=? ORDER BY ne.note_id,ne.turn_id`},
 		{"history", `SELECT * FROM annotation_history WHERE conversation_id=? ORDER BY annotation_version`},
 		{"candidates", `SELECT * FROM memory_candidates WHERE conversation_id=? ORDER BY id`},
@@ -981,6 +987,9 @@ func (s *Store) redactForgetDatabase(ctx context.Context, tombstoneID string) er
 		return err
 	}
 	if err := deleteIDs(ctx, tx, "notes", "id", noteIDs); err != nil {
+		return err
+	}
+	if err := forgetHighlights(ctx, tx, t); err != nil {
 		return err
 	}
 	if err := deleteIDs(ctx, tx, "memory_candidates", "id", candidateIDs); err != nil {

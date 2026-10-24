@@ -173,6 +173,7 @@ var migrations = []migration{
 		`CREATE INDEX IF NOT EXISTS attachment_turns_by_turn ON attachment_turns(turn_id, attachment_id);`,
 	}},
 	{version: 18, name: "processing-runtime", statements: statements(ProcessingRuntimeDDL)},
+	{version: 19, name: "memory-highlights", statements: HighlightsStatements},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`
