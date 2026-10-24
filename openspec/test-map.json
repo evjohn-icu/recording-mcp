@@ -446,6 +446,24 @@
       "spec": "openspec/changes/2026-10-25-brief-polish-experience/specs/brief-polish/spec.md",
       "test_file": "cmd/context-web/brief_polish_test.go",
       "test_anchor": "TestBriefPolisherPiConfigUsesOnlyExplicitProvider"
+    },
+    {
+      "id": "retrieval.scope-before-projection",
+      "status": "pending",
+      "spec": "openspec/changes/2026-10-25-real-retrieval-validation/specs/scoped-retrieval/spec.md",
+      "reason": "新增回归测试尚待实现"
+    },
+    {
+      "id": "retrieval.v1-compatible",
+      "status": "pending",
+      "spec": "openspec/changes/2026-10-25-real-retrieval-validation/specs/scoped-retrieval/spec.md",
+      "reason": "新增回归测试尚待实现"
+    },
+    {
+      "id": "retrieval.version-ui",
+      "status": "pending",
+      "spec": "openspec/changes/2026-10-25-real-retrieval-validation/specs/scoped-retrieval/spec.md",
+      "reason": "新增回归测试尚待实现"
     }
   ]
 }
