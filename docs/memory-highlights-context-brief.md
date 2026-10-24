@@ -52,3 +52,34 @@ SQLite v19 新增 memory_highlights 和 memory_highlight_requests，并安装退
 永久遗忘把标记纳入预览状态摘要，编辑发生后旧预览不能提交。turn 遗忘同时删除重叠的无 turn_id 时间标记；无法判定时保守处理。已删除标记的请求账本不保存备注和 payload 摘要；重放不得复活。整个 Profile 退休清理新表并阻止新增、编辑和重放。
 
 实际命令和结果见 `docs/memory-highlights-context-brief-validation.md`。
+
+## P2：可选润色、导出与编辑体验
+
+Brief 页面新增精简/详细 Markdown 模板、复制反馈与 `.md` 下载。两种模板均保留来源 revision、附件、证据 ID、来源/断言状态、未知时间、截断和数据缺口。详细模板另外保留来源说明、人物与 Topic ID。输入文本按纯文本转义；AI 候选不混入确定性导出。
+
+Highlights 可按标签筛选，显示录音绝对时间。409 冲突显示服务器最新版本、标签和备注，同时保留本地草稿；点击「重新加载版本」保留草稿并更新编辑基准，随后保存，或显式点击「以服务器新版为基础重试」。保存期间暂时禁用该条目编辑，避免请求完成时清除新输入。
+
+润色默认关闭，确定性 preview 和 MCP `build_context_brief` 不调用模型。要启用，在原来的 `context-web` 启动命令追加：
+
+```bash
+--brief-polish-endpoint http://127.0.0.1:8080/v1/chat/completions \
+--brief-polish-model YOUR_LOCAL_MODEL
+```
+
+端点是管理员启动配置，不接受网页传入的 URL；HTTP 只接受 loopback，远端必须 HTTPS。需要鉴权时再传 `--brief-polish-key-env YOUR_KEY_ENV`，从指定环境变量读密钥。示例不表示该端口已有模型。Profile 选择模式和单 Profile/legacy 模式均支持这些参数。
+
+用户生成简报后，必须每次勾选「同意发送」并点击「生成独立候选」。服务可能是外部模型，界面明确说明发送内容；默认不发送任何私人资料。本次实现/测试没有连接外部模型，仅使用合成内容和 loopback 假模型。
+
+新增 API（均复用 session/CSRF/Origin/请求体限制）：
+
+- `GET /api/briefs/polish/config` → `{"enabled":false}`（或 true），不公开端点或密钥。
+- `POST /api/briefs/polish` → 输入 `{"request":{...原 preview 参数...},"snapshot_id":"...","consent":true}`。
+- 输出 `snapshot_id/candidates/degraded/reason`；候选包含 `entry_id/text/evidence_ids/assertion_state`，状态只能是 `proposed`，只能引用原条目的完整证据集合。
+
+未启用返回 `503 polish_disabled`；缺同意或快照返回 400；来源在调用前后变化返回 `409 snapshot_changed`，需重新生成。模型网络/结构/预算失败返回 `degraded=true, reason=polish_unavailable, candidates=[]`，不含模型错误正文。原确定性简报仍可使用。
+
+适配器使用兼容 chat-completions 的 JSON 交换格式；没有新增事实引擎或生成任务队列。现有 `generate.Generator` 用于记忆候选抽取，提示词与领域含义不同，因此没有将润色送入持久化候选流水线，也没有修改其错误处理行为。润色传输是独立的小适配器，最多 40 条、每条 8192 字节、总正文 64 KiB、请求/响应 64 KiB、超时 30 秒，不跟随重定向。超过限制可缩小范围后重试；不会影响原 preview 的资源预算。
+
+候选只在响应与浏览器内存中存在，不存数据库；前后重新构建快照检查修订、遗忘、绑定和范围。结构校验不能证明模型文本真实，必须人工对照关联证据。永久遗忘不能撤回已复制/下载或已明确发送到外部服务的内容。
+
+本增量无数据库迁移，schema 仍为 v19；没有新增 MCP 写工具、依赖或专门的检索性能调优。取消过期前端请求、复用证据索引与模型调用预算减少无用工作。

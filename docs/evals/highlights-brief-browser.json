@@ -1,5 +1,5 @@
 {
-  "base_url": "http://127.0.0.1:32913",
+  "base_url": "http://127.0.0.1:60861",
   "synthetic_fixture": true,
   "cases": [
     {
@@ -15,7 +15,7 @@
     {
       "name": "highlight-edit-409-retains-draft",
       "status": "PASS",
-      "detail": "race=200, retained=True"
+      "detail": "race=200, retained=True, latest shown=True"
     },
     {
       "name": "highlight-edit-tag-note",
@@ -23,9 +23,39 @@
       "detail": "{\"tag\": \"follow_up\", \"note\": \"synthetic retained note draft\", \"version\": 3}"
     },
     {
+      "name": "highlight-tag-filter-no-results-state",
+      "status": "PASS",
+      "detail": "visible cards=0"
+    },
+    {
       "name": "highlight-audio-controlled-route",
       "status": "PASS",
       "detail": ""
+    },
+    {
+      "name": "brief-polish-no-call-before-consent",
+      "status": "PASS",
+      "detail": "model calls=0"
+    },
+    {
+      "name": "brief-polish-consented-proposed-candidate",
+      "status": "PASS",
+      "detail": "expanded=True; 独立候选（待审核）\n\nsynthetic polish candidate\n\n候选状态：proposed · 来源条目：entry:caeabda05d2a14014f53 · 证据 ID：ev:caeabda05d2a14014f53\n\n收起关联证据\n改成下周二下午召开\n播放证据\ncurrent · rev-1"
+    },
+    {
+      "name": "brief-polish-failure-preserves-deterministic-result",
+      "status": "PASS",
+      "detail": "model calls=2; baseline unchanged=True"
+    },
+    {
+      "name": "brief-download-detailed-snapshot-revision",
+      "status": "PASS",
+      "detail": "bytes=1785"
+    },
+    {
+      "name": "brief-download-compact",
+      "status": "PASS",
+      "detail": "bytes=1693"
     },
     {
       "name": "brief-project-topic-conversation-union",

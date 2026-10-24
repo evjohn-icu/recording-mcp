@@ -3,6 +3,7 @@
 import asyncio, json, os, pathlib, sys
 from urllib.parse import unquote
 import re
+from urllib.request import build_opener, ProxyHandler, Request
 from playwright.async_api import async_playwright
 
 BASE = os.environ.get('BASE_URL', 'http://127.0.0.1:8798').rstrip('/')
@@ -83,12 +84,19 @@ async def main():
       await card.get_by_role('button', name='保存').click()
       await panel.get_by_role('alert').wait_for(timeout=10000)
       retained = await note.input_value() == 'synthetic retained note draft'
-      record('highlight-edit-409-retains-draft', staged['status'] == 200 and retained, f"race={staged['status']}, retained={retained}")
+      conflict_text = await panel.get_by_role('alert').first.inner_text()
+      conflict_shows_latest = '服务器版本' in conflict_text and '问题' in conflict_text and '备注：（空）' in conflict_text
+      record('highlight-edit-409-retains-draft', staged['status'] == 200 and retained and conflict_shows_latest, f"race={staged['status']}, retained={retained}, latest shown={conflict_shows_latest}")
       await panel.get_by_role('button', name='重新加载版本').click()
       await card.get_by_role('button', name='保存').click()
       await page.wait_for_timeout(500)
       saved = await page.evaluate("""async id => { const h=await fetch(`/api/highlights/${encodeURIComponent(id)}`).then(r=>r.json()); return {tag:h.tag,note:h.note_text,version:h.version}; }""", highlight_id)
       record('highlight-edit-tag-note', saved['tag'] == 'follow_up' and saved['note'] == 'synthetic retained note draft', json.dumps(saved))
+      await panel.get_by_label('按标签筛选重点').select_option('question')
+      no_results = await panel.get_by_role('status').filter(has_text='没有符合此标签').count() == 1
+      record('highlight-tag-filter-no-results-state', no_results, f'visible cards={await panel.locator(".note-card").count()}')
+      await panel.get_by_label('按标签筛选重点').select_option('all')
+      await panel.get_by_text('录音时间：', exact=False).first.wait_for(timeout=5000)
       audio = card.locator('audio')
       await audio.evaluate('(a)=>a.load()')
       try:
@@ -112,6 +120,51 @@ async def main():
         alert = await page.locator('[role="alert"]').all_text_contents()
         selected = await selector.locator('input[type=checkbox]:checked').count()
         raise AssertionError(f'brief preview not rendered: {e}; conversation_id={conversation_id}; matching_index={matching_index}; selectors={await page.locator("fieldset").count()}; inputs={await selector.locator("input[type=checkbox]").count()}; selected={selected}; alerts={alert}')
+      fake_polish = os.environ['FAKE_POLISH_BASE']
+      def model_call_count():
+        opener = build_opener(ProxyHandler({}))
+        request = Request(fake_polish + '/stats', headers={'Cache-Control': 'no-cache'})
+        with opener.open(request, timeout=3) as response:
+          return json.loads(response.read())['count']
+      initial_model_calls = model_call_count()
+      record('brief-polish-no-call-before-consent', initial_model_calls == 0, f'model calls={initial_model_calls}')
+      baseline = await page.locator('.brief-result').evaluate("el => { const clone=el.cloneNode(true); clone.querySelector('.brief-polish')?.remove(); return clone.innerText }")
+      await page.get_by_label(re.compile('我同意将此范围')).check()
+      await page.get_by_role('button', name='生成独立候选').click()
+      candidate = page.locator('[aria-label="AI 润色候选"]')
+      await candidate.get_by_text('synthetic polish candidate').wait_for(timeout=15000)
+      candidate_evidence = candidate.get_by_role('button', name='查看关联证据')
+      await candidate_evidence.click()
+      evidence_expanded = await candidate.locator('blockquote').count() > 0
+      candidate_ok = '候选状态：proposed' in await candidate.inner_text()
+      record('brief-polish-consented-proposed-candidate', candidate_ok and evidence_expanded and model_call_count() == 1, f"expanded={evidence_expanded}; {await candidate.inner_text()}")
+      # The fake endpoint intentionally fails from its second request onward.
+      # The optional failure must leave the deterministic result intact.
+      await page.get_by_label(re.compile('我同意将此范围')).check()
+      await page.get_by_role('button', name='生成独立候选').click()
+      candidate_panel = page.locator('.brief-candidates')
+      await candidate_panel.get_by_text('候选服务部分降级').wait_for(timeout=15000)
+      fallback_content = await page.locator('.brief-result').evaluate("el => { const clone=el.cloneNode(true); clone.querySelector('.brief-polish')?.remove(); return clone.innerText }")
+      calls_after_failure = model_call_count()
+      fallback_ok = calls_after_failure == 2 and fallback_content == baseline and await candidate_panel.locator('.note-card').count() == 0
+      record('brief-polish-failure-preserves-deterministic-result', fallback_ok, f'model calls={calls_after_failure}; baseline unchanged={fallback_content == baseline}')
+      await page.get_by_label('Markdown 导出格式').select_option('detailed')
+      async with page.expect_download() as detailed_download:
+        await page.get_by_role('button', name='下载 .md').click()
+      detailed_file = OUT / 'brief-detailed.md'
+      await (await detailed_download.value).save_as(str(detailed_file))
+      detailed_text = detailed_file.read_text()
+      detailed_ok = 'Snapshot:' in detailed_text and '修订：' in detailed_text and '来源说明' in detailed_text
+      record('brief-download-detailed-snapshot-revision', detailed_ok, f'bytes={len(detailed_text)}')
+      await page.get_by_label('Markdown 导出格式').select_option('compact')
+      async with page.expect_download() as compact_download:
+        await page.get_by_role('button', name='下载 .md').click()
+      compact_file = OUT / 'brief-compact.md'
+      await (await compact_download.value).save_as(str(compact_file))
+      compact_text = compact_file.read_text()
+      record('brief-download-compact', bool(compact_text) and 'Snapshot:' in compact_text and '修订：' in compact_text, f'bytes={len(compact_text)}')
+      # Restore the detailed format expected by the existing clipboard check.
+      await page.get_by_label('Markdown 导出格式').select_option('detailed')
       await page.get_by_label('范围类型').select_option('project')
       async with page.expect_response(lambda response: response.url.endswith('/api/briefs/preview') and response.request.method == 'POST') as project_response:
         await page.get_by_role('button', name='生成简报预览').click()

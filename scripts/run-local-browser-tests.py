@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import shutil
@@ -11,11 +12,66 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class FakePolishHandler(BaseHTTPRequestHandler):
+    requests = []
+
+    def log_message(self, *_args):
+        pass
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        self.end_headers()
+
+    def do_GET(self):
+        if self.path != '/stats':
+            self.send_error(404)
+            return
+        payload = json.dumps({'count': len(type(self).requests)}).encode()
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def do_POST(self):
+        body = self.rfile.read(int(self.headers.get('Content-Length', '0')))
+        type(self).requests.append(body)
+        if len(type(self).requests) > 1:
+            self.send_response(503)
+            self.end_headers()
+            return
+        try:
+            request = json.loads(body)
+            content = request['messages'][1]['content']
+            entries = json.loads(content.split('Input entries:\n', 1)[1])
+            candidates = [] if not entries else [{
+                'entry_id': entries[0]['id'],
+                'text': 'synthetic polish candidate',
+                'evidence_ids': entries[0]['evidence_ids'],
+            }]
+            response = json.dumps({'choices': [{'message': {'content': json.dumps({'candidates': candidates})}}]}).encode()
+        except Exception:
+            self.send_response(400)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(response)))
+        self.end_headers()
+        self.wfile.write(response)
 
 
 def free_port() -> int:
@@ -104,19 +160,29 @@ def run() -> int:
             feature_credentials = __import__('json').loads(feature_fixture.stdout.splitlines()[-1])
             feature_port = free_port()
             feature_base = f'http://127.0.0.1:{feature_port}'
+            FakePolishHandler.requests = []
+            fake_polish = ThreadingHTTPServer(('127.0.0.1', 0), FakePolishHandler)
+            fake_polish_thread = threading.Thread(target=fake_polish.serve_forever, daemon=True)
+            fake_polish_thread.start()
+            polish_endpoint = f'http://127.0.0.1:{fake_polish.server_address[1]}/chat/completions'
             feature_log_path = artifacts/'highlights-brief-web.log'
             feature_log = feature_log_path.open('w')
             feature_server = subprocess.Popen([str(ROOT/'bin/context-web'), '--profiles-root', str(feature_profiles),
                                                 '--addr', f'127.0.0.1:{feature_port}', '--web-dir', str(ROOT/'web/dist'),
-                                                '--semantic-provider', 'hash'], cwd=ROOT, env=env,
+                                                '--semantic-provider', 'hash', '--brief-polish-endpoint', polish_endpoint,
+                                                '--brief-polish-model', 'test'], cwd=ROOT, env=env,
                                                stdout=feature_log, stderr=subprocess.STDOUT, start_new_session=True)
             try:
                 wait_http(feature_base+'/api/auth-info', feature_server, feature_log_path)
-                feature_env = env | {'BASE_URL': feature_base, 'ALPHA_PASSWORD': feature_credentials['alpha_password']}
+                feature_env = env | {'BASE_URL': feature_base, 'ALPHA_PASSWORD': feature_credentials['alpha_password'],
+                                    'FAKE_POLISH_BASE': f'http://127.0.0.1:{fake_polish.server_address[1]}'}
                 subprocess.run([python, str(ROOT/'scripts/highlights-brief-browser.py')], cwd=ROOT, env=feature_env, check=True)
             finally:
                 _stop(feature_server)
                 feature_log.close()
+                fake_polish.shutdown()
+                fake_polish.server_close()
+                fake_polish_thread.join(timeout=5)
             subprocess.run([python, str(ROOT/'scripts/local-v2-flow-browser.py')], cwd=ROOT, env=env, check=True)
         finally:
             _stop(profile_server)
