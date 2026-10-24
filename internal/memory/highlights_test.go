@@ -244,3 +244,83 @@ func TestHighlightConcurrentCASDoesNotLoseUpdate(t *testing.T) {
 		t.Fatalf("version %+v %v", got, e)
 	}
 }
+
+func TestHighlightConversationForgetCannotReplay(t *testing.T) {
+	ctx := context.Background()
+	s := openTempStore(t)
+	r, e := s.IngestTranscript(ctx, sampleResult("seg-highlight", "rev-1", 0))
+	if e != nil {
+		t.Fatal(e)
+	}
+	point := int64(20)
+	in := HighlightCreate{RequestID: "conversation-forget", RecordingID: r.RecordingID, AnchorKind: "point", StartMS: &point, SourceAttachmentID: stableKey("attachment", r.RecordingID, "seg-highlight", "rev-1"), TranscriptRevision: "rev-1", Tag: "question", NoteText: "synthetic conversation secret"}
+	if _, e = s.CreateHighlight(ctx, in); e != nil {
+		t.Fatal(e)
+	}
+	req := ForgetRequest{Scope: "conversation", ConversationID: r.ConversationID}
+	p, e := s.PreviewForget(ctx, req)
+	if e != nil {
+		t.Fatal(e)
+	}
+	req.ExpectedState = p.ExpectedState
+	if _, e = s.CommitForget(ctx, req); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.CreateHighlight(ctx, in); !errors.Is(e, ErrHighlightGone) {
+		t.Fatalf("replay after conversation forget: %v", e)
+	}
+	in.RequestID = "fresh-after-conversation-forget"
+	if _, e = s.CreateHighlight(ctx, in); !errors.Is(e, ErrHighlightSourceForgotten) {
+		t.Fatalf("new request after conversation forget: %v", e)
+	}
+}
+
+func TestHighlightCASAcrossIndependentStoreConnections(t *testing.T) {
+	ctx := context.Background()
+	s := openTempStore(t)
+	var seq int
+	var name, path string
+	if e := s.DB().QueryRow(`PRAGMA database_list`).Scan(&seq, &name, &path); e != nil {
+		t.Fatal(e)
+	}
+	other, e := Open(path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer other.Close()
+	r, e := s.IngestTranscript(ctx, sampleResult("seg-highlight", "rev-1", 0))
+	if e != nil {
+		t.Fatal(e)
+	}
+	start, end := int64(20), int64(80)
+	h, e := s.CreateHighlight(ctx, HighlightCreate{RequestID: "two-connections", RecordingID: r.RecordingID, AnchorKind: "range", StartMS: &start, EndMS: &end, SourceAttachmentID: stableKey("attachment", r.RecordingID, "seg-highlight", "rev-1"), TranscriptRevision: "rev-1", Tag: "important"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	for version := int64(1); version <= 10; version++ {
+		gate := make(chan struct{})
+		results := make(chan error, 2)
+		for _, store := range []*Store{s, other} {
+			go func(store *Store) {
+				<-gate
+				_, err := store.UpdateHighlight(ctx, h.ID, HighlightUpdate{ExpectedVersion: version, NoteText: stringPtr("synthetic concurrent update")})
+				results <- err
+			}(store)
+		}
+		close(gate)
+		success, conflict := 0, 0
+		for i := 0; i < 2; i++ {
+			err := <-results
+			if err == nil {
+				success++
+			} else if errors.Is(err, ErrHighlightVersionConflict) {
+				conflict++
+			} else {
+				t.Fatalf("concurrent store update: %v", err)
+			}
+		}
+		if success != 1 || conflict != 1 {
+			t.Fatalf("CAS across connections: success=%d conflict=%d", success, conflict)
+		}
+	}
+}

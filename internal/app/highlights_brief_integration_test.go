@@ -1,8 +1,10 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"recordingmcp/internal/contextbrief"
 	"recordingmcp/internal/memory"
@@ -81,6 +83,11 @@ func TestHighlightsBriefRevisionForgetSyntheticJourney(t *testing.T) {
 	if next.SnapshotID == b.SnapshotID {
 		t.Fatal("revision did not change snapshot")
 	}
+	f.svc.ManagedBackupDir = t.TempDir()
+	backup := filepath.Join(f.svc.ManagedBackupDir, "before-forget.sqlite")
+	if _, e = f.store.DB().Exec(`VACUUM INTO ?`, backup); e != nil {
+		t.Fatal(e)
+	}
 	forget := memory.ForgetRequest{Scope: "recording", RecordingID: f.recordingID}
 	preview, e := f.svc.PreviewForget(ctx, forget)
 	if e != nil {
@@ -90,6 +97,23 @@ func TestHighlightsBriefRevisionForgetSyntheticJourney(t *testing.T) {
 	op, e := f.svc.CommitForget(ctx, forget)
 	if e != nil || op.CleanupPending {
 		t.Fatalf("forget incomplete: %+v %v", op, e)
+	}
+	if _, e = os.Stat(backup); !os.IsNotExist(e) {
+		t.Fatalf("managed backup survived forget: %v", e)
+	}
+	var seq int
+	var name, dbPath string
+	if e = f.store.DB().QueryRow(`PRAGMA database_list`).Scan(&seq, &name, &dbPath); e != nil {
+		t.Fatal(e)
+	}
+	for _, p := range []string{dbPath, dbPath + "-wal"} {
+		data, err := os.ReadFile(p)
+		if err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		if bytes.Contains(data, []byte(input.NoteText)) {
+			t.Fatal("private highlight bytes remain in managed SQLite/WAL")
+		}
 	}
 	if _, e = f.svc.CreateHighlight(ctx, input); e == nil {
 		t.Fatal("forgotten replay revived")
