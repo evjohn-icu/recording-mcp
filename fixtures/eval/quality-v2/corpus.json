@@ -1,0 +1,3605 @@
+{
+  "description": "独立撰写的 retrieval-quality-v2 合成中文语料；无录音、隐私或旧版评测问题复用。",
+  "conversations": [
+    {
+      "conversation_id": "v2-conv-001",
+      "description": "独立合成事实组 001",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-001",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-001",
+            "conversation_id": "v2-conv-001",
+            "segment_id": "v2-seg-001",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/001"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "青禾工坊第1批的巡检表由周岚确认：三箱。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-002",
+      "description": "独立合成事实组 002",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-002",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-002",
+            "conversation_id": "v2-conv-002",
+            "segment_id": "v2-seg-002",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-02T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/002"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "北辰诊所第2批的交付节点由蒋老师确认：九点半。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-003",
+      "description": "独立合成事实组 003",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-003",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-003",
+            "conversation_id": "v2-conv-003",
+            "segment_id": "v2-seg-003",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-03T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/003"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "云渡书店第3批的客户回访由许老师确认：第三单元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-004",
+      "description": "独立合成事实组 004",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-004",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-004",
+            "conversation_id": "v2-conv-004",
+            "segment_id": "v2-seg-004",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-04T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/004"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "松石社团第4批的接送安排由魏宁确认：六月底前。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-005",
+      "description": "独立合成事实组 005",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-005",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-005",
+            "conversation_id": "v2-conv-005",
+            "segment_id": "v2-seg-005",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/005"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "澄湾工作室第5批的周末值班由罗主管确认：四十六件。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-006",
+      "description": "独立合成事实组 006",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-006",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-006",
+            "conversation_id": "v2-conv-006",
+            "segment_id": "v2-seg-006",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-06T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/006"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "白鹭厨房第6批的轮班名单由苏禾确认：十二个名额。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-007",
+      "description": "独立合成事实组 007",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-007",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-007",
+            "conversation_id": "v2-conv-007",
+            "segment_id": "v2-seg-007",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-07T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/007"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "远山学堂第7批的备用电池由方医生确认：陈师傅。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-008",
+      "description": "独立合成事实组 008",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-008",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-008",
+            "conversation_id": "v2-conv-008",
+            "segment_id": "v2-seg-008",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-08T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/008"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "星桥车队第8批的设备保养由邱老师确认：五月十六日。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-009",
+      "description": "独立合成事实组 009",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-009",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-009",
+            "conversation_id": "v2-conv-009",
+            "segment_id": "v2-seg-009",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-09T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/009"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "木棉旅舍第9批的订货数量由孟姐确认：七百二十元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-010",
+      "description": "独立合成事实组 010",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-010",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-010",
+            "conversation_id": "v2-conv-010",
+            "segment_id": "v2-seg-010",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-10T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/010"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "溪谷实验室第10批的讲座名额由杜妍确认：周四下午。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-011",
+      "description": "独立合成事实组 011",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-011",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-011",
+            "conversation_id": "v2-conv-011",
+            "segment_id": "v2-seg-011",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-11T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/011"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "南窗花店第11批的培训材料由陶然确认：蓝色文件夹。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-012",
+      "description": "独立合成事实组 012",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-012",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-012",
+            "conversation_id": "v2-conv-012",
+            "segment_id": "v2-seg-012",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-12T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/012"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "晨雾剧场第12批的安全演练由顾师傅确认：西门访客区。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-013",
+      "description": "独立合成事实组 013",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-013",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-013",
+            "conversation_id": "v2-conv-013",
+            "segment_id": "v2-seg-013",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-13T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/013"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "橙屿咖啡第13批的仓储钥匙由贺师傅确认：每隔三周。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-014",
+      "description": "独立合成事实组 014",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-014",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-014",
+            "conversation_id": "v2-conv-014",
+            "segment_id": "v2-seg-014",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-14T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/014"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "砾石球馆第14批的场地预约由唐宁确认：先做消防通道。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-015",
+      "description": "独立合成事实组 015",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-015",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-015",
+            "conversation_id": "v2-conv-015",
+            "segment_id": "v2-seg-015",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-15T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/015"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "风铃托育第15批的课程讲义由沈队长确认：冷藏柜第二层。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-016",
+      "description": "独立合成事实组 016",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-016",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-016",
+            "conversation_id": "v2-conv-016",
+            "segment_id": "v2-seg-016",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-16T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/016"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "长堤维修站第16批的活动预算由叶晴确认：林组长。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-017",
+      "description": "独立合成事实组 017",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-017",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-017",
+            "conversation_id": "v2-conv-017",
+            "segment_id": "v2-seg-017",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-17T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/017"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "银杏画室第17批的报销凭证由梁经理确认：东侧库房。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-018",
+      "description": "独立合成事实组 018",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-018",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-018",
+            "conversation_id": "v2-conv-018",
+            "segment_id": "v2-seg-018",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-18T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/018"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "微光志愿队第18批的停车许可由陈澈确认：改到室内。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-019",
+      "description": "独立合成事实组 019",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-019",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-019",
+            "conversation_id": "v2-conv-019",
+            "segment_id": "v2-seg-019",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-19T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/019"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "栖云农场第19批的药品清单由袁师傅确认：两万四千元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-020",
+      "description": "独立合成事实组 020",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-020",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-020",
+            "conversation_id": "v2-conv-020",
+            "segment_id": "v2-seg-020",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-20T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/020"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "海盐设计组第20批的雨天方案由邵工确认：五号会议室。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-021",
+      "description": "独立合成事实组 021",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-021",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-021",
+            "conversation_id": "v2-conv-021",
+            "segment_id": "v2-seg-021",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-21T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/021"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "青禾工坊第21批的巡检表由周岚确认：三箱。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-022",
+      "description": "独立合成事实组 022",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-022",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-022",
+            "conversation_id": "v2-conv-022",
+            "segment_id": "v2-seg-022",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-22T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/022"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "北辰诊所第22批的交付节点由蒋老师确认：九点半。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-023",
+      "description": "独立合成事实组 023",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-023",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-023",
+            "conversation_id": "v2-conv-023",
+            "segment_id": "v2-seg-023",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-23T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/023"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "云渡书店第23批的客户回访由许老师确认：第三单元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-024",
+      "description": "独立合成事实组 024",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-024",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-024",
+            "conversation_id": "v2-conv-024",
+            "segment_id": "v2-seg-024",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-24T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/024"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "松石社团第24批的接送安排由魏宁确认：六月底前。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-025",
+      "description": "独立合成事实组 025",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-025",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-025",
+            "conversation_id": "v2-conv-025",
+            "segment_id": "v2-seg-025",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-25T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/025"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "澄湾工作室第25批的周末值班由罗主管确认：四十六件。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-026",
+      "description": "独立合成事实组 026",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-026",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-026",
+            "conversation_id": "v2-conv-026",
+            "segment_id": "v2-seg-026",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-26T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/026"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "白鹭厨房第26批的轮班名单由苏禾确认：十二个名额。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-027",
+      "description": "独立合成事实组 027",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-027",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-027",
+            "conversation_id": "v2-conv-027",
+            "segment_id": "v2-seg-027",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-27T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/027"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "远山学堂第27批的备用电池由方医生确认：陈师傅。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-028",
+      "description": "独立合成事实组 028",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-028",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-028",
+            "conversation_id": "v2-conv-028",
+            "segment_id": "v2-seg-028",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-28T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/028"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "星桥车队第28批的设备保养由邱老师确认：五月十六日。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-029",
+      "description": "独立合成事实组 029",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-029",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-029",
+            "conversation_id": "v2-conv-029",
+            "segment_id": "v2-seg-029",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/029"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "木棉旅舍第29批的订货数量由孟姐确认：七百二十元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-030",
+      "description": "独立合成事实组 030",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-030",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-030",
+            "conversation_id": "v2-conv-030",
+            "segment_id": "v2-seg-030",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-02T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/030"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "溪谷实验室第30批的讲座名额由杜妍确认：周四下午。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-031",
+      "description": "独立合成事实组 031",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-031",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-031",
+            "conversation_id": "v2-conv-031",
+            "segment_id": "v2-seg-031",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-03T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/031"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "南窗花店第31批的培训材料由陶然确认：蓝色文件夹。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-032",
+      "description": "独立合成事实组 032",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-032",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-032",
+            "conversation_id": "v2-conv-032",
+            "segment_id": "v2-seg-032",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-04T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/032"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "晨雾剧场第32批的安全演练由顾师傅确认：西门访客区。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-033",
+      "description": "独立合成事实组 033",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-033",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-033",
+            "conversation_id": "v2-conv-033",
+            "segment_id": "v2-seg-033",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/033"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "橙屿咖啡第33批的仓储钥匙由贺师傅确认：每隔三周。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-034",
+      "description": "独立合成事实组 034",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-034",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-034",
+            "conversation_id": "v2-conv-034",
+            "segment_id": "v2-seg-034",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-06T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/034"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "砾石球馆第34批的场地预约由唐宁确认：先做消防通道。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-035",
+      "description": "独立合成事实组 035",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-035",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-035",
+            "conversation_id": "v2-conv-035",
+            "segment_id": "v2-seg-035",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-07T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/035"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "风铃托育第35批的课程讲义由沈队长确认：冷藏柜第二层。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-036",
+      "description": "独立合成事实组 036",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-036",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-036",
+            "conversation_id": "v2-conv-036",
+            "segment_id": "v2-seg-036",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-08T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/036"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "长堤维修站第36批的活动预算由叶晴确认：林组长。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-037",
+      "description": "独立合成事实组 037",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-037",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-037",
+            "conversation_id": "v2-conv-037",
+            "segment_id": "v2-seg-037",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-09T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/037"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "银杏画室第37批的报销凭证由梁经理确认：东侧库房。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-038",
+      "description": "独立合成事实组 038",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-038",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-038",
+            "conversation_id": "v2-conv-038",
+            "segment_id": "v2-seg-038",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-10T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/038"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "微光志愿队第38批的停车许可由陈澈确认：改到室内。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-039",
+      "description": "独立合成事实组 039",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-039",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-039",
+            "conversation_id": "v2-conv-039",
+            "segment_id": "v2-seg-039",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-11T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/039"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "栖云农场第39批的药品清单由袁师傅确认：两万四千元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-040",
+      "description": "独立合成事实组 040",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-040",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-040",
+            "conversation_id": "v2-conv-040",
+            "segment_id": "v2-seg-040",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-12T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/040"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "海盐设计组第40批的雨天方案由邵工确认：五号会议室。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-041",
+      "description": "独立合成事实组 041",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-041",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-041",
+            "conversation_id": "v2-conv-041",
+            "segment_id": "v2-seg-041",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-13T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/041"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "青禾工坊第41批的巡检表由周岚确认：三箱。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-042",
+      "description": "独立合成事实组 042",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-042",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-042",
+            "conversation_id": "v2-conv-042",
+            "segment_id": "v2-seg-042",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-14T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/042"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "北辰诊所第42批的交付节点由蒋老师确认：九点半。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-043",
+      "description": "独立合成事实组 043",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-043",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-043",
+            "conversation_id": "v2-conv-043",
+            "segment_id": "v2-seg-043",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-15T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/043"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "云渡书店第43批的客户回访由许老师确认：第三单元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-044",
+      "description": "独立合成事实组 044",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-044",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-044",
+            "conversation_id": "v2-conv-044",
+            "segment_id": "v2-seg-044",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-16T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/044"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "松石社团第44批的接送安排由魏宁确认：六月底前。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-045",
+      "description": "独立合成事实组 045",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-045",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-045",
+            "conversation_id": "v2-conv-045",
+            "segment_id": "v2-seg-045",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-17T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/045"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "澄湾工作室第45批的周末值班由罗主管确认：四十六件。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-046",
+      "description": "独立合成事实组 046",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-046",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-046",
+            "conversation_id": "v2-conv-046",
+            "segment_id": "v2-seg-046",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-18T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/046"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "白鹭厨房第46批的轮班名单由苏禾确认：十二个名额。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-047",
+      "description": "独立合成事实组 047",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-047",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-047",
+            "conversation_id": "v2-conv-047",
+            "segment_id": "v2-seg-047",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-19T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/047"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "远山学堂第47批的备用电池由方医生确认：陈师傅。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-048",
+      "description": "独立合成事实组 048",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-048",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-048",
+            "conversation_id": "v2-conv-048",
+            "segment_id": "v2-seg-048",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-20T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/048"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "星桥车队第48批的设备保养由邱老师确认：五月十六日。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-049",
+      "description": "独立合成事实组 049",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-049",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-049",
+            "conversation_id": "v2-conv-049",
+            "segment_id": "v2-seg-049",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-21T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/049"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "木棉旅舍第49批的订货数量由孟姐确认：七百二十元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-050",
+      "description": "独立合成事实组 050",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-050",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-050",
+            "conversation_id": "v2-conv-050",
+            "segment_id": "v2-seg-050",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-22T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/050"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "溪谷实验室第50批的讲座名额由杜妍确认：周四下午。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-051",
+      "description": "独立合成事实组 051",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-051",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-051",
+            "conversation_id": "v2-conv-051",
+            "segment_id": "v2-seg-051",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-23T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/051"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "南窗花店第51批的培训材料由陶然确认：蓝色文件夹。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-052",
+      "description": "独立合成事实组 052",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-052",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-052",
+            "conversation_id": "v2-conv-052",
+            "segment_id": "v2-seg-052",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-24T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/052"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "晨雾剧场第52批的安全演练由顾师傅确认：西门访客区。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-053",
+      "description": "独立合成事实组 053",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-053",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-053",
+            "conversation_id": "v2-conv-053",
+            "segment_id": "v2-seg-053",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-25T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/053"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "橙屿咖啡第53批的仓储钥匙由贺师傅确认：每隔三周。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-054",
+      "description": "独立合成事实组 054",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-054",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-054",
+            "conversation_id": "v2-conv-054",
+            "segment_id": "v2-seg-054",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-26T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/054"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "砾石球馆第54批的场地预约由唐宁确认：先做消防通道。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-055",
+      "description": "独立合成事实组 055",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-055",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-055",
+            "conversation_id": "v2-conv-055",
+            "segment_id": "v2-seg-055",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-27T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/055"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "风铃托育第55批的课程讲义由沈队长确认：冷藏柜第二层。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-056",
+      "description": "独立合成事实组 056",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-056",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-056",
+            "conversation_id": "v2-conv-056",
+            "segment_id": "v2-seg-056",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-28T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/056"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "长堤维修站第56批的活动预算由叶晴确认：林组长。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-057",
+      "description": "独立合成事实组 057",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-057",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-057",
+            "conversation_id": "v2-conv-057",
+            "segment_id": "v2-seg-057",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-01T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/057"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "银杏画室第57批的报销凭证由梁经理确认：东侧库房。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-058",
+      "description": "独立合成事实组 058",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-058",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-058",
+            "conversation_id": "v2-conv-058",
+            "segment_id": "v2-seg-058",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-02T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/058"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "微光志愿队第58批的停车许可由陈澈确认：改到室内。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-059",
+      "description": "独立合成事实组 059",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-059",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-059",
+            "conversation_id": "v2-conv-059",
+            "segment_id": "v2-seg-059",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-03T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/059"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "栖云农场第59批的药品清单由袁师傅确认：两万四千元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-060",
+      "description": "独立合成事实组 060",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-060",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-060",
+            "conversation_id": "v2-conv-060",
+            "segment_id": "v2-seg-060",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-04T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/060"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "海盐设计组第60批的雨天方案由邵工确认：五号会议室。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-061",
+      "description": "独立合成事实组 061",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-061",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-061",
+            "conversation_id": "v2-conv-061",
+            "segment_id": "v2-seg-061",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/061"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "青禾工坊第61批的巡检表由周岚确认：三箱。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-062",
+      "description": "独立合成事实组 062",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-062",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-062",
+            "conversation_id": "v2-conv-062",
+            "segment_id": "v2-seg-062",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-06T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/062"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "北辰诊所第62批的交付节点由蒋老师确认：九点半。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-063",
+      "description": "独立合成事实组 063",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-063",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-063",
+            "conversation_id": "v2-conv-063",
+            "segment_id": "v2-seg-063",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-07T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/063"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "云渡书店第63批的客户回访由许老师确认：第三单元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-064",
+      "description": "独立合成事实组 064",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-064",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-064",
+            "conversation_id": "v2-conv-064",
+            "segment_id": "v2-seg-064",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-08T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/064"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "松石社团第64批的接送安排由魏宁确认：六月底前。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-065",
+      "description": "独立合成事实组 065",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-065",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-065",
+            "conversation_id": "v2-conv-065",
+            "segment_id": "v2-seg-065",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-09T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/065"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "澄湾工作室第65批的周末值班由罗主管确认：四十六件。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-066",
+      "description": "独立合成事实组 066",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-066",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-066",
+            "conversation_id": "v2-conv-066",
+            "segment_id": "v2-seg-066",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-10T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/066"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "白鹭厨房第66批的轮班名单由苏禾确认：十二个名额。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-067",
+      "description": "独立合成事实组 067",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-067",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-067",
+            "conversation_id": "v2-conv-067",
+            "segment_id": "v2-seg-067",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-11T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/067"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "远山学堂第67批的备用电池由方医生确认：陈师傅。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-068",
+      "description": "独立合成事实组 068",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-068",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-068",
+            "conversation_id": "v2-conv-068",
+            "segment_id": "v2-seg-068",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-12T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/068"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "星桥车队第68批的设备保养由邱老师确认：五月十六日。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-069",
+      "description": "独立合成事实组 069",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-069",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-069",
+            "conversation_id": "v2-conv-069",
+            "segment_id": "v2-seg-069",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-13T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/069"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "木棉旅舍第69批的订货数量由孟姐确认：七百二十元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-070",
+      "description": "独立合成事实组 070",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-070",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-070",
+            "conversation_id": "v2-conv-070",
+            "segment_id": "v2-seg-070",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-14T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/070"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "溪谷实验室第70批的讲座名额由杜妍确认：周四下午。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-071",
+      "description": "独立合成事实组 071",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-071",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-071",
+            "conversation_id": "v2-conv-071",
+            "segment_id": "v2-seg-071",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-15T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/071"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "南窗花店第71批的培训材料由陶然确认：蓝色文件夹。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-072",
+      "description": "独立合成事实组 072",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-072",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-072",
+            "conversation_id": "v2-conv-072",
+            "segment_id": "v2-seg-072",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-16T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/072"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "晨雾剧场第72批的安全演练由顾师傅确认：西门访客区。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-073",
+      "description": "独立合成事实组 073",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-073",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-073",
+            "conversation_id": "v2-conv-073",
+            "segment_id": "v2-seg-073",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-17T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/073"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "橙屿咖啡第73批的仓储钥匙由贺师傅确认：每隔三周。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-074",
+      "description": "独立合成事实组 074",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-074",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-074",
+            "conversation_id": "v2-conv-074",
+            "segment_id": "v2-seg-074",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-18T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/074"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "砾石球馆第74批的场地预约由唐宁确认：先做消防通道。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-075",
+      "description": "独立合成事实组 075",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-075",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-075",
+            "conversation_id": "v2-conv-075",
+            "segment_id": "v2-seg-075",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-19T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/075"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "风铃托育第75批的课程讲义由沈队长确认：冷藏柜第二层。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-076",
+      "description": "独立合成事实组 076",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-076",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-076",
+            "conversation_id": "v2-conv-076",
+            "segment_id": "v2-seg-076",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-20T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/076"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "长堤维修站第76批的活动预算由叶晴确认：林组长。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-077",
+      "description": "独立合成事实组 077",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-077",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-077",
+            "conversation_id": "v2-conv-077",
+            "segment_id": "v2-seg-077",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-21T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/077"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "银杏画室第77批的报销凭证由梁经理确认：东侧库房。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-078",
+      "description": "独立合成事实组 078",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-078",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-078",
+            "conversation_id": "v2-conv-078",
+            "segment_id": "v2-seg-078",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-22T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/078"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "微光志愿队第78批的停车许可由陈澈确认：改到室内。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-079",
+      "description": "独立合成事实组 079",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-079",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-079",
+            "conversation_id": "v2-conv-079",
+            "segment_id": "v2-seg-079",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-23T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/079"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "栖云农场第79批的药品清单由袁师傅确认：两万四千元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-conv-080",
+      "description": "独立合成事实组 080",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-req-080",
+            "device_id": "v2-device",
+            "recording_id": "v2-rec-080",
+            "conversation_id": "v2-conv-080",
+            "segment_id": "v2-seg-080",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-02-24T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/080"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "海盐设计组第80批的雨天方案由邵工确认：五号会议室。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-061",
+      "description": "独立合成事实组 061 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-061",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-061",
+            "conversation_id": "v2-followup-061",
+            "segment_id": "v2-followup-seg-061",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/061"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "青禾工坊第61批的巡检表由周岚后来补充确认：三箱。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-062",
+      "description": "独立合成事实组 062 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-062",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-062",
+            "conversation_id": "v2-followup-062",
+            "segment_id": "v2-followup-seg-062",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-06T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/062"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "北辰诊所第62批的交付节点由蒋老师后来补充确认：九点半。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-063",
+      "description": "独立合成事实组 063 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-063",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-063",
+            "conversation_id": "v2-followup-063",
+            "segment_id": "v2-followup-seg-063",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-07T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/063"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "云渡书店第63批的客户回访由许老师后来补充确认：第三单元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-064",
+      "description": "独立合成事实组 064 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-064",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-064",
+            "conversation_id": "v2-followup-064",
+            "segment_id": "v2-followup-seg-064",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-08T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/064"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "松石社团第64批的接送安排由魏宁后来补充确认：六月底前。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-065",
+      "description": "独立合成事实组 065 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-065",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-065",
+            "conversation_id": "v2-followup-065",
+            "segment_id": "v2-followup-seg-065",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-09T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/065"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "澄湾工作室第65批的周末值班由罗主管后来补充确认：四十六件。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-066",
+      "description": "独立合成事实组 066 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-066",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-066",
+            "conversation_id": "v2-followup-066",
+            "segment_id": "v2-followup-seg-066",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-10T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/066"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "白鹭厨房第66批的轮班名单由苏禾后来补充确认：十二个名额。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-067",
+      "description": "独立合成事实组 067 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-067",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-067",
+            "conversation_id": "v2-followup-067",
+            "segment_id": "v2-followup-seg-067",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-11T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/067"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "远山学堂第67批的备用电池由方医生后来补充确认：陈师傅。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-068",
+      "description": "独立合成事实组 068 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-068",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-068",
+            "conversation_id": "v2-followup-068",
+            "segment_id": "v2-followup-seg-068",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-12T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/068"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "星桥车队第68批的设备保养由邱老师后来补充确认：五月十六日。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-069",
+      "description": "独立合成事实组 069 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-069",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-069",
+            "conversation_id": "v2-followup-069",
+            "segment_id": "v2-followup-seg-069",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-13T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/069"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "木棉旅舍第69批的订货数量由孟姐后来补充确认：七百二十元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-070",
+      "description": "独立合成事实组 070 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-070",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-070",
+            "conversation_id": "v2-followup-070",
+            "segment_id": "v2-followup-seg-070",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-14T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/070"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "溪谷实验室第70批的讲座名额由杜妍后来补充确认：周四下午。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-071",
+      "description": "独立合成事实组 071 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-071",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-071",
+            "conversation_id": "v2-followup-071",
+            "segment_id": "v2-followup-seg-071",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-15T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/071"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "南窗花店第71批的培训材料由陶然后来补充确认：蓝色文件夹。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-072",
+      "description": "独立合成事实组 072 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-072",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-072",
+            "conversation_id": "v2-followup-072",
+            "segment_id": "v2-followup-seg-072",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-16T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/072"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "晨雾剧场第72批的安全演练由顾师傅后来补充确认：西门访客区。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-073",
+      "description": "独立合成事实组 073 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-073",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-073",
+            "conversation_id": "v2-followup-073",
+            "segment_id": "v2-followup-seg-073",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-17T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/073"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "橙屿咖啡第73批的仓储钥匙由贺师傅后来补充确认：每隔三周。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-074",
+      "description": "独立合成事实组 074 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-074",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-074",
+            "conversation_id": "v2-followup-074",
+            "segment_id": "v2-followup-seg-074",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-18T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/074"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "砾石球馆第74批的场地预约由唐宁后来补充确认：先做消防通道。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-075",
+      "description": "独立合成事实组 075 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-075",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-075",
+            "conversation_id": "v2-followup-075",
+            "segment_id": "v2-followup-seg-075",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-19T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/075"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "风铃托育第75批的课程讲义由沈队长后来补充确认：冷藏柜第二层。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-076",
+      "description": "独立合成事实组 076 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-076",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-076",
+            "conversation_id": "v2-followup-076",
+            "segment_id": "v2-followup-seg-076",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-20T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/076"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "长堤维修站第76批的活动预算由叶晴后来补充确认：林组长。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-077",
+      "description": "独立合成事实组 077 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-077",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-077",
+            "conversation_id": "v2-followup-077",
+            "segment_id": "v2-followup-seg-077",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-21T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/077"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "银杏画室第77批的报销凭证由梁经理后来补充确认：东侧库房。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-078",
+      "description": "独立合成事实组 078 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-078",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-078",
+            "conversation_id": "v2-followup-078",
+            "segment_id": "v2-followup-seg-078",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-22T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/078"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "微光志愿队第78批的停车许可由陈澈后来补充确认：改到室内。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-079",
+      "description": "独立合成事实组 079 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-079",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-079",
+            "conversation_id": "v2-followup-079",
+            "segment_id": "v2-followup-seg-079",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-23T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/079"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "栖云农场第79批的药品清单由袁师傅后来补充确认：两万四千元。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation_id": "v2-followup-080",
+      "description": "独立合成事实组 080 的另一场后续沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-quality-v2",
+            "provider_request_id": "v2-followup-req-080",
+            "device_id": "v2-device",
+            "recording_id": "v2-followup-rec-080",
+            "conversation_id": "v2-followup-080",
+            "segment_id": "v2-followup-seg-080",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 8000,
+            "transcript_revision": "rev-1",
+            "completion_status": "final",
+            "recording_started_at": "2026-03-24T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_ref": "synthetic://quality-v2/followup/080"
+          },
+          "turns": [
+            {
+              "id": "v2-utt-1",
+              "original_index": 1,
+              "text": "海盐设计组第80批的雨天方案由邵工后来补充确认：五号会议室。",
+              "local_start_ms": 0,
+              "local_end_ms": 6000,
+              "global_start_ms": 0,
+              "global_end_ms": 6000,
+              "speaker_scoped_id": "spk:v2-device:1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

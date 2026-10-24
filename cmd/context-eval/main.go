@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"recordingmcp/internal/contextbuild"
+	"recordingmcp/internal/decision"
 	"recordingmcp/internal/eval"
 	"recordingmcp/internal/semantic"
 )
@@ -31,23 +33,30 @@ func main() {
 
 func run() error {
 	var (
-		dbPath        = flag.String("db", "", "SQLite database path (default: a fresh temp file). The file is removed and recreated on every run.")
-		outPath       = flag.String("out", "", "JSON report path (default: stdout)")
-		corpusPath    = flag.String("corpus", filepath.Join("fixtures", "eval", "corpus.json"), "corpus fixture path")
-		questionsPath = flag.String("questions", filepath.Join("fixtures", "eval", "questions.json"), "questions fixture path")
-		linksPath     = flag.String("links", filepath.Join("fixtures", "eval", "links.json"), "curated links fixture path")
-		retrPath      = flag.String("retrieval", filepath.Join("fixtures", "eval", "retrieval.json"), "retrieval questions fixture path (empty disables the hybrid/lexical retrieval pass)")
-		projectionKey = flag.String("projection", filepath.Join("fixtures", "eval", "projection.json"), "projection fixture path (empty disables the projection pass)")
-		reportMD      = flag.String("report-md", "", "write a human-readable markdown summary to this path")
-		maxItems      = flag.Int("max-items", 8, "contextbuild request MaxItems")
-		maxBytes      = flag.Int("max-bytes", 16000, "contextbuild request MaxBytes")
-		embedProvider = flag.String("embed-provider", "hash", "embedding provider: hash|off|openai")
-		embedDims     = flag.Int("embed-dims", semantic.DefaultHashDims, "embedding dimensions")
-		embedEndpoint = flag.String("embed-endpoint", "", "OpenAI-compatible embedding endpoint")
-		embedModel    = flag.String("embed-model", "", "embedding model")
-		embedKeyEnv   = flag.String("embed-key-env", "", "environment variable containing the embedding API key")
-		minSimilarity = flag.Float64("min-similarity", -1, "optional semantic admission threshold; omit for default behavior")
-		timeout       = flag.Duration("timeout", 5*time.Minute, "total evaluation timeout")
+		dbPath                = flag.String("db", "", "SQLite database path (default: a fresh temp file). The file is removed and recreated on every run.")
+		outPath               = flag.String("out", "", "JSON report path (default: stdout)")
+		corpusPath            = flag.String("corpus", filepath.Join("fixtures", "eval", "corpus.json"), "corpus fixture path")
+		questionsPath         = flag.String("questions", filepath.Join("fixtures", "eval", "questions.json"), "questions fixture path")
+		linksPath             = flag.String("links", filepath.Join("fixtures", "eval", "links.json"), "curated links fixture path")
+		retrPath              = flag.String("retrieval", filepath.Join("fixtures", "eval", "retrieval.json"), "retrieval questions fixture path (empty disables the hybrid/lexical retrieval pass)")
+		projectionKey         = flag.String("projection", filepath.Join("fixtures", "eval", "projection.json"), "projection fixture path (empty disables the projection pass)")
+		reportMD              = flag.String("report-md", "", "write a human-readable markdown summary to this path")
+		maxItems              = flag.Int("max-items", 8, "contextbuild request MaxItems")
+		maxBytes              = flag.Int("max-bytes", 16000, "contextbuild request MaxBytes")
+		embedProvider         = flag.String("embed-provider", "hash", "embedding provider: hash|off|openai")
+		embedDims             = flag.Int("embed-dims", semantic.DefaultHashDims, "embedding dimensions")
+		embedEndpoint         = flag.String("embed-endpoint", "", "OpenAI-compatible embedding endpoint")
+		embedModel            = flag.String("embed-model", "", "embedding model")
+		embedKeyEnv           = flag.String("embed-key-env", "", "environment variable containing the embedding API key")
+		retrievalVersion      = flag.String("retrieval-version", "v1", "retrieval implementation: v1|v2")
+		rerankCandidateLimit  = flag.Int("rerank-candidate-limit", 64, "v2 candidate pool size before final budget (1..128)")
+		rerankDecisionURL     = flag.String("rerank-decision-url", "", "optional Decision service endpoint for explicitly enabled reranking")
+		rerankDecisionModel   = flag.String("rerank-decision-model", "", "Decision model name for reranking")
+		assessorDecisionURL   = flag.String("assessor-decision-url", "", "optional Decision service endpoint for evidence sufficiency assessment")
+		assessorDecisionModel = flag.String("assessor-decision-model", "", "Decision model name for evidence assessment")
+		minSimilarity         = flag.Float64("min-similarity", -1, "optional semantic admission threshold; omit for default behavior")
+		lexicalOnly           = flag.Bool("lexical-only", false, "run only the lexical retrieval pass")
+		timeout               = flag.Duration("timeout", 5*time.Minute, "total evaluation timeout")
 	)
 	flag.Parse()
 
@@ -80,6 +89,28 @@ func run() error {
 	if *minSimilarity > 1 {
 		return fmt.Errorf("min-similarity must be in [0,1]")
 	}
+	if *retrievalVersion != "v1" && *retrievalVersion != "v2" {
+		return fmt.Errorf("retrieval-version must be v1 or v2")
+	}
+	if *rerankCandidateLimit < 1 || *rerankCandidateLimit > 128 {
+		return fmt.Errorf("rerank-candidate-limit must be in [1,128]")
+	}
+	if (*rerankDecisionURL == "") != (*rerankDecisionModel == "") {
+		return fmt.Errorf("rerank-decision-url and rerank-decision-model must be configured together")
+	}
+	if (*assessorDecisionURL == "") != (*assessorDecisionModel == "") {
+		return fmt.Errorf("assessor-decision-url and assessor-decision-model must be configured together")
+	}
+	var reranker contextbuild.Reranker
+	if *rerankDecisionURL != "" {
+		engine := &decision.SystemOneClient{Endpoint: strings.TrimSpace(*rerankDecisionURL), Model: strings.TrimSpace(*rerankDecisionModel)}
+		reranker = &contextbuild.DecisionReranker{Engine: engine}
+	}
+	var assessor contextbuild.EvidenceAssessor
+	if *assessorDecisionURL != "" {
+		engine := &decision.SystemOneClient{Endpoint: strings.TrimSpace(*assessorDecisionURL), Model: strings.TrimSpace(*assessorDecisionModel)}
+		assessor = contextbuild.DecisionEvidenceAssessor{Engine: engine}
+	}
 	threshold := (*float64)(nil)
 	if *minSimilarity >= 0 {
 		threshold = minSimilarity
@@ -101,6 +132,11 @@ func run() error {
 		SemanticProvider:           provider,
 		SemanticProviderConfigured: true,
 		MinimumSimilarity:          threshold,
+		RetrievalVersion:           *retrievalVersion,
+		RerankCandidateLimit:       *rerankCandidateLimit,
+		Reranker:                   reranker,
+		Assessor:                   assessor,
+		LexicalOnly:                *lexicalOnly,
 	})
 	if err != nil {
 		return err

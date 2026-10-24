@@ -1,0 +1,151 @@
+# Retrieval quality v2 r2 authoring notes
+
+All records and utterances are synthetic and independently authored. Positive group records explain the gold answer and completeness in each question’s `notes` and expose `scenario_kind` / `gold_answer` for auditing. No scoring results are included.
+
+## Positive groups
+- `syn-01` (train, synonym): 社区图书馆期刊借阅 — 期刊外借五天是问题所问期限的直接依据；工具书归还规则是干扰项。
+- `syn-02` (train, synonym): 儿童诊所雾化安排 — 早餐后是明确安排；同句抽血条件用于区分空腹要求。
+- `syn-03` (train, synonym): 自行车维修取车 — 北站修车铺是唯一明确的取车地点。
+- `syn-04` (train, synonym): 社区花圃堆肥 — 蓝色带孔桶给出具体容器，肉类排除项防止混淆。
+- `syn-05` (train, synonym): 博物馆寄存柜 — 一层东侧服务台旁是直接位置答案。
+- `syn-06` (train, synonym): 社区合唱排练 — 二楼小厅是周三的新场地；周五礼堂为近邻干扰。
+- `syn-07` (train, synonym): 农机站滤芯领取 — 蓝色零件柜、西墙均是明确定位信息。
+- `syn-08` (train, synonym): 幼儿园午睡毯清洗 — 周五将毯子发回家清洗，周一入园前送回，交接节点明确。
+- `syn-09` (train, synonym): 法律援助预约 — 只接受电话预约直接回答渠道。
+- `syn-10` (train, synonym): 水站空桶押金 — 三十元是明确金额，换桶规则为干扰项。
+- `syn-11` (calibration, synonym): 社区急救箱位置 — 一楼楼梯口左边是明确位置。
+- `syn-12` (calibration, synonym): 陶艺工作室烧窑 — 周二下午与周四釉件安排形成对照。
+- `syn-13` (calibration, synonym): 养老餐配送 — 门外把手是明确交付位置。
+- `syn-14` (calibration, synonym): 公园观鸟望远镜 — 西门服务亭是明确领取点，证件条件补充流程。
+- `syn-15` (calibration, synonym): 水库皮划艇救生衣 — 码头二号柜是答案；归还要求无关。
+- `syn-16` (test, synonym): 摄影社照片交付 — 灰色文件架第二层明确指出存放位置。
+- `syn-17` (test, synonym): 社区电池回收 — 北门红盒为投放位置，日期仅为辅助事实。
+- `syn-18` (test, synonym): 舞蹈教室鞋柜 — 十二号鞋柜给出唯一编号位置。
+- `syn-19` (test, synonym): 农贸市场摊位续租 — 十个工作日为明确办理期限。
+- `syn-20` (test, synonym): 社区打印室纸张 — 默认A4是事实；A3为特例干扰。
+- `time-01` (train, time): 冷库温控上限 — 两条有日期先后且数值冲突的记录；问题要求当前值，因此只标四月新值。
+- `time-02` (train, time): 档案室除湿计划 — 三月记录明确覆盖一月旧计划。
+- `time-03` (train, time): 剧团候场时间 — 六月通知更新了上一季度的四十五分钟。
+- `time-04` (train, time): 冷泉步道维护日 — 新旧日程相反，春季记录为当前安排。
+- `time-05` (train, time): 博物馆夜场闭馆 — 冬季新规是八点半停止入场，旧的九点闭馆不是同一指标。
+- `time-06` (train, time): 屋顶花园喷灌 — 伏天记录覆盖春季时间，直接回答当前安排。
+- `time-07` (train, time): 体育馆羽毛球照明 — 新赛季更新关闭时刻为十点半。
+- `time-08` (train, time): 门诊抽血窗口 — 五月新版取号时间应替代三月旧时间。
+- `time-09` (train, time): 社区图书配送 — 新学期安排覆盖原来的周三单次配送。
+- `time-10` (train, time): 设备巡检周期 — 四月记录把间隔从两周缩短到每周。
+- `time-11` (calibration, time): 海堤闸门巡查 — 汛期方案明确每日两次，取代每周一次。
+- `time-12` (calibration, time): 剧院票务退款 — 七月政策取代二月的四十八小时要求。
+- `time-13` (calibration, time): 幼儿园接送门 — 秋季通知明确更新通行门，北门仅为旧安排。
+- `time-14` (calibration, time): 河岸营地饮水点 — 新位置在东侧洗手台，旧管线已封闭。
+- `time-15` (calibration, time): 仓库叉车限速 — 最新窄巷规则是五公里每小时。
+- `time-16` (test, time): 水族馆喂食场次 — 新安排有两个场次，完整答案应包含十一点半和四点。
+- `time-17` (test, time): 社区垃圾清运 — 新方案区分垃圾类别并明确混合垃圾周三。
+- `time-18` (test, time): 温室遮阳帘 — 六月阈值覆盖四月旧值。
+- `time-19` (test, time): 城市书展布撤展 — 今年两天前中午的新要求替代旧的一天前安排。
+- `time-20` (test, time): 轮渡自行车票 — 六月新价二十元，且问题明确排除免收费折叠车。
+- `cross-01` (train, cross_session): 乡村观鸟课 — 两场记录分别提供柳湾木栈道和七点二十分，完整回答必须合并。
+- `cross-02` (train, cross_session): 手工艺集市 — 场地和摊主进场时间来自不同会话，两者缺一无法完整作答。
+- `cross-03` (train, cross_session): 社区电影夜 — 西草坪和七点四十五分分别由两条记录提供。
+- `cross-04` (train, cross_session): 旧物修理日 — 登记地点与开始时间必须组合。
+- `cross-05` (train, cross_session): 山地徒步补给 — 第一个会话标地点，第二个标开放日期和时段。
+- `cross-06` (train, cross_session): 家长会托管 — 必须结合阅览室地点与周四时段。
+- `cross-07` (train, cross_session): 社区义诊 — 会议室位置与到场时间在两次沟通中补全。
+- `cross-08` (train, cross_session): 轮船码头接驳 — 候船区与接驳时刻分别在不同会话中。
+- `cross-09` (train, cross_session): 社区烘焙课 — 共享厨房和入炉时刻共同构成完整安排。
+- `cross-10` (train, cross_session): 港口安全讲座 — 地点与时间分别由两个会话确认。
+- `cross-11` (calibration, cross_session): 古城夜游 — 牌坊定位与出发时刻分属两条事实。
+- `cross-12` (calibration, cross_session): 海岛垃圾清运 — 存放位置和清运时间需要合并。
+- `cross-13` (calibration, cross_session): 乐器合奏排练 — 地下排练室与四点二十分各由一个会话提供。
+- `cross-14` (calibration, cross_session): 农田灌溉培训 — 培训场地和示范时刻是互补信息。
+- `cross-15` (calibration, cross_session): 消防器材年检 — 坡道位置和收件时间来自不同记录。
+- `cross-16` (test, cross_session): 城市定向赛 — 终点位置和关闭时刻均为答题必需。
+- `cross-17` (test, cross_session): 书店作者对谈 — 活动区位置与日期时刻必须结合。
+- `cross-18` (test, cross_session): 社区滑板体验 — 入口与护具发放时刻是不同事实。
+- `cross-19` (test, cross_session): 城市流浪猫绝育 — 后门位置与第二周周一时刻须同时检索。
+- `cross-20` (test, cross_session): 河道皮划艇赛 — 签到点和发令时刻分别来自两次赛前说明。
+
+## No-evidence groups
+- `none-01` (train): 社区泳池入场 — 资料只有开放时间和陪同规则，没有儿童票价；不能把陪同规则当作价格。
+- `none-02` (train): 旧书交换活动 — 记录未提到个人姓名，只有地点和分类安排。
+- `none-03` (train): 手术陪护通知 — 文本没有提供时刻，只说每天一次和登记地点。
+- `none-04` (train): 露营地烤炉规则 — 文本明确禁止木炭，未提供租金或租赁服务。
+- `none-05` (train): 乐团演出曲目 — 仅说明作品类型，没有曲目顺序或第三首信息。
+- `none-06` (train): 快递柜故障报修 — 记录未提供工程师姓名或联系方式。
+- `none-07` (train): 地铁站无障碍电梯 — 只说明当前检修和替代路线，没有完工日期。
+- `none-08` (train): 咖啡机清洁 — 记录只有维护动作和周期，没有品牌或清洁剂型号。
+- `none-09` (train): 山地车比赛报名 — 报名截止与装备要求不包含奖金金额。
+- `none-10` (train): 社区菜园浇水 — 记录只写轮值日期，没有种类或畦数。
+- `none-11` (train): 宠物疫苗提醒 — 提醒没有列出批号或厂家。
+- `none-12` (train): 剧院失物招领 — 记录仅列物品种类，没有颜色或品牌。
+- `none-13` (train): 工地安全培训 — 记录没有讲师身份资料。
+- `none-14` (train): 公交卡充值点 — 可充值地点和最低金额不说明额外手续费。
+- `none-15` (train): 博物馆展品借展 — 记录未提保险金额。
+- `none-16` (train): 校园实验室门禁 — 使用规则没有设备供应商或型号。
+- `none-17` (train): 理发店预约 — 记录没有提员工姓名。
+- `none-18` (train): 山泉水质检测 — 只给结论，没有数值指标。
+- `none-19` (train): 宠物寄养接送 — 服务条件中没有车辆或司机信息。
+- `none-20` (train): 儿童绘本讲读 — 记录只描述本周活动，未预告下一周内容。
+- `none-21` (train): 舞蹈服装押运 — 来源只写装箱和归还地点，没有保险条款。
+- `none-22` (train): 海洋馆海豹喂食 — 讲解时段与观众安全线信息不包含员工证书。
+- `none-23` (train): 无人机飞行申请 — 飞行许可条件没有披露设备序列号。
+- `none-24` (train): 丝绸展柜照明 — 文本有照度标准和频率，没有仪器型号。
+- `none-25` (train): 轮滑场护具 — 说明安全要求，没有提到是否出租或押金。
+- `none-26` (train): 企业档案销毁 — 处理时间和部门分工没有设备规格。
+- `none-27` (train): 山村诊疗点药柜 — 只说明存放和药品权限，未说备用钥匙责任人。
+- `none-28` (train): 合租公寓水费 — 分摊办法和账单位置不提供金额，也未给月份账单。
+- `none-29` (train): 山区救援演练 — 文本没有天气观测或温度数据。
+- `none-30` (train): 校刊截稿日期 — 截稿日不等于稿件数量，文本未给篇数。
+- `none-31` (train): 家用光伏检修 — 只记录检修频率，没有发电统计。
+- `none-32` (train): 烘焙坊过敏原 — 过敏原隔离说明没有售价。
+- `none-33` (train): 城市马拉松寄物 — 寄物流程没有写赔偿额度。
+- `none-34` (train): 宠物医院住院探视 — 探视规则未列出医生排班和姓名。
+- `none-35` (train): 山地滑雪雪道 — 当前关闭原因明确，但没有恢复计划。
+- `none-36` (train): 湖区科研采样 — 记录只有数量和送检去向，没有实验结果。
+- `none-37` (train): 社区食堂餐盒 — 文本说明是否可购买，没有材质信息。
+- `none-38` (train): 仓储冷链交接 — 没有给出具体班次记录或编号。
+- `none-39` (train): 公路养护封闭 — 施工时段和封闭方向未提供承包商人员信息。
+- `none-40` (train): 养老院床单更换 — 全院更换制度没有个人偏好记录。
+- `none-41` (calibration): 茶园采摘登记 — 登记方式已描述，但没有当天称重数据。
+- `none-42` (calibration): 火车站母婴室 — 地点和借车服务不包含室内设施数量。
+- `none-43` (calibration): 镇文化馆琴房 — 预约规则没有具体日期的用户记录。
+- `none-44` (calibration): 露天市集电源 — 电流规格和申请时间并未说明电价。
+- `none-45` (calibration): 室内攀岩保险 — 文本列出安全培训和装备，没有保险承保信息。
+- `none-46` (calibration): 公交场站充电 — 当夜操作流程没有采购总量。
+- `none-47` (calibration): 社区药品回收 — 回收周期和地点不等于本次回收清单。
+- `none-48` (calibration): 城市书屋志愿班 — 岗位要求没有具体排班人数。
+- `none-49` (calibration): 展会样品报关 — 准入材料没有具体产品和税率信息。
+- `none-50` (calibration): 家庭宽带迁移 — 流程提醒没有费用条款。
+- `none-51` (calibration): 森林防火观察 — 巡查职责没有历史事件统计。
+- `none-52` (calibration): 中学机器人社 — 活动记录没有硬件清单。
+- `none-53` (calibration): 海港冷冻鱼卸货 — 卸货验收要求没有捕捞来源资料。
+- `none-54` (calibration): 旅馆早餐时段 — 供应地点与时段没有收费信息。
+- `none-55` (calibration): 城市雨水花园 — 维护频率没有工程尺寸。
+- `none-56` (calibration): 国际会议同传 — 使用说明没有供应商工商信息。
+- `none-57` (calibration): 村镇快修点 — 维修项目和报价方式没有员工工资信息。
+- `none-58` (calibration): 高校交换宿舍 — 入住流程没有楼栋床位统计。
+- `none-59` (calibration): 工厂危废暂存 — 处置流程没有本月重量。
+- `none-60` (calibration): 城市观光巴士 — 票种被提及但无票价或优惠条款。
+- `none-61` (test): 社区合唱录音 — 备份介质被明确说明，但从未记录密码。
+- `none-62` (test): 温泉浴场毛巾 — 服务流程没有供应商资料。
+- `none-63` (test): 边境口岸货车排队 — 规则没有当日队列运行数据。
+- `none-64` (test): 儿童剧团服装 — 制作主体和交回安排没有采购价格。
+- `none-65` (test): 农场蜂箱搬迁 — 搬迁位置和时间条件不包含蜂王品系。
+- `none-66` (test): 港口轮胎检查 — 检查项目没有轮胎品牌。
+- `none-67` (test): 气象站自动雨量 — 校准安排不包含气候观测数值。
+- `none-68` (test): 大学生创业路演 — 时间安排没有评审结果或分数。
+- `none-69` (test): 社区老人助浴 — 服务准备要求没有人员资格档案。
+- `none-70` (test): 公园喷泉维护 — 维护日程没有泵体参数。
+- `none-71` (test): 城市停车月卡 — 续费流程没有卡价。
+- `none-72` (test): 中药材晾晒 — 加工方法没有化验数据。
+- `none-73` (test): 工业设计样机 — 试验地点没有成本信息。
+- `none-74` (test): 社区共享工具 — 工具种类与借用方式没有具体产品规格。
+- `none-75` (test): 儿童足球联赛 — 赛制说明没有比赛结果。
+- `none-76` (test): 乡镇客运班车 — 只说明班次数量与购票渠道，没有时刻表。
+- `none-77` (test): 公司差旅标准 — 差旅流程没有餐补标准。
+- `none-78` (test): 海边潮间带观察 — 活动守则不提供潮汐数值。
+- `none-79` (test): 电影资料馆拷贝 — 存档与借阅规则没有设备信息。
+- `none-80` (test): 社区垃圾分类桶 — 分类指引没有车辆排班信息。
+
+## R3 structural repair
+
+R3 is byte-for-byte semantically identical to the reviewed R2 questions and source utterances. The only corpus correction sets each turn’s `original_index` to a unique 1-based ordinal within its segment, as required by `asrinput.Validate`; no retrieval texts, dates, labels, scopes, or gold references changed.

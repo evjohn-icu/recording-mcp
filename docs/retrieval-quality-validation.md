@@ -1,5 +1,7 @@
 # Retrieval quality validation
 
+独立 v2 评测及实验路径见 [Retrieval Quality v2](retrieval-quality-v2.md)。本页保留 v1 冻结实验和其已暴露 holdout 的历史记录。
+
 `internal/semantic.SQLiteRetriever` keeps its historical minimum similarity of
 `0.05` when no explicit threshold is supplied. `context-eval --min-similarity N`
 is an opt-in calibration override. The default remains unchanged unless a

@@ -64,6 +64,9 @@ type Question struct {
 // LoadQuestions reads the fixture and resolves every human reference against
 // the ingested database.
 func LoadQuestions(ctx context.Context, db *sql.DB, path string) ([]Question, error) {
+	if path == "" {
+		return nil, nil
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read questions: %w", err)

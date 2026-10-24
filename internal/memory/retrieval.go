@@ -84,16 +84,19 @@ type EvidenceContext struct {
 	Stale bool `json:"stale"`
 }
 
-// MemorySearch bounds SearchMemory. Text is matched as a case-insensitive
-// literal substring; % and _ never act as wildcards.
+// MemorySearch bounds memory retrieval. SearchMemory v1 uses case-insensitive
+// literal substring matching; SearchMemoryV2 tokenizes Text lexically.
 type MemorySearch struct {
-	Text          string
-	Scope         string
-	Limit         int
-	Cursor        string
-	TopicID       string
-	StartedAfter  *time.Time
-	StartedBefore *time.Time
+	Text string
+	// ConversationID is applied by SearchMemoryV2 before ranking and limiting.
+	// SearchMemory (v1) intentionally retains its historical behavior.
+	ConversationID string
+	Scope          string
+	Limit          int
+	Cursor         string
+	TopicID        string
+	StartedAfter   *time.Time
+	StartedBefore  *time.Time
 	// IncludeStale opts into superseded notes and turns, which are excluded
 	// from current-state results by default.
 	IncludeStale bool

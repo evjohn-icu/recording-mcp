@@ -40,6 +40,7 @@ type authoredRetrievalQuestion struct {
 	ExpectAmbientExcluded bool           `json:"expect_ambient_excluded"`
 	ExpectStaleExcluded   bool           `json:"expect_stale_excluded"`
 	Notes                 string         `json:"notes"`
+	EvidenceCompleteness  string         `json:"evidence_completeness,omitempty"`
 }
 
 // RetrievalQuestion is one resolved retrieval question.
@@ -61,6 +62,7 @@ type RetrievalQuestion struct {
 	ScopeStartedBefore    *time.Time
 	ExpectAmbientExcluded bool
 	ExpectStaleExcluded   bool
+	EvidenceCompleteness  string
 }
 
 type retrievalFile struct {
@@ -118,6 +120,7 @@ func LoadRetrievalQuestions(ctx context.Context, db *sql.DB, path string) ([]Ret
 			Unanswerable:          aq.Unanswerable,
 			ExpectAmbientExcluded: aq.ExpectAmbientExcluded,
 			ExpectStaleExcluded:   aq.ExpectStaleExcluded,
+			EvidenceCompleteness:  aq.EvidenceCompleteness,
 		}
 		if q.GroupID == "" {
 			q.GroupID = q.ID

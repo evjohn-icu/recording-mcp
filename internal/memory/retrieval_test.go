@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -357,6 +358,14 @@ func TestSearchMemoryScopesCaseEscapesAndCursor(t *testing.T) {
 	if !sameStrings(topicedKeys, []string{"note/n:b1", "turn/t:b1"}) {
 		t.Fatalf("topic-filtered hits = %v", topicedKeys)
 	}
+	v2Timed, err := s.SearchMemoryV2(ctx, MemorySearch{Text: "android", StartedAfter: &after})
+	if err != nil || len(v2Timed.Hits) != 2 || v2Timed.Hits[0].ID != "t:a1" || v2Timed.Hits[1].ID != "t:a3" {
+		t.Fatalf("v2 time filter hits = %+v err=%v", v2Timed.Hits, err)
+	}
+	v2Topic, err := s.SearchMemoryV2(ctx, MemorySearch{Text: "android", TopicID: "topic:dev"})
+	if err != nil || len(v2Topic.Hits) != 2 {
+		t.Fatalf("v2 topic filter hits = %+v err=%v", v2Topic.Hits, err)
+	}
 
 	if _, err = s.SearchMemory(ctx, MemorySearch{Text: "  "}); err == nil {
 		t.Fatal("blank text must error")
@@ -370,6 +379,75 @@ func TestSearchMemoryScopesCaseEscapesAndCursor(t *testing.T) {
 	}
 	if _, err = s.SearchMemory(ctx, MemorySearch{Text: "android", Cursor: "###"}); err == nil {
 		t.Fatal("malformed cursor must error")
+	}
+}
+
+func TestSearchMemoryV2ChineseRankingAndConversationIsolation(t *testing.T) {
+	s := seedRetrieval(t)
+	ctx := context.Background()
+	// Insert lexical fixtures into separate conversations. The unrelated
+	// conversation sorts first by id in v1, while v2 must filter it before top-k.
+	seedTurn(t, s, "t:aaa", "conv:a", "rec:a", 10, 10000, "没有相关内容")
+	seedTurn(t, s, "t:bbb", "conv:b", "rec:b", 10, 10000, "苹果手机电池续航很好")
+	seedTurn(t, s, "t:ccc", "conv:c", "rec:c", 10, 10000, "苹果发布了新的手机，手机性能提升")
+
+	page, err := s.SearchMemoryV2(ctx, MemorySearch{Text: "苹果手机", Scope: "raw", Limit: 1, ConversationID: "conv:b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Hits) != 1 || page.Hits[0].ID != "t:bbb" {
+		t.Fatalf("conversation-filtered top hit = %+v", page.Hits)
+	}
+	if page.Hits[0].Score <= 0 {
+		t.Fatalf("expected positive lexical score: %+v", page.Hits[0])
+	}
+	ranked, err := s.SearchMemoryV2(ctx, MemorySearch{Text: "苹果手机", Scope: "raw", Limit: 10})
+	if err != nil || len(ranked.Hits) < 2 || ranked.Hits[0].ID != "t:bbb" || ranked.Hits[0].Score < ranked.Hits[1].Score {
+		t.Fatalf("exact phrase should rank above split-term hit: %+v err=%v", ranked.Hits, err)
+	}
+
+	// CJK two-character grams and one-character queries both have recall.
+	for _, query := range []string{"续航", "果"} {
+		got, err := s.SearchMemoryV2(ctx, MemorySearch{Text: query, Scope: "raw", ConversationID: "conv:b"})
+		if err != nil || len(got.Hits) != 1 || got.Hits[0].ID != "t:bbb" {
+			t.Fatalf("query %q hits = %+v, err=%v", query, got.Hits, err)
+		}
+	}
+	if _, err := s.SearchMemoryV2(ctx, MemorySearch{Text: "苹果", Cursor: "anything"}); err == nil {
+		t.Fatal("v2 must reject cursors")
+	}
+	// V1 keeps its established behavior and ignores the V2-only conversation field.
+	v1, err := s.SearchMemory(ctx, MemorySearch{Text: "android", ConversationID: "conv:b"})
+	if err != nil || len(v1.Hits) < 2 {
+		t.Fatalf("v1 behavior changed: hits=%+v err=%v", v1.Hits, err)
+	}
+}
+
+func TestSearchMemoryV2ScoresFullEligibleCorpusAndTokenBoundaries(t *testing.T) {
+	s := seedRetrieval(t)
+	ctx := context.Background()
+	// More than the former 512-candidate cap match the first query gram. The
+	// only document matching both grams sorts last by ID and must still rank.
+	for i := 0; i < 520; i++ {
+		id := fmt.Sprintf("t:noise-%04d", i)
+		seedTurn(t, s, id, "conv:a", "rec:a", 20+i, int64(20000+i*1000), "苹果橘子")
+	}
+	seedTurn(t, s, "t:zz-relevant", "conv:a", "rec:a", 600, 700000, "苹果手机")
+	page, err := s.SearchMemoryV2(ctx, MemorySearch{Text: "苹果手机", Scope: "raw", Limit: 1})
+	if err != nil || len(page.Hits) != 1 || page.Hits[0].ID != "t:zz-relevant" {
+		t.Fatalf("late exact match was lost: hits=%+v err=%v", page.Hits, err)
+	}
+
+	// Candidate generation may not turn an interior substring into a token hit.
+	seedTurn(t, s, "t:party", "conv:b", "rec:b", 30, 30000, "party atmosphere")
+	boundary, err := s.SearchMemoryV2(ctx, MemorySearch{Text: "art", Scope: "raw"})
+	for _, h := range boundary.Hits {
+		if h.ID == "t:party" {
+			t.Fatalf("substring-only token match returned: %+v", h)
+		}
+	}
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -421,6 +499,9 @@ func TestRetrievalExcludesStaleDerivedMemory(t *testing.T) {
 	if page, err := s.SearchMemory(ctx, MemorySearch{Text: "stale summary", Scope: "both"}); err != nil || len(page.Hits) != 0 {
 		t.Fatalf("stale note surfaced by default: %+v %v", page, err)
 	}
+	if page, err := s.SearchMemoryV2(ctx, MemorySearch{Text: "stale summary", Scope: "both"}); err != nil || len(page.Hits) != 0 {
+		t.Fatalf("v2 stale note surfaced by default: %+v %v", page, err)
+	}
 	if page, err := s.SearchMemory(ctx, MemorySearch{Text: "superseded phrase", Scope: "raw"}); err != nil || len(page.Hits) != 0 {
 		t.Fatalf("stale turn surfaced by default: %+v %v", page, err)
 	}
@@ -431,6 +512,10 @@ func TestRetrievalExcludesStaleDerivedMemory(t *testing.T) {
 	}
 	if h := page.Hits[0]; !h.Stale || h.ID != noteID || len(h.DerivedFrom) != 1 || h.DerivedFrom[0] != "rev-1" {
 		t.Fatalf("stale note marker/provenance wrong: %+v", h)
+	}
+	v2Audit, err := s.SearchMemoryV2(ctx, MemorySearch{Text: "stale summary", Scope: "both", IncludeStale: true})
+	if err != nil || len(v2Audit.Hits) != 1 || !v2Audit.Hits[0].Stale || len(v2Audit.Hits[0].DerivedFrom) != 1 || v2Audit.Hits[0].DerivedFrom[0] != "rev-1" {
+		t.Fatalf("v2 stale note provenance wrong: %+v err=%v", v2Audit.Hits, err)
 	}
 	turnPage, err := s.SearchMemory(ctx, MemorySearch{Text: "superseded phrase", Scope: "raw", IncludeStale: true})
 	if err != nil || len(turnPage.Hits) != 1 {
@@ -567,6 +652,14 @@ func TestRetrievalSeparatesAmbient(t *testing.T) {
 		if h.Ambient {
 			t.Fatalf("default search marked a hit ambient but returned it: %+v", h)
 		}
+	}
+	v2Default, err := s.SearchMemoryV2(ctx, MemorySearch{Text: "phrase", Scope: "both"})
+	if err != nil || len(v2Default.Hits) != 2 {
+		t.Fatalf("v2 default ambient separation = %+v err=%v", v2Default.Hits, err)
+	}
+	v2Ambient, err := s.SearchMemoryV2(ctx, MemorySearch{Text: "phrase", Scope: "both", IncludeAmbient: true})
+	if err != nil || len(v2Ambient.Hits) != 4 {
+		t.Fatalf("v2 include ambient hits = %+v err=%v", v2Ambient.Hits, err)
 	}
 
 	// include_ambient surfaces them, explicitly marked.

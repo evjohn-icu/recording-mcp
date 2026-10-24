@@ -274,6 +274,21 @@ func (s *Server) handleHybrid(w http.ResponseWriter, r *http.Request) {
 		writeBadRequest(w, "mode must be hybrid or lexical")
 		return
 	}
+	version := strings.TrimSpace(r.URL.Query().Get("retrieval_version"))
+	if version != "" && version != "v1" && version != "v2" {
+		writeBadRequest(w, "retrieval_version must be v1 or v2")
+		return
+	}
+	poolLimit, err := queryInt(r, "rerank_candidate_limit", 64, 1, 128)
+	if err != nil {
+		writeBadRequest(w, err.Error())
+		return
+	}
+	maxBytes, err := queryInt(r, "max_bytes", 16000, 1, 262144)
+	if err != nil {
+		writeBadRequest(w, err.Error())
+		return
+	}
 	maxItems, err := queryInt(r, "max_items", 20, 1, 64)
 	if err != nil {
 		writeBadRequest(w, err.Error())
@@ -290,14 +305,16 @@ func (s *Server) handleHybrid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req := contextbuild.Request{
-		Purpose:        "web_search",
-		Query:          q,
-		ConversationID: strings.TrimSpace(r.URL.Query().Get("conversation_id")),
-		Mode:           mode,
-		StartedAfter:   after,
-		StartedBefore:  before,
-		MaxItems:       maxItems,
-		MaxBytes:       16000,
+		Purpose:              "web_search",
+		Query:                q,
+		ConversationID:       strings.TrimSpace(r.URL.Query().Get("conversation_id")),
+		Mode:                 mode,
+		StartedAfter:         after,
+		StartedBefore:        before,
+		MaxItems:             maxItems,
+		MaxBytes:             maxBytes,
+		RetrievalVersion:     version,
+		RerankCandidateLimit: poolLimit,
 	}
 	if topic := strings.TrimSpace(r.URL.Query().Get("topic_id")); topic != "" {
 		req.TopicIDs = []string{topic}

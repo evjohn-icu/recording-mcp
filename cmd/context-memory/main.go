@@ -317,7 +317,7 @@ func newServer(store *memory.Store, svc *app.Service, readOnly bool) *mcp.Server
 		r, e := svc.Search(ctx, memory.MemorySearch{Text: in.Text, Scope: in.Scope, Limit: in.Limit, Cursor: in.Cursor, TopicID: in.TopicID, StartedAfter: after, StartedBefore: before, IncludeStale: in.IncludeStale, IncludeAmbient: in.IncludeAmbient})
 		return nil, r, e
 	})
-	mcp.AddTool(s, read("build_context", "实验性：为任务组装带预算与来源的上下文包（items / evidence / coverage / gaps / trace / ranking）。默认排除已失效的派生记忆；mode 可选 hybrid（默认，含语义召回）或 lexical（仅字面）；未配置决策引擎时不做重排并返回 degraded=true，确定性结果仍完整返回；未配置或未索引语义后端时同样降级并在 gaps 中说明。"), func(ctx context.Context, _ *mcp.CallToolRequest, in contextbuild.Request) (*mcp.CallToolResult, contextbuild.Package, error) {
+	mcp.AddTool(s, read("build_context", "实验性：为任务组装带预算与来源的上下文包（items / evidence / coverage / gaps / trace / ranking）。默认排除已失效的派生记忆；mode 可选 hybrid（默认，含语义召回）或 lexical（仅字面）；retrieval_version 默认 v1，显式 v2 启用中文召回、预算前重排及充分性状态；未配置决策引擎时不做重排并返回 degraded=true，确定性结果仍完整返回；未配置或未索引语义后端时同样降级并在 gaps 中说明。"), func(ctx context.Context, _ *mcp.CallToolRequest, in contextbuild.Request) (*mcp.CallToolResult, contextbuild.Package, error) {
 		pkg, e := svc.BuildContext(ctx, in)
 		return nil, pkg, e
 	})
@@ -524,6 +524,8 @@ func main() {
 	profileCLI := profile.RegisterCLI(flag.CommandLine)
 	readOnly := flag.Bool("read-only", false, "register only the read tools; ingest_transcript, apply_annotations, review_memory_link, propose_speaker_binding and review_speaker_binding are not exposed")
 	decisionURL := flag.String("decision-url", "", "optional Decision engine endpoint used to rerank build_context items (empty disables reranking)")
+	sufficiencyURL := flag.String("sufficiency-url", "", "optional Decision endpoint for v2 evidence sufficiency (empty disables assessment)")
+	sufficiencyModel := flag.String("sufficiency-model", "", "model identity for v2 evidence sufficiency")
 	decisionModel := flag.String("decision-model", "jev-style-2b-v2", "model name sent to the Decision engine for build_context reranking")
 	useSemanticIndex := flag.Bool("semantic-index", false, "opt in to the experimental profile-owned HNSW sidecar; exact search remains default")
 	semanticProvider := flag.String("semantic-provider", "hash", "semantic recall backend: off, hash (offline deterministic embedder) or openai")
@@ -590,6 +592,9 @@ func main() {
 		log.Fatal(e)
 	}
 	svc := app.New(store, retriever, rerank, "")
+	if strings.TrimSpace(*sufficiencyURL) != "" {
+		svc.Assessor = &contextbuild.DecisionEvidenceAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
+	}
 	srv := newServer(store, svc, *readOnly)
 	mcpserver.Register(srv, events, nil, *readOnly)
 	if e = srv.Run(ctx, &mcp.StdioTransport{}); e != nil && ctx.Err() == nil {

@@ -796,3 +796,40 @@ func TestConversationDetailAndTurnsHappyPath(t *testing.T) {
 		t.Fatalf("unknown conversation: got %d want 404", status)
 	}
 }
+
+func TestHybridRetrievalVersionSelection(t *testing.T) {
+	env := newTestEnv(t, "")
+	status, data := env.do(t, http.MethodGet, "/api/search/hybrid?q=预算&retrieval_version=typo", "", nil)
+	if status != http.StatusBadRequest {
+		t.Fatalf("invalid version: %d %s", status, data)
+	}
+	var defaultBody, v1Body []byte
+	for _, version := range []string{"", "v1", "v2"} {
+		status, data = env.do(t, http.MethodGet, "/api/search/hybrid?q=预算&mode=lexical&retrieval_version="+version, "", nil)
+		if status != http.StatusOK {
+			t.Fatalf("version %q: %d %s", version, status, data)
+		}
+		var result map[string]json.RawMessage
+		if err := json.Unmarshal(data, &result); err != nil {
+			t.Fatal(err)
+		}
+		if version == "" {
+			defaultBody = append([]byte(nil), data...)
+			if len(result["sufficiency"]) != 0 {
+				t.Fatalf("default retrieval unexpectedly selected v2: %s", data)
+			}
+		}
+		if version == "v1" {
+			v1Body = append([]byte(nil), data...)
+			if len(result["sufficiency"]) != 0 {
+				t.Fatalf("explicit v1 unexpectedly selected v2: %s", data)
+			}
+		}
+		if version == "v2" && len(result["sufficiency"]) == 0 {
+			t.Fatalf("v2 missing sufficiency: %s", data)
+		}
+	}
+	if string(defaultBody) != string(v1Body) {
+		t.Fatalf("omitted retrieval_version differs from explicit v1\ndefault: %s\nv1: %s", defaultBody, v1Body)
+	}
+}

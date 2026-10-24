@@ -1,0 +1,1235 @@
+{
+  "description": "Independent frozen 240-query benchmark; 160 answerable in four 40-query buckets and 80 no-evidence. Source/concept groups are split 50/25/25.",
+  "questions": [
+    {
+      "id": "v2-negative-041",
+      "group_id": "v2-negative-041",
+      "source_group_id": "v2-no-source-041",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "赤陶器材室第41号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-042",
+      "group_id": "v2-negative-042",
+      "source_group_id": "v2-no-source-042",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "蒲公英游泳馆第42号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-043",
+      "group_id": "v2-negative-043",
+      "source_group_id": "v2-no-source-043",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "折桂阅读会第43号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-044",
+      "group_id": "v2-negative-044",
+      "source_group_id": "v2-no-source-044",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "晴川宠物站第44号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-045",
+      "group_id": "v2-negative-045",
+      "source_group_id": "v2-no-source-045",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "石榴山屋第45号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-046",
+      "group_id": "v2-negative-046",
+      "source_group_id": "v2-no-source-046",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "月台修表铺第46号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-047",
+      "group_id": "v2-negative-047",
+      "source_group_id": "v2-no-source-047",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "榆钱摄影社第47号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-048",
+      "group_id": "v2-negative-048",
+      "source_group_id": "v2-no-source-048",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "寒星茶园第48号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-049",
+      "group_id": "v2-negative-049",
+      "source_group_id": "v2-no-source-049",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "白帆模型组第49号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-050",
+      "group_id": "v2-negative-050",
+      "source_group_id": "v2-no-source-050",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "铜铃舞团第50号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-051",
+      "group_id": "v2-negative-051",
+      "source_group_id": "v2-no-source-051",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "青柠汽修点第51号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-052",
+      "group_id": "v2-negative-052",
+      "source_group_id": "v2-no-source-052",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "暮色合唱团第52号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-053",
+      "group_id": "v2-negative-053",
+      "source_group_id": "v2-no-source-053",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "苔原露营队第53号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-054",
+      "group_id": "v2-negative-054",
+      "source_group_id": "v2-no-source-054",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "云杉钟表行第54号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-055",
+      "group_id": "v2-negative-055",
+      "source_group_id": "v2-no-source-055",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "稻香烘焙房第55号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-056",
+      "group_id": "v2-negative-056",
+      "source_group_id": "v2-no-source-056",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "远灯棋社第56号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-057",
+      "group_id": "v2-negative-057",
+      "source_group_id": "v2-no-source-057",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "竹影门诊部第57号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-058",
+      "group_id": "v2-negative-058",
+      "source_group_id": "v2-no-source-058",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "流沙展览馆第58号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-059",
+      "group_id": "v2-negative-059",
+      "source_group_id": "v2-no-source-059",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "石榴河救援队第59号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-negative-060",
+      "group_id": "v2-negative-060",
+      "source_group_id": "v2-no-source-060",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "晚潮乐器行第60号之前记录的备用仓库门禁口令是什么",
+      "purpose": "no_evidence",
+      "unanswerable": true,
+      "gold_turn_refs": [],
+      "notes": "该机构与门禁口令均为合成且不在冻结证据中；用于检验无证据误召回。",
+      "evidence_completeness": "none"
+    },
+    {
+      "id": "v2-positive-cross_session-11-q1",
+      "group_id": "v2-positive-cross_session-11",
+      "source_group_id": "v2-source-071",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "综合前后两次沟通，南窗花店第71批的培训材料最后确认了什么",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-071",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        },
+        {
+          "segment_id": "v2-followup-seg-071",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-071",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成跨会话查询；两场独立沟通中的同一概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-cross_session-11-q2",
+      "group_id": "v2-positive-cross_session-11",
+      "source_group_id": "v2-source-071",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "南窗花店第71批后来补充过培训材料，前后记录合起来的结论是什么",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-071",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        },
+        {
+          "segment_id": "v2-followup-seg-071",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-071",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成跨会话查询；两场独立沟通中的同一概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-cross_session-12-q1",
+      "group_id": "v2-positive-cross_session-12",
+      "source_group_id": "v2-source-072",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "综合前后两次沟通，晨雾剧场第72批的安全演练最后确认了什么",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-072",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        },
+        {
+          "segment_id": "v2-followup-seg-072",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-072",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成跨会话查询；两场独立沟通中的同一概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-cross_session-12-q2",
+      "group_id": "v2-positive-cross_session-12",
+      "source_group_id": "v2-source-072",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "晨雾剧场第72批后来补充过安全演练，前后记录合起来的结论是什么",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-072",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        },
+        {
+          "segment_id": "v2-followup-seg-072",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-072",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成跨会话查询；两场独立沟通中的同一概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-cross_session-13-q1",
+      "group_id": "v2-positive-cross_session-13",
+      "source_group_id": "v2-source-073",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "综合前后两次沟通，橙屿咖啡第73批的仓储钥匙最后确认了什么",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-073",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        },
+        {
+          "segment_id": "v2-followup-seg-073",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-073",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成跨会话查询；两场独立沟通中的同一概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-cross_session-13-q2",
+      "group_id": "v2-positive-cross_session-13",
+      "source_group_id": "v2-source-073",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "橙屿咖啡第73批后来补充过仓储钥匙，前后记录合起来的结论是什么",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-073",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        },
+        {
+          "segment_id": "v2-followup-seg-073",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-073",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成跨会话查询；两场独立沟通中的同一概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-cross_session-14-q1",
+      "group_id": "v2-positive-cross_session-14",
+      "source_group_id": "v2-source-074",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "综合前后两次沟通，砾石球馆第74批的场地预约最后确认了什么",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-074",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        },
+        {
+          "segment_id": "v2-followup-seg-074",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-074",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成跨会话查询；两场独立沟通中的同一概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-cross_session-14-q2",
+      "group_id": "v2-positive-cross_session-14",
+      "source_group_id": "v2-source-074",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "砾石球馆第74批后来补充过场地预约，前后记录合起来的结论是什么",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-074",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        },
+        {
+          "segment_id": "v2-followup-seg-074",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-074",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成跨会话查询；两场独立沟通中的同一概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-cross_session-15-q1",
+      "group_id": "v2-positive-cross_session-15",
+      "source_group_id": "v2-source-075",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "综合前后两次沟通，风铃托育第75批的课程讲义最后确认了什么",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-075",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        },
+        {
+          "segment_id": "v2-followup-seg-075",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-075",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成跨会话查询；两场独立沟通中的同一概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-cross_session-15-q2",
+      "group_id": "v2-positive-cross_session-15",
+      "source_group_id": "v2-source-075",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "风铃托育第75批后来补充过课程讲义，前后记录合起来的结论是什么",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-075",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        },
+        {
+          "segment_id": "v2-followup-seg-075",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-075",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成跨会话查询；两场独立沟通中的同一概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-negation-11-q1",
+      "group_id": "v2-positive-negation-11",
+      "source_group_id": "v2-source-031",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "南窗花店第31批的培训材料没有按原计划保留，后来确认了什么",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-031",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-031",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；negation桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-negation-11-q2",
+      "group_id": "v2-positive-negation-11",
+      "source_group_id": "v2-source-031",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "别按旧说法找，南窗花店第31批最终关于培训材料的确认内容是什么",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-031",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-031",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；negation桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-negation-12-q1",
+      "group_id": "v2-positive-negation-12",
+      "source_group_id": "v2-source-032",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "晨雾剧场第32批的安全演练没有按原计划保留，后来确认了什么",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-032",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-032",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；negation桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-negation-12-q2",
+      "group_id": "v2-positive-negation-12",
+      "source_group_id": "v2-source-032",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "别按旧说法找，晨雾剧场第32批最终关于安全演练的确认内容是什么",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-032",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-032",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；negation桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-negation-13-q1",
+      "group_id": "v2-positive-negation-13",
+      "source_group_id": "v2-source-033",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "橙屿咖啡第33批的仓储钥匙没有按原计划保留，后来确认了什么",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-033",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-033",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；negation桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-negation-13-q2",
+      "group_id": "v2-positive-negation-13",
+      "source_group_id": "v2-source-033",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "别按旧说法找，橙屿咖啡第33批最终关于仓储钥匙的确认内容是什么",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-033",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-033",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；negation桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-negation-14-q1",
+      "group_id": "v2-positive-negation-14",
+      "source_group_id": "v2-source-034",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "砾石球馆第34批的场地预约没有按原计划保留，后来确认了什么",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-034",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-034",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；negation桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-negation-14-q2",
+      "group_id": "v2-positive-negation-14",
+      "source_group_id": "v2-source-034",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "别按旧说法找，砾石球馆第34批最终关于场地预约的确认内容是什么",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-034",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-034",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；negation桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-negation-15-q1",
+      "group_id": "v2-positive-negation-15",
+      "source_group_id": "v2-source-035",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "风铃托育第35批的课程讲义没有按原计划保留，后来确认了什么",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-035",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-035",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；negation桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-negation-15-q2",
+      "group_id": "v2-positive-negation-15",
+      "source_group_id": "v2-source-035",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "别按旧说法找，风铃托育第35批最终关于课程讲义的确认内容是什么",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-035",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-035",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；negation桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-synonym-11-q1",
+      "group_id": "v2-positive-synonym-11",
+      "source_group_id": "v2-source-011",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "南窗花店第11批关于培训材料最后定下什么内容",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-011",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-011",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；synonym桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-synonym-11-q2",
+      "group_id": "v2-positive-synonym-11",
+      "source_group_id": "v2-source-011",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "陶然在南窗花店第11批提到的培训材料安排是什么",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-011",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-011",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；synonym桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-synonym-12-q1",
+      "group_id": "v2-positive-synonym-12",
+      "source_group_id": "v2-source-012",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "晨雾剧场第12批关于安全演练最后定下什么内容",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-012",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-012",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；synonym桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-synonym-12-q2",
+      "group_id": "v2-positive-synonym-12",
+      "source_group_id": "v2-source-012",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "顾师傅在晨雾剧场第12批提到的安全演练安排是什么",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-012",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-012",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；synonym桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-synonym-13-q1",
+      "group_id": "v2-positive-synonym-13",
+      "source_group_id": "v2-source-013",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "橙屿咖啡第13批关于仓储钥匙最后定下什么内容",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-013",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-013",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；synonym桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-synonym-13-q2",
+      "group_id": "v2-positive-synonym-13",
+      "source_group_id": "v2-source-013",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "贺师傅在橙屿咖啡第13批提到的仓储钥匙安排是什么",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-013",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-013",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；synonym桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-synonym-14-q1",
+      "group_id": "v2-positive-synonym-14",
+      "source_group_id": "v2-source-014",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "砾石球馆第14批关于场地预约最后定下什么内容",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-014",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-014",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；synonym桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-synonym-14-q2",
+      "group_id": "v2-positive-synonym-14",
+      "source_group_id": "v2-source-014",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "唐宁在砾石球馆第14批提到的场地预约安排是什么",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-014",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-014",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；synonym桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-synonym-15-q1",
+      "group_id": "v2-positive-synonym-15",
+      "source_group_id": "v2-source-015",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "风铃托育第15批关于课程讲义最后定下什么内容",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-015",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-015",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；synonym桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-synonym-15-q2",
+      "group_id": "v2-positive-synonym-15",
+      "source_group_id": "v2-source-015",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "沈队长在风铃托育第15批提到的课程讲义安排是什么",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-015",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-015",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；synonym桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-time-11-q1",
+      "group_id": "v2-positive-time-11",
+      "source_group_id": "v2-source-051",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "最近一次记录里南窗花店第51批的培训材料定在何时或何处",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-051",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-051",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；time桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-time-11-q2",
+      "group_id": "v2-positive-time-11",
+      "source_group_id": "v2-source-051",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "按最新安排，南窗花店第51批的培训材料具体信息是什么",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-051",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-051",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；time桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-time-12-q1",
+      "group_id": "v2-positive-time-12",
+      "source_group_id": "v2-source-052",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "最近一次记录里晨雾剧场第52批的安全演练定在何时或何处",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-052",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-052",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；time桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-time-12-q2",
+      "group_id": "v2-positive-time-12",
+      "source_group_id": "v2-source-052",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "按最新安排，晨雾剧场第52批的安全演练具体信息是什么",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-052",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-052",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；time桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-time-13-q1",
+      "group_id": "v2-positive-time-13",
+      "source_group_id": "v2-source-053",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "最近一次记录里橙屿咖啡第53批的仓储钥匙定在何时或何处",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-053",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-053",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；time桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-time-13-q2",
+      "group_id": "v2-positive-time-13",
+      "source_group_id": "v2-source-053",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "按最新安排，橙屿咖啡第53批的仓储钥匙具体信息是什么",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-053",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-053",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；time桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-time-14-q1",
+      "group_id": "v2-positive-time-14",
+      "source_group_id": "v2-source-054",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "最近一次记录里砾石球馆第54批的场地预约定在何时或何处",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-054",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-054",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；time桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-time-14-q2",
+      "group_id": "v2-positive-time-14",
+      "source_group_id": "v2-source-054",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "按最新安排，砾石球馆第54批的场地预约具体信息是什么",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-054",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-054",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；time桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-time-15-q1",
+      "group_id": "v2-positive-time-15",
+      "source_group_id": "v2-source-055",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "最近一次记录里风铃托育第55批的课程讲义定在何时或何处",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-055",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-055",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；time桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    },
+    {
+      "id": "v2-positive-time-15-q2",
+      "group_id": "v2-positive-time-15",
+      "source_group_id": "v2-source-055",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "按最新安排，风铃托育第55批的课程讲义具体信息是什么",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-055",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-055",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "新写的合成查询；time桶概念组不跨分区。",
+      "evidence_completeness": "complete"
+    }
+  ]
+}

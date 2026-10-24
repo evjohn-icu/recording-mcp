@@ -17,6 +17,7 @@ type Service struct {
 	Store    *memory.Store
 	Semantic semantic.SemanticRetriever
 	Reranker contextbuild.Reranker
+	Assessor contextbuild.EvidenceAssessor
 	// AudioDir is the cloud-sync audio directory. Every served clip must live
 	// beneath it; an empty value disables audio serving instead of allowing
 	// paths relative to the process working directory.
@@ -151,7 +152,7 @@ func (s *Service) EvidenceContext(ctx context.Context, turnID string, radius, ma
 // BuildContext assembles a hybrid context package with the service's fixed
 // dependency set.
 func (s *Service) BuildContext(ctx context.Context, req contextbuild.Request) (contextbuild.Package, error) {
-	return contextbuild.Build(ctx, contextbuild.Deps{Store: s.Store, DB: s.Store.DB(), Reranker: s.Reranker, Semantic: s.Semantic}, req)
+	return contextbuild.Build(ctx, contextbuild.Deps{Store: s.Store, DB: s.Store.DB(), Reranker: s.Reranker, Assessor: s.Assessor, Semantic: s.Semantic}, req)
 }
 
 // ApplyAnnotations applies one full annotation revision. It is a passthrough:

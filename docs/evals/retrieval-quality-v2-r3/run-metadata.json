@@ -1,0 +1,12 @@
+{
+  "base_git_commit": "af3590d608c06d7deb0d7c2fa0c6b7ff8d2ee60b",
+  "go_version": "go version go1.27.2 linux/amd64",
+  "platform": "Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "fixture_sha256": {
+    "corpus.json": "b95ade6df3221b8c0fd4653d88d2761da33c15efed5aa4be3cd9402b3fb63dc2",
+    "retrieval.json": "03e8ed678f35cc6632092daacb0f031871048f596853e01cf664d2997b3cc4d3"
+  },
+  "binary_sha256": "56e397a30224161a14354b0b7b083a43a866859df2ca70e0a07accd8b31c2429",
+  "runner_sha256": "a30bc351731bf60876ffcdfc21a31aeb252e08420bf9fdcd84614b890f4a25f3",
+  "note": "工作区变更未提交。所有延迟来自本机单次运行，非跨机器性能承诺。原始报告路径保留实际/tmp命令参数；本目录保存原字节归档。"
+}

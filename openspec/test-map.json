@@ -243,6 +243,34 @@
       "spec": "openspec/specs/workflow/spec.md",
       "test_file": "scripts/test_check_spec_test_map.py",
       "test_anchor": "test_exact_test_anchor_passes"
+    },
+    {
+      "id": "retrieval.v2-lexical-isolation",
+      "status": "covered",
+      "spec": "openspec/changes/retrieval-quality-v2/specs/retrieval/spec.md",
+      "test_file": "internal/memory/retrieval_test.go",
+      "test_anchor": "TestSearchMemoryV2ChineseRankingAndConversationIsolation"
+    },
+    {
+      "id": "retrieval.v2-prebudget-rerank",
+      "status": "covered",
+      "spec": "openspec/changes/retrieval-quality-v2/specs/retrieval/spec.md",
+      "test_file": "internal/contextbuild/retrieval_v2_test.go",
+      "test_anchor": "TestBuildV2ReranksBoundedPoolBeforeFinalBudget"
+    },
+    {
+      "id": "retrieval.v2-sufficiency",
+      "status": "covered",
+      "spec": "openspec/changes/retrieval-quality-v2/specs/retrieval/spec.md",
+      "test_file": "internal/contextbuild/retrieval_v2_test.go",
+      "test_anchor": "TestBuildV2RejectsOutOfSetAssessmentReferences"
+    },
+    {
+      "id": "retrieval.v2-frozen-evaluation",
+      "status": "covered",
+      "spec": "openspec/changes/retrieval-quality-v2/specs/retrieval/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_independent_fixture_shape_and_group_split"
     }
   ]
 }

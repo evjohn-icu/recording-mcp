@@ -105,6 +105,8 @@ func main() {
 	semanticModel := flag.String("semantic-model", "", "embedding model name (required when --semantic-provider=openai)")
 	semanticKeyEnv := flag.String("semantic-key-env", "", "environment variable holding the embeddings API key (openai only)")
 	decisionURL := flag.String("decision-url", "", "optional Decision engine endpoint used to rerank hybrid search items (empty disables reranking)")
+	sufficiencyURL := flag.String("sufficiency-url", "", "optional Decision endpoint for v2 evidence sufficiency (empty disables assessment)")
+	sufficiencyModel := flag.String("sufficiency-model", "", "model identity for v2 evidence sufficiency")
 	decisionModel := flag.String("decision-model", "jev-style-2b-v2", "model name sent to the Decision engine for reranking")
 	worldlineURL := flag.String("worldline-decision-url", "", "local loopback system_one endpoint for worldline semantic suggestions")
 	worldlineModel := flag.String("worldline-decision-model", "decision-v3-0.8b", "actual local decision model for worldline suggestions")
@@ -179,6 +181,9 @@ func main() {
 				rerank = &contextbuild.DecisionReranker{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*decisionURL), Model: *decisionModel}}
 			}
 			svc := app.New(store, retriever, rerank, paths.Audio)
+			if strings.TrimSpace(*sufficiencyURL) != "" {
+				svc.Assessor = &contextbuild.DecisionEvidenceAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
+			}
 			svc.ForgetPlane = events
 			svc.ManagedIndexDir = paths.Index
 			svc.ManagedBackupDir = paths.Backups
@@ -295,6 +300,9 @@ func main() {
 		rerank = &contextbuild.DecisionReranker{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*decisionURL), Model: *decisionModel}}
 	}
 	svc := app.New(store, retriever, rerank, *audioDir)
+	if strings.TrimSpace(*sufficiencyURL) != "" {
+		svc.Assessor = &contextbuild.DecisionEvidenceAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
+	}
 	svc.ForgetPlane = events
 	if *useSemanticIndex {
 		svc.ManagedIndexDir = indexDir

@@ -1,0 +1,1445 @@
+{
+  "description": "仅用于v2 corpus的合成直接检索回归，不参与独立240问指标。",
+  "questions": [
+    {
+      "id": "classic-v2-seg-001",
+      "query": "青禾工坊的巡检表由周岚确认：三箱",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-001",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-001",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-002",
+      "query": "北辰诊所的交付节点由蒋老师确认：九点半",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-002",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-002",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-003",
+      "query": "云渡书店的客户回访由许老师确认：第三单元",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-003",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-003",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-004",
+      "query": "松石社团的接送安排由魏宁确认：六月底前",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-004",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-004",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-005",
+      "query": "澄湾工作室的周末值班由罗主管确认：四十六件",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-005",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-005",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-006",
+      "query": "白鹭厨房的轮班名单由苏禾确认：十二个名额",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-006",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-006",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-007",
+      "query": "远山学堂的备用电池由方医生确认：陈师傅",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-007",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-007",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-008",
+      "query": "星桥车队的设备保养由邱老师确认：五月十六日",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-008",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-008",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-009",
+      "query": "木棉旅舍的订货数量由孟姐确认：七百二十元",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-009",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-009",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-010",
+      "query": "溪谷实验室的讲座名额由杜妍确认：周四下午",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-010",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-010",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-011",
+      "query": "南窗花店的培训材料由陶然确认：蓝色文件夹",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-011",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-011",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-012",
+      "query": "晨雾剧场的安全演练由顾师傅确认：西门访客区",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-012",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-012",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-013",
+      "query": "橙屿咖啡的仓储钥匙由贺师傅确认：每隔三周",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-013",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-013",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-014",
+      "query": "砾石球馆的场地预约由唐宁确认：先做消防通道",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-014",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-014",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-015",
+      "query": "风铃托育的课程讲义由沈队长确认：冷藏柜第二层",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-015",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-015",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-016",
+      "query": "长堤维修站的活动预算由叶晴确认：林组长",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-016",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-016",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-017",
+      "query": "银杏画室的报销凭证由梁经理确认：东侧库房",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-017",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-017",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-018",
+      "query": "微光志愿队的停车许可由陈澈确认：改到室内",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-018",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-018",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-019",
+      "query": "栖云农场的药品清单由袁师傅确认：两万四千元",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-019",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-019",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-020",
+      "query": "海盐设计组的雨天方案由邵工确认：五号会议室",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-020",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-020",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-021",
+      "query": "青禾工坊的巡检表由周岚确认：三箱",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-021",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-021",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-022",
+      "query": "北辰诊所的交付节点由蒋老师确认：九点半",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-022",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-022",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-023",
+      "query": "云渡书店的客户回访由许老师确认：第三单元",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-023",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-023",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-024",
+      "query": "松石社团的接送安排由魏宁确认：六月底前",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-024",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-024",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-025",
+      "query": "澄湾工作室的周末值班由罗主管确认：四十六件",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-025",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-025",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-026",
+      "query": "白鹭厨房的轮班名单由苏禾确认：十二个名额",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-026",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-026",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-027",
+      "query": "远山学堂的备用电池由方医生确认：陈师傅",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-027",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-027",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-028",
+      "query": "星桥车队的设备保养由邱老师确认：五月十六日",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-028",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-028",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-029",
+      "query": "木棉旅舍的订货数量由孟姐确认：七百二十元",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-029",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-029",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-030",
+      "query": "溪谷实验室的讲座名额由杜妍确认：周四下午",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-030",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-030",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-031",
+      "query": "南窗花店的培训材料由陶然确认：蓝色文件夹",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-031",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-031",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-032",
+      "query": "晨雾剧场的安全演练由顾师傅确认：西门访客区",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-032",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-032",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-033",
+      "query": "橙屿咖啡的仓储钥匙由贺师傅确认：每隔三周",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-033",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-033",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-034",
+      "query": "砾石球馆的场地预约由唐宁确认：先做消防通道",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-034",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-034",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-035",
+      "query": "风铃托育的课程讲义由沈队长确认：冷藏柜第二层",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-035",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-035",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-036",
+      "query": "长堤维修站的活动预算由叶晴确认：林组长",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-036",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-036",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-037",
+      "query": "银杏画室的报销凭证由梁经理确认：东侧库房",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-037",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-037",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-038",
+      "query": "微光志愿队的停车许可由陈澈确认：改到室内",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-038",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-038",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-039",
+      "query": "栖云农场的药品清单由袁师傅确认：两万四千元",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-039",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-039",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-040",
+      "query": "海盐设计组的雨天方案由邵工确认：五号会议室",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-040",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-040",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-041",
+      "query": "青禾工坊的巡检表由周岚确认：三箱",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-041",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-041",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-042",
+      "query": "北辰诊所的交付节点由蒋老师确认：九点半",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-042",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-042",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-043",
+      "query": "云渡书店的客户回访由许老师确认：第三单元",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-043",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-043",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-044",
+      "query": "松石社团的接送安排由魏宁确认：六月底前",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-044",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-044",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-045",
+      "query": "澄湾工作室的周末值班由罗主管确认：四十六件",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-045",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-045",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-046",
+      "query": "白鹭厨房的轮班名单由苏禾确认：十二个名额",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-046",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-046",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-047",
+      "query": "远山学堂的备用电池由方医生确认：陈师傅",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-047",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-047",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-048",
+      "query": "星桥车队的设备保养由邱老师确认：五月十六日",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-048",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-048",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-049",
+      "query": "木棉旅舍的订货数量由孟姐确认：七百二十元",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-049",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-049",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-050",
+      "query": "溪谷实验室的讲座名额由杜妍确认：周四下午",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-050",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-050",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-051",
+      "query": "南窗花店的培训材料由陶然确认：蓝色文件夹",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-051",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-051",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-052",
+      "query": "晨雾剧场的安全演练由顾师傅确认：西门访客区",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-052",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-052",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-053",
+      "query": "橙屿咖啡的仓储钥匙由贺师傅确认：每隔三周",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-053",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-053",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-054",
+      "query": "砾石球馆的场地预约由唐宁确认：先做消防通道",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-054",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-054",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-055",
+      "query": "风铃托育的课程讲义由沈队长确认：冷藏柜第二层",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-055",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-055",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-056",
+      "query": "长堤维修站的活动预算由叶晴确认：林组长",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-056",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-056",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-057",
+      "query": "银杏画室的报销凭证由梁经理确认：东侧库房",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-057",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-057",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-058",
+      "query": "微光志愿队的停车许可由陈澈确认：改到室内",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-058",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-058",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-059",
+      "query": "栖云农场的药品清单由袁师傅确认：两万四千元",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-059",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-059",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-060",
+      "query": "海盐设计组的雨天方案由邵工确认：五号会议室",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-060",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-060",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-061",
+      "query": "青禾工坊的巡检表由周岚确认：三箱",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-061",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-061",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-062",
+      "query": "北辰诊所的交付节点由蒋老师确认：九点半",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-062",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-062",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-063",
+      "query": "云渡书店的客户回访由许老师确认：第三单元",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-063",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-063",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-064",
+      "query": "松石社团的接送安排由魏宁确认：六月底前",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-064",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-064",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-065",
+      "query": "澄湾工作室的周末值班由罗主管确认：四十六件",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-065",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-065",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-066",
+      "query": "白鹭厨房的轮班名单由苏禾确认：十二个名额",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-066",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-066",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-067",
+      "query": "远山学堂的备用电池由方医生确认：陈师傅",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-067",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-067",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-068",
+      "query": "星桥车队的设备保养由邱老师确认：五月十六日",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-068",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-068",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-069",
+      "query": "木棉旅舍的订货数量由孟姐确认：七百二十元",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-069",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-069",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-070",
+      "query": "溪谷实验室的讲座名额由杜妍确认：周四下午",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-070",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-070",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-071",
+      "query": "南窗花店的培训材料由陶然确认：蓝色文件夹",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-071",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-071",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-072",
+      "query": "晨雾剧场的安全演练由顾师傅确认：西门访客区",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-072",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-072",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-073",
+      "query": "橙屿咖啡的仓储钥匙由贺师傅确认：每隔三周",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-073",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-073",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-074",
+      "query": "砾石球馆的场地预约由唐宁确认：先做消防通道",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-074",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-074",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-075",
+      "query": "风铃托育的课程讲义由沈队长确认：冷藏柜第二层",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-075",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-075",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-076",
+      "query": "长堤维修站的活动预算由叶晴确认：林组长",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-076",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-076",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-077",
+      "query": "银杏画室的报销凭证由梁经理确认：东侧库房",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-077",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-077",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-078",
+      "query": "微光志愿队的停车许可由陈澈确认：改到室内",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-078",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-078",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-079",
+      "query": "栖云农场的药品清单由袁师傅确认：两万四千元",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-079",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-079",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    },
+    {
+      "id": "classic-v2-seg-080",
+      "query": "海盐设计组的雨天方案由邵工确认：五号会议室",
+      "purpose": "quality-v2-classic",
+      "gold_turn_refs": [
+        {
+          "segment_id": "v2-seg-080",
+          "transcript_revision": "rev-1",
+          "turn_id": "v2-utt-1"
+        }
+      ],
+      "gold_top1_turn_ref": {
+        "segment_id": "v2-seg-080",
+        "transcript_revision": "rev-1",
+        "turn_id": "v2-utt-1"
+      },
+      "notes": "独立合成事实的直接检索回归问题。"
+    }
+  ]
+}

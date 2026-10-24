@@ -14,9 +14,11 @@ package contextbuild
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -48,6 +50,9 @@ const (
 	maxLinksPerTopic    = 8
 	maxEvidenceItems    = 3
 	evidenceRadius      = 1
+	defaultRerankPool   = 64
+	maxRerankPool       = 128
+	maxRerankInputBytes = 64 * 1024
 
 	analysisProcessorVersion = "extract-v1"
 
@@ -107,7 +112,9 @@ type Request struct {
 	Mode string `json:"mode,omitempty"`
 	// Now enables the optional recency bonus. When nil the bonus is skipped so
 	// runs without a clock stay byte-identical.
-	Now *time.Time `json:"now,omitempty"`
+	Now                  *time.Time `json:"now,omitempty"`
+	RetrievalVersion     string     `json:"retrieval_version,omitempty"`
+	RerankCandidateLimit int        `json:"rerank_candidate_limit,omitempty"`
 }
 
 // EvidenceRef is one raw transcript turn exposed as supporting evidence.
@@ -139,7 +146,20 @@ type Package struct {
 	Trace         Trace         `json:"trace"`
 	// Ranking reports, per returned item, why it was retrieved: which branches
 	// produced it, the per-branch raw scores and the fused retrieval score.
-	Ranking []ItemRanking `json:"ranking"`
+	Ranking     []ItemRanking       `json:"ranking"`
+	Sufficiency *EvidenceAssessment `json:"sufficiency,omitempty"`
+}
+
+// EvidenceAssessment reports whether the evidence cited by budgeted output items
+// can answer the query. EvidenceRefs contains only validated source turn IDs.
+type EvidenceAssessment struct {
+	Status       string   `json:"status"`
+	EvidenceRefs []string `json:"evidence_refs"`
+}
+
+// EvidenceAssessor independently assesses the final, budgeted evidence.
+type EvidenceAssessor interface {
+	Assess(ctx context.Context, query string, evidence []EvidenceRef) (EvidenceAssessment, error)
 }
 
 // TimeRange echoes the requested bounds and reports whether the returned
@@ -242,29 +262,114 @@ type DecisionReranker struct {
 	Engine decision.Engine
 }
 
+// DecisionRerankerV2 enforces bounded-input and strict result validation for
+// explicit v2 builds. Build upgrades a DecisionReranker dependency on v2.
+type DecisionRerankerV2 struct{ Engine decision.Engine }
+
+// DecisionEvidenceAssessor adapts the decision engine to evidence sufficiency.
+type DecisionEvidenceAssessor struct{ Engine decision.Engine }
+
+// Assess classifies only the final evidence supplied by Build.
+func (a DecisionEvidenceAssessor) Assess(ctx context.Context, query string, evidence []EvidenceRef) (EvidenceAssessment, error) {
+	if a.Engine == nil {
+		return EvidenceAssessment{}, errors.New("contextbuild: decision engine is required")
+	}
+	var b strings.Builder
+	b.WriteString("query: ")
+	b.WriteString(query)
+	b.WriteString("\nfinal evidence:\n")
+	refs := make([]string, 0, len(evidence))
+	for _, ev := range evidence {
+		line := fmt.Sprintf("%s: %s\n", ev.TurnID, ev.Text)
+		if b.Len()+len(line) > maxRerankInputBytes {
+			return EvidenceAssessment{}, errors.New("contextbuild: evidence assessment input exceeds 64 KiB")
+		}
+		b.WriteString(line)
+		refs = append(refs, ev.TurnID)
+	}
+	if b.Len() > maxRerankInputBytes {
+		return EvidenceAssessment{}, errors.New("contextbuild: evidence assessment input exceeds 64 KiB")
+	}
+	q := decision.Question{ID: "sufficiency", Type: decision.TypeChoice, Instructions: "Determine whether the final evidence supports a complete answer to the query, including relevant qualifiers, negation, and time constraints. Use insufficient when relevant evidence does not establish all requested details; use unknown only when the evidence cannot be judged.", Criteria: map[string]string{"sufficient": "Evidence supports all requested answer details and qualifiers", "insufficient": "Evidence is relevant but does not support a complete answer", "unknown": "Evidence cannot be judged"}}
+	request, err := json.Marshal(struct {
+		State     string              `json:"state"`
+		Questions []decision.Question `json:"questions"`
+	}{State: b.String(), Questions: []decision.Question{q}})
+	if err != nil || len(request) > maxRerankInputBytes {
+		return EvidenceAssessment{}, errors.New("contextbuild: evidence assessment request exceeds 64 KiB")
+	}
+	result, err := a.Engine.Evaluate(ctx, b.String(), []decision.Question{q})
+	if err != nil {
+		return EvidenceAssessment{}, err
+	}
+	answer, ok := result.Answers[q.ID]
+	if !ok || answer.Type != decision.TypeChoice {
+		return EvidenceAssessment{}, errors.New("contextbuild: decision engine returned invalid sufficiency answer")
+	}
+	if answer.Choice != "sufficient" && answer.Choice != "insufficient" && answer.Choice != "unknown" {
+		return EvidenceAssessment{}, fmt.Errorf("contextbuild: invalid sufficiency status %q", answer.Choice)
+	}
+	if math.IsNaN(answer.Confidence) || math.IsInf(answer.Confidence, 0) || answer.Confidence < 0 || answer.Confidence > 1 || len(answer.Distribution) != 3 {
+		return EvidenceAssessment{}, errors.New("contextbuild: decision engine returned malformed sufficiency distribution")
+	}
+	total := 0.0
+	for _, status := range []string{"sufficient", "insufficient", "unknown"} {
+		p, exists := answer.Distribution[status]
+		if !exists || math.IsNaN(p) || math.IsInf(p, 0) || p < 0 || p > 1 {
+			return EvidenceAssessment{}, errors.New("contextbuild: decision engine returned malformed sufficiency distribution")
+		}
+		total += p
+	}
+	if math.Abs(total-1) > 1e-6 {
+		return EvidenceAssessment{}, errors.New("contextbuild: decision engine returned malformed sufficiency distribution")
+	}
+	if answer.Choice != "sufficient" {
+		refs = []string{}
+	}
+	return EvidenceAssessment{Status: answer.Choice, EvidenceRefs: refs}, nil
+}
+
 // rerankRubric is the ordered score rubric used for every rerank question.
 var rerankRubric = []string{"irrelevant", "weak", "relevant", "critical"}
 
 // Rerank implements Reranker.
 func (d DecisionReranker) Rerank(ctx context.Context, query string, items []memory.Item) ([]memory.Item, error) {
-	if d.Engine == nil {
+	return rerankWithDecisionEngine(ctx, d.Engine, query, items, false)
+}
+
+func (d DecisionRerankerV2) Rerank(ctx context.Context, query string, items []memory.Item) ([]memory.Item, error) {
+	return rerankWithDecisionEngine(ctx, d.Engine, query, items, true)
+}
+
+func rerankWithDecisionEngine(ctx context.Context, engine decision.Engine, query string, items []memory.Item, strict bool) ([]memory.Item, error) {
+	if engine == nil {
 		return nil, errors.New("contextbuild: decision engine is required")
 	}
 	if len(items) == 0 {
 		return items, nil
 	}
+	if strict && rerankInputBytes(query, items) > maxRerankInputBytes {
+		return nil, errors.New("contextbuild: rerank input exceeds 64 KiB")
+	}
 	questions := make([]decision.Question, len(items))
 	for i := range items {
+		instructions := fmt.Sprintf("Rate how relevant item_%d is to the query %q against the rubric.", i, query)
+		if strict {
+			instructions = fmt.Sprintf("Rate how relevant item_%d is to the query in the state against the rubric.", i)
+		}
 		questions[i] = decision.Question{
 			ID:           fmt.Sprintf("item_%d", i),
 			Type:         decision.TypeScore,
-			Instructions: fmt.Sprintf("Rate how relevant item_%d is to the query %q against the rubric.", i, query),
+			Instructions: instructions,
 			Rubric:       append([]string(nil), rerankRubric...),
 		}
 	}
-	result, err := d.Engine.Evaluate(ctx, rerankState(query, items), questions)
+	result, err := engine.Evaluate(ctx, rerankState(query, items), questions)
 	if err != nil {
 		return nil, err
+	}
+	if strict && len(result.Answers) != len(questions) {
+		return nil, errors.New("contextbuild: decision engine returned unexpected answer count")
 	}
 	type scoredItem struct {
 		item  memory.Item
@@ -276,6 +381,9 @@ func (d DecisionReranker) Rerank(ctx context.Context, query string, items []memo
 		answer, ok := result.Answers[questions[i].ID]
 		if !ok {
 			return nil, fmt.Errorf("contextbuild: decision engine returned no answer for %s", questions[i].ID)
+		}
+		if strict && !validRerankAnswer(answer) {
+			return nil, fmt.Errorf("contextbuild: decision engine returned invalid score for %s", questions[i].ID)
 		}
 		scored[i] = scoredItem{item: item, score: answer.Score, index: i}
 	}
@@ -312,6 +420,36 @@ func rerankState(query string, items []memory.Item) string {
 	return b.String()
 }
 
+func rerankInputBytes(query string, items []memory.Item) int {
+	questions := make([]decision.Question, len(items))
+	for i := range items {
+		questions[i] = decision.Question{ID: fmt.Sprintf("item_%d", i), Type: decision.TypeScore, Instructions: fmt.Sprintf("Rate how relevant item_%d is to the query in the state against the rubric.", i), Rubric: append([]string(nil), rerankRubric...)}
+	}
+	data, err := json.Marshal(struct {
+		State     string              `json:"state"`
+		Questions []decision.Question `json:"questions"`
+	}{State: rerankState(query, items), Questions: questions})
+	if err != nil {
+		return maxRerankInputBytes + 1
+	}
+	return len(data)
+}
+
+func validRerankAnswer(answer decision.Answer) bool {
+	if answer.Type != decision.TypeScore || math.IsNaN(answer.Score) || math.IsInf(answer.Score, 0) || answer.Score < 0 || answer.Score > float64(len(rerankRubric)-1) || math.IsNaN(answer.Confidence) || math.IsInf(answer.Confidence, 0) || answer.Confidence < 0 || answer.Confidence > 1 || len(answer.Distribution) != len(rerankRubric) {
+		return false
+	}
+	total := 0.0
+	for _, label := range rerankRubric {
+		p, ok := answer.Distribution[label]
+		if !ok || math.IsNaN(p) || math.IsInf(p, 0) || p < 0 || p > 1 {
+			return false
+		}
+		total += p
+	}
+	return math.Abs(total-1) <= 1e-6
+}
+
 // candidate is one recalled item plus the retrieval branches that produced it.
 type candidate struct {
 	item     memory.Item
@@ -342,6 +480,7 @@ type Deps struct {
 	DB       *sql.DB
 	Reranker Reranker
 	Semantic semantic.SemanticRetriever
+	Assessor EvidenceAssessor
 }
 
 // Build assembles a deterministic context package.
@@ -365,6 +504,24 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	if req.Mode == "hybrid" {
 		req.Mode = ModeHybrid
 	}
+	if req.RetrievalVersion == "" {
+		req.RetrievalVersion = "v1"
+	}
+	if req.RetrievalVersion != "v1" && req.RetrievalVersion != "v2" {
+		return Package{}, errors.New("build_context: retrieval_version must be v1 or v2")
+	}
+	if req.RetrievalVersion == "v2" {
+		switch typed := rerank.(type) {
+		case DecisionReranker:
+			rerank = DecisionRerankerV2{Engine: typed.Engine}
+		case *DecisionReranker:
+			if typed != nil {
+				rerank = DecisionRerankerV2{Engine: typed.Engine}
+			} else {
+				rerank = nil
+			}
+		}
+	}
 
 	query := strings.TrimSpace(req.Query)
 	convID := strings.TrimSpace(req.ConversationID)
@@ -374,6 +531,19 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	}
 	maxBytes := clampInt(req.MaxBytes, defaultMaxBytes, minMaxBytes, maxMaxBytes)
 	maxItems := clampInt(req.MaxItems, defaultMaxItems, minMaxItems, maxMaxItems)
+	recallLimit := maxOf(lexicalLimitFactor*maxItems, lexicalLimitFloor)
+	if req.RetrievalVersion == "v2" {
+		poolLimit := req.RerankCandidateLimit
+		if poolLimit <= 0 {
+			poolLimit = defaultRerankPool
+		}
+		if poolLimit > maxRerankPool {
+			poolLimit = maxRerankPool
+		}
+		if poolLimit > recallLimit {
+			recallLimit = poolLimit
+		}
+	}
 
 	pkg := Package{
 		Items:    []memory.Item{},
@@ -470,14 +640,22 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 		return nil
 	}
 	if query != "" && !scope.topicScoped() {
-		limit := maxOf(lexicalLimitFactor*maxItems, lexicalLimitFloor)
-		page, err := store.SearchMemory(ctx, memory.MemorySearch{
-			Text:          query,
-			Scope:         "both",
-			Limit:         limit,
-			StartedAfter:  req.StartedAfter,
-			StartedBefore: req.StartedBefore,
-		})
+		limit := recallLimit
+		search := memory.MemorySearch{
+			Text:           query,
+			ConversationID: convID,
+			Scope:          "both",
+			Limit:          limit,
+			StartedAfter:   req.StartedAfter,
+			StartedBefore:  req.StartedBefore,
+		}
+		var page memory.SearchPage
+		var err error
+		if req.RetrievalVersion == "v2" {
+			page, err = store.SearchMemoryV2(ctx, search)
+		} else {
+			page, err = store.SearchMemory(ctx, search)
+		}
 		if err != nil {
 			return Package{}, err
 		}
@@ -487,14 +665,22 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	}
 	for _, tid := range firstN(topics, maxRequestTopics) {
 		if query != "" {
-			page, err := store.SearchMemory(ctx, memory.MemorySearch{
-				Text:          query,
-				Scope:         "both",
-				TopicID:       tid,
-				Limit:         maxItems,
-				StartedAfter:  req.StartedAfter,
-				StartedBefore: req.StartedBefore,
-			})
+			search := memory.MemorySearch{
+				Text:           query,
+				ConversationID: convID,
+				Scope:          "both",
+				TopicID:        tid,
+				Limit:          recallLimit,
+				StartedAfter:   req.StartedAfter,
+				StartedBefore:  req.StartedBefore,
+			}
+			var page memory.SearchPage
+			var err error
+			if req.RetrievalVersion == "v2" {
+				page, err = store.SearchMemoryV2(ctx, search)
+			} else {
+				page, err = store.SearchMemory(ctx, search)
+			}
 			if err != nil {
 				return Package{}, err
 			}
@@ -540,7 +726,7 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 		default:
 			pkg.Trace.Semantic.Backend = deps.Semantic.Describe()
 			if query != "" {
-				limit := maxOf(lexicalLimitFactor*maxItems, lexicalLimitFloor)
+				limit := recallLimit
 				hits, err := deps.Semantic.Search(ctx, query, semantic.SearchOptions{ConversationID: convID, Limit: limit})
 				if err != nil {
 					return Package{}, err
@@ -713,6 +899,59 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	// Step 5 (before budgeting): rank the candidates and drop items whose
 	// evidence is already fully covered by a better-ranked item.
 	ordered := dedupeBySourceEvidence(candidates.sorted())
+	if req.RetrievalVersion == "v2" && len(ordered) > 0 {
+		limit := req.RerankCandidateLimit
+		if limit <= 0 {
+			limit = defaultRerankPool
+		}
+		if limit > maxRerankPool {
+			limit = maxRerankPool
+		}
+		poolEnd := limit
+		if poolEnd > len(ordered) {
+			poolEnd = len(ordered)
+		}
+		if poolEnd < len(ordered) {
+			pkg.Gaps = append(pkg.Gaps, Gap{Kind: "candidate_pool_limited", Detail: fmt.Sprintf("v2 candidate pool limited to %d items", poolEnd)})
+		}
+		ordered = ordered[:poolEnd]
+		if rerank != nil {
+			beforeInputLimit := poolEnd
+			// Keep the serialized decision input bounded, including the query.
+			for poolEnd > 0 && rerankInputBytes(query, candidateItems(ordered[:poolEnd])) > maxRerankInputBytes {
+				poolEnd--
+			}
+			if poolEnd < beforeInputLimit {
+				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "rerank_input_limited", Detail: fmt.Sprintf("v2 rerank input limited to %d candidates by the 64 KiB cap", poolEnd)})
+			}
+			ordered = ordered[:poolEnd]
+		}
+		if rerank == nil {
+			pkg.Degraded = true
+			degradeReasons = append(degradeReasons, degradeNoReranker)
+			pkg.Gaps = append(pkg.Gaps, Gap{Kind: "rerank_unavailable", Detail: "v2 reranking not configured; deterministic candidate order used"})
+		} else if poolEnd == 0 {
+			pkg.Degraded = true
+			degradeReasons = append(degradeReasons, "decision rerank input exceeds 64 KiB")
+			pkg.Gaps = append(pkg.Gaps, Gap{Kind: "rerank_failed", Detail: "no candidate fits the 64 KiB rerank input limit"})
+		} else {
+			original := candidateItems(ordered)
+			returned, err := rerank.Rerank(ctx, query, cloneItems(original))
+			if err != nil || !validPermutation(original, returned) {
+				pkg.Degraded = true
+				detail := "reranker returned an invalid item permutation"
+				if err != nil {
+					detail = "reranker failed: " + err.Error()
+				}
+				degradeReasons = append(degradeReasons, detail)
+				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "rerank_failed", Detail: detail})
+			} else {
+				pkg.Trace.DecisionRerank = true
+				reorderedCandidates := reorderCandidates(ordered, returned)
+				ordered = reorderedCandidates
+			}
+		}
+	}
 
 	// Step 6: budget the ranked items, then (step 4) attach evidence windows
 	// for up to three selected items while the byte budget allows.
@@ -722,6 +961,7 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	bytesUsed := 0
 	truncated := false
 	evidenceFetched := 0
+	includeBudgetedEvidence := req.IncludeRawEvidence || (req.RetrievalVersion == "v2" && deps.Assessor != nil)
 	for _, c := range ordered {
 		if len(selected) >= maxItems {
 			truncated = true
@@ -735,7 +975,7 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 		selected = append(selected, c.item)
 		bytesUsed += itemBytes
 
-		if !req.IncludeRawEvidence || evidenceFetched >= maxEvidenceItems {
+		if !includeBudgetedEvidence || evidenceFetched >= maxEvidenceItems {
 			continue
 		}
 		turnID := c.firstEvidenceTurn()
@@ -755,6 +995,9 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 		window, err := store.GetCurrentEvidenceContext(ctx, turnID, evidenceRadius, remaining)
 		if err != nil {
 			return Package{}, err
+		}
+		if window.Truncated {
+			truncated = true
 		}
 		for _, turn := range window.Turns {
 			allowed, err := scope.allowsEvidence(ctx, db, turn.ID)
@@ -785,13 +1028,14 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 		}
 	}
 
-	// Step 8: optional shadow rerank. A missing or failing reranker degrades
-	// the package but never empties it.
+	// v1 preserves its historical post-budget shadow rerank.
 	items := selected
 	if len(items) == 0 {
 		items = []memory.Item{}
 	}
-	if rerank == nil {
+	if req.RetrievalVersion == "v2" {
+		// v2 already ranked the bounded candidate pool before budgeting.
+	} else if rerank == nil {
 		pkg.Degraded = true
 		degradeReasons = append([]string{degradeNoReranker}, degradeReasons...)
 	} else if len(items) > 0 {
@@ -855,7 +1099,41 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	if err := collectGaps(ctx, db, &pkg, truncated); err != nil {
 		return Package{}, err
 	}
+	if req.RetrievalVersion == "v2" {
+		pkg.Sufficiency = &EvidenceAssessment{Status: "unknown", EvidenceRefs: []string{}}
+		if deps.Assessor == nil {
+			pkg.Degraded = true
+			degradeReasons = append(degradeReasons, "evidence assessor not configured")
+			pkg.Gaps = append(pkg.Gaps, Gap{Kind: "evidence_assessment_unavailable", Detail: "v2 evidence sufficiency was not assessed"})
+			if !hasItemEvidence(items) {
+				pkg.Sufficiency = &EvidenceAssessment{Status: "insufficient", EvidenceRefs: []string{}}
+			}
+		} else {
+			assessmentEvidence, allowedRefs, evidenceErr := evidenceForAssessment(items, pkg.Evidence)
+			if evidenceErr != nil {
+				pkg.Degraded = true
+				degradeReasons = append(degradeReasons, "evidence assessment input exceeds 64 KiB")
+				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "evidence_assessment_failed", Detail: "final budgeted evidence exceeds the 64 KiB assessment input limit"})
+			} else if len(assessmentEvidence) == 0 {
+				pkg.Sufficiency = &EvidenceAssessment{Status: "insufficient", EvidenceRefs: []string{}}
+			} else {
+				assessment, err := deps.Assessor.Assess(ctx, query, assessmentEvidence)
+				if err != nil {
+					pkg.Degraded = true
+					degradeReasons = append(degradeReasons, "evidence assessment failed: "+err.Error())
+					pkg.Gaps = append(pkg.Gaps, Gap{Kind: "evidence_assessment_failed", Detail: "evidence sufficiency could not be determined"})
+				} else if validAssessment(assessment, allowedRefs) {
+					pkg.Sufficiency = &assessment
+				} else {
+					pkg.Degraded = true
+					degradeReasons = append(degradeReasons, "evidence assessment returned invalid status or references")
+					pkg.Gaps = append(pkg.Gaps, Gap{Kind: "evidence_assessment_failed", Detail: "evidence assessment returned invalid status or references"})
+				}
+			}
+		}
+	}
 	pkg.Ranking = rankingFor(items, candidates)
+	pkg.DegradeReason = strings.Join(degradeReasons, "; ")
 	return pkg, nil
 }
 
@@ -883,6 +1161,168 @@ func rankingFor(items []memory.Item, candidates *candidateSet) []ItemRanking {
 		out = append(out, ItemRanking{ItemID: item.ID, Kind: item.Kind, Sources: []string{}, Branches: map[string]float64{}})
 	}
 	return out
+}
+
+func candidateItems(candidates []candidate) []memory.Item {
+	out := make([]memory.Item, len(candidates))
+	for i, c := range candidates {
+		out[i] = c.item
+	}
+	return out
+}
+
+func cloneItems(items []memory.Item) []memory.Item {
+	out := make([]memory.Item, len(items))
+	for i, item := range items {
+		out[i] = item
+		out[i].TopicIDs = cloneStrings(item.TopicIDs)
+		out[i].EvidenceTurnIDs = cloneStrings(item.EvidenceTurnIDs)
+		out[i].DerivedFrom = cloneStrings(item.DerivedFrom)
+		if item.SpeakerScopedID != nil {
+			v := *item.SpeakerScopedID
+			out[i].SpeakerScopedID = &v
+		}
+		if item.SpeakerEntityID != nil {
+			v := *item.SpeakerEntityID
+			out[i].SpeakerEntityID = &v
+		}
+		if item.SpeakerPersonID != nil {
+			v := *item.SpeakerPersonID
+			out[i].SpeakerPersonID = &v
+		}
+		if item.GlobalStartMS != nil {
+			v := *item.GlobalStartMS
+			out[i].GlobalStartMS = &v
+		}
+		if item.GlobalEndMS != nil {
+			v := *item.GlobalEndMS
+			out[i].GlobalEndMS = &v
+		}
+	}
+	return out
+}
+
+func cloneStrings(values []string) []string {
+	if values == nil {
+		return nil
+	}
+	out := make([]string, len(values))
+	copy(out, values)
+	return out
+}
+
+func validPermutation(original, reordered []memory.Item) bool {
+	if len(original) != len(reordered) {
+		return false
+	}
+	used := make([]bool, len(original))
+	for _, got := range reordered {
+		found := -1
+		for i, want := range original {
+			if !used[i] && candidateKey(want) == candidateKey(got) && reflect.DeepEqual(want, got) {
+				found = i
+				break
+			}
+		}
+		if found < 0 {
+			return false
+		}
+		used[found] = true
+	}
+	return true
+}
+
+func reorderCandidates(original []candidate, reordered []memory.Item) []candidate {
+	byKey := make(map[string][]candidate, len(original))
+	for i := range original {
+		c := original[i]
+		k := candidateKey(c.item)
+		byKey[k] = append(byKey[k], c)
+	}
+	out := make([]candidate, 0, len(original))
+	for _, item := range reordered {
+		k := candidateKey(item)
+		out = append(out, byKey[k][0])
+		byKey[k] = byKey[k][1:]
+	}
+	return out
+}
+
+func validAssessment(a EvidenceAssessment, evidence []EvidenceRef) bool {
+	if a.Status != "sufficient" && a.Status != "insufficient" && a.Status != "unknown" {
+		return false
+	}
+	allowed := make(map[string]bool, len(evidence))
+	for _, ev := range evidence {
+		allowed[ev.TurnID] = true
+	}
+	seen := map[string]bool{}
+	for _, id := range a.EvidenceRefs {
+		if !allowed[id] || seen[id] {
+			return false
+		}
+		seen[id] = true
+	}
+	if a.Status == "sufficient" && len(a.EvidenceRefs) == 0 {
+		return false
+	}
+	return true
+}
+
+// evidenceForAssessment uses only evidence that is present in the final budgeted
+// package: returned evidence windows and raw turn items whose text used item budget.
+func evidenceForAssessment(items []memory.Item, finalEvidence []EvidenceRef) ([]EvidenceRef, []EvidenceRef, error) {
+	byID := make(map[string]EvidenceRef, len(finalEvidence))
+	for _, ev := range finalEvidence {
+		byID[ev.TurnID] = ev
+	}
+	allowed := make(map[string]bool, len(finalEvidence))
+	for _, ev := range finalEvidence {
+		allowed[ev.TurnID] = true
+	}
+	for _, item := range items {
+		if item.Kind != "turn" || item.Content == "" {
+			continue
+		}
+		id := item.ID
+		if id == "" {
+			id = item.TurnID
+		}
+		if id == "" {
+			continue
+		}
+		if _, ok := byID[id]; !ok {
+			byID[id] = EvidenceRef{TurnID: id, Text: item.Content, SpeakerScopedID: item.SpeakerScopedID, GlobalStartMS: item.GlobalStartMS, GlobalEndMS: item.GlobalEndMS}
+			allowed[id] = true
+		}
+	}
+	ids := sortedKeys(allowed)
+	out := make([]EvidenceRef, 0, len(ids))
+	refs := make([]EvidenceRef, 0, len(ids))
+	used := 0
+	for _, id := range ids {
+		ev, ok := byID[id]
+		if !ok {
+			continue
+		}
+		lineSize := len(ev.TurnID) + len(ev.Text) + 2
+		if used+lineSize > maxRerankInputBytes {
+			return nil, nil, errors.New("final evidence exceeds 64 KiB model input limit")
+		}
+		used += lineSize
+		out = append(out, ev)
+		refs = append(refs, EvidenceRef{TurnID: id})
+	}
+	return out, refs, nil
+}
+
+func hasItemEvidence(items []memory.Item) bool {
+	for _, item := range items {
+		if len(item.EvidenceTurnIDs) > 0 || (item.Kind == "turn" && item.TurnID != "") {
+			return true
+		}
+	}
+	return false
 }
 
 // sortedSources returns the branch names in the fixed branchOrder.

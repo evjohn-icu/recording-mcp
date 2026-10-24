@@ -846,6 +846,24 @@ func TestBuildContextToolSmoke(t *testing.T) {
 	if pkg.Trace.DecisionRerank {
 		t.Fatal("build_context reported a decision rerank without an engine")
 	}
+	res, err = cs.CallTool(ctx, &mcp.CallToolParams{Name: "build_context", Arguments: map[string]any{
+		"query": "设备的固件升级情况", "mode": "lexical", "retrieval_version": "v2", "include_raw_evidence": true,
+	}})
+	if err != nil || res.IsError {
+		t.Fatalf("v2 MCP: %v %+v", err, res)
+	}
+	b, _ = json.Marshal(res.StructuredContent)
+	var v2 struct {
+		Items       []memory.Item   `json:"items"`
+		Sufficiency json.RawMessage `json:"sufficiency"`
+	}
+	if err := json.Unmarshal(b, &v2); err != nil {
+		t.Fatal(err)
+	}
+	if len(v2.Items) == 0 || len(v2.Sufficiency) == 0 {
+		t.Fatalf("v2 fields/recall missing: %s", b)
+	}
+
 }
 
 // TestSpeakerBindingToolsOverMCP exercises the speaker identity contract over
