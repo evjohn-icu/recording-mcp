@@ -7,10 +7,19 @@ export interface BriefRequest {
 export interface BriefEntry { id: string; text: string; text_truncated?: boolean; evidence_ids: string[]; source_state: 'current' | 'superseded' | 'unavailable'; assertion_state: 'proposed' | 'unverified' | 'explicitly_confirmed' }
 export interface BriefEvidence { id: string; turn_id: string; conversation_id: string; recording_id: string; source_attachment_id?: string; transcript_revision?: string; global_start_ms?: number; global_end_ms?: number; text_truncated?: boolean; topic_ids: string[]; person_ids: string[]; text: string; started_at?: string | null; source_state: string; provenance: string }
 export interface BriefResult {
-  snapshot_id: string; scope: BriefRequest['scope']; sections: Record<'background' | 'previous_discussions' | 'follow_up_candidates' | 'changes_conflicts' | 'unknowns', BriefEntry[]>
+  snapshot_id: string; scope: Pick<BriefRequest['scope'], 'kind'> & Partial<Omit<BriefRequest['scope'], 'kind'>>; sections: Record<'background' | 'previous_discussions' | 'follow_up_candidates' | 'changes_conflicts' | 'unknowns', BriefEntry[]>
   evidence: BriefEvidence[]; coverage: { eligible_turns: number; selected_turns: number; selected_notes: number; omitted_turns: number; omitted_notes: number }
   gaps: { kind: string; detail: string }[]; truncated: boolean; degraded: boolean
 }
-export function previewBrief(body: BriefRequest): Promise<BriefResult> { return request('/api/briefs/preview', { method: 'POST', body: JSON.stringify(body) }) }
+export function previewBrief(body: BriefRequest, signal?: AbortSignal): Promise<BriefResult> { return request('/api/briefs/preview', { method: 'POST', body: JSON.stringify(body), signal }) }
+
+export interface PolishCandidate { entry_id: string; text: string; evidence_ids: string[]; assertion_state: 'proposed' }
+export interface PolishResponse { snapshot_id: string; candidates: PolishCandidate[]; degraded: boolean; reason?: string }
+export function getBriefPolishConfig(signal?: AbortSignal): Promise<{ enabled: boolean }> {
+  return request('/api/briefs/polish/config', { signal })
+}
+export function polishBrief(body: { request: BriefRequest; snapshot_id: string; consent: true }, signal?: AbortSignal): Promise<PolishResponse> {
+  return request('/api/briefs/polish', { method: 'POST', body: JSON.stringify(body), signal })
+}
 
 export function listBriefPeople(): Promise<{people: {id: string; label: string}[]}> { return request('/api/briefs/people') }

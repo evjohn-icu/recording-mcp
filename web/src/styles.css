@@ -90,6 +90,34 @@ button:disabled {
   border-color: var(--border);
 }
 
+.brief-page .brief-result > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.brief-page .brief-result > header .turn-actions,
+.brief-page .brief-polish .turn-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.brief-polish {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+.brief-polish .toggle-label {
+  margin: 0.5rem 0;
+}
+
 .link-button {
   background: transparent;
   color: var(--accent);
