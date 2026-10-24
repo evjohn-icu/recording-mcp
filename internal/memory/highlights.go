@@ -85,7 +85,7 @@ func (s *Store) CreateHighlight(ctx context.Context, in HighlightCreate) (Highli
 	}
 	sum := sha256.Sum256(payload)
 	payloadHash := hex.EncodeToString(sum[:])
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.beginHighlightWrite(ctx)
 	if err != nil {
 		return Highlight{}, err
 	}
@@ -202,7 +202,7 @@ func (s *Store) UpdateHighlight(ctx context.Context, id string, u HighlightUpdat
 	if u.ExpectedVersion < 1 || u.Tag == nil && u.NoteText == nil && u.Relink == nil {
 		return Highlight{}, ErrHighlightInvalid
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.beginHighlightWrite(ctx)
 	if err != nil {
 		return Highlight{}, err
 	}
@@ -253,7 +253,7 @@ func (s *Store) UpdateHighlight(ctx context.Context, id string, u HighlightUpdat
 }
 
 func (s *Store) DeleteHighlight(ctx context.Context, id string, expectedVersion int64) error {
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.beginHighlightWrite(ctx)
 	if err != nil {
 		return err
 	}
@@ -535,4 +535,19 @@ func checkProfileRetired(ctx context.Context, q queryer) error {
 		return ErrProfileRetired
 	}
 	return nil
+}
+
+// Acquire SQLite's reserved writer lock before reading the version or request
+// ledger. A deferred read-to-write upgrade can fail with SQLITE_BUSY despite
+// busy_timeout; reserving first makes independent processes observe the winner.
+func (s *Store) beginHighlightWrite(ctx context.Context) (*sql.Tx, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE profile_control SET retired=retired WHERE id=1`); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+	return tx, nil
 }

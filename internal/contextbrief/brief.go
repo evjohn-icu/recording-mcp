@@ -64,7 +64,7 @@ type Evidence struct {
 	PersonIDs          []string   `json:"person_ids"`
 	Text               string     `json:"text"`
 	TextTruncated      bool       `json:"text_truncated,omitempty"`
-	StartedAt          *time.Time `json:"started_at,omitempty"`
+	StartedAt          *time.Time `json:"started_at"`
 	SourceState        string     `json:"source_state"`
 	Provenance         string     `json:"provenance"`
 }
@@ -265,24 +265,88 @@ func Build(ctx context.Context, store *memory.Store, req Request) (Result, error
 	selectedTurnIDs := sortedTurnIDs(selectedByTurn)
 	inClause := placeholdersOrNull(len(selectedTurnIDs))
 	inArgs := stringsToAny(selectedTurnIDs)
-	hRows, err := tx.QueryContext(ctx, `SELECT h.id,h.tag,h.note_text,h.turn_id,h.recording_id,h.version FROM memory_highlights h JOIN source_attachments a ON a.id=h.source_attachment_id AND a.recording_id=h.recording_id AND a.conversation_id=h.conversation_id AND a.active=1 WHERE h.tag IN ('follow_up','question') AND h.turn_id IN (`+inClause+`) ORDER BY h.id`, inArgs...)
+	selectedAttachmentIDs := selectedAttachments(selectedByTurn)
+	attachmentClause := placeholdersOrNull(len(selectedAttachmentIDs))
+	attachmentArgs := stringsToAny(selectedAttachmentIDs)
+	hRows, err := tx.QueryContext(ctx, `SELECT h.id,h.tag,h.note_text,COALESCE(h.turn_id,''),h.recording_id,h.version,h.anchor_kind,h.start_ms,h.end_ms,h.source_attachment_id,h.transcript_revision FROM memory_highlights h JOIN source_attachments a ON a.id=h.source_attachment_id AND a.recording_id=h.recording_id AND a.conversation_id=h.conversation_id AND a.active=1 AND a.transcript_revision=h.transcript_revision WHERE h.tag IN ('follow_up','question') AND h.source_attachment_id IN (`+attachmentClause+`) ORDER BY h.id`, attachmentArgs...)
 	if err == nil {
 		for hRows.Next() {
-			var id, tag, note, turnID, recordingID string
+			var id, tag, note, turnID, recordingID, anchorKind, attachmentID, revision string
 			var version int64
-			if err = hRows.Scan(&id, &tag, &note, &turnID, &recordingID, &version); err != nil {
+			var startMS, endMS sql.NullInt64
+			if err = hRows.Scan(&id, &tag, &note, &turnID, &recordingID, &version, &anchorKind, &startMS, &endMS, &attachmentID, &revision); err != nil {
 				hRows.Close()
 				return Result{}, err
 			}
-			ev, ok := selectedByTurn[turnID]
-			if !ok {
+			var relevant []Evidence
+			if anchorKind == "turn" && turnID != "" {
+				if ev, ok := selectedByTurn[turnID]; ok && ev.SourceAttachmentID == attachmentID && ev.TranscriptRevision == revision {
+					relevant = append(relevant, ev)
+				} else {
+					continue
+				}
+			} else {
+				var overlap string
+				var overlapArgs []any
+				switch anchorKind {
+				case "point":
+					if !startMS.Valid {
+						continue
+					}
+					overlap = `t.global_start_ms<=? AND t.global_end_ms>?`
+					overlapArgs = []any{startMS.Int64, startMS.Int64}
+				case "range":
+					if !startMS.Valid || !endMS.Valid {
+						continue
+					}
+					overlap = `t.global_start_ms<? AND t.global_end_ms>?`
+					overlapArgs = []any{endMS.Int64, startMS.Int64}
+				default:
+					continue
+				}
+				args := append([]any{attachmentID}, overlapArgs...)
+				rs, e := tx.QueryContext(ctx, `SELECT t.id FROM attachment_turns at JOIN turns t ON t.id=at.turn_id WHERE at.attachment_id=? AND t.global_start_ms IS NOT NULL AND t.global_end_ms IS NOT NULL AND `+overlap+` AND `+memory.CurrentTurnPredicate("t")+` AND NOT EXISTS(SELECT 1 FROM turn_classes tc WHERE tc.turn_id=t.id AND tc.class='ambient') ORDER BY t.id`, args...)
+				if e != nil {
+					hRows.Close()
+					return Result{}, e
+				}
+				allRelevant := true
+				for rs.Next() {
+					var tid string
+					if e = rs.Scan(&tid); e != nil {
+						rs.Close()
+						hRows.Close()
+						return Result{}, e
+					}
+					ev, ok := selectedByTurn[tid]
+					if !ok || ev.SourceAttachmentID != attachmentID || ev.TranscriptRevision != revision {
+						allRelevant = false
+						continue
+					}
+					relevant = append(relevant, ev)
+				}
+				if e = rs.Err(); e != nil {
+					rs.Close()
+					hRows.Close()
+					return Result{}, e
+				}
+				rs.Close()
+				if !allRelevant {
+					continue
+				}
+			}
+			if len(relevant) == 0 {
 				continue
 			}
 			body := strings.TrimSpace(note)
 			if body == "" {
 				continue
 			}
-			entry := Entry{ID: "highlight:" + shortHash(id), Text: body, EvidenceIDs: []string{ev.ID}, SourceState: "current", AssertionState: "proposed", Provenance: "user_authored_highlight:" + tag, SourceVersion: strconv.FormatInt(version, 10)}
+			refs := make([]string, 0, len(relevant))
+			for _, ev := range relevant {
+				refs = append(refs, ev.ID)
+			}
+			entry := Entry{ID: "highlight:" + shortHash(id), Text: body, EvidenceIDs: refs, SourceState: "current", AssertionState: "proposed", Provenance: "user_authored_highlight:" + tag, SourceVersion: strconv.FormatInt(version, 10)}
 			res.Sections.FollowUpCandidates = append(res.Sections.FollowUpCandidates, entry)
 			res.Coverage.SelectedNotes++
 		}
@@ -492,6 +556,20 @@ func entriesWithEvidence(entries []Entry, evidence []Evidence) []Entry {
 func sortedTurnIDs(m map[string]Evidence) []string {
 	out := make([]string, 0, len(m))
 	for id := range m {
+		out = append(out, id)
+	}
+	sort.Strings(out)
+	return out
+}
+func selectedAttachments(m map[string]Evidence) []string {
+	set := map[string]bool{}
+	for _, ev := range m {
+		if ev.SourceAttachmentID != "" {
+			set[ev.SourceAttachmentID] = true
+		}
+	}
+	out := make([]string, 0, len(set))
+	for id := range set {
 		out = append(out, id)
 	}
 	sort.Strings(out)

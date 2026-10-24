@@ -32,12 +32,13 @@ func TestBuildAppliesUnionTimeAndConfirmedPersonScopeDeterministically(t *testin
 		seed(`INSERT INTO recordings(id,conversation_id,source_file,source_sha256,duration_ms,recording_started_at,absolute_time_known) VALUES(?,?, 'file','sha',1000,?,?)`, x.r, x.c, x.start, boolInt(x.start != nil))
 	}
 	seed(`INSERT INTO topics(id,title) VALUES('t1','Topic one'),('t2','Topic two')`)
-	seed(`INSERT INTO turns(id,conversation_id,recording_id,segment_index,global_start_ms,global_end_ms,speaker_scoped_id,content,source_sha256,transcript_version,original_turn_id,turn_json) VALUES('a','c1','r1',0,0,100,'spk1','first','sha','rev1','a','{}'),('a2','c1','r1',1,100,200,NULL,'second first','sha','rev1','a2','{}'),('b','c2','r2',0,0,100,'spk2','second','sha','rev1','b','{}')`)
+	seed(`INSERT INTO turns(id,conversation_id,recording_id,segment_index,global_start_ms,global_end_ms,speaker_scoped_id,content,source_sha256,transcript_version,original_turn_id,turn_json) VALUES('a','c1','r1',0,0,100,'spk1','first','sha','rev1','a','{}'),('a2','c1','r1',1,100,200,NULL,'second first','sha','rev1','a2','{}'),('a3','c1','r1',2,200,300,NULL,'other topic','sha','rev1','a3','{}'),('b','c2','r2',0,0,100,'spk2','second','sha','rev1','b','{}')`)
 	for _, x := range []struct{ a, c, r, turn string }{{"att-a", "c1", "r1", "a"}, {"att-b", "c2", "r2", "b"}} {
 		seed(`INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active) VALUES(?,?,?,0,?,'rev1','{}','{}','sha',1)`, x.a, x.c, x.r, "seg-"+x.a)
 		seed(`INSERT INTO attachment_turns(attachment_id,turn_id) VALUES(?,?)`, x.a, x.turn)
 	}
-	seed(`INSERT INTO turn_topics(turn_id,topic_id) VALUES('a','t1'),('a2','t1'),('b','t2')`)
+	seed(`INSERT INTO attachment_turns(attachment_id,turn_id) VALUES('att-a','a2'),('att-a','a3')`)
+	seed(`INSERT INTO turn_topics(turn_id,topic_id) VALUES('a','t1'),('a2','t1'),('a3','t2'),('b','t2')`)
 	seed(`INSERT INTO speaker_bindings(id,recording_id,transcript_revision,speaker_scoped_id,person_id,status,version,created_at,updated_at) VALUES('bind-a','r1','rev1','spk1','p1','confirmed',1,0,0),('bind-b','r2','rev1','spk2','p1','proposed',1,0,0)`)
 	seed(`INSERT INTO speaker_bindings(id,recording_id,transcript_revision,speaker_scoped_id,person_id,status,version,created_at,updated_at) VALUES('bind-wrong-revision','r2','rev-old','spk2','p2','confirmed',2,0,0)`)
 	seed(`INSERT INTO notes(id,conversation_id,kind,summary,topic_ids_json,claim_mode,interpretation_note,annotation_version) VALUES('n1','c1','intention','I plan to call','["t1"]','inference','','v1'),('n2','c1','observation','stale note','["t1"]','inference','','v1')`)
@@ -74,6 +75,13 @@ func TestBuildAppliesUnionTimeAndConfirmedPersonScopeDeterministically(t *testin
 	if err != nil || len(conversationOnly.Evidence) != 1 || conversationOnly.Evidence[0].TurnID != "b" {
 		t.Fatalf("conversation scope failed: %+v err=%v", conversationOnly.Evidence, err)
 	}
+	unknownDateJSON, err := json.Marshal(conversationOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(unknownDateJSON), `"started_at":null`) {
+		t.Fatal("unknown recording time must serialize as explicit null")
+	}
 	truncated, err := Build(context.Background(), store, Request{Scope: Scope{Kind: "topic", TopicIDs: []string{"t1"}}, MaxItems: 1})
 	if err != nil {
 		t.Fatal(err)
@@ -94,6 +102,8 @@ func TestBuildAppliesUnionTimeAndConfirmedPersonScopeDeterministically(t *testin
 		t.Fatal("out-of-scope highlight changed the scoped snapshot")
 	}
 	seed(`INSERT INTO memory_highlights(id,conversation_id,recording_id,anchor_kind,start_ms,end_ms,turn_id,source_attachment_id,transcript_revision,tag,note_text,version,created_at_ms,updated_at_ms) VALUES('in-highlight','c1','r1','turn',0,100,'a','att-a','rev1','follow_up','user reminder',3,1,1)`)
+	seed(`INSERT INTO source_attachments(id,conversation_id,recording_id,segment_index,segment_id,transcript_revision,source_json,result_json,content_sha256,active) VALUES('att-old','c1','r1',1,'seg-old','rev-old','{}','{}','sha',0)`)
+	seed(`INSERT INTO memory_highlights(id,conversation_id,recording_id,anchor_kind,start_ms,end_ms,turn_id,source_attachment_id,transcript_revision,tag,note_text,version,created_at_ms,updated_at_ms) VALUES('point-highlight','c1','r1','point',50,NULL,NULL,'att-a','rev1','question','current point note',1,1,1),('mixed-range-highlight','c1','r1','range',50,250,NULL,'att-a','rev1','follow_up','mixed scope note',1,1,1),('inactive-revision-highlight','c1','r1','range',50,80,NULL,'att-old','rev-old','question','must not relink',1,1,1)`)
 	withHighlight, err := Build(context.Background(), store, Request{Scope: Scope{Kind: "topic", TopicIDs: []string{"t1"}}})
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +117,31 @@ func TestBuildAppliesUnionTimeAndConfirmedPersonScopeDeterministically(t *testin
 	if !foundVersion {
 		t.Fatal("current user highlight missing source version or proposed state")
 	}
+	pointFound, mixedFound, inactiveFound := false, false, false
+	for _, entry := range withHighlight.Sections.FollowUpCandidates {
+		switch entry.Text {
+		case "current point note":
+			pointFound = len(entry.EvidenceIDs) == 1
+		case "mixed scope note":
+			mixedFound = true
+		case "must not relink":
+			inactiveFound = true
+		}
+	}
+	if !pointFound || mixedFound || inactiveFound {
+		t.Fatalf("time-only highlight scope/revision handling incorrect: point=%v mixed=%v inactive=%v entries=%+v", pointFound, mixedFound, inactiveFound, withHighlight.Sections.FollowUpCandidates)
+	}
+	seed(`UPDATE memory_highlights SET turn_id='a' WHERE id='mixed-range-highlight'`)
+	scopedRange, e := Build(context.Background(), store, Request{Scope: Scope{Kind: "topic", TopicIDs: []string{"t1"}}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, entry := range scopedRange.Sections.FollowUpCandidates {
+		if entry.Text == "mixed scope note" {
+			t.Fatal("range with explicit turn leaked out-of-scope note")
+		}
+	}
+
 	seed(`UPDATE turns SET content=? WHERE id='a'`, strings.Repeat("long transcript sentence ", 300))
 	bounded, err := Build(context.Background(), store, Request{Scope: Scope{Kind: "topic", TopicIDs: []string{"t1"}}, MaxItems: 1, MaxBytes: 2048})
 	if err != nil {
@@ -149,13 +184,17 @@ func TestBuildAppliesUnionTimeAndConfirmedPersonScopeDeterministically(t *testin
 	if len(wrongRevision.Evidence) != 0 {
 		t.Fatalf("binding from another source revision leaked: %+v", wrongRevision.Evidence)
 	}
-	if len(person.Sections.FollowUpCandidates) != 2 || person.Sections.FollowUpCandidates[1].AssertionState != "proposed" || person.Sections.FollowUpCandidates[1].SourceVersion != "v1" {
-		t.Fatalf("intention note must remain proposed: %+v", person.Sections.FollowUpCandidates)
-	}
+	intentionFound := false
 	for _, entry := range person.Sections.FollowUpCandidates {
 		if entry.Text == "stale note" {
 			t.Fatal("stale note text leaked into current brief")
 		}
+		if entry.Provenance == "inferred_note:intention" && entry.AssertionState == "proposed" && entry.SourceVersion == "v1" {
+			intentionFound = true
+		}
+	}
+	if !intentionFound {
+		t.Fatalf("intention note must remain proposed with source version: %+v", person.Sections.FollowUpCandidates)
 	}
 	if _, err = Build(context.Background(), store, Request{Scope: Scope{Kind: "project", TopicIDs: []string{"t1"}}, MaxBytes: 256}); err == nil {
 		t.Fatal("byte budget smaller than the response skeleton must be rejected")
