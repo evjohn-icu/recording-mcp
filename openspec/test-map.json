@@ -397,6 +397,42 @@
       "spec": "openspec/changes/2026-10-25-context-brief/specs/context-brief/spec.md",
       "test_file": "internal/contextbrief/brief_scope_test.go",
       "test_anchor": "TestBuildAppliesUnionTimeAndConfirmedPersonScopeDeterministically"
+    },
+    {
+      "id": "polish.explicit-consent",
+      "status": "pending",
+      "spec": "openspec/changes/2026-10-25-brief-polish-experience/specs/brief-polish/spec.md",
+      "reason": "P2 测试尚未实现"
+    },
+    {
+      "id": "polish.closed-evidence",
+      "status": "pending",
+      "spec": "openspec/changes/2026-10-25-brief-polish-experience/specs/brief-polish/spec.md",
+      "reason": "P2 测试尚未实现"
+    },
+    {
+      "id": "polish.source-changed",
+      "status": "pending",
+      "spec": "openspec/changes/2026-10-25-brief-polish-experience/specs/brief-polish/spec.md",
+      "reason": "P2 测试尚未实现"
+    },
+    {
+      "id": "polish.failure-fallback",
+      "status": "pending",
+      "spec": "openspec/changes/2026-10-25-brief-polish-experience/specs/brief-polish/spec.md",
+      "reason": "P2 测试尚未实现"
+    },
+    {
+      "id": "polish.markdown-provenance",
+      "status": "pending",
+      "spec": "openspec/changes/2026-10-25-brief-polish-experience/specs/brief-polish/spec.md",
+      "reason": "P2 测试尚未实现"
+    },
+    {
+      "id": "polish.highlight-conflict",
+      "status": "pending",
+      "spec": "openspec/changes/2026-10-25-brief-polish-experience/specs/brief-polish/spec.md",
+      "reason": "P2 测试尚未实现"
     }
   ]
 }
