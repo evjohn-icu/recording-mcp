@@ -144,6 +144,7 @@ func New(cfg Config) (*Server, error) {
 		RegisterTimeRoutes(mux, cfg.TimeService, profileScope)
 		registerWorldlineRoutes(mux, &app.WorldlineService{Time: cfg.TimeService, DecisionEngine: cfg.WorldlineDecision}, profileScope)
 	}
+	s.registerHighlightRoutes(mux)
 	s.registerCorrectionRoutes(mux)
 	s.registerForgetRoutes(mux)
 	mux.HandleFunc("/", s.handleCatchAll)

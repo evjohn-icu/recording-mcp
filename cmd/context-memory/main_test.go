@@ -69,6 +69,18 @@ func TestMCPToolsExposeQueryAndConversationMemory(t *testing.T) {
 	if res.StructuredContent == nil {
 		t.Fatal("query_context omitted structured content")
 	}
+	for _, call := range []struct {
+		name string
+		args map[string]any
+	}{
+		{"list_highlights", map[string]any{"recording_id": "rec:mcp"}},
+		{"build_context_brief", map[string]any{"scope": map[string]any{"kind": "conversation", "conversation_ids": []string{"conv:mcp"}}}},
+	} {
+		out, e := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: call.name, Arguments: call.args})
+		if e != nil || out == nil || out.IsError || out.StructuredContent == nil {
+			t.Fatalf("%s: %v %+v", call.name, e, out)
+		}
+	}
 	conv, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "get_conversation_context", Arguments: map[string]any{"conversation_id": "conv:mcp"}})
 	if err != nil || conv.IsError {
 		t.Fatalf("get_conversation_context: %v %+v", err, conv)
@@ -728,6 +740,7 @@ func TestReadOnlyServerExposesOnlyReadTools(t *testing.T) {
 		"get_processing_status", "get_annotation_history", "list_conversations",
 		"get_evidence_context", "search_memory", "build_context", "get_current_context",
 		"list_memory_links", "get_speaker_projection", "list_speaker_bindings",
+		"list_highlights", "build_context_brief",
 	}
 	if len(got) != len(wantRead) {
 		t.Fatalf("read-only server exposes %d tools %v, want %d", len(got), got, len(wantRead))

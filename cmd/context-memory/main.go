@@ -16,6 +16,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"recordingmcp/internal/app"
 	"recordingmcp/internal/asrinput"
+	"recordingmcp/internal/contextbrief"
 	"recordingmcp/internal/contextbuild"
 	"recordingmcp/internal/decision"
 	"recordingmcp/internal/mcpserver"
@@ -240,6 +241,13 @@ func newServer(store *memory.Store, svc *app.Service, readOnly bool) *mcp.Server
 	read := func(name, desc string) *mcp.Tool {
 		return &mcp.Tool{Name: name, Description: "EXPERIMENTAL: " + desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &no}}
 	}
+	mcp.AddTool(s, read("list_highlights", "List user attention markers for one recording, with current source revision and needs_relink state. Markers do not confirm facts."), func(ctx context.Context, _ *mcp.CallToolRequest, in struct {
+		RecordingID string `json:"recording_id"`
+	}) (*mcp.CallToolResult, app.HighlightList, error) { out, e := svc.ListHighlights(ctx, in.RecordingID); return nil, out, e })
+	mcp.AddTool(s, read("build_context_brief", "Build a deterministic evidence-backed brief within explicit person, topic, conversation or project sources. Current evidence is not verified fact; no data is written or sent to a model."), func(ctx context.Context, _ *mcp.CallToolRequest, in contextbrief.Request) (*mcp.CallToolResult, contextbrief.Result, error) {
+		out, e := svc.BuildContextBrief(ctx, in)
+		return nil, out, e
+	})
 	mcp.AddTool(s, read("query_context", "Find annotated discussion notes and optionally stored transcript turns. query is literal Unicode lowercase substring matching. Filters are ANDed. A speaker filter requires recording_id. Turns are excluded unless include_turns=true. Ambient sound is excluded by default; include_ambient=true opts in and marks such hits with ambient."), func(ctx context.Context, _ *mcp.CallToolRequest, in memory.Query) (*mcp.CallToolResult, memory.Page, error) {
 		p, e := svc.Query(ctx, in)
 		return nil, p, e
