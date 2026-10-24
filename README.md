@@ -108,9 +108,11 @@ scripts/local-start.sh home
 
 `scripts/local-start.sh PROFILE [port] [profiles-root]` 默认只监听 `127.0.0.1:8788`；profile 数据默认位于 `data/profiles/`，也可通过 `RECORDING_PROFILES_ROOT` 或第三个参数指定根目录。生成器默认关闭，因此不会生成新的 AI 摘要或候选；需要时通过 `GENERATOR_PROVIDER`、`GENERATOR_ENDPOINT`、`GENERATOR_MODEL` 和 `GENERATOR_KEY_ENV` 显式配置，密钥值留在对应环境变量中。可选的 Worldline 决策端点使用 `WORLDLINE_DECISION_URL` 和 `WORLDLINE_DECISION_MODEL`。脚本不会自动提供或启用外部模型服务；事件数据库始终使用 profile 自己管理的路径。
 
+录音详情页可标记重点并添加备注；导航“上下文简报”可按人物、主题、会话或显式项目来源生成确定性简报。来源修订会使重点需要重新关联，关注标签不代表事实确认。操作、应用契约及 v19 升级见 [记忆重点与上下文简报](docs/memory-highlights-context-brief.md)。
+
 ## MCP 客户端与 Web 运行限制
 
-MCP 客户端里 `tools/list` 可见 27 个工具（19 个记忆工具 + 8 个事件原型工具）。调用 `get_current_context`：
+MCP 客户端里 `tools/list` 可见 29 个工具（21 个记忆工具 + 8 个事件原型工具）。调用 `get_current_context`：
 
 ```json
 {"jsonrpc":"2.0","id":1,"method":"tools/call",
@@ -178,10 +180,10 @@ Android 端构建与真机说明见 [docs/android.md](docs/android.md)；云端�
 | 家族 | 工具 | 用途 |
 | --- | --- | --- |
 | 记忆写入（5） | `ingest_transcript`、`apply_annotations`、`review_memory_link`、`propose_speaker_binding`、`review_speaker_binding` | 摄入转写、应用注释修订、复核关联与说话人绑定 |
-| 检索与读取（14） | `search_memory`、`query_context`、`get_conversation_context`、`get_context_item`、`list_conversations`、`list_topics`、`get_evidence_context`、`get_processing_status`、`get_annotation_history`、`build_context`、`get_current_context`、`list_memory_links`、`get_speaker_projection`、`list_speaker_bindings` | 字面/混合检索、上下文包、当前上下文投影、历史与状态 |
+| 检索与读取（16） | `search_memory`、`query_context`、`get_conversation_context`、`get_context_item`、`list_conversations`、`list_topics`、`get_evidence_context`、`get_processing_status`、`get_annotation_history`、`build_context`、`get_current_context`、`list_memory_links`、`get_speaker_projection`、`list_speaker_bindings`、`list_highlights`、`build_context_brief` | 字面/混合检索、上下文包、当前上下文投影、历史与状态 |
 | 事件原型（8） | `search_events`、`get_timeline`、`get_commitments`、`get_conversation_events`、`get_person_context`、`get_current_state`、`ingest_events`、`record_feedback` | 独立的事件原型，与记忆家族共用同一数据库与服务 |
 
-记忆家族共 19 个工具（14 只读 + 5 写入）；事件原型工具由同一二进制提供。精确字段以 [docs/contract.md](docs/contract.md) 与 [docs/context-layer-runtime.md](docs/context-layer-runtime.md) 为准。
+记忆家族共 21 个工具（16 只读 + 5 写入）；事件原型工具由同一二进制提供。精确字段以 [docs/contract.md](docs/contract.md) 与 [docs/context-layer-runtime.md](docs/context-layer-runtime.md) 为准。
 
 ## 安全与信任语义
 

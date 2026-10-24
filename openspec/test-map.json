@@ -271,6 +271,132 @@
       "spec": "openspec/changes/retrieval-quality-v2/specs/retrieval/spec.md",
       "test_file": "scripts/test_retrieval_quality_v2.py",
       "test_anchor": "test_independent_fixture_shape_and_group_split"
+    },
+    {
+      "id": "highlights.create-with-source",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-memory-highlights/specs/memory-highlights/spec.md",
+      "test_file": "internal/memory/highlights_test.go",
+      "test_anchor": "TestHighlightRequiresCurrentMatchingEvidence"
+    },
+    {
+      "id": "highlights.idempotent-replay",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-memory-highlights/specs/memory-highlights/spec.md",
+      "test_file": "internal/memory/highlights_test.go",
+      "test_anchor": "TestHighlightCreateReplayVersionAndDelete"
+    },
+    {
+      "id": "highlights.version-conflict",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-memory-highlights/specs/memory-highlights/spec.md",
+      "test_file": "internal/memory/highlights_test.go",
+      "test_anchor": "TestHighlightCASAcrossIndependentStoreConnections"
+    },
+    {
+      "id": "highlights.revision-needs-relink",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-memory-highlights/specs/memory-highlights/spec.md",
+      "test_file": "internal/memory/highlights_test.go",
+      "test_anchor": "TestHighlightRequiresCurrentMatchingEvidence"
+    },
+    {
+      "id": "highlights.manual-not-fact",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-memory-highlights/specs/memory-highlights/spec.md",
+      "test_file": "internal/app/highlights_brief_integration_test.go",
+      "test_anchor": "TestHighlightsBriefRevisionForgetSyntheticJourney"
+    },
+    {
+      "id": "highlights.forget-purges-content",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-memory-highlights/specs/memory-highlights/spec.md",
+      "test_file": "internal/memory/highlights_test.go",
+      "test_anchor": "TestHighlightsTimeOnlyForgetPreviewCASAndRetirement"
+    },
+    {
+      "id": "highlights.retired-profile-blocks-writes",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-memory-highlights/specs/memory-highlights/spec.md",
+      "test_file": "internal/memory/highlights_test.go",
+      "test_anchor": "TestHighlightsTimeOnlyForgetPreviewCASAndRetirement"
+    },
+    {
+      "id": "highlights.audio-respects-source",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-memory-highlights/specs/memory-highlights/spec.md",
+      "test_file": "internal/app/highlight_audio_test.go",
+      "test_anchor": "TestHighlightAudioUsesManagedAbsoluteOffsetsAndForgetFence"
+    },
+    {
+      "id": "brief.scope-is-hard",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-context-brief/specs/context-brief/spec.md",
+      "test_file": "internal/app/highlights_brief_integration_test.go",
+      "test_anchor": "TestBriefHardTopicScopeMixedEvidenceAndConflictPreserved"
+    },
+    {
+      "id": "brief.person-requires-binding",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-context-brief/specs/context-brief/spec.md",
+      "test_file": "internal/contextbrief/brief_scope_test.go",
+      "test_anchor": "TestBuildAppliesUnionTimeAndConfirmedPersonScopeDeterministically"
+    },
+    {
+      "id": "brief.proposed-is-not-fact",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-context-brief/specs/context-brief/spec.md",
+      "test_file": "internal/app/highlights_brief_integration_test.go",
+      "test_anchor": "TestBriefHardTopicScopeMixedEvidenceAndConflictPreserved"
+    },
+    {
+      "id": "brief.evidence-required",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-context-brief/specs/context-brief/spec.md",
+      "test_file": "internal/contextbrief/brief_scope_test.go",
+      "test_anchor": "TestBuildAppliesUnionTimeAndConfirmedPersonScopeDeterministically"
+    },
+    {
+      "id": "brief.conflict-preserved",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-context-brief/specs/context-brief/spec.md",
+      "test_file": "internal/app/highlights_brief_integration_test.go",
+      "test_anchor": "TestBriefHardTopicScopeMixedEvidenceAndConflictPreserved"
+    },
+    {
+      "id": "brief.source-revision-invalidates",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-context-brief/specs/context-brief/spec.md",
+      "test_file": "internal/app/highlights_brief_integration_test.go",
+      "test_anchor": "TestHighlightsBriefRevisionForgetSyntheticJourney"
+    },
+    {
+      "id": "brief.unknown-time-separated",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-context-brief/specs/context-brief/spec.md",
+      "test_file": "internal/contextbrief/brief_scope_test.go",
+      "test_anchor": "TestBuildAppliesUnionTimeAndConfirmedPersonScopeDeterministically"
+    },
+    {
+      "id": "brief.forgotten-source-excluded",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-context-brief/specs/context-brief/spec.md",
+      "test_file": "internal/app/highlights_brief_integration_test.go",
+      "test_anchor": "TestHighlightsBriefRevisionForgetSyntheticJourney"
+    },
+    {
+      "id": "brief.budget-truncation",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-context-brief/specs/context-brief/spec.md",
+      "test_file": "internal/contextbrief/brief_scope_test.go",
+      "test_anchor": "TestBuildAppliesUnionTimeAndConfirmedPersonScopeDeterministically"
+    },
+    {
+      "id": "brief.deterministic-snapshot",
+      "status": "covered",
+      "spec": "openspec/changes/2026-10-25-context-brief/specs/context-brief/spec.md",
+      "test_file": "internal/contextbrief/brief_scope_test.go",
+      "test_anchor": "TestBuildAppliesUnionTimeAndConfirmedPersonScopeDeterministically"
     }
   ]
 }

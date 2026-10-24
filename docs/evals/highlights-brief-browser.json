@@ -1,0 +1,82 @@
+{
+  "base_url": "http://127.0.0.1:32913",
+  "synthetic_fixture": true,
+  "cases": [
+    {
+      "name": "highlight-create-from-turn",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "highlight-create-at-current-playhead",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "highlight-edit-409-retains-draft",
+      "status": "PASS",
+      "detail": "race=200, retained=True"
+    },
+    {
+      "name": "highlight-edit-tag-note",
+      "status": "PASS",
+      "detail": "{\"tag\": \"follow_up\", \"note\": \"synthetic retained note draft\", \"version\": 3}"
+    },
+    {
+      "name": "highlight-audio-controlled-route",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "brief-project-topic-conversation-union",
+      "status": "PASS",
+      "detail": "{\"kind\": \"project\", \"conversation_ids\": [\"conversation:cf646a9c65e748f1c598293d7ba6bd97e4d7fc8b5ac9cec182c0295b94b1607d\"]}"
+    },
+    {
+      "name": "brief-person-picker-only-current-confirmed-identities",
+      "status": "PASS",
+      "detail": "API=['person:curator']; UI=['person:curator']"
+    },
+    {
+      "name": "brief-preview",
+      "status": "PASS",
+      "detail": "evidence groups=3; evidence=2"
+    },
+    {
+      "name": "brief-evidence-expand-and-play",
+      "status": "PASS",
+      "detail": "evidence audio currentTime advanced"
+    },
+    {
+      "name": "brief-copy-markdown-content",
+      "status": "PASS",
+      "detail": "snapshot, evidence text, and caveats copied"
+    },
+    {
+      "name": "highlight-source-revision-relink",
+      "status": "PASS",
+      "detail": "revision=200, state=current"
+    },
+    {
+      "name": "brief-refresh-after-transcript-revision",
+      "status": "PASS",
+      "detail": "evidence=2; old evidence text absent=True"
+    },
+    {
+      "name": "highlight-forget-erases-source-linked-data",
+      "status": "PASS",
+      "detail": "{\"status\": 200, \"count\": 0}"
+    },
+    {
+      "name": "forget-removes-brief-evidence-and-notes",
+      "status": "PASS",
+      "detail": "{\"status\": 200, \"evidence\": 0, \"entries\": 0}"
+    },
+    {
+      "name": "uncaught-browser-errors",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "page_errors": []
+}
