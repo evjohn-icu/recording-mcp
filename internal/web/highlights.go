@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"recordingmcp/internal/app"
 	"recordingmcp/internal/contextbrief"
 	"recordingmcp/internal/memory"
 	"strconv"
@@ -18,6 +19,8 @@ func (s *Server) registerHighlightRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/highlights/{id}/audio", s.handleHighlightAudio)
 	mux.HandleFunc("POST /api/briefs/preview", s.handleBrief)
 	mux.HandleFunc("GET /api/briefs/people", s.handleBriefPeople)
+	mux.HandleFunc("GET /api/briefs/polish/config", s.handleBriefPolishConfig)
+	mux.HandleFunc("POST /api/briefs/polish", s.handleBriefPolish)
 }
 func decodeHighlightBody(w http.ResponseWriter, r *http.Request, v any) bool {
 	if !requireJSON(w, r) {
@@ -121,4 +124,20 @@ func (s *Server) handleBriefPeople(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"people": people})
+}
+
+func (s *Server) handleBriefPolishConfig(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]bool{"enabled": s.svc.BriefPolisher != nil})
+}
+func (s *Server) handleBriefPolish(w http.ResponseWriter, r *http.Request) {
+	var in app.BriefPolishRequest
+	if !decodeHighlightBody(w, r, &in) {
+		return
+	}
+	result, err := s.svc.PolishContextBrief(r.Context(), in)
+	if err != nil {
+		s.writeError(w, r, err, nil)
+		return
+	}
+	writeJSON(w, 200, result)
 }

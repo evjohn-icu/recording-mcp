@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"recordingmcp/internal/contextbrief"
 	"recordingmcp/internal/contextbuild"
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/plane"
@@ -14,10 +15,12 @@ import (
 // Service is the shared business facade. The MCP server and the local web
 // server both call these methods; no transport owns retrieval or write rules.
 type Service struct {
-	Store    *memory.Store
-	Semantic semantic.SemanticRetriever
-	Reranker contextbuild.Reranker
-	Assessor contextbuild.EvidenceAssessor
+	// BriefPolisher is nil unless explicitly configured at startup.
+	BriefPolisher contextbrief.Polisher
+	Store         *memory.Store
+	Semantic      semantic.SemanticRetriever
+	Reranker      contextbuild.Reranker
+	Assessor      contextbuild.EvidenceAssessor
 	// AudioDir is the cloud-sync audio directory. Every served clip must live
 	// beneath it; an empty value disables audio serving instead of allowing
 	// paths relative to the process working directory.

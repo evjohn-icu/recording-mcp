@@ -112,7 +112,14 @@ func main() {
 	worldlineModel := flag.String("worldline-decision-model", "decision-v3-0.8b", "actual local decision model for worldline suggestions")
 	var devOrigins repeatedFlag
 	flag.Var(&devOrigins, "dev-origin", "additional allowed Origin header value for development (repeatable), e.g. http://127.0.0.1:5173")
+	briefPolishEndpoint := flag.String("brief-polish-endpoint", "", "optional chat-completions endpoint; empty disables brief polishing")
+	briefPolishModel := flag.String("brief-polish-model", "", "model used only for explicitly consented brief polishing")
+	briefPolishKeyEnv := flag.String("brief-polish-key-env", "", "environment variable containing optional brief model API key")
 	flag.Parse()
+	briefPolisher, briefPolishErr := configuredBriefPolisher(*briefPolishEndpoint, *briefPolishModel, *briefPolishKeyEnv)
+	if briefPolishErr != nil {
+		log.Fatal(briefPolishErr)
+	}
 	worldlineEngine, worldlineErr := localWorldlineDecision(*worldlineURL, *worldlineModel)
 	if worldlineErr != nil {
 		log.Fatal(worldlineErr)
@@ -181,6 +188,7 @@ func main() {
 				rerank = &contextbuild.DecisionReranker{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*decisionURL), Model: *decisionModel}}
 			}
 			svc := app.New(store, retriever, rerank, paths.Audio)
+			svc.BriefPolisher = briefPolisher
 			if strings.TrimSpace(*sufficiencyURL) != "" {
 				svc.Assessor = &contextbuild.DecisionEvidenceAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
 			}
@@ -300,6 +308,7 @@ func main() {
 		rerank = &contextbuild.DecisionReranker{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*decisionURL), Model: *decisionModel}}
 	}
 	svc := app.New(store, retriever, rerank, *audioDir)
+	svc.BriefPolisher = briefPolisher
 	if strings.TrimSpace(*sufficiencyURL) != "" {
 		svc.Assessor = &contextbuild.DecisionEvidenceAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
 	}
