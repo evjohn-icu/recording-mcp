@@ -1,0 +1,19 @@
+{
+  "base_url": "http://127.0.0.1:8788",
+  "synthetic_profile": "alpha",
+  "cases": [
+    {
+      "name": "hybrid-default-is-v1",
+      "status": "PASS"
+    },
+    {
+      "name": "v2-selection-updates-request-and-url",
+      "status": "PASS"
+    },
+    {
+      "name": "v2-selection-restores-from-url",
+      "status": "PASS"
+    }
+  ],
+  "page_errors": []
+}

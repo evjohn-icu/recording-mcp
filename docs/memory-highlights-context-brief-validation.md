@@ -1,6 +1,6 @@
 # Memory Highlights / Context Brief 验证记录
 
-本轮仅使用临时 SQLite、合成转写、模拟 PCM 和临时 Profile。未读取真实录音或真实用户数据库。
+下文 P0/P1 与最初 P2 验证仅使用临时 SQLite、合成转写、模拟 PCM 和临时 Profile。当时未读取真实录音或真实用户数据库。用户后来授权的真实来源只读诊断另见 [真实来源检索诊断](real-source-retrieval-diagnostic.md)，不与合成回归结果混同。
 
 ## 基线
 

@@ -1,0 +1,382 @@
+{
+  "study_kind": "exploratory source-target diagnostic, NOT human-labelled relevance recall",
+  "private_text_in_report": false,
+  "original_databases_read_only": true,
+  "inventory": {
+    "primary_profile_schema": 17,
+    "legacy_same_turn_content_schema": 12,
+    "conversations": 47,
+    "recordings": 47,
+    "turns": 7233,
+    "notes": 6176,
+    "conversations_with_turns": 36,
+    "empty_conversations": 11,
+    "nonambient_current_turns": 6924,
+    "ambient_turns": 309,
+    "confirmed_speaker_bindings": 0,
+    "original_embedding_rows": 0
+  },
+  "sample": {
+    "source_groups": 23,
+    "queries": 59,
+    "exact": 23,
+    "keyword": 18,
+    "model_paraphrase": 18,
+    "missing_or_rejected_model_drafts": 5,
+    "model": "gpt-6-luna via user-configured provider",
+    "human_reviewed": false,
+    "negative_relevance_labels": false
+  },
+  "baseline": [
+    {
+      "buckets": {
+        "exact": {
+          "hit5": 10,
+          "n": 23
+        },
+        "keyword": {
+          "hit5": 9,
+          "n": 18
+        },
+        "natural": {
+          "n": 18
+        }
+      },
+      "errors": 0,
+      "leaks": 0,
+      "mode": "lexical",
+      "mrr10": 0.26633709981167597,
+      "p95_ms": 430.132,
+      "queries": 59,
+      "scoped": false,
+      "target_hit10": 41,
+      "target_hit5": 19,
+      "version": "v1"
+    },
+    {
+      "buckets": {
+        "exact": {
+          "hit5": 10,
+          "n": 23
+        },
+        "keyword": {
+          "hit5": 9,
+          "n": 18
+        },
+        "natural": {
+          "hit5": 4,
+          "n": 18
+        }
+      },
+      "errors": 0,
+      "leaks": 0,
+      "mode": "lexical",
+      "mrr10": 0.2982580037664782,
+      "p95_ms": 465.804,
+      "queries": 59,
+      "scoped": true,
+      "target_hit10": 44,
+      "target_hit5": 23,
+      "version": "v1"
+    },
+    {
+      "buckets": {
+        "exact": {
+          "hit5": 10,
+          "n": 23
+        },
+        "keyword": {
+          "hit5": 9,
+          "n": 18
+        },
+        "natural": {
+          "n": 18
+        }
+      },
+      "errors": 0,
+      "leaks": 0,
+      "mode": "hybrid",
+      "mrr10": 0.26633709981167597,
+      "p95_ms": 431.479,
+      "queries": 59,
+      "scoped": false,
+      "target_hit10": 41,
+      "target_hit5": 19,
+      "version": "v1"
+    },
+    {
+      "buckets": {
+        "exact": {
+          "hit5": 10,
+          "n": 23
+        },
+        "keyword": {
+          "hit5": 9,
+          "n": 18
+        },
+        "natural": {
+          "hit5": 4,
+          "n": 18
+        }
+      },
+      "errors": 0,
+      "leaks": 0,
+      "mode": "hybrid",
+      "mrr10": 0.2982580037664782,
+      "p95_ms": 485.98,
+      "queries": 59,
+      "scoped": true,
+      "target_hit10": 44,
+      "target_hit5": 23,
+      "version": "v1"
+    },
+    {
+      "buckets": {
+        "exact": {
+          "hit5": 9,
+          "n": 23
+        },
+        "keyword": {
+          "hit5": 9,
+          "n": 18
+        },
+        "natural": {
+          "hit5": 8,
+          "n": 18
+        }
+      },
+      "errors": 0,
+      "leaks": 0,
+      "mode": "lexical",
+      "mrr10": 0.41468926553672314,
+      "p95_ms": 2182.229,
+      "queries": 59,
+      "scoped": false,
+      "target_hit10": 28,
+      "target_hit5": 26,
+      "version": "v2"
+    },
+    {
+      "buckets": {
+        "exact": {
+          "hit5": 16,
+          "n": 23
+        },
+        "keyword": {
+          "hit5": 14,
+          "n": 18
+        },
+        "natural": {
+          "hit5": 14,
+          "n": 18
+        }
+      },
+      "errors": 0,
+      "leaks": 0,
+      "mode": "lexical",
+      "mrr10": 0.6557909604519774,
+      "p95_ms": 1435.542,
+      "queries": 59,
+      "scoped": true,
+      "target_hit10": 47,
+      "target_hit5": 44,
+      "version": "v2"
+    },
+    {
+      "buckets": {
+        "exact": {
+          "hit5": 9,
+          "n": 23
+        },
+        "keyword": {
+          "hit5": 9,
+          "n": 18
+        },
+        "natural": {
+          "hit5": 8,
+          "n": 18
+        }
+      },
+      "errors": 0,
+      "leaks": 0,
+      "mode": "hybrid",
+      "mrr10": 0.41468926553672314,
+      "p95_ms": 2179.308,
+      "queries": 59,
+      "scoped": false,
+      "target_hit10": 28,
+      "target_hit5": 26,
+      "version": "v2"
+    },
+    {
+      "buckets": {
+        "exact": {
+          "hit5": 16,
+          "n": 23
+        },
+        "keyword": {
+          "hit5": 14,
+          "n": 18
+        },
+        "natural": {
+          "hit5": 14,
+          "n": 18
+        }
+      },
+      "errors": 0,
+      "leaks": 0,
+      "mode": "hybrid",
+      "mrr10": 0.6557909604519774,
+      "p95_ms": 1440.623,
+      "queries": 59,
+      "scoped": true,
+      "target_hit10": 47,
+      "target_hit5": 44,
+      "version": "v2"
+    }
+  ],
+  "scope_pushdown": {
+    "rank_item_count_and_gap_details_identical": true,
+    "before_p95_ms": 1435.542,
+    "after_p95_ms": 591.765,
+    "target_hit5_before": 44,
+    "target_hit5_after": 44,
+    "queries": 59,
+    "single_pass_not_latency_SLA": true
+  },
+  "hash_index_trial": {
+    "index_report": {
+      "notes": 6176,
+      "turns": 7233,
+      "skipped": 0,
+      "pruned": 0,
+      "embed_requests": 211,
+      "embedded_items": 13409,
+      "provider_id": "hash-ngram-v1",
+      "model": "hash-ngram-v1"
+    },
+    "conditions": [
+      {
+        "buckets": {
+          "exact": {
+            "hit5": 3,
+            "n": 23
+          },
+          "keyword": {
+            "hit5": 2,
+            "n": 18
+          },
+          "natural": {
+            "hit5": 3,
+            "n": 18
+          }
+        },
+        "errors": 0,
+        "leaks": 0,
+        "mode": "hybrid",
+        "mrr10": 0.12671509281678775,
+        "queries": 59,
+        "scoped": false,
+        "target_hit10": 9,
+        "target_hit5": 8,
+        "version": "v1"
+      },
+      {
+        "buckets": {
+          "exact": {
+            "hit5": 12,
+            "n": 23
+          },
+          "keyword": {
+            "hit5": 11,
+            "n": 18
+          },
+          "natural": {
+            "hit5": 7,
+            "n": 18
+          }
+        },
+        "errors": 0,
+        "leaks": 0,
+        "mode": "hybrid",
+        "mrr10": 0.4355461393596987,
+        "queries": 59,
+        "scoped": true,
+        "target_hit10": 37,
+        "target_hit5": 30,
+        "version": "v1"
+      },
+      {
+        "buckets": {
+          "exact": {
+            "hit5": 9,
+            "n": 23
+          },
+          "keyword": {
+            "hit5": 8,
+            "n": 18
+          },
+          "natural": {
+            "hit5": 8,
+            "n": 18
+          }
+        },
+        "errors": 0,
+        "leaks": 0,
+        "mode": "hybrid",
+        "mrr10": 0.3979284369114877,
+        "queries": 59,
+        "scoped": false,
+        "target_hit10": 27,
+        "target_hit5": 25,
+        "version": "v2"
+      },
+      {
+        "buckets": {
+          "exact": {
+            "hit5": 16,
+            "n": 23
+          },
+          "keyword": {
+            "hit5": 14,
+            "n": 18
+          },
+          "natural": {
+            "hit5": 14,
+            "n": 18
+          }
+        },
+        "errors": 0,
+        "leaks": 0,
+        "mode": "hybrid",
+        "mrr10": 0.6491525423728813,
+        "queries": 59,
+        "scoped": true,
+        "target_hit10": 45,
+        "target_hit5": 44,
+        "version": "v2"
+      }
+    ],
+    "latencies_excluded_due_parallel_browser_run": true,
+    "applied_to_original": false
+  },
+  "original_checks": [
+    {
+      "original_unchanged_size_and_mtime": true,
+      "original_schema": 17,
+      "original_embeddings": 0
+    },
+    {
+      "original_unchanged_size_and_mtime": true,
+      "original_schema": 12,
+      "original_embeddings": 0
+    }
+  ],
+  "limitations": [
+    "Sources selected by length and availability, not a representative production workload.",
+    "LLM-authored questions and one known target are not exhaustive human relevance gold.",
+    "No precision, general recall, contradiction adjudication or identity-confirmation claims.",
+    "No true neural embedding or reranker was tested.",
+    "No default algorithm or original profile data/index was changed."
+  ]
+}

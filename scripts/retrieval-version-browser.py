@@ -31,7 +31,10 @@ async def main():
             query = urlencode({'q': 'synthetic retrieval probe', 'hybrid': '1'})
             async with page.expect_response(lambda r: '/api/search/hybrid' in r.url, timeout=15000) as initial_response:
                 await page.goto(f'{BASE}/search?{query}', wait_until='domcontentloaded')
-            initial_url = (await initial_response.value).url
+            initial = await initial_response.value
+            assert initial.status == 200, initial.status
+            assert "sufficiency" not in await initial.json()
+            initial_url = initial.url
             selector = page.get_by_role('combobox', name='检索版本')
             await selector.wait_for(timeout=10000)
             default_value = await selector.input_value()
@@ -41,7 +44,10 @@ async def main():
 
             async with page.expect_response(lambda r: '/api/search/hybrid' in r.url and 'retrieval_version=v2' in r.url, timeout=15000) as v2_response:
                 await selector.select_option('v2')
-            v2_url = (await v2_response.value).url
+            v2 = await v2_response.value
+            assert v2.status == 200, v2.status
+            assert "sufficiency" in await v2.json()
+            v2_url = v2.url
             assert parse_qs(urlparse(v2_url).query).get('retrieval_version') == ['v2'], v2_url
             assert 'retrieval_version=v2' in page.url, page.url
             cases.append({'name': 'v2-selection-updates-request-and-url', 'status': 'PASS'})
