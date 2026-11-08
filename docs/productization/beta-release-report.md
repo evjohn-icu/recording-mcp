@@ -68,11 +68,12 @@
 ## E. Git Deliverables
 
 - 分支：`feat/productization-beta`（基于 `3f2865e9d2f41f4d03bc982d1ed8a2958e450433`）。
-- 本地提交（`feat/productization-beta`）：
+- 本地提交（`feat/productization-beta`，完整列表见 `git log --oneline 3f2865e..HEAD`）：
   - `0071471` test(spec): specify productization beta scenarios and baseline audit
   - `63d1c54` feat(beta): local deployment, audio import, decision trail and MCP context
   - `54cfd0b` test(beta): verification suites, fixtures, deployment evidence and CI
   - `7a7f517` docs(beta): record deployment, audio E2E, retrieval and release evidence
+  - 其后为文档收尾提交（端口、r3 复跑、最终计时）。
 - **未推送、未创建 PR（未授权）**。
 - 主要文件：`Dockerfile`、`docker-compose.yml`、`internal/ingest/**`、`internal/app/decision_trail*.go`、`internal/web/import.go`、`internal/web/decision_trail.go`、`web/src/components/ImportPanel.tsx`、`web/src/components/DecisionTrailPanel.tsx`、`cmd/context-memory/decision_trail_test.go`、`scripts/product-*.py`、`scripts/beta-demo.py`、`docs/productization/**`。
 
