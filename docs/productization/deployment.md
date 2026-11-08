@@ -15,6 +15,7 @@
 ```sh
 RECORDING_PROFILE=home
 MEMORY_PROFILE_PASSWORD=<至少 12 个字符的本地密码>
+WEB_PORT=8788                # 宿主发布端口（可选；容器内固定 8788）
 ASR_PROVIDER=off            # off | fixture | doubao
 GENERATOR_PROVIDER=off
 EMBED_PROVIDER=hash
