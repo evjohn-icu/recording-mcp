@@ -13,6 +13,8 @@
 | decision-trail.scenario-* | 先写 24 个具名子测试：`topics=0 want 1`、`version conflict`、`reopen kept the decision confirmed` | 增加 orphan topic、把 `decision.review` 纳入版本、最新复核治理后 24/24 |
 | decision-trail.review-* | `TestDecisionReviewRejectsStaleVersion` 初次返回 `nil`（Review 未校验 Snapshot 版本） | 版本/请求/证据校验后 7/7 |
 | mcp-context.* | `TestMCPDecisionTrailByteBudget`：`serialized trail=1229 bytes > 512`（截断作用于副本） | 原地截断 + 改用 1 KiB 预算后 15/15 |
+| productization.import-progress-projection（>100 jobs） | `--durations 7200` 的音频 E2E 卡在 `current_stage=ingest`（快照只取最新 100 个 job，ingest/asr 被挤出） | 按 stage 直查最新 job 后 `TestProcessingPhasesSurviveMoreThanListLimitJobs` 通过；E2E 完成 |
+| productization.web-workflow（profiles 路由） | 3 分钟音频上传 `BrokenPipeError`（外层 profile 路由把 `/api/imports` 限制为 1 MiB） | 路由按路径选择 2 GiB 上限后 E2E 通过；新增 `TestProfilesAllowsLargeImportUpload` |
 | mcp-context.profile-event-plane | `TestMCPProfileUsesProfileEventPlane` 先确认旧实现打开记忆库；修复后断言 `paths.Plane` | 通过 |
 | productization.retrieval-* | 先写 `test_productization_retrieval.py`：报告缺指标/结果文件 | 生成 4 份 JSON 与报告后 3/3 |
 | productization.demo-ten-steps | `beta-demo.py` 首跑：step 6 `state=unresolved` 误判、step 8 `X-Audio-Start-MS` 大小写 | 修正断言后 10/10 |
