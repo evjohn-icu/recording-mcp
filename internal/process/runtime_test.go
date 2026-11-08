@@ -92,3 +92,45 @@ func TestListForConversationFiltersBeforeLimit(t *testing.T) {
 		t.Fatalf("target job omitted: %+v", jobs)
 	}
 }
+
+func TestHeartbeatCapabilities(t *testing.T) {
+	db := newDB(t)
+	now := time.Now()
+	if err := WriteHeartbeat(context.Background(), db, Heartbeat{
+		WorkerID: "w-cap", PID: 7, Stages: []string{"ingest", "asr"},
+		GeneratorEnabled: false, ASRProvider: "doubao", ASRAvailable: true, EmbedProvider: "hash",
+	}, now); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadHeartbeats(context.Background(), db, now.Add(time.Second), 30*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("heartbeats=%d", len(got))
+	}
+	h := got[0]
+	if h.ASRProvider != "doubao" || !h.ASRAvailable || h.EmbedProvider != "hash" {
+		t.Fatalf("capabilities=%+v", h)
+	}
+
+	// A row written before migration v20 keeps the column defaults.
+	if _, err := db.ExecContext(context.Background(),
+		`INSERT OR REPLACE INTO worker_heartbeats(worker_id,pid,stages_json,generator_enabled,last_seen_at) VALUES('legacy',1,'["extract"]',0,?)`,
+		now.UnixMilli()); err != nil {
+		t.Fatal(err)
+	}
+	got, err = ReadHeartbeats(context.Background(), db, now.Add(time.Second), 30*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range got {
+		if h.WorkerID == "legacy" {
+			if h.ASRProvider != "" || h.ASRAvailable || h.EmbedProvider != "" {
+				t.Fatalf("legacy defaults=%+v", h)
+			}
+			return
+		}
+	}
+	t.Fatal("legacy heartbeat missing")
+}

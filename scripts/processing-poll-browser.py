@@ -58,13 +58,29 @@ async def main():
                 # responses. After retry succeeds, transition to terminal immediately.
                 if not retry_success:
                     body = {"status": {"analysis_status": "pending", "indexing_status": "pending"},
-                            "jobs": [{"id": "job-synthetic", "stage": "worldline", "status": "failed",
+                            "jobs": [{"id": "job-synthetic", "stage": "ingest", "status": "failed",
                                       "attempt_count": 1, "max_attempts": 2}],
-                            "workers": None, "generator_enabled": False}
+                            "workers": None, "generator_enabled": False,
+                            "phases": [{"name": "ingest", "state": "failed", "job_id": "job-synthetic",
+                                        "attempt": 1, "error": "synthetic failure",
+                                        "error_code": "asr_unavailable", "error_action": "配置 ASR 后重试"},
+                                       {"name": "asr", "state": "skipped"},
+                                       {"name": "extract", "state": "skipped"},
+                                       {"name": "publish", "state": "skipped"},
+                                       {"name": "index", "state": "skipped"}],
+                            "current_stage": "ingest", "asr_provider": "off",
+                            "asr_available": False, "worker_alive": False}
                 else:
                     body = {"status": {"analysis_status": "ready", "indexing_status": "ready"},
                             "jobs": None,
-                            "workers": None, "generator_enabled": False}
+                            "workers": None, "generator_enabled": False,
+                            "phases": [{"name": "ingest", "state": "done"},
+                                       {"name": "asr", "state": "done"},
+                                       {"name": "extract", "state": "done"},
+                                       {"name": "publish", "state": "skipped"},
+                                       {"name": "index", "state": "done"}],
+                            "current_stage": "completed", "asr_provider": "fixture",
+                            "asr_available": True, "worker_alive": True}
                 await route.fulfill(json=body)
             elif path.endswith("/annotations/history"):
                 await route.fulfill(json={"revisions": []})
@@ -80,7 +96,13 @@ async def main():
         except Exception:
             raise AssertionError(f"synthetic detail did not load: {observations}; body={await page.locator('body').inner_text()}")
         await page.locator(".processing-progress").wait_for()
-        assert "候选生成器状态未知" in await page.locator(".processing-progress").inner_text(), "missing heartbeat must report unknown generator state"
+        progress_text = await page.locator(".processing-progress").inner_text()
+        assert "候选生成器状态未知" in progress_text, "missing heartbeat must report unknown generator state"
+        assert "语音转写：未配置" in progress_text, progress_text
+        assert "配置 ASR 后重试" in progress_text, progress_text
+        phase = page.locator('[data-testid="phase-ingest"]')
+        assert await phase.get_attribute("data-state") == "failed", progress_text
+        assert await page.locator('[data-testid="phase-asr"]').get_attribute("data-state") == "skipped", progress_text
         # The poller must continue during pending work.
         for _ in range(120):
             if observations["processing"] >= 2:

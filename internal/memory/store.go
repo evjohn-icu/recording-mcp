@@ -29,7 +29,7 @@ func Open(path string) (*Store, error) {
 			return nil, err
 		}
 	}
-	db, err := sql.Open("sqlite", path)
+	db, err := sql.Open("sqlite", immediateTxDSN(path))
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +38,17 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	if !inMemoryPath(path) {
+		// WAL lets the web process read while a worker writes. It requires a
+		// writable database directory, so a read-only volume fails here
+		// instead of silently falling back to the rollback journal. Another
+		// process may be switching or using the file right now, so retry
+		// SQLITE_BUSY instead of failing startup.
+		if err := ensureWALJournal(db); err != nil {
+			db.Close()
+			return nil, err
+		}
+	}
 	if err := migrations.Apply(context.Background(), db); err != nil {
 		db.Close()
 		return nil, err
@@ -45,6 +56,53 @@ func Open(path string) (*Store, error) {
 	return &Store{db}, nil
 }
 func (s *Store) Close() error { return s.db.Close() }
+
+// immediateTxDSN makes every explicit transaction start with BEGIN IMMEDIATE.
+// Under WAL a deferred transaction that reads before writing cannot upgrade
+// once another process committed; SQLite returns SQLITE_BUSY_SNAPSHOT and
+// busy_timeout does not retry it. The worker writes while the web process
+// reads, so both sides open with immediate transactions.
+func immediateTxDSN(path string) string {
+	if path == "" || path == ":memory:" || path == "::memory:" || strings.HasPrefix(path, "file::memory:") || strings.Contains(path, "mode=memory") {
+		return path
+	}
+	separator := "?"
+	if strings.Contains(path, "?") {
+		separator = "&"
+	}
+	return path + separator + "_txlock=immediate"
+}
+
+// ensureWALJournal switches the database to WAL, tolerating a concurrent
+// process that holds the file while it starts.
+func ensureWALJournal(db *sql.DB) error {
+	var lastErr error
+	for attempt := 0; attempt < 100; attempt++ {
+		var mode string
+		if err := db.QueryRow(`PRAGMA journal_mode`).Scan(&mode); err == nil && mode == "wal" {
+			return nil
+		}
+		if err := db.QueryRow(`PRAGMA journal_mode=WAL`).Scan(&mode); err == nil && mode == "wal" {
+			return nil
+		} else if err != nil {
+			lastErr = err
+		} else {
+			lastErr = fmt.Errorf("journal_mode=%q", mode)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("enable WAL journal: %w", lastErr)
+}
+
+// inMemoryPath reports whether path designates a private in-memory database,
+// which has no journal file and therefore cannot use WAL.
+func inMemoryPath(path string) bool {
+	switch path {
+	case "", ":memory:", "::memory:":
+		return true
+	}
+	return strings.HasPrefix(path, "file::memory:") || strings.Contains(path, "mode=memory")
+}
 
 // DB exposes the underlying connection pool so packages that operate on the
 // same database (for example link curation) share one SQLite connection

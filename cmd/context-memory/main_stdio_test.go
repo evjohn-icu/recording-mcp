@@ -47,7 +47,7 @@ func TestExecutableStdioReadOnlySurface(t *testing.T) {
 		"get_processing_status", "get_annotation_history", "list_conversations",
 		"get_evidence_context", "search_memory", "build_context", "get_current_context",
 		"list_memory_links", "get_speaker_projection", "list_speaker_bindings",
-		"list_highlights", "build_context_brief",
+		"list_highlights", "build_context_brief", "get_decision_trail",
 		// event archive family (read tools only)
 		"search_events", "get_timeline", "get_commitments", "get_conversation_events",
 		"get_person_context", "get_current_state",
@@ -130,7 +130,7 @@ func TestExecutableStdioRoundTrip(t *testing.T) {
 		"get_processing_status", "get_annotation_history", "list_conversations",
 		"get_evidence_context", "search_memory", "build_context", "get_current_context",
 		"list_memory_links", "get_speaker_projection", "list_speaker_bindings",
-		"list_highlights", "build_context_brief",
+		"list_highlights", "build_context_brief", "get_decision_trail",
 		"ingest_transcript", "apply_annotations", "review_memory_link",
 		"propose_speaker_binding", "review_speaker_binding",
 		// Event-archive family, co-registered on the same server (phase 1 of

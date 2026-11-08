@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -50,6 +51,7 @@ type Job struct {
 	AttemptCount    int       `json:"attempt_count"`
 	MaxAttempts     int       `json:"max_attempts"`
 	LeaseExpiresAt  time.Time `json:"lease_expires_at,omitempty"`
+	UpdatedAt       time.Time `json:"updated_at,omitempty"`
 }
 
 // ClaimOptions configures a Claim call.
@@ -437,18 +439,20 @@ func scanJob(row interface{ Scan(...any) error }) (*Job, error) {
 		workerID, leaseToken sql.NullString
 		leaseExpiresAt       sql.NullInt64
 	)
+	var updatedAt int64
 	if err := row.Scan(&j.ID, &j.Stage, &j.InputSnapshotID, &j.Status, &j.PayloadJSON,
-		&j.AttemptCount, &j.MaxAttempts, &workerID, &leaseToken, &leaseExpiresAt); err != nil {
+		&j.AttemptCount, &j.MaxAttempts, &workerID, &leaseToken, &leaseExpiresAt, &updatedAt); err != nil {
 		return nil, err
 	}
 	j.WorkerID = workerID.String
 	j.LeaseToken = leaseToken.String
 	j.LeaseExpiresAt = fromMS(leaseExpiresAt.Int64)
+	j.UpdatedAt = fromMS(updatedAt)
 	return &j, nil
 }
 
 const jobColumns = `id, stage, input_snapshot_id, status, payload_json, attempt_count, max_attempts,
-	worker_id, lease_token, lease_expires_at`
+	worker_id, lease_token, lease_expires_at, updated_at`
 
 // Get returns one job by id, or ErrNotFound.
 func Get(ctx context.Context, db *sql.DB, jobID string) (*Job, error) {
@@ -518,4 +522,54 @@ func ListForConversation(ctx context.Context, db *sql.DB, conversationID string,
 		jobs = append(jobs, j)
 	}
 	return jobs, rows.Err()
+}
+
+// JobError is the parsed error_json of the newest failed attempt.
+type JobError struct {
+	Error  string `json:"error"`
+	Code   string `json:"code"`
+	Action string `json:"action"`
+}
+
+// LastError returns the newest recorded attempt error for a job. A job that
+// never failed returns the zero value.
+func LastError(ctx context.Context, db *sql.DB, jobID string) (JobError, error) {
+	var raw sql.NullString
+	err := db.QueryRowContext(ctx, `SELECT error_json FROM processing_attempts WHERE job_id=? AND error_json IS NOT NULL ORDER BY attempt DESC LIMIT 1`, jobID).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return JobError{}, nil
+	}
+	if err != nil {
+		return JobError{}, err
+	}
+	var out JobError
+	if raw.String == "" {
+		return out, nil
+	}
+	if err := json.Unmarshal([]byte(raw.String), &out); err != nil {
+		return JobError{Error: raw.String}, nil
+	}
+	return out, nil
+}
+
+// LatestByStage returns the newest job for each requested stage. The list
+// endpoint caps at a fixed limit, so a conversation with hundreds of
+// extract/embed jobs would otherwise hide its ingest/asr rows from the phase
+// projection.
+func LatestByStage(ctx context.Context, db *sql.DB, conversationID string, stages []string) (map[string]*Job, error) {
+	out := make(map[string]*Job, len(stages))
+	for _, stage := range stages {
+		row := db.QueryRowContext(ctx, `SELECT `+jobColumns+` FROM processing_jobs
+			WHERE stage=? AND (input_snapshot_id=? OR json_extract(payload_json,'$.conversation_id')=?)
+			ORDER BY created_at DESC, rowid DESC LIMIT 1`, stage, conversationID, conversationID)
+		job, err := scanJob(row)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		out[stage] = job
+	}
+	return out, nil
 }

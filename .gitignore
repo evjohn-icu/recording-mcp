@@ -32,3 +32,6 @@ apps/android/.gradle/
 apps/android/build/
 apps/android/app/build/
 apps/android/.idea/
+
+# Productization verification outputs (screenshots, logs, temp profiles)
+/artifacts/

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -27,6 +28,26 @@ import (
 	"recordingmcp/internal/projection"
 	"recordingmcp/internal/semantic"
 )
+
+// scopedDecisionTrail binds the MCP tool to the resolved profile scope without
+// letting a caller pick another profile's events.
+type scopedDecisionTrail struct {
+	inner *app.DecisionTrailService
+	scope string
+}
+
+func (s *scopedDecisionTrail) Build(ctx context.Context, _ string, q app.DecisionQuery) (app.DecisionTrail, error) {
+	return s.inner.Build(ctx, s.scope, q)
+}
+
+type DecisionTrailInput struct {
+	Scope          string `json:"scope,omitempty" jsonschema:"ignored; the server uses the resolved profile scope"`
+	TopicID        string `json:"topic_id,omitempty"`
+	KnownAt        string `json:"known_at,omitempty"`
+	IncludeHistory *bool  `json:"include_history,omitempty"`
+	Limit          int    `json:"limit,omitempty"`
+	MaxBytes       int    `json:"max_bytes,omitempty"`
+}
 
 type ConversationInput struct {
 	ConversationID string `json:"conversation_id"`
@@ -235,15 +256,50 @@ func parseRFC3339(label, value string) (*time.Time, error) {
 	return &t, nil
 }
 
-func newServer(store *memory.Store, svc *app.Service, readOnly bool) *mcp.Server {
+// decisionTrailBuilder is the read-only surface the MCP tool needs; the scope
+// is fixed by the server, never by a tool argument.
+type decisionTrailBuilder interface {
+	Build(ctx context.Context, scope string, q app.DecisionQuery) (app.DecisionTrail, error)
+}
+
+func newServer(store *memory.Store, svc *app.Service, trail decisionTrailBuilder, readOnly bool) *mcp.Server {
 	no := false
 	s := mcp.NewServer(&mcp.Implementation{Name: "context-memory-experimental", Version: "0.1-experimental"}, &mcp.ServerOptions{Instructions: "Experimental local conversation memory for private audio transcripts. Results preserve source evidence and are not verified facts. Speaker labels are recording-scoped and never identify real people. No audio is downloaded or processed by this server."})
 	read := func(name, desc string) *mcp.Tool {
 		return &mcp.Tool{Name: name, Description: "EXPERIMENTAL: " + desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &no}}
 	}
+	mcp.AddTool(s, read("get_decision_trail", "只读决策轨迹：返回某主题的候选、确认、取代与待解决记录及来源证据。确认只来自人工 review；confidence 不代表真实性；valid_from 未知时不推断；known_at 按系统记录时间过滤历史；来源失效或已遗忘的内容不返回。"), func(ctx context.Context, _ *mcp.CallToolRequest, in DecisionTrailInput) (*mcp.CallToolResult, app.DecisionTrail, error) {
+		if trail == nil {
+			return nil, app.DecisionTrail{}, fmt.Errorf("decision trail is not configured")
+		}
+		q := app.DecisionQuery{TopicID: strings.TrimSpace(in.TopicID), IncludeHistory: true}
+		if in.IncludeHistory != nil {
+			q.IncludeHistory = *in.IncludeHistory
+		}
+		if raw := strings.TrimSpace(in.KnownAt); raw != "" {
+			parsed, err := time.Parse(time.RFC3339, raw)
+			if err != nil {
+				return nil, app.DecisionTrail{}, fmt.Errorf("known_at must be an RFC3339 timestamp: %w", err)
+			}
+			q.KnownAt = &parsed
+		}
+		q.Limit = in.Limit
+		q.MaxBytes = in.MaxBytes
+		result, err := trail.Build(ctx, in.Scope, q)
+		if err != nil {
+			if errors.Is(err, app.ErrDecisionNotFound) {
+				return nil, app.DecisionTrail{}, fmt.Errorf("decision topic not found")
+			}
+			return nil, app.DecisionTrail{}, err
+		}
+		return nil, result, nil
+	})
 	mcp.AddTool(s, read("list_highlights", "List user attention markers for one recording, with current source revision and needs_relink state. Markers do not confirm facts."), func(ctx context.Context, _ *mcp.CallToolRequest, in struct {
 		RecordingID string `json:"recording_id"`
-	}) (*mcp.CallToolResult, app.HighlightList, error) { out, e := svc.ListHighlights(ctx, in.RecordingID); return nil, out, e })
+	}) (*mcp.CallToolResult, app.HighlightList, error) {
+		out, e := svc.ListHighlights(ctx, in.RecordingID)
+		return nil, out, e
+	})
 	mcp.AddTool(s, read("build_context_brief", "Build a deterministic evidence-backed brief within explicit person, topic, conversation or project sources. Current evidence is not verified fact; no data is written or sent to a model."), func(ctx context.Context, _ *mcp.CallToolRequest, in contextbrief.Request) (*mcp.CallToolResult, contextbrief.Result, error) {
 		out, e := svc.BuildContextBrief(ctx, in)
 		return nil, out, e
@@ -566,7 +622,16 @@ func main() {
 	// events table is disjoint from the memory schema, so one MCP server
 	// carries both tool families. (With --db :memory: each connection is its
 	// own database, so the event family sees an empty archive.)
-	events, e := plane.Open(*db)
+	// Profile mode stores events in the profile's own plane, never inside the
+	// memory database. Legacy databases keep the shared-file prototype.
+	scope, eventsPath := "local", *db
+	if profileCLI.Selected() {
+		scope, eventsPath, e = profileCLI.WorldlinePlane(*db, "")
+		if e != nil {
+			log.Fatal(e)
+		}
+	}
+	events, e := plane.Open(eventsPath)
 	if e != nil {
 		log.Fatal(e)
 	}
@@ -603,7 +668,11 @@ func main() {
 	if strings.TrimSpace(*sufficiencyURL) != "" {
 		svc.Assessor = &contextbuild.DecisionEvidenceAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
 	}
-	srv := newServer(store, svc, *readOnly)
+	timeSvc := &app.TimeService{Store: store, Events: events}
+	worldlineSvc := &app.WorldlineService{Time: timeSvc}
+	decisionSvc := &app.DecisionTrailService{Worldline: worldlineSvc, Time: timeSvc}
+	trail := &scopedDecisionTrail{inner: decisionSvc, scope: scope}
+	srv := newServer(store, svc, trail, *readOnly)
 	mcpserver.Register(srv, events, nil, *readOnly)
 	if e = srv.Run(ctx, &mcp.StdioTransport{}); e != nil && ctx.Err() == nil {
 		log.Fatal(e)

@@ -20,6 +20,8 @@ import type {
   TemporalEvent,
   TemporalState,
   ProcessingSnapshot,
+  Capabilities,
+  ImportResult,
 } from './types'
 
 let csrfToken: string | null = null
@@ -76,7 +78,7 @@ async function parseError(response: Response): Promise<ApiError> {
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method || 'GET').toUpperCase()
   const headers = new Headers(init.headers)
-  if (init.body !== undefined && init.body !== null && !headers.has('Content-Type')) {
+  if (init.body !== undefined && init.body !== null && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
   if (method !== 'GET' && method !== 'HEAD' && csrfToken && !headers.has('X-CSRF-Token')) {
@@ -114,6 +116,12 @@ export function loginProfile(profile: string, password: string): Promise<{ csrf_
   return request('/api/profiles/login', { method: 'POST', body: JSON.stringify({ profile, password }) })
 }
 export function authInfo(): Promise<AuthInfo> { return request('/api/auth-info') }
+export function getCapabilities(signal?: AbortSignal): Promise<Capabilities> { return request('/api/capabilities', { signal }) }
+export async function importRecording(file: File): Promise<ImportResult> {
+  const body = new FormData()
+  body.append('file', file, file.name)
+  return request<ImportResult>('/api/imports', { method: 'POST', body })
+}
 export function getProcessing(conversationId: string, signal?: AbortSignal): Promise<ProcessingSnapshot> { return request(`/api/conversations/${encodeURIComponent(conversationId)}/processing`, { signal }) }
 export function retryProcessing(conversationId: string, jobId: string, expectedAttempt: number, requestId: string): Promise<unknown> {
   return request(`/api/conversations/${encodeURIComponent(conversationId)}/processing/retry`, { method: 'POST', body: JSON.stringify({ job_id: jobId, expected_attempt: expectedAttempt, request_id: requestId }) })

@@ -20,9 +20,11 @@ import (
 	"time"
 
 	"recordingmcp/internal/app"
+	"recordingmcp/internal/cloudsync"
 	"recordingmcp/internal/contextbrief"
 	"recordingmcp/internal/contextbuild"
 	"recordingmcp/internal/decision"
+	"recordingmcp/internal/ingest"
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/plane"
 	"recordingmcp/internal/profile"
@@ -39,22 +41,28 @@ func (f *repeatedFlag) Set(v string) error {
 	return nil
 }
 
-func validateListenAddress(addr string) error {
+func validateListenAddress(addr string, containerBind bool) error {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		return fmt.Errorf("context-web: invalid listen address: %w", err)
 	}
 	if host == "" {
-		return errors.New("context-web: listen address must be an explicit loopback host")
+		return errors.New("context-web: listen address must be an explicit host")
 	}
 	if host == "localhost" {
 		return nil
 	}
 	ip := net.ParseIP(host)
-	if ip == nil || !ip.IsLoopback() {
-		return errors.New("context-web: listen address must be loopback (127.0.0.1, ::1, or localhost)")
+	if ip != nil && ip.IsLoopback() {
+		return nil
 	}
-	return nil
+	// A container must listen on its own interface to be reachable through a
+	// published port. The compose binding keeps the host side on 127.0.0.1;
+	// this flag never widens that.
+	if containerBind && ip != nil && ip.IsUnspecified() {
+		return nil
+	}
+	return errors.New("context-web: listen address must be loopback (127.0.0.1, ::1, or localhost) unless --container-bind selects 0.0.0.0 or ::")
 }
 
 func serveHTTP(addr string, handler http.Handler) error {
@@ -63,8 +71,8 @@ func serveHTTP(addr string, handler http.Handler) error {
 		return err
 	}
 	httpServer := &http.Server{
-		Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
-		WriteTimeout: 60 * time.Second, IdleTimeout: 120 * time.Second,
+		Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Minute,
+		WriteTimeout: 10 * time.Minute, IdleTimeout: 120 * time.Second,
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -97,6 +105,18 @@ func main() {
 	profilesRoot := flag.String("profiles-root", "", "trusted profile root; without --profile enables profile selection")
 	profilePasswordEnv := flag.String("profile-password-env", profile.DefaultPasswordEnv, "environment variable holding the selected profile password")
 	addr := flag.String("addr", "127.0.0.1:8788", "listen address (loopback by default)")
+	containerBind := flag.Bool("container-bind", false, "allow binding 0.0.0.0/:: inside a container; the host side stays loopback")
+	asrProvider := flag.String("asr-provider", "off", "ASR provider for uploads: off|fixture|doubao")
+	asrKeyEnv := flag.String("asr-key-env", "VOLC_API_KEY", "environment variable holding the doubao ASR API key")
+	asrEndpoint := flag.String("asr-endpoint", "", "doubao ASR endpoint override")
+	asrResourceID := flag.String("asr-resource-id", "", "doubao ASR resource id")
+	asrModel := flag.String("asr-model", "", "ASR model identifier recorded on transcript results")
+	asrSegmentMS := flag.Int64("asr-segment-ms", 300000, "doubao window length in milliseconds")
+	asrOverlapMS := flag.Int64("asr-overlap-ms", 2000, "doubao window overlap in milliseconds")
+	asrConcurrency := flag.Int("asr-concurrency", 2, "maximum concurrent doubao recognition sessions")
+	fixtureWindowMS := flag.Int64("fixture-window-ms", 5000, "fixture transcriber window length in milliseconds")
+	ffmpegPath := flag.String("ffmpeg", "ffmpeg", "ffmpeg binary used by uploads")
+	ffprobePath := flag.String("ffprobe", "ffprobe", "ffprobe binary used by uploads")
 	audioDir := flag.String("audio-dir", "", "cloud-sync audio directory (legacy mode; profile mode uses its private audio directory)")
 	webDir := flag.String("web-dir", "web/dist", "built frontend directory")
 	useSemanticIndex := flag.Bool("semantic-index", false, "opt in to experimental HNSW; exact search remains default")
@@ -142,8 +162,21 @@ func main() {
 	if flag.NArg() != 0 {
 		log.Fatalf("unexpected arguments: %v", flag.Args())
 	}
-	if err := validateListenAddress(*addr); err != nil {
+	if err := validateListenAddress(*addr, *containerBind); err != nil {
 		log.Fatal(err)
+	}
+	transcriber, err := buildASRTranscriber(*asrProvider, *asrKeyEnv, *asrEndpoint, *asrResourceID, *asrModel, *asrSegmentMS, *asrOverlapMS, *asrConcurrency, *fixtureWindowMS)
+	if err != nil {
+		log.Fatal(err)
+	}
+	newImporter := func(store *memory.Store, audioDir string) (*ingest.Service, error) {
+		return ingest.New(ingest.Config{
+			Store: store, DB: store.DB(), AudioDir: audioDir,
+			Decoder:       &ingest.FFmpegDecoder{FFmpeg: *ffmpegPath, FFprobe: *ffprobePath},
+			Transcription: transcriber,
+			ASRProvider:   *asrProvider, ASRModel: *asrModel, ASRResourceID: *asrResourceID,
+			TranscriptRevision: ingest.DefaultTranscriptRevision,
+		})
 	}
 	root := strings.TrimSpace(*profilesRoot)
 	if root == "" {
@@ -203,6 +236,7 @@ func main() {
 				rerank = &contextbuild.DecisionReranker{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*decisionURL), Model: *decisionModel}}
 			}
 			svc := app.New(store, retriever, rerank, paths.Audio)
+			svc.ASRProvider = *asrProvider
 			svc.BriefPolisher = briefPolisher
 			if strings.TrimSpace(*sufficiencyURL) != "" {
 				svc.Assessor = &contextbuild.DecisionEvidenceAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
@@ -210,11 +244,22 @@ func main() {
 			svc.ForgetPlane = events
 			svc.ManagedIndexDir = paths.Index
 			svc.ManagedBackupDir = paths.Backups
+			importer, err := newImporter(store, paths.Audio)
+			if err != nil {
+				events.Close()
+				store.Close()
+				return nil, err
+			}
+			timeSvc := &app.TimeService{Store: store, Events: events}
+			worldlineSvc := &app.WorldlineService{Time: timeSvc, DecisionEngine: worldlineEngine}
 			return web.New(web.Config{
 				Service:           svc,
-				TimeService:       &app.TimeService{Store: store, Events: events},
+				TimeService:       timeSvc,
+				Worldline:         worldlineSvc,
+				DecisionTrail:     &app.DecisionTrailService{Worldline: worldlineSvc, Time: timeSvc},
 				WorldlineDecision: worldlineEngine,
 				WebDir:            *webDir, DevOrigins: devOrigins, Logger: log.Default(),
+				Importer:    importer,
 				ProfileName: paths.Name, VerifyProfilePassword: verifier,
 				ChangeProfilePassword: func(oldPassword, newPassword string) error {
 					return manager.ChangePassword(paths.Name, oldPassword, newPassword)
@@ -241,7 +286,6 @@ func main() {
 		return
 	}
 	var profileManager *profile.Manager
-	var err error
 	planePath := ""
 	selectedProfile := strings.TrimSpace(*profileName)
 	var verifyProfilePassword func(string) bool
@@ -323,6 +367,7 @@ func main() {
 		rerank = &contextbuild.DecisionReranker{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*decisionURL), Model: *decisionModel}}
 	}
 	svc := app.New(store, retriever, rerank, *audioDir)
+	svc.ASRProvider = *asrProvider
 	svc.BriefPolisher = briefPolisher
 	if strings.TrimSpace(*sufficiencyURL) != "" {
 		svc.Assessor = &contextbuild.DecisionEvidenceAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
@@ -339,9 +384,18 @@ func main() {
 		svc.ManagedIndexDir = paths.Index
 		svc.ManagedBackupDir = paths.Backups
 	}
+	importer, err := newImporter(store, *audioDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	timeSvc := &app.TimeService{Store: store, Events: events}
+	worldlineSvc := &app.WorldlineService{Time: timeSvc, DecisionEngine: worldlineEngine}
 	server, err := web.New(web.Config{
 		Service:               svc,
-		TimeService:           &app.TimeService{Store: store, Events: events},
+		Importer:              importer,
+		TimeService:           timeSvc,
+		Worldline:             worldlineSvc,
+		DecisionTrail:         &app.DecisionTrailService{Worldline: worldlineSvc, Time: timeSvc},
 		WorldlineDecision:     worldlineEngine,
 		WebDir:                *webDir,
 		DevOrigins:            devOrigins,
@@ -360,8 +414,8 @@ func main() {
 	httpServer := &http.Server{
 		Handler:           server.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      60 * time.Second,
+		ReadTimeout:       10 * time.Minute,
+		WriteTimeout:      10 * time.Minute,
 		IdleTimeout:       120 * time.Second,
 	}
 	fmt.Fprintf(os.Stderr, "context-web: profile=%s db=%s audio-dir=%s web-dir=%s\n", selectedProfile, *dbPath, *audioDir, *webDir)
@@ -394,5 +448,31 @@ func main() {
 			log.Printf("context-web: shutdown: %v", err)
 		}
 		<-serveErr
+	}
+}
+
+// buildASRTranscriber selects the upload ASR adapter. "off" returns nil so the
+// capability surface reports uploads as unavailable instead of queueing work
+// no worker can run.
+func buildASRTranscriber(name, keyEnv, endpoint, resourceID, model string, segmentMS, overlapMS int64, concurrency int, fixtureWindowMS int64) (cloudsync.Transcriber, error) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", "off":
+		return nil, nil
+	case "fixture":
+		return &cloudsync.FixtureTranscriber{WindowMS: fixtureWindowMS}, nil
+	case "doubao":
+		apiKey := ""
+		if strings.TrimSpace(keyEnv) != "" {
+			apiKey = os.Getenv(keyEnv)
+		}
+		if strings.TrimSpace(apiKey) == "" {
+			return nil, fmt.Errorf("--asr-provider doubao requires %s in the environment", keyEnv)
+		}
+		return &cloudsync.DoubaoTranscriber{
+			APIKey: apiKey, Endpoint: endpoint, ResourceID: resourceID, ModelName: model,
+			SegmentMS: segmentMS, OverlapMS: overlapMS, MaxConcurrent: concurrency,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown --asr-provider %q (want off, fixture or doubao)", name)
 	}
 }

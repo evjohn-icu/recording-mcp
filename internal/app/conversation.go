@@ -45,6 +45,11 @@ type RecordingView struct {
 	StartedAt         *time.Time `json:"started_at"`
 	AbsoluteTimeKnown bool       `json:"absolute_time_known"`
 	LocalAudio        string     `json:"local_audio"` // available|deleted|missing|unavailable
+	// SourceFile, SourceBytes and DurationMS describe the imported file. They
+	// stay zero for recordings that were not imported through the web path.
+	SourceFile  string `json:"source_file,omitempty"`
+	SourceBytes int64  `json:"source_bytes,omitempty"`
+	DurationMS  int64  `json:"duration_ms,omitempty"`
 }
 
 // NoteView is one note of the conversation's current logical annotation view.
@@ -461,7 +466,7 @@ func (s *Service) recordingViews(ctx context.Context, conversationID string) ([]
 	// before any per-recording query runs; a nested query while iterating
 	// would deadlock on that connection.
 	rows, err := s.Store.DB().QueryContext(ctx,
-		`SELECT id, recording_started_at, absolute_time_known FROM recordings WHERE conversation_id=? ORDER BY id`, conversationID)
+		`SELECT id, recording_started_at, absolute_time_known, source_file, source_bytes, duration_ms FROM recordings WHERE conversation_id=? ORDER BY id`, conversationID)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +474,7 @@ func (s *Service) recordingViews(ctx context.Context, conversationID string) ([]
 	for rows.Next() {
 		var rec RecordingView
 		var started sql.NullString
-		if err := rows.Scan(&rec.RecordingID, &started, &rec.AbsoluteTimeKnown); err != nil {
+		if err := rows.Scan(&rec.RecordingID, &started, &rec.AbsoluteTimeKnown, &rec.SourceFile, &rec.SourceBytes, &rec.DurationMS); err != nil {
 			rows.Close()
 			return nil, err
 		}

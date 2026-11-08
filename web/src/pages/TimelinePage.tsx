@@ -5,6 +5,7 @@ import type { AnalysisStatus, ConversationSummary, Topic } from '../api/types'
 import { useApi } from '../hooks/useApi'
 import { Filters, type FilterValues } from '../components/Filters'
 import { TimelineList } from '../components/TimelineList'
+import { ImportPanel } from '../components/ImportPanel'
 import { StateView } from '../components/StateView'
 
 function filtersFromParams(params: URLSearchParams): FilterValues {
@@ -89,14 +90,20 @@ function TimelinePageContent() {
         <p className="page-subtitle">按时间浏览本地录音与会话</p>
       </header>
       <Filters value={filters} topics={topicList} onChange={updateFilters} />
+      <ImportPanel onImported={reload} />
       <StateView
         loading={loading && items.length === 0}
         error={items.length === 0 ? error : undefined}
         onRetry={reload}
-        empty={!loading && !error && items.length === 0}
+        empty={false}
         emptyMessage="还没有录音"
       >
         {error && items.length > 0 && <p role="alert">加载失败：{error.message} <button type="button" onClick={reload}>重试</button></p>}
+        {items.length === 0 && !loading && !error && (
+          <div className="empty-onboarding" data-testid="empty-onboarding">
+            <p>这里会显示你的本地录音。点击上方“导入录音”选择音频文件，处理完成后即可查看转写、搜索和证据。</p>
+          </div>
+        )}
         <TimelineList
           items={items}
           nextCursor={nextCursor}

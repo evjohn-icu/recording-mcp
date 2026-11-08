@@ -1,0 +1,99 @@
+name: recording-mcp
+
+x-app: &app
+  build: .
+  image: recording-mcp:beta
+  user: "10001:10001"
+  read_only: true
+  tmpfs:
+    - /tmp:size=256m
+  volumes:
+    - recording-mcp-data:/data
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  stop_grace_period: 30s
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  init:
+    <<: *app
+    entrypoint: ["/bin/sh", "/app/docker-profile-init.sh"]
+    restart: "no"
+    environment:
+      RECORDING_PROFILE: ${RECORDING_PROFILE:-home}
+      RECORDING_PROFILES_ROOT: /data/profiles
+      MEMORY_PROFILE_PASSWORD: ${MEMORY_PROFILE_PASSWORD:?set MEMORY_PROFILE_PASSWORD in .env}
+
+  web:
+    <<: *app
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    command:
+      - /app/context-web
+      - --profile
+      - ${RECORDING_PROFILE:-home}
+      - --profiles-root
+      - /data/profiles
+      - --addr
+      - 0.0.0.0:8788
+      - --container-bind
+      - --web-dir
+      - /app/web/dist
+      - --semantic-provider
+      - hash
+      - --asr-provider
+      - ${ASR_PROVIDER:-off}
+    environment:
+      MEMORY_PROFILE_PASSWORD: ${MEMORY_PROFILE_PASSWORD:?set MEMORY_PROFILE_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8788}:8788"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8788/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  worker:
+    <<: *app
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    command:
+      - /app/context-worker
+      - --profile
+      - ${RECORDING_PROFILE:-home}
+      - --profiles-root
+      - /data/profiles
+      - --asr-provider
+      - ${ASR_PROVIDER:-off}
+      - --asr-key-env
+      - VOLC_API_KEY
+      - --generator
+      - ${GENERATOR_PROVIDER:-off}
+      - --embed-provider
+      - ${EMBED_PROVIDER:-hash}
+      - --health-addr
+      - 127.0.0.1:8789
+    environment:
+      MEMORY_PROFILE_PASSWORD: ${MEMORY_PROFILE_PASSWORD:?set MEMORY_PROFILE_PASSWORD in .env}
+      VOLC_API_KEY: ${VOLC_API_KEY:-}
+      GENERATOR_API_KEY: ${GENERATOR_API_KEY:-}
+      EMBED_API_KEY: ${EMBED_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8789/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+volumes:
+  recording-mcp-data:
+    name: ${DATA_VOLUME:-recording-mcp-data}

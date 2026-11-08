@@ -133,6 +133,9 @@ type migration struct {
 	version    int
 	name       string
 	statements []string
+	// run handles migrations SQLite cannot express idempotently (ALTER TABLE
+	// ADD COLUMN has no IF NOT EXISTS). It runs inside the same transaction.
+	run func(context.Context, *sql.Tx) error
 }
 
 // statement splits a multi-statement DDL script into individual statements.
@@ -174,6 +177,8 @@ var migrations = []migration{
 	}},
 	{version: 18, name: "processing-runtime", statements: statements(ProcessingRuntimeDDL)},
 	{version: 19, name: "memory-highlights", statements: HighlightsStatements},
+	{version: 20, name: "worker-capabilities", run: applyWorkerCapabilities},
+	{version: 21, name: "recording-source-bytes", run: applyRecordingSourceBytes},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`
@@ -230,6 +235,11 @@ func applyOne(ctx context.Context, db *sql.DB, m migration) error {
 	for _, stmt := range m.statements {
 		if _, err := tx.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("migration %d %q: exec: %w", m.version, m.name, err)
+		}
+	}
+	if m.run != nil {
+		if err := m.run(ctx, tx); err != nil {
+			return fmt.Errorf("migration %d %q: %w", m.version, m.name, err)
 		}
 	}
 	if _, err := tx.ExecContext(ctx,

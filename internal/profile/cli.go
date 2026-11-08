@@ -16,6 +16,11 @@ type CLI struct {
 	name, root, passwordEnv *string
 }
 
+// Selected reports whether a profile was named on the command line.
+func (c *CLI) Selected() bool {
+	return c != nil && strings.TrimSpace(*c.name) != ""
+}
+
 // WorldlinePlane resolves the trusted event-plane location and matching API
 // scope for context-worker. Legacy databases require an explicit sidecar path;
 // profile paths are derived only from the verified profile registry.

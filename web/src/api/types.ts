@@ -72,6 +72,9 @@ export interface RecordingView {
   started_at: string | null
   absolute_time_known: boolean
   local_audio: 'available' | 'deleted' | 'missing' | 'unavailable' | string
+  source_file?: string
+  source_bytes?: number
+  duration_ms?: number
 }
 
 export interface NoteView {
@@ -105,9 +108,57 @@ export interface WorkerHeartbeat {
   worker_id: string; pid: number; stages: string[]; generator_enabled: boolean
   last_seen_at: string; alive: boolean
 }
+export type PhaseState = 'pending' | 'running' | 'done' | 'failed' | 'skipped'
+export type PhaseName = 'ingest' | 'asr' | 'extract' | 'publish' | 'index'
+export interface ProcessingPhase {
+  name: PhaseName | string
+  state: PhaseState | string
+  job_id?: string
+  attempt?: number
+  updated_at?: string
+  error?: string
+  error_code?: string
+  error_action?: string
+}
 export interface ProcessingSnapshot {
   status: ProcessingStatus; jobs: ProcessingJob[]; workers: WorkerHeartbeat[]
   generator_enabled: boolean
+  phases: ProcessingPhase[]
+  current_stage: string
+  asr_provider: string
+  asr_available: boolean
+  worker_alive: boolean
+}
+
+export interface ASRCapability {
+  provider: string
+  configured: boolean
+  worker_available: boolean
+  available: boolean
+  reason?: string
+}
+export interface Capabilities {
+  version: string
+  asr: ASRCapability
+  generator: { enabled: boolean }
+  retrieval: { default_version: string; v2_available: boolean }
+  worker: { alive: boolean; count: number }
+  limits: { upload_bytes: number }
+}
+
+export interface ImportResult {
+  conversation_id: string
+  recording_id: string
+  job_id: string
+  duplicate: boolean
+  audio: {
+    filename: string
+    bytes: number
+    duration_ms: number
+    format: string
+    sample_rate: number
+    channels: number
+  }
 }
 
 export interface ConversationView {

@@ -39,7 +39,7 @@ flowchart TD
 
 ```sh
 make build
-# 一分钟闭环演示（隔离库 data/demo，无需任何 API key）
+# 一分钟闭环演示（临时目录，不触碰 data/，无需任何 API key）
 make demo
 
 # 真实摄入（转写并入库；需 VOLC_API_KEY）
@@ -54,6 +54,20 @@ bin/context-worker --db data/context-memory.db \
 # 启动 MCP 服务器
 bin/context-memory --db data/context-memory.db
 ```
+
+### Local-first Beta（Docker，推荐）
+
+```sh
+cp .env.example .env          # 设置 MEMORY_PROFILE_PASSWORD（必填）
+docker compose up -d --build
+# 打开 http://127.0.0.1:8788，选择 profile 并登录
+```
+
+- `ASR_PROVIDER=off` 时服务可用但不能上传：`/api/capabilities` 返回 `asr_not_configured`，上传返回 409 并给出下一步。配置 `ASR_PROVIDER=doubao` + `VOLC_API_KEY`（或使用明确的 `fixture` 演示模式）后，Web 与 worker 必须使用同一个值。
+- 上传上限 2 GiB；服务端先按扩展名过滤，再用 `ffprobe` 真实探测；失败返回 `invalid_audio`。
+- 阶段进度：音频接收 → 语音转写 → 信息提炼 → 发布 → 索引；失败阶段带 `error_code`/`error_action` 与重试。
+- 部署、备份、升级与排障：[docs/productization/deployment.md](docs/productization/deployment.md)。
+- 发布清单与验证记录：[docs/productization/beta-release-checklist.md](docs/productization/beta-release-checklist.md)。
 
 ### 本地 Web 浏览器（安全合成演示）
 
@@ -112,7 +126,7 @@ scripts/local-start.sh home
 
 ## MCP 客户端与 Web 运行限制
 
-MCP 客户端里 `tools/list` 可见 29 个工具（21 个记忆工具 + 8 个事件原型工具）。调用 `get_current_context`：
+MCP 客户端里 `tools/list` 可见 30 个工具（22 个记忆工具 + 8 个事件原型工具）。调用 `get_current_context`：
 
 ```json
 {"jsonrpc":"2.0","id":1,"method":"tools/call",
@@ -180,10 +194,10 @@ Android 端构建与真机说明见 [docs/android.md](docs/android.md)；云端�
 | 家族 | 工具 | 用途 |
 | --- | --- | --- |
 | 记忆写入（5） | `ingest_transcript`、`apply_annotations`、`review_memory_link`、`propose_speaker_binding`、`review_speaker_binding` | 摄入转写、应用注释修订、复核关联与说话人绑定 |
-| 检索与读取（16） | `search_memory`、`query_context`、`get_conversation_context`、`get_context_item`、`list_conversations`、`list_topics`、`get_evidence_context`、`get_processing_status`、`get_annotation_history`、`build_context`、`get_current_context`、`list_memory_links`、`get_speaker_projection`、`list_speaker_bindings`、`list_highlights`、`build_context_brief` | 字面/混合检索、上下文包、当前上下文投影、历史与状态 |
+| 检索与读取（17） | `search_memory`、`query_context`、`get_conversation_context`、`get_context_item`、`list_conversations`、`list_topics`、`get_evidence_context`、`get_processing_status`、`get_annotation_history`、`build_context`、`get_current_context`、`list_memory_links`、`get_speaker_projection`、`list_speaker_bindings`、`list_highlights`、`build_context_brief`、`get_decision_trail` | 字面/混合检索、上下文包、当前上下文投影、历史、状态与决策轨迹 |
 | 事件原型（8） | `search_events`、`get_timeline`、`get_commitments`、`get_conversation_events`、`get_person_context`、`get_current_state`、`ingest_events`、`record_feedback` | 独立的事件原型，与记忆家族共用同一数据库与服务 |
 
-记忆家族共 21 个工具（16 只读 + 5 写入）；事件原型工具由同一二进制提供。精确字段以 [docs/contract.md](docs/contract.md) 与 [docs/context-layer-runtime.md](docs/context-layer-runtime.md) 为准。
+记忆家族共 22 个工具（17 只读 + 5 写入）；事件原型工具由同一二进制提供。`get_decision_trail` 只读，返回 `schema_version: "decision-trail-v1"`：确认只来自人工 review，`confidence` 不代表真实性，`valid_from` 未知时不推断，来源失效或已遗忘的内容不返回。精确字段以 [docs/contract.md](docs/contract.md) 与 [docs/context-layer-runtime.md](docs/context-layer-runtime.md) 为准。
 
 ## 安全与信任语义
 

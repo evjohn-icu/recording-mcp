@@ -21,8 +21,10 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"recordingmcp/internal/cloudsync"
 	"recordingmcp/internal/decision"
 	"recordingmcp/internal/generate"
+	"recordingmcp/internal/ingest"
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/migrations"
 	"recordingmcp/internal/pipeline"
@@ -43,7 +45,7 @@ func run() error {
 	dbPath := flag.String("db", "", "path to the SQLite database (required)")
 	profileCLI := profile.RegisterCLI(flag.CommandLine)
 	workerID := flag.String("worker-id", defaultWorkerID(), "worker identity recorded on claims")
-	stages := flag.String("stages", "extract,publish,curate,embed", "comma-separated stage names to claim")
+	stages := flag.String("stages", "ingest,asr,extract,publish,curate,embed", "comma-separated stage names to claim")
 	worldlineEventsDB := flag.String("worldline-events-db", "", "explicit event-plane path required for worldline jobs using a legacy database")
 	worldlineDecisionURL := flag.String("worldline-decision-url", "", "loopback JEV endpoint used for Worldline private-source relation analysis")
 	worldlineDecisionModel := flag.String("worldline-decision-model", "jev-style-2b-v2", "JEV model for Worldline relation analysis")
@@ -69,17 +71,33 @@ func run() error {
 	embedEndpoint := flag.String("embed-endpoint", "", "OpenAI-compatible embeddings endpoint used by the openai embed provider")
 	embedModel := flag.String("embed-model", "", "embedding model name used by the openai embed provider")
 	embedKeyEnv := flag.String("embed-key-env", "EMBED_API_KEY", "environment variable holding the embedding API key")
+	asrProvider := flag.String("asr-provider", "off", "ASR provider for the asr stage: off|fixture|doubao")
+	asrKeyEnv := flag.String("asr-key-env", "VOLC_API_KEY", "environment variable holding the doubao ASR API key")
+	asrEndpoint := flag.String("asr-endpoint", "", "doubao ASR endpoint override")
+	asrResourceID := flag.String("asr-resource-id", "", "doubao ASR resource id")
+	asrModel := flag.String("asr-model", "", "ASR model identifier recorded on transcript results")
+	asrSegmentMS := flag.Int64("asr-segment-ms", 300000, "doubao window length in milliseconds")
+	asrOverlapMS := flag.Int64("asr-overlap-ms", 2000, "doubao window overlap in milliseconds")
+	asrConcurrency := flag.Int("asr-concurrency", 2, "maximum concurrent doubao recognition sessions")
+	fixtureWindowMS := flag.Int64("fixture-window-ms", 5000, "fixture transcriber window length in milliseconds")
+	ffmpegPath := flag.String("ffmpeg", "ffmpeg", "ffmpeg binary used by the ingest stage")
+	ffprobePath := flag.String("ffprobe", "ffprobe", "ffprobe binary used by the ingest stage")
+	audioDir := flag.String("audio-dir", "", "audio directory (legacy mode; profile mode uses the profile audio directory)")
+	healthAddr := flag.String("health-addr", "", "address for the worker health endpoint; empty disables it")
 	flag.Parse()
 
 	if flag.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %v", flag.Args())
 	}
-	resolvedDB, _, err := profileCLI.Resolve(*dbPath, "")
+	resolvedDB, resolvedAudio, err := profileCLI.Resolve(*dbPath, *audioDir)
 	if err != nil {
 		return err
 	}
 	if *dbPath == "" {
 		*dbPath = resolvedDB
+	}
+	if *audioDir == "" {
+		*audioDir = resolvedAudio
 	}
 	if strings.TrimSpace(*dbPath) == "" {
 		return fmt.Errorf("--db is required")
@@ -87,7 +105,7 @@ func run() error {
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 
-	db, err := sql.Open("sqlite", *dbPath)
+	db, err := sql.Open("sqlite", workerDSN(*dbPath))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -133,11 +151,28 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("resolve database path: %w", err)
 	}
+	if strings.TrimSpace(*audioDir) == "" {
+		*audioDir = filepath.Join(filepath.Dir(absDBPath), "synced-audio")
+	}
+	transcriber, err := buildASRTranscriber(*asrProvider, *asrKeyEnv, *asrEndpoint, *asrResourceID, *asrModel, *asrSegmentMS, *asrOverlapMS, *asrConcurrency, *fixtureWindowMS)
+	if err != nil {
+		return err
+	}
+	importer, err := ingest.New(ingest.Config{
+		Store: store, DB: db, AudioDir: *audioDir,
+		Decoder:       &ingest.FFmpegDecoder{FFmpeg: *ffmpegPath, FFprobe: *ffprobePath},
+		Transcription: transcriber,
+		ASRProvider:   *asrProvider, ASRModel: *asrModel, ASRResourceID: *asrResourceID,
+		TranscriptRevision: ingest.DefaultTranscriptRevision,
+	})
+	if err != nil {
+		return fmt.Errorf("configure importer: %w", err)
+	}
 	embedProviderImpl, err := buildEmbedProvider(*embedProvider, *embedDims, *embedEndpoint, *embedModel, *embedKeyEnv)
 	if err != nil {
 		return err
 	}
-	inner, err := buildExecutor(*executor, db, store, *decisionURL, *decisionModel, gen, *syntheticDelay, absDBPath, *curatorCommand, *curatorModel, *curatorTimeout, embedProviderImpl)
+	inner, err := buildExecutor(*executor, db, store, *decisionURL, *decisionModel, gen, *syntheticDelay, absDBPath, *curatorCommand, *curatorModel, *curatorTimeout, embedProviderImpl, importer)
 	if err != nil {
 		return err
 	}
@@ -176,7 +211,15 @@ func run() error {
 			inner:  inner,
 		},
 	}
-	heartbeat := process.Heartbeat{WorkerID: cfg.WorkerID, PID: os.Getpid(), Stages: cfg.Stages, GeneratorEnabled: gen != nil}
+	heartbeat := process.Heartbeat{
+		WorkerID:         cfg.WorkerID,
+		PID:              os.Getpid(),
+		Stages:           cfg.Stages,
+		GeneratorEnabled: gen != nil,
+		ASRProvider:      strings.TrimSpace(*asrProvider),
+		ASRAvailable:     transcriber != nil && containsStage(jobStages, "asr"),
+		EmbedProvider:    strings.TrimSpace(*embedProvider),
+	}
 	if err := process.WriteHeartbeat(ctx, db, heartbeat, time.Now()); err != nil {
 		return fmt.Errorf("write worker heartbeat: %w", err)
 	}
@@ -195,6 +238,25 @@ func run() error {
 			logger.Print("no job available")
 		}
 		return nil
+	}
+	if addr := strings.TrimSpace(*healthAddr); addr != "" {
+		healthServer := &http.Server{
+			Addr:              addr,
+			Handler:           workerHealthHandler(db, cfg.WorkerID),
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+		go func() {
+			<-ctx.Done()
+			shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = healthServer.Shutdown(shutdown)
+		}()
+		go func() {
+			if err := healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				logger.Printf("worker health server failed: %v", err)
+			}
+		}()
+		logger.Printf("worker health endpoint listening on %s", addr)
 	}
 	logger.Printf("worker %s started stages=%v lease=%s poll=%s generator_enabled=%t", cfg.WorkerID, cfg.Stages, cfg.Lease, cfg.PollInterval, gen != nil)
 	beatCtx, cancelBeat := context.WithCancel(ctx)
@@ -216,11 +278,21 @@ func run() error {
 	return worker.Run(ctx, cfg)
 }
 
+// workerDSN starts explicit transactions with BEGIN IMMEDIATE so two worker
+// processes cannot deadlock on a read-then-write upgrade under WAL.
+func workerDSN(path string) string {
+	separator := "?"
+	if strings.Contains(path, "?") {
+		separator = "&"
+	}
+	return path + separator + "_txlock=immediate"
+}
+
 // buildExecutor selects the executor implementation named by --executor. The
 // pipeline executor routes extract, publish, curate and embed jobs to their
 // stage handlers; the curate handler runs the configured curator command and
 // stores the proposals it produces.
-func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, decisionModel string, gen generate.Generator, syntheticDelay time.Duration, dbPath, curatorCommand, curatorModel string, curatorTimeout time.Duration, embedProvider semantic.Provider) (worker.Executor, error) {
+func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, decisionModel string, gen generate.Generator, syntheticDelay time.Duration, dbPath, curatorCommand, curatorModel string, curatorTimeout time.Duration, embedProvider semantic.Provider, importer *ingest.Service) (worker.Executor, error) {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "synthetic":
 		return worker.Synthetic{Delay: syntheticDelay}, nil
@@ -236,6 +308,8 @@ func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, de
 			}
 		}
 		return &stageExecutor{stages: map[string]worker.Executor{
+			"ingest": &ingestStage{svc: importer, stage: "ingest"},
+			"asr":    &ingestStage{svc: importer, stage: "asr"},
 			"extract": &pipeline.ExtractHandler{
 				DB:               db,
 				Engine:           engine,
@@ -358,6 +432,47 @@ func (s *stageExecutor) Execute(ctx context.Context, job process.Job) (string, e
 	return exec.Execute(ctx, job)
 }
 
+// buildASRTranscriber selects the ASR adapter. "off" returns nil so the worker
+// advertises no ASR capability and uploads are rejected before queueing.
+func buildASRTranscriber(name, keyEnv, endpoint, resourceID, model string, segmentMS, overlapMS int64, concurrency int, fixtureWindowMS int64) (cloudsync.Transcriber, error) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", "off":
+		return nil, nil
+	case "fixture":
+		return &cloudsync.FixtureTranscriber{WindowMS: fixtureWindowMS}, nil
+	case "doubao":
+		apiKey := ""
+		if strings.TrimSpace(keyEnv) != "" {
+			apiKey = os.Getenv(keyEnv)
+		}
+		if strings.TrimSpace(apiKey) == "" {
+			return nil, fmt.Errorf("--asr-provider doubao requires %s in the environment", keyEnv)
+		}
+		return &cloudsync.DoubaoTranscriber{
+			APIKey: apiKey, Endpoint: endpoint, ResourceID: resourceID, ModelName: model,
+			SegmentMS: segmentMS, OverlapMS: overlapMS, MaxConcurrent: concurrency,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown --asr-provider %q (want off, fixture or doubao)", name)
+	}
+}
+
+// ingestStage dispatches the two importer-owned stages.
+type ingestStage struct {
+	svc   *ingest.Service
+	stage string
+}
+
+func (i *ingestStage) Execute(ctx context.Context, job process.Job) (string, error) {
+	if i.svc == nil {
+		return "", fmt.Errorf("context-worker: import service is not configured")
+	}
+	if i.stage == "ingest" {
+		return i.svc.RunIngestJob(ctx, job)
+	}
+	return i.svc.RunASRJob(ctx, job)
+}
+
 func parseStages(raw string) []string {
 	parts := strings.Split(raw, ",")
 	stages := make([]string, 0, len(parts))
@@ -384,6 +499,32 @@ func workerStages(raw string, profileSelected, explicitStages bool) []string {
 		stages = append(stages, "worldline")
 	}
 	return stages
+}
+
+// workerHealthHandler reports worker liveness: a healthy response requires the
+// database to answer and this worker's own heartbeat to be at most 90s old.
+func workerHealthHandler(db *sql.DB, workerID string) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if err := db.PingContext(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(w, `{"status":"degraded","database":"unavailable","worker":"%s"}`, workerID)
+			return
+		}
+		var stamp int64
+		err := db.QueryRowContext(ctx, `SELECT last_seen_at FROM worker_heartbeats WHERE worker_id=?`, workerID).Scan(&stamp)
+		if err != nil || time.Since(time.UnixMilli(stamp)) > 90*time.Second {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(w, `{"status":"degraded","database":"ok","worker":"stale"}`)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"status":"ok","database":"ok","worker":"%s"}`, workerID)
+	})
+	return mux
 }
 
 func defaultWorkerID() string {
