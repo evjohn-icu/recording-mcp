@@ -31,9 +31,10 @@
 
 实际运行的命令与结果（退出码 0，除非注明）：
 
-- `go vet ./...` — 通过。
-- `go test -count=1 ./...` — 通过（含新增包）。
-- `go test -race -count=1 ./...` — 通过。
+- `go vet ./...` — 退出 0。
+- `go test -count=1 ./...` — 退出 0（含新增包）。
+- `go test -race -count=1` 于 `internal/app`、`internal/ingest`、`internal/web`、`internal/worker`、`internal/process`、`internal/memory`、`internal/migrations`、`internal/profile`、`cmd/context-*` — 退出 0。
+- `python3 scripts/run-local-browser-tests.py` — 退出 0（既有合成浏览器套件）。
 - `make build`、`make spec-validate` — 通过。
 - `python3 scripts/run-product-browser.py` — 13/13。
 - `python3 scripts/product-audio-e2e.py --mode synthetic` — PASS：148 音频分钟、148 turns、零覆盖缺口、13.29 秒 wall time。

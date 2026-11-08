@@ -1,0 +1,1772 @@
+{
+  "description": "Frozen 240-question synthetic Chinese retrieval benchmark r2. Grouped paraphrases and source groups are split-isolated.",
+  "questions": [
+    {
+      "id": "syn-11-q1",
+      "group_id": "syn-11",
+      "source_group_id": "syn-11",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "云杉活动室的急救箱放在哪里？",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-syn-11",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-syn-11",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "社区急救箱位置。黄金答案：一楼楼梯口左边。证据说明：一楼楼梯口左边是明确位置。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "synonym",
+      "gold_answer": "一楼楼梯口左边"
+    },
+    {
+      "id": "syn-11-q2",
+      "group_id": "syn-11",
+      "source_group_id": "syn-11",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "在街道活动室遇到磕碰，去哪里找急救箱？",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-syn-11",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-syn-11",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "社区急救箱位置。黄金答案：一楼楼梯口左边。证据说明：一楼楼梯口左边是明确位置。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "synonym",
+      "gold_answer": "一楼楼梯口左边"
+    },
+    {
+      "id": "syn-12-q1",
+      "group_id": "syn-12",
+      "source_group_id": "syn-12",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "白鹭陶房哪天烧没有上釉的坯？",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-syn-12",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-syn-12",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "陶艺工作室烧窑。黄金答案：每周二下午。证据说明：周二下午与周四釉件安排形成对照。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "synonym",
+      "gold_answer": "每周二下午"
+    },
+    {
+      "id": "syn-12-q2",
+      "group_id": "syn-12",
+      "source_group_id": "syn-12",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "陶艺素坯交到工作室后通常排在哪个窑次？",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-syn-12",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-syn-12",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "陶艺工作室烧窑。黄金答案：每周二下午。证据说明：周二下午与周四釉件安排形成对照。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "synonym",
+      "gold_answer": "每周二下午"
+    },
+    {
+      "id": "syn-13-q1",
+      "group_id": "syn-13",
+      "source_group_id": "syn-13",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "松庭食堂送到家门口的餐放在哪里？",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-syn-13",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-syn-13",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "养老餐配送。黄金答案：门外把手。证据说明：门外把手是明确交付位置。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "synonym",
+      "gold_answer": "门外把手"
+    },
+    {
+      "id": "syn-13-q2",
+      "group_id": "syn-13",
+      "source_group_id": "syn-13",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "松庭食堂的保温餐袋送到门口时，会挂在哪里？",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-syn-13",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-syn-13",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "养老餐配送。黄金答案：门外把手。证据说明：门外把手是明确交付位置。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "synonym",
+      "gold_answer": "门外把手"
+    },
+    {
+      "id": "syn-14-q1",
+      "group_id": "syn-14",
+      "source_group_id": "syn-14",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "去白沙湿地借公用望远镜要到哪儿登记？",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-syn-14",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-syn-14",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "公园观鸟望远镜。黄金答案：西门服务亭。证据说明：西门服务亭是明确领取点，证件条件补充流程。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "synonym",
+      "gold_answer": "西门服务亭"
+    },
+    {
+      "id": "syn-14-q2",
+      "group_id": "syn-14",
+      "source_group_id": "syn-14",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "湿地的观鸟望远镜在哪里领取？",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-syn-14",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-syn-14",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "公园观鸟望远镜。黄金答案：西门服务亭。证据说明：西门服务亭是明确领取点，证件条件补充流程。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "synonym",
+      "gold_answer": "西门服务亭"
+    },
+    {
+      "id": "syn-15-q1",
+      "group_id": "syn-15",
+      "source_group_id": "syn-15",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "枫岭水库的救生衣在哪个柜子里？",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-syn-15",
+          "transcript_revision": "r2",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-syn-15",
+        "transcript_revision": "r2",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "水库皮划艇救生衣。黄金答案：码头二号柜。证据说明：码头二号柜是答案；归还要求无关。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "synonym",
+      "gold_answer": "码头二号柜"
+    },
+    {
+      "id": "syn-15-q2",
+      "group_id": "syn-15",
+      "source_group_id": "syn-15",
+      "split": "calibration",
+      "bucket": "synonym",
+      "query": "在枫岭水库码头领取皮划艇救生衣时，应查看哪个柜？",
+      "purpose": "synonym",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-syn-15",
+          "transcript_revision": "r2",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-syn-15",
+        "transcript_revision": "r2",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "水库皮划艇救生衣。黄金答案：码头二号柜。证据说明：码头二号柜是答案；归还要求无关。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "synonym",
+      "gold_answer": "码头二号柜"
+    },
+    {
+      "id": "neg-11-q1",
+      "group_id": "neg-11",
+      "source_group_id": "neg-11",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "沧海论坛的问答环节会提供录像吗？",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-neg-11",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-neg-11",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "学术论坛资料。黄金答案：不录制现场问答。证据说明：问答不录制；讲稿幻灯片会公开是不同材料。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "negation",
+      "gold_answer": "不录制现场问答"
+    },
+    {
+      "id": "neg-11-q2",
+      "group_id": "neg-11",
+      "source_group_id": "neg-11",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "会后能下载现场提问的完整视频吗？",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-neg-11",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-neg-11",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "学术论坛资料。黄金答案：不录制现场问答。证据说明：问答不录制；讲稿幻灯片会公开是不同材料。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "negation",
+      "gold_answer": "不录制现场问答"
+    },
+    {
+      "id": "neg-12-q1",
+      "group_id": "neg-12",
+      "source_group_id": "neg-12",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "榕桥夜市的便民摊可以用现金结账吗？",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-neg-12",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-neg-12",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "夜市支付方式。黄金答案：不收现金。证据说明：现金被明确排除，另外两种支付方式是正例干扰。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "negation",
+      "gold_answer": "不收现金"
+    },
+    {
+      "id": "neg-12-q2",
+      "group_id": "neg-12",
+      "source_group_id": "neg-12",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "买夜市商品时摊主是否接收纸币？",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-neg-12",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-neg-12",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "夜市支付方式。黄金答案：不收现金。证据说明：现金被明确排除，另外两种支付方式是正例干扰。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "negation",
+      "gold_answer": "不收现金"
+    },
+    {
+      "id": "neg-13-q1",
+      "group_id": "neg-13",
+      "source_group_id": "neg-13",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "仁济检验科会把未处理血样留到隔天吗？",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-neg-13",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-neg-13",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "医院检验样本。黄金答案：不留到第二天。证据说明：过夜保存被明确禁止，当日处理是事实依据。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "negation",
+      "gold_answer": "不留到第二天"
+    },
+    {
+      "id": "neg-13-q2",
+      "group_id": "neg-13",
+      "source_group_id": "neg-13",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "抽血后没处理的样本能不能在科室过夜？",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-neg-13",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-neg-13",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "医院检验样本。黄金答案：不留到第二天。证据说明：过夜保存被明确禁止，当日处理是事实依据。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "negation",
+      "gold_answer": "不留到第二天"
+    },
+    {
+      "id": "neg-14-q1",
+      "group_id": "neg-14",
+      "source_group_id": "neg-14",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "春潮泳馆周一能下水游泳吗？",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-neg-14",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-neg-14",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "社区游泳馆开放。黄金答案：闭馆换水。证据说明：周一闭馆明确回答，其他日开放是时间边界干扰。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "negation",
+      "gold_answer": "闭馆换水"
+    },
+    {
+      "id": "neg-14-q2",
+      "group_id": "neg-14",
+      "source_group_id": "neg-14",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "每周一泳池是否对公众营业？",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-neg-14",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-neg-14",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "社区游泳馆开放。黄金答案：闭馆换水。证据说明：周一闭馆明确回答，其他日开放是时间边界干扰。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "negation",
+      "gold_answer": "闭馆换水"
+    },
+    {
+      "id": "neg-15-q1",
+      "group_id": "neg-15",
+      "source_group_id": "neg-15",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "没有报名的孩子能跟着哥哥一起参加吗？",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-neg-15",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-neg-15",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "亲子科学活动报名。黄金答案：不接待未报名的兄弟姐妹旁听。证据说明：未报名儿童不能旁听；成人陪同许可不可误读为儿童开放。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "negation",
+      "gold_answer": "不接待未报名的兄弟姐妹旁听"
+    },
+    {
+      "id": "neg-15-q2",
+      "group_id": "neg-15",
+      "source_group_id": "neg-15",
+      "split": "calibration",
+      "bucket": "negation",
+      "query": "活动现场可以临时带兄弟姐妹进场吗？",
+      "purpose": "negation",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-neg-15",
+          "transcript_revision": "r1",
+          "turn_id": "fact"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-neg-15",
+        "transcript_revision": "r1",
+        "turn_id": "fact"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "亲子科学活动报名。黄金答案：不接待未报名的兄弟姐妹旁听。证据说明：未报名儿童不能旁听；成人陪同许可不可误读为儿童开放。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "negation",
+      "gold_answer": "不接待未报名的兄弟姐妹旁听"
+    },
+    {
+      "id": "time-11-q1",
+      "group_id": "time-11",
+      "source_group_id": "time-11",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "汛期北堤闸门现在每天检查几次？",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-time-11-new",
+          "transcript_revision": "r1",
+          "turn_id": "latest"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-time-11-new",
+        "transcript_revision": "r1",
+        "turn_id": "latest"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "海堤闸门巡查。黄金答案：每天早晚各一次。证据说明：汛期方案明确每日两次，取代每周一次。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "time",
+      "gold_answer": "每天早晚各一次"
+    },
+    {
+      "id": "time-11-q2",
+      "group_id": "time-11",
+      "source_group_id": "time-11",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "风险评估后的最新巡查节奏是什么？",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-time-11-new",
+          "transcript_revision": "r1",
+          "turn_id": "latest"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-time-11-new",
+        "transcript_revision": "r1",
+        "turn_id": "latest"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "海堤闸门巡查。黄金答案：每天早晚各一次。证据说明：汛期方案明确每日两次，取代每周一次。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "time",
+      "gold_answer": "每天早晚各一次"
+    },
+    {
+      "id": "time-12-q1",
+      "group_id": "time-12",
+      "source_group_id": "time-12",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "按七月新规，星河剧院退票要提前多少小时办理？",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-time-12-new",
+          "transcript_revision": "r1",
+          "turn_id": "latest"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-time-12-new",
+        "transcript_revision": "r1",
+        "turn_id": "latest"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "剧院票务退款。黄金答案：开演前七十二小时。证据说明：七月政策取代二月的四十八小时要求。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "time",
+      "gold_answer": "开演前七十二小时"
+    },
+    {
+      "id": "time-12-q2",
+      "group_id": "time-12",
+      "source_group_id": "time-12",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "七月票务规则的退款截止点距离开演还有多久？",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-time-12-new",
+          "transcript_revision": "r1",
+          "turn_id": "latest"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-time-12-new",
+        "transcript_revision": "r1",
+        "turn_id": "latest"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "剧院票务退款。黄金答案：开演前七十二小时。证据说明：七月政策取代二月的四十八小时要求。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "time",
+      "gold_answer": "开演前七十二小时"
+    },
+    {
+      "id": "time-13-q1",
+      "group_id": "time-13",
+      "source_group_id": "time-13",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "秋季施工期间，彩虹园家长应该从哪个门接孩子？",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-time-13-new",
+          "transcript_revision": "r1",
+          "turn_id": "latest"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-time-13-new",
+        "transcript_revision": "r1",
+        "turn_id": "latest"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "幼儿园接送门。黄金答案：西门。证据说明：秋季通知明确更新通行门，北门仅为旧安排。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "time",
+      "gold_answer": "西门"
+    },
+    {
+      "id": "time-13-q2",
+      "group_id": "time-13",
+      "source_group_id": "time-13",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "北门施工结束前，学生放学的家长通道安排在哪里？",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-time-13-new",
+          "transcript_revision": "r1",
+          "turn_id": "latest"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-time-13-new",
+        "transcript_revision": "r1",
+        "turn_id": "latest"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "幼儿园接送门。黄金答案：西门。证据说明：秋季通知明确更新通行门，北门仅为旧安排。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "time",
+      "gold_answer": "西门"
+    },
+    {
+      "id": "time-14-q1",
+      "group_id": "time-14",
+      "source_group_id": "time-14",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "河岸营地现在去哪里接饮用水？",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-time-14-new",
+          "transcript_revision": "r1",
+          "turn_id": "latest"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-time-14-new",
+        "transcript_revision": "r1",
+        "turn_id": "latest"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "河岸营地饮水点。黄金答案：东侧洗手台。证据说明：新位置在东侧洗手台，旧管线已封闭。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "time",
+      "gold_answer": "东侧洗手台"
+    },
+    {
+      "id": "time-14-q2",
+      "group_id": "time-14",
+      "source_group_id": "time-14",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "维修后营地新的饮水位置在哪里？",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-time-14-new",
+          "transcript_revision": "r1",
+          "turn_id": "latest"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-time-14-new",
+        "transcript_revision": "r1",
+        "turn_id": "latest"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "河岸营地饮水点。黄金答案：东侧洗手台。证据说明：新位置在东侧洗手台，旧管线已封闭。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "time",
+      "gold_answer": "东侧洗手台"
+    },
+    {
+      "id": "time-15-q1",
+      "group_id": "time-15",
+      "source_group_id": "time-15",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "二号库窄巷叉车现在的限速是多少？",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-time-15-new",
+          "transcript_revision": "r1",
+          "turn_id": "latest"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-time-15-new",
+        "transcript_revision": "r1",
+        "turn_id": "latest"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "仓库叉车限速。黄金答案：每小时五公里。证据说明：最新窄巷规则是五公里每小时。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "time",
+      "gold_answer": "每小时五公里"
+    },
+    {
+      "id": "time-15-q2",
+      "group_id": "time-15",
+      "source_group_id": "time-15",
+      "split": "calibration",
+      "bucket": "time",
+      "query": "复训后叉车通过窄巷最多能开多快？",
+      "purpose": "time",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-time-15-new",
+          "transcript_revision": "r1",
+          "turn_id": "latest"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "gold_top1_turn_ref": {
+        "segment_id": "seg-time-15-new",
+        "transcript_revision": "r1",
+        "turn_id": "latest"
+      },
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "仓库叉车限速。黄金答案：每小时五公里。证据说明：最新窄巷规则是五公里每小时。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "time",
+      "gold_answer": "每小时五公里"
+    },
+    {
+      "id": "cross-11-q1",
+      "group_id": "cross-11",
+      "source_group_id": "cross-11",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "夜游从哪里出发，向导几点带队？",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-cross-11-session-1",
+          "transcript_revision": "r1",
+          "turn_id": "fact1"
+        },
+        {
+          "segment_id": "seg-cross-11-session-2",
+          "transcript_revision": "r1",
+          "turn_id": "fact2"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "古城夜游。黄金答案必须合并两个来源：南门文旅社：夜游从钟楼东侧游客牌坊集合。；南门文旅社：向导每晚八点整出发，团队不等迟到者。。证据说明：牌坊定位与出发时刻分属两条事实。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "cross_session",
+      "gold_answer": "南门文旅社：夜游从钟楼东侧游客牌坊集合。；南门文旅社：向导每晚八点整出发，团队不等迟到者。"
+    },
+    {
+      "id": "cross-11-q2",
+      "group_id": "cross-11",
+      "source_group_id": "cross-11",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "参加古城夜行应在哪个入口、什么时间集合？",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-cross-11-session-1",
+          "transcript_revision": "r1",
+          "turn_id": "fact1"
+        },
+        {
+          "segment_id": "seg-cross-11-session-2",
+          "transcript_revision": "r1",
+          "turn_id": "fact2"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "古城夜游。黄金答案必须合并两个来源：南门文旅社：夜游从钟楼东侧游客牌坊集合。；南门文旅社：向导每晚八点整出发，团队不等迟到者。。证据说明：牌坊定位与出发时刻分属两条事实。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "cross_session",
+      "gold_answer": "南门文旅社：夜游从钟楼东侧游客牌坊集合。；南门文旅社：向导每晚八点整出发，团队不等迟到者。"
+    },
+    {
+      "id": "cross-12-q1",
+      "group_id": "cross-12",
+      "source_group_id": "cross-12",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "垃圾要放在哪里，清运船周几几点来？",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-cross-12-session-1",
+          "transcript_revision": "r1",
+          "turn_id": "fact1"
+        },
+        {
+          "segment_id": "seg-cross-12-session-2",
+          "transcript_revision": "r1",
+          "turn_id": "fact2"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "海岛垃圾清运。黄金答案必须合并两个来源：白帆民宿：客人将分类后的垃圾放到码头仓库蓝门外。；白帆民宿：环卫船每周三上午十点靠岸清运，不收玻璃瓶。。证据说明：存放位置和清运时间需要合并。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "cross_session",
+      "gold_answer": "白帆民宿：客人将分类后的垃圾放到码头仓库蓝门外。；白帆民宿：环卫船每周三上午十点靠岸清运，不收玻璃瓶。"
+    },
+    {
+      "id": "cross-12-q2",
+      "group_id": "cross-12",
+      "source_group_id": "cross-12",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "白帆民宿的垃圾交接点和环卫船到达时刻是什么？",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-cross-12-session-1",
+          "transcript_revision": "r1",
+          "turn_id": "fact1"
+        },
+        {
+          "segment_id": "seg-cross-12-session-2",
+          "transcript_revision": "r1",
+          "turn_id": "fact2"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "海岛垃圾清运。黄金答案必须合并两个来源：白帆民宿：客人将分类后的垃圾放到码头仓库蓝门外。；白帆民宿：环卫船每周三上午十点靠岸清运，不收玻璃瓶。。证据说明：存放位置和清运时间需要合并。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "cross_session",
+      "gold_answer": "白帆民宿：客人将分类后的垃圾放到码头仓库蓝门外。；白帆民宿：环卫船每周三上午十点靠岸清运，不收玻璃瓶。"
+    },
+    {
+      "id": "cross-13-q1",
+      "group_id": "cross-13",
+      "source_group_id": "cross-13",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "铜管组去哪里排练，周六几点开始？",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-cross-13-session-1",
+          "transcript_revision": "r1",
+          "turn_id": "fact1"
+        },
+        {
+          "segment_id": "seg-cross-13-session-2",
+          "transcript_revision": "r1",
+          "turn_id": "fact2"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "乐器合奏排练。黄金答案必须合并两个来源：松涛少年乐团：铜管组排练在青少年宫地下排练室。；松涛少年乐团：周六排练从下午四点二十分开始，谱架由团里提供。。证据说明：地下排练室与四点二十分各由一个会话提供。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "cross_session",
+      "gold_answer": "松涛少年乐团：铜管组排练在青少年宫地下排练室。；松涛少年乐团：周六排练从下午四点二十分开始，谱架由团里提供。"
+    },
+    {
+      "id": "cross-13-q2",
+      "group_id": "cross-13",
+      "source_group_id": "cross-13",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "少年乐团周末的排练房间和起始时刻是什么？",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-cross-13-session-1",
+          "transcript_revision": "r1",
+          "turn_id": "fact1"
+        },
+        {
+          "segment_id": "seg-cross-13-session-2",
+          "transcript_revision": "r1",
+          "turn_id": "fact2"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "乐器合奏排练。黄金答案必须合并两个来源：松涛少年乐团：铜管组排练在青少年宫地下排练室。；松涛少年乐团：周六排练从下午四点二十分开始，谱架由团里提供。。证据说明：地下排练室与四点二十分各由一个会话提供。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "cross_session",
+      "gold_answer": "松涛少年乐团：铜管组排练在青少年宫地下排练室。；松涛少年乐团：周六排练从下午四点二十分开始，谱架由团里提供。"
+    },
+    {
+      "id": "cross-14-q1",
+      "group_id": "cross-14",
+      "source_group_id": "cross-14",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "滴灌培训在哪儿办，示范从几点开始？",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-cross-14-session-1",
+          "transcript_revision": "r1",
+          "turn_id": "fact1"
+        },
+        {
+          "segment_id": "seg-cross-14-session-2",
+          "transcript_revision": "r1",
+          "turn_id": "fact2"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "农田灌溉培训。黄金答案必须合并两个来源：丰禾合作社：滴灌操作培训放在东河村粮站后院。；丰禾合作社：农技员周一上午九点半示范过滤器清洗。。证据说明：培训场地和示范时刻是互补信息。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "cross_session",
+      "gold_answer": "丰禾合作社：滴灌操作培训放在东河村粮站后院。；丰禾合作社：农技员周一上午九点半示范过滤器清洗。"
+    },
+    {
+      "id": "cross-14-q2",
+      "group_id": "cross-14",
+      "source_group_id": "cross-14",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "去东河村学清洗过滤器要到哪里、何时到？",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-cross-14-session-1",
+          "transcript_revision": "r1",
+          "turn_id": "fact1"
+        },
+        {
+          "segment_id": "seg-cross-14-session-2",
+          "transcript_revision": "r1",
+          "turn_id": "fact2"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "农田灌溉培训。黄金答案必须合并两个来源：丰禾合作社：滴灌操作培训放在东河村粮站后院。；丰禾合作社：农技员周一上午九点半示范过滤器清洗。。证据说明：培训场地和示范时刻是互补信息。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "cross_session",
+      "gold_answer": "丰禾合作社：滴灌操作培训放在东河村粮站后院。；丰禾合作社：农技员周一上午九点半示范过滤器清洗。"
+    },
+    {
+      "id": "cross-15-q1",
+      "group_id": "cross-15",
+      "source_group_id": "cross-15",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "灭火器送检在哪个位置，什么时间收件？",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-cross-15-session-1",
+          "transcript_revision": "r1",
+          "turn_id": "fact1"
+        },
+        {
+          "segment_id": "seg-cross-15-session-2",
+          "transcript_revision": "r1",
+          "turn_id": "fact2"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "消防器材年检。黄金答案必须合并两个来源：锦华物业：灭火器送检点设在二号车库坡道旁。；锦华物业：检修人员周五上午八点到十一点收件，每户最多两具。。证据说明：坡道位置和收件时间来自不同记录。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "cross_session",
+      "gold_answer": "锦华物业：灭火器送检点设在二号车库坡道旁。；锦华物业：检修人员周五上午八点到十一点收件，每户最多两具。"
+    },
+    {
+      "id": "cross-15-q2",
+      "group_id": "cross-15",
+      "source_group_id": "cross-15",
+      "split": "calibration",
+      "bucket": "cross_session",
+      "query": "灭火器年检应交到哪个位置，周五什么时段有人收件？",
+      "purpose": "cross_session",
+      "gold_turn_refs": [
+        {
+          "segment_id": "seg-cross-15-session-1",
+          "transcript_revision": "r1",
+          "turn_id": "fact1"
+        },
+        {
+          "segment_id": "seg-cross-15-session-2",
+          "transcript_revision": "r1",
+          "turn_id": "fact2"
+        }
+      ],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": false,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "消防器材年检。黄金答案必须合并两个来源：锦华物业：灭火器送检点设在二号车库坡道旁。；锦华物业：检修人员周五上午八点到十一点收件，每户最多两具。。证据说明：坡道位置和收件时间来自不同记录。",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "scenario_kind": "cross_session",
+      "gold_answer": "锦华物业：灭火器送检点设在二号车库坡道旁。；锦华物业：检修人员周五上午八点到十一点收件，每户最多两具。"
+    },
+    {
+      "id": "none-41-q1",
+      "group_id": "none-41",
+      "source_group_id": "none-41",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "当前会话材料里，云杉活动室急救箱位于楼梯口的哪一边？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {
+        "conversation_id": "c-none-41"
+      },
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "茶园采摘登记。无证据说明：该问题询问社区急救箱位置中有记录的事实，但硬范围限制在茶园采摘登记对应会话，答案来源位于范围之外，因此范围内确实无证据。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "scope_negative",
+      "gold_answer": null
+    },
+    {
+      "id": "none-42-q1",
+      "group_id": "none-42",
+      "source_group_id": "none-42",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "只按这段会话检索，白鹭陶房安排素坯集中烧窑的是星期几？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {
+        "conversation_id": "c-none-42"
+      },
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "火车站母婴室。无证据说明：该问题询问陶艺工作室烧窑中有记录的事实，但硬范围限制在火车站母婴室对应会话，答案来源位于范围之外，因此范围内确实无证据。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "scope_negative",
+      "gold_answer": null
+    },
+    {
+      "id": "none-43-q1",
+      "group_id": "none-43",
+      "source_group_id": "none-43",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "周日晚上七点的琴房被谁预约了？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "镇文化馆琴房。无证据说明：预约规则没有具体日期的用户记录。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-44-q1",
+      "group_id": "none-44",
+      "source_group_id": "none-44",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "市集现场每度电收费多少？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "露天市集电源。无证据说明：电流规格和申请时间并未说明电价。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-45-q1",
+      "group_id": "none-45",
+      "source_group_id": "none-45",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "新手体验包含几万元的意外险？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "室内攀岩保险。无证据说明：文本列出安全培训和装备，没有保险承保信息。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-46-q1",
+      "group_id": "none-46",
+      "source_group_id": "none-46",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "场站去年采购了多少个充电桩？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "公交场站充电。无证据说明：当夜操作流程没有采购总量。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-47-q1",
+      "group_id": "none-47",
+      "source_group_id": "none-47",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "这次回收了多少盒降压药？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "社区药品回收。无证据说明：回收周期和地点不等于本次回收清单。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-48-q1",
+      "group_id": "none-48",
+      "source_group_id": "none-48",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "周末每班有多少名志愿者？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "城市书屋志愿班。无证据说明：岗位要求没有具体排班人数。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-49-q1",
+      "group_id": "none-49",
+      "source_group_id": "none-49",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "样品报关的关税税率是多少？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "展会样品报关。无证据说明：准入材料没有具体产品和税率信息。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-50-q1",
+      "group_id": "none-50",
+      "source_group_id": "none-50",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "迁线服务会收取多少上门费？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "家庭宽带迁移。无证据说明：流程提醒没有费用条款。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-51-q1",
+      "group_id": "none-51",
+      "source_group_id": "none-51",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "上周东坡记录到几次违规用火？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "森林防火观察。无证据说明：巡查职责没有历史事件统计。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-52-q1",
+      "group_id": "none-52",
+      "source_group_id": "none-52",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "循迹车搭载的控制芯片是什么型号？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "中学机器人社。无证据说明：活动记录没有硬件清单。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-53-q1",
+      "group_id": "none-53",
+      "source_group_id": "none-53",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "这批鲭鱼的捕捞海域是哪片海？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {
+        "started_after": "2026-01-13T00:00:00+08:00",
+        "started_before": "2026-01-14T00:00:00+08:00"
+      },
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "海港冷冻鱼卸货。无证据说明：卸货验收要求没有捕捞来源资料。 该问题还限定了一个日期区间，而来源记录日期不在该区间。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "time_scope_negative",
+      "gold_answer": null
+    },
+    {
+      "id": "none-54-q1",
+      "group_id": "none-54",
+      "source_group_id": "none-54",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "早餐每位成人收费多少？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "旅馆早餐时段。无证据说明：供应地点与时段没有收费信息。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-55-q1",
+      "group_id": "none-55",
+      "source_group_id": "none-55",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "沉砂井有多深？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "城市雨水花园。无证据说明：维护频率没有工程尺寸。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-56-q1",
+      "group_id": "none-56",
+      "source_group_id": "none-56",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "同传承包公司的注册资本是多少？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "国际会议同传。无证据说明：使用说明没有供应商工商信息。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-57-q1",
+      "group_id": "none-57",
+      "source_group_id": "none-57",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "补胎师傅周末加班的时薪是多少？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "村镇快修点。无证据说明：维修项目和报价方式没有员工工资信息。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-58-q1",
+      "group_id": "none-58",
+      "source_group_id": "none-58",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "六号楼一共有多少个床位？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "高校交换宿舍。无证据说明：入住流程没有楼栋床位统计。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-59-q1",
+      "group_id": "none-59",
+      "source_group_id": "none-59",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "本月含镍污泥转运了多少吨？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "工厂危废暂存。无证据说明：处置流程没有本月重量。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    },
+    {
+      "id": "none-60-q1",
+      "group_id": "none-60",
+      "source_group_id": "none-60",
+      "split": "calibration",
+      "bucket": "no_evidence",
+      "query": "一日通票的儿童优惠比例是多少？",
+      "purpose": "no_evidence",
+      "gold_turn_refs": [],
+      "gold_evidence_turn_ids": [],
+      "gold_topic_refs": [],
+      "gold_topic_ids": [],
+      "unanswerable": true,
+      "scope": {},
+      "expect_ambient_excluded": true,
+      "expect_stale_excluded": true,
+      "notes": "城市观光巴士。无证据说明：票种被提及但无票价或优惠条款。",
+      "expected_sufficiency": "unknown",
+      "evidence_completeness": "none",
+      "scenario_kind": "missing_attribute",
+      "gold_answer": null
+    }
+  ]
+}

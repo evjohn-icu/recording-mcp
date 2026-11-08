@@ -54,3 +54,14 @@
 - sufficiency assessor：未配置 `--assessor-decision-url`，因此“证据不足/错误宣称充分”为 `NOT_RUN`。
 - r3 冻结集 holdout：未运行（无候选通过校准门槛，且计划禁止消耗 holdout）。
 - 人工逐题判定：`REVIEW.md` 由本机作者完成，未做第二人复核。
+
+## r3 冻结集复跑（r4，校准阶段）
+
+```sh
+python3 scripts/run-retrieval-quality-v2.py --binary /tmp/context-eval-product --out docs/evals/productization-retrieval-r4
+# exit=0
+```
+
+产物：`docs/evals/productization-retrieval-r4/`（manifest、train/calibration 四配置结果）。
+
+结论（`manifest.json`）：`"No v2 candidate passed every calibration gate; no holdout lock was created."`，`default_changed` 为 false，`test_touched` 为 false。未运行 `--phase holdout`，未消耗冻结测试集。该复跑只用于确认默认版本不变，不作为 v2 切换依据。
