@@ -7,7 +7,7 @@
 ```sh
 docker compose --env-file ci.env config            # exit 0
 RUN_DOCKER_DEPLOYMENT_TEST=1 python3 -m unittest discover -s scripts -p 'test_productization_deploy.py' -v
-# Ran 6 tests in 58.020s — OK
+# Ran 6 tests in 25.403s — OK
 ```
 
 6 项检查全部通过：
@@ -21,7 +21,7 @@ RUN_DOCKER_DEPLOYMENT_TEST=1 python3 -m unittest discover -s scripts -p 'test_pr
 | `test_startup_without_external_api_reports_unavailable` | PASS | `ASR_PROVIDER=off` 时服务启动且健康 |
 | `test_backup_restore_preserves_sources` | PASS | 停止写入后备份卷、恢复到新卷，文件哈希一致 |
 
-构建耗时：首次约 104 秒（含拉取基础镜像），后续增量约 60 秒。首次 `up` 到登录可用约 6 秒（init 完成 + web 健康）。
+构建耗时：首次约 104 秒（含拉取基础镜像），最终增量重建 7.3 秒。首次 `up` 到登录可用约 6 秒（init 完成 + web 健康）。
 
 ## 关键实现细节
 

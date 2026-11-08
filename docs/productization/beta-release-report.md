@@ -39,7 +39,7 @@
 - `python3 scripts/run-product-browser.py` — 13/13。
 - `python3 scripts/product-audio-e2e.py --mode synthetic` — PASS：148 音频分钟、148 turns、零覆盖缺口、13.29 秒 wall time。
 - `python3 scripts/beta-demo.py` — 10/10。
-- `RUN_DOCKER_DEPLOYMENT_TEST=1 python3 -m unittest ... test_productization_deploy.py` — 6/6，58.0 秒，见 `deployment-verification.md`。
+- `RUN_DOCKER_DEPLOYMENT_TEST=1 python3 -m unittest ... test_productization_deploy.py` — 6/6（最终复跑 25.4 秒），见 `deployment-verification.md`。
 - `python3 scripts/decision-trail-browser.py` — 14/14。
 - `python3 -m unittest scripts.test_productization_retrieval` — 3/3。
 
