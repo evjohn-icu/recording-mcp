@@ -1,0 +1,85 @@
+{
+  "description": "Beta 演示投影：Atlas 项目的观察、方案候选与最终确认。",
+  "notes": [
+    {
+      "id": "beta-obs-1",
+      "conversation_ref": "conv-atlas-kickoff",
+      "kind": "observation",
+      "summary": "客户要求 6 月前上线",
+      "topic_titles": [
+        "Atlas 项目"
+      ],
+      "evidence_turn_refs": [
+        {
+          "segment_id": "seg-kick-1",
+          "transcript_revision": "rev-1",
+          "turn_id": "k1"
+        }
+      ]
+    },
+    {
+      "id": "beta-cand-a",
+      "conversation_ref": "conv-atlas-kickoff",
+      "kind": "suggestion",
+      "summary": "建议先采用方案 A 快速上线",
+      "topic_titles": [
+        "Atlas 项目"
+      ],
+      "evidence_turn_refs": [
+        {
+          "segment_id": "seg-kick-2",
+          "transcript_revision": "rev-1",
+          "turn_id": "k2"
+        }
+      ]
+    },
+    {
+      "id": "beta-obs-2",
+      "conversation_ref": "conv-atlas-review",
+      "kind": "observation",
+      "summary": "维护成本比预期高",
+      "topic_titles": [
+        "Atlas 项目"
+      ],
+      "evidence_turn_refs": [
+        {
+          "segment_id": "seg-review-1",
+          "transcript_revision": "rev-1",
+          "turn_id": "r1"
+        }
+      ]
+    },
+    {
+      "id": "beta-cand-b",
+      "conversation_ref": "conv-atlas-review",
+      "kind": "suggestion",
+      "summary": "改为采用方案 B，分两阶段交付",
+      "topic_titles": [
+        "Atlas 项目"
+      ],
+      "evidence_turn_refs": [
+        {
+          "segment_id": "seg-review-2",
+          "transcript_revision": "rev-1",
+          "turn_id": "r2"
+        }
+      ]
+    },
+    {
+      "id": "beta-final",
+      "conversation_ref": "conv-atlas-final",
+      "kind": "suggestion",
+      "summary": "最终确定采用方案 B，分两阶段交付",
+      "topic_titles": [
+        "Atlas 项目"
+      ],
+      "evidence_turn_refs": [
+        {
+          "segment_id": "seg-final-1",
+          "transcript_revision": "rev-1",
+          "turn_id": "f1"
+        }
+      ]
+    }
+  ]
+}
