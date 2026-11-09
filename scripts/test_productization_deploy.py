@@ -171,15 +171,21 @@ class DeploymentTest(unittest.TestCase):
         return f"http://127.0.0.1:{self.web_port}"
 
     def import_wav(self) -> str:
-        # Wait until the worker advertises ASR before importing.
-        deadline = time.time() + 60
+        # Wait until the worker advertises ASR before importing. CI runners can
+        # be slow to build/start the stack, so allow a generous window.
+        deadline = time.time() + 240
         while True:
             cookie, csrf = self.login()
             caps = self.api_json("/api/capabilities", cookie, csrf)
             if caps.get("asr", {}).get("available"):
                 break
             if time.time() > deadline:
-                raise AssertionError(f"ASR capability never became available: {caps}")
+                ps = self.run_compose("ps", "--format", "json")
+                logs = self.run_compose("logs", "--tail=80", "worker")
+                raise AssertionError(
+                    f"ASR capability never became available: {caps}\n"
+                    f"compose ps:\n{ps.stdout}\nworker logs:\n{logs.stdout}\n{logs.stderr}"
+                )
             time.sleep(1)
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as handle:
             with wave.open(handle.name, "wb") as wav:
@@ -222,7 +228,7 @@ class DeploymentTest(unittest.TestCase):
             subprocess.run(compose + ["down", "-v"], capture_output=True)
 
     def test_backup_restore_preserves_sources(self) -> None:
-        self.run_compose("up", "-d")
+        self.run_compose("up", "-d", "--build")
         wait_http(self.health_url())
         self.import_wav()
         # Stop writers so the backup and the original are hashed in the same
