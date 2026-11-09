@@ -90,6 +90,8 @@ HF_ROOT=${HF_HOME:-$HOME/.cache/huggingface}/hub
 # Test-only hooks are inert unless LOCAL_GPU_UP_TEST_MODE=1: they execute
 # commands and redirect binaries, so an accidental environment value (or a
 # sourced .env) must not be able to reach them.
+FFMPEG_BIN=ffmpeg
+FFPROBE_BIN=ffprobe
 if [ "$TEST_MODE" = 1 ]; then
   ARTIFACTS_DIR=${LOCAL_GPU_UP_ARTIFACTS_DIR:-$ARTIFACTS_DIR}
   PYTHON=${LOCAL_GPU_UP_PYTHON:-$PYTHON}
@@ -104,6 +106,8 @@ if [ "$TEST_MODE" = 1 ]; then
   NVIDIA_SMI=${LOCAL_GPU_UP_NVIDIA_SMI:-$NVIDIA_SMI}
   HEALTH_TIMEOUT=${LOCAL_GPU_UP_HEALTH_TIMEOUT:-$HEALTH_TIMEOUT}
   HF_ROOT=${LOCAL_GPU_UP_HF_ROOT:-$HF_ROOT}
+  FFMPEG_BIN=${LOCAL_GPU_UP_FFMPEG:-ffmpeg}
+  FFPROBE_BIN=${LOCAL_GPU_UP_FFPROBE:-ffprobe}
   EMBED_CMD=${LOCAL_GPU_UP_EMBED_CMD:-}
   EMBED_HEALTH_CMD=${LOCAL_GPU_UP_EMBED_HEALTH_CMD:-}
 fi
@@ -151,8 +155,8 @@ preflight() {
   local need
   need=$(required_vram)
   [ "$free" -ge "$need" ] || die "GPU has ${free} MiB free, ${need} MiB required for --backend $BACKEND"
-  command -v ffmpeg >/dev/null 2>&1 || die "ffmpeg not found"
-  command -v ffprobe >/dev/null 2>&1 || die "ffprobe not found"
+  command -v "$FFMPEG_BIN" >/dev/null 2>&1 || die "ffmpeg not found"
+  command -v "$FFPROBE_BIN" >/dev/null 2>&1 || die "ffprobe not found"
   [ -x "$PYTHON" ] || die "ASR interpreter not found: $PYTHON (see docs/productization/local-asr.md)"
   local repo revision dir
   repo=$(pin asr_"$BACKEND" repo_id)
@@ -290,7 +294,7 @@ start_embedding() {
       sh -c "$EMBED_HEALTH_CMD" >/dev/null 2>&1
       healthy=$?
     else
-      curl -fsS --connect-timeout 2 --max-time 5 "http://127.0.0.1:$port/healthz" >/dev/null 2>&1
+      curl -fsS --noproxy '*' --connect-timeout 2 --max-time 5 "http://127.0.0.1:$port/healthz" >/dev/null 2>&1
       healthy=$?
     fi
     if [ "$healthy" -eq 0 ]; then
@@ -316,12 +320,12 @@ health_ok() {
   if [ -n "$HEALTH_CMD" ]; then
     sh -c "$HEALTH_CMD" >/dev/null 2>&1 || return 1
   else
-    curl -fsS --connect-timeout 2 --max-time 5 "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 || return 1
+    curl -fsS --noproxy '*' --connect-timeout 2 --max-time 5 "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 || return 1
   fi
   if [ -n "$WORKER_HEALTH_CMD" ]; then
     sh -c "$WORKER_HEALTH_CMD" >/dev/null 2>&1 || return 1
   else
-    curl -fsS --connect-timeout 2 --max-time 5 "http://127.0.0.1:$WORKER_HEALTH_PORT/healthz" >/dev/null 2>&1 || return 1
+    curl -fsS --noproxy '*' --connect-timeout 2 --max-time 5 "http://127.0.0.1:$WORKER_HEALTH_PORT/healthz" >/dev/null 2>&1 || return 1
   fi
   return 0
 }

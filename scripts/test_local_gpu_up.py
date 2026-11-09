@@ -83,6 +83,8 @@ class GPUUpTests(unittest.TestCase):
         self.stub("bin/context-profile", PROFILE_STUB)
         self.stub("bin/python", "#!/bin/sh\nexit 0\n")
         self.stub("bin/nvidia-smi", NVIDIA_STUB)
+        self.stub("bin/ffmpeg", "#!/bin/sh\nexit 0\n")
+        self.stub("bin/ffprobe", "#!/bin/sh\nexit 0\n")
         self.stub("bin/launch.sh", START_STUB)
         self.log = self.root / "stub.log"
         self.profiles = self.root / "profiles"
@@ -130,6 +132,8 @@ class GPUUpTests(unittest.TestCase):
             "LOCAL_GPU_UP_WORKER_HEALTH_CMD": "true",
             "LOCAL_GPU_UP_NVIDIA_SMI": str(self.root / "bin" / "nvidia-smi"),
             "LOCAL_GPU_UP_HF_ROOT": str(self.hf_root),
+            "LOCAL_GPU_UP_FFMPEG": str(self.root / "bin" / "ffmpeg"),
+            "LOCAL_GPU_UP_FFPROBE": str(self.root / "bin" / "ffprobe"),
             "STUB_LOG": str(self.log),
             "STUB_PID_FILE": str(self.root / "stub.pid"),
         })

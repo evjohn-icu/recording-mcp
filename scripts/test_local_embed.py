@@ -23,6 +23,13 @@ QUERY_PREFIX = "Instruct: Given a web search query, retrieve relevant passages t
 DIMS = 1024
 
 
+OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def get(url: str, timeout: float = 5):
+    return OPENER.open(url, timeout=timeout)
+
+
 def free_port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -45,7 +52,7 @@ class LocalEmbedProtocolTests(unittest.TestCase):
             if cls.proc.poll() is not None:
                 raise RuntimeError(cls.proc.stderr.read())
             try:
-                with urllib.request.urlopen(cls.base + "/healthz", timeout=1) as response:
+                with get(cls.base + "/healthz", timeout=1) as response:
                     if response.status == 200:
                         return
             except Exception:  # noqa: BLE001
@@ -68,7 +75,7 @@ class LocalEmbedProtocolTests(unittest.TestCase):
         request = urllib.request.Request(self.base + "/v1/embeddings", data=body,
                                          headers={"Content-Type": "application/json", **(headers or {})})
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with OPENER.open(request, timeout=30) as response:
                 return response.status, json.loads(response.read())
         except urllib.error.HTTPError as error:
             return error.code, json.loads(error.read())
@@ -82,7 +89,7 @@ class LocalEmbedProtocolTests(unittest.TestCase):
         return [item["embedding"] for item in body["data"]]
 
     def test_embeddings_protocol_and_query_instruction(self):
-        health = json.loads(urllib.request.urlopen(self.base + "/healthz", timeout=5).read())
+        health = json.loads(get(self.base + "/healthz").read())
         self.assertEqual(health["status"], "ok")
         self.assertEqual(health["model"], "test-fake")
         self.assertEqual(health["dims"], DIMS)
