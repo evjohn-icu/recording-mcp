@@ -65,6 +65,7 @@ class LocalStartTests(unittest.TestCase):
                        FAIL_CHILD=failing)
             if local_asr:
                 env.update(ASR_PROVIDER="ark", ASR_BACKEND="ark", ASR_MODEL="/models/ark",
+                           ASR_SCRIPT="/opt/asr/run.py",
                            ASR_PYTHON="/opt/asr/bin/python", ASR_DEVICE="cuda:1", ASR_REVISION="deadbeef")
             if embedding:
                 env.update(EMBED_PROVIDER="local", EMBED_ENDPOINT="http://127.0.0.1:8790/v1/embeddings",
@@ -110,6 +111,8 @@ class LocalStartTests(unittest.TestCase):
                 self.assertEqual(flag_value(argv["worker"], "--generator"), "off")
                 if not embedding:
                     self.assertEqual(flag_value(argv["worker"], "--embed-provider"), "hash")
+                    self.assertNotIn("--embed-input-type", argv["worker"])
+                    self.assertNotIn("--semantic-input-type", argv["web"])
                 for role in ("web", "worker"):
                     self.assertNotIn("--brief-polish", argv[role])
             if embedding:
@@ -120,12 +123,14 @@ class LocalStartTests(unittest.TestCase):
                 self.assertEqual(flag_value(worker, "--embed-dims"), "1024")
                 self.assertEqual(flag_value(worker, "--embed-key-env"), "")
                 self.assertNotIn("--embed_endpoint", worker)
+                self.assertIn("--embed-input-type", worker)
                 self.assertEqual(flag_value(web, "--semantic-provider"), "openai")
                 self.assertEqual(flag_value(web, "--semantic-endpoint"), "http://127.0.0.1:8790/v1/embeddings")
                 self.assertEqual(flag_value(web, "--semantic-model"), "Qwen/Qwen3-Embedding-0.6B")
                 self.assertEqual(flag_value(web, "--semantic-dims"), "1024")
                 self.assertEqual(flag_value(web, "--semantic-key-env"), "")
                 self.assertNotIn("--semantic_endpoint", web)
+                self.assertIn("--semantic-input-type", web)
             if local_asr:
                 for role in ("web", "worker"):
                     args = argv[role]
@@ -135,6 +140,7 @@ class LocalStartTests(unittest.TestCase):
                     self.assertEqual(flag_value(args, "--asr-python"), "/opt/asr/bin/python")
                     self.assertEqual(flag_value(args, "--asr-device"), "cuda:1")
                     self.assertEqual(flag_value(args, "--asr-revision"), "deadbeef")
+                    self.assertEqual(flag_value(args, "--asr-script"), "/opt/asr/run.py")
 
     def test_worker_exit_stops_web_and_propagates_status(self):
         self.run_fake_pair("worker")

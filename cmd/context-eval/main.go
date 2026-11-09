@@ -48,6 +48,7 @@ func run() error {
 		embedEndpoint         = flag.String("embed-endpoint", "", "OpenAI-compatible embedding endpoint")
 		embedModel            = flag.String("embed-model", "", "embedding model")
 		embedKeyEnv           = flag.String("embed-key-env", "", "environment variable containing the embedding API key")
+		embedInputType        = flag.Bool("embed-input-type", false, "send the non-standard input_type field (needed by the bundled Qwen embedding server)")
 		retrievalVersion      = flag.String("retrieval-version", "v1", "retrieval implementation: v1|v2")
 		rerankCandidateLimit  = flag.Int("rerank-candidate-limit", 64, "v2 candidate pool size before final budget (1..128)")
 		rerankDecisionURL     = flag.String("rerank-decision-url", "", "optional Decision service endpoint for explicitly enabled reranking")
@@ -77,11 +78,12 @@ func run() error {
 	defer cleanup()
 
 	provider, err := semantic.ProviderFromConfig(semantic.Config{
-		Provider: *embedProvider,
-		Dims:     *embedDims,
-		Endpoint: *embedEndpoint,
-		Model:    *embedModel,
-		KeyEnv:   *embedKeyEnv,
+		Provider:       *embedProvider,
+		Dims:           *embedDims,
+		Endpoint:       *embedEndpoint,
+		Model:          *embedModel,
+		KeyEnv:         *embedKeyEnv,
+		InputTypeField: *embedInputType,
 	})
 	if err != nil {
 		return err

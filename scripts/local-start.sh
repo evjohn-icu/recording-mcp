@@ -48,6 +48,9 @@ for value in EMBED_ENDPOINT EMBED_MODEL EMBED_DIMS; do
   fi
 done
 if [ -n "${EMBED_KEY_ENV+set}" ]; then WORKER_ARGS+=(--embed-key-env "$EMBED_KEY_ENV"); fi
+# input_type is a non-standard field: only the bundled Qwen server needs it.
+# Local provider enables it automatically; remote users can opt in explicitly.
+if [ "${EMBED_INPUT_TYPE:-}" = 1 ] || [ "${EMBED_PROVIDER:-hash}" = local ]; then WORKER_ARGS+=(--embed-input-type); fi
 for value in SEMANTIC_ENDPOINT SEMANTIC_MODEL SEMANTIC_DIMS; do
   if [ -n "${!value:-}" ]; then
     flag=${value,,}; flag=${flag//_/-}
@@ -55,10 +58,12 @@ for value in SEMANTIC_ENDPOINT SEMANTIC_MODEL SEMANTIC_DIMS; do
   fi
 done
 if [ -n "${SEMANTIC_KEY_ENV+set}" ]; then WEB_ARGS+=(--semantic-key-env "$SEMANTIC_KEY_ENV"); fi
+if [ "${SEMANTIC_INPUT_TYPE:-}" = 1 ] || [ "${SEMANTIC_PROVIDER:-}" = local ] || [ "${EMBED_PROVIDER:-hash}" = local ]; then WEB_ARGS+=(--semantic-input-type); fi
 # Local ASR settings must reach both processes so provider/config agree.
 if [ -n "${ASR_BACKEND:-}" ]; then WORKER_ARGS+=(--asr-backend "$ASR_BACKEND"); WEB_ARGS+=(--asr-backend "$ASR_BACKEND"); fi
 if [ -n "${ASR_MODEL:-}" ]; then WORKER_ARGS+=(--asr-model "$ASR_MODEL"); WEB_ARGS+=(--asr-model "$ASR_MODEL"); fi
 if [ -n "${ASR_PYTHON:-}" ]; then WORKER_ARGS+=(--asr-python "$ASR_PYTHON"); WEB_ARGS+=(--asr-python "$ASR_PYTHON"); fi
+if [ -n "${ASR_SCRIPT:-}" ]; then WORKER_ARGS+=(--asr-script "$ASR_SCRIPT"); WEB_ARGS+=(--asr-script "$ASR_SCRIPT"); fi
 if [ -n "${ASR_DEVICE:-}" ]; then WORKER_ARGS+=(--asr-device "$ASR_DEVICE"); WEB_ARGS+=(--asr-device "$ASR_DEVICE"); fi
 if [ -n "${ASR_REVISION:-}" ]; then WORKER_ARGS+=(--asr-revision "$ASR_REVISION"); WEB_ARGS+=(--asr-revision "$ASR_REVISION"); fi
 if [ -n "${ASR_TIMEOUT:-}" ]; then WORKER_ARGS+=(--asr-timeout "$ASR_TIMEOUT"); fi

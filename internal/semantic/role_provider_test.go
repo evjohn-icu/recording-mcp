@@ -62,7 +62,7 @@ func TestOpenAICompatProviderSendsInputType(t *testing.T) {
 		})
 	}))
 	defer server.Close()
-	provider := OpenAICompatProvider{Endpoint: server.URL, ModelName: "qwen3-embedding", Dimensions: 2}
+	provider := OpenAICompatProvider{Endpoint: server.URL, ModelName: "qwen3-embedding", Dimensions: 2, SendInputType: true}
 	if _, err := provider.EmbedRole(context.Background(), []string{"查预算"}, RoleQuery); err != nil {
 		t.Fatal(err)
 	}
@@ -85,6 +85,36 @@ func TestOpenAICompatProviderSendsInputType(t *testing.T) {
 	}
 	if bodies[2]["input_type"] != "document" {
 		t.Fatalf("document role input_type = %v, want document", bodies[2]["input_type"])
+	}
+}
+
+func TestOpenAICompatProviderOmitsInputTypeByDefault(t *testing.T) {
+	var bodies []map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		bodies = append(bodies, body)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{{"embedding": []float32{0.1, 0.2}}},
+		})
+	}))
+	defer server.Close()
+	provider := OpenAICompatProvider{Endpoint: server.URL, ModelName: "text-embedding-3-small", Dimensions: 2}
+	if _, err := provider.Embed(context.Background(), []string{"预算记录"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.EmbedRole(context.Background(), []string{"查预算"}, RoleQuery); err != nil {
+		t.Fatal(err)
+	}
+	if len(bodies) != 2 {
+		t.Fatalf("requests = %d, want 2", len(bodies))
+	}
+	for i, body := range bodies {
+		if _, present := body["input_type"]; present {
+			t.Fatalf("request %d sent input_type without opt-in: %v", i, body)
+		}
 	}
 }
 

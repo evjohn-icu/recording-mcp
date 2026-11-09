@@ -71,6 +71,7 @@ func run() error {
 	embedEndpoint := flag.String("embed-endpoint", "", "OpenAI-compatible embeddings endpoint used by the openai embed provider")
 	embedModel := flag.String("embed-model", "", "embedding model name used by the openai embed provider")
 	embedKeyEnv := flag.String("embed-key-env", "EMBED_API_KEY", "environment variable holding the embedding API key")
+	embedInputType := flag.Bool("embed-input-type", false, "send the non-standard input_type field (needed by the bundled Qwen embedding server)")
 	asrProvider := flag.String("asr-provider", "off", "ASR provider for the asr stage: off|fixture|doubao|ark|qwen|local")
 	asrKeyEnv := flag.String("asr-key-env", "VOLC_API_KEY", "environment variable holding the doubao ASR API key")
 	asrEndpoint := flag.String("asr-endpoint", "", "doubao ASR endpoint override")
@@ -219,7 +220,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("configure importer: %w", err)
 	}
-	embedProviderImpl, err := buildEmbedProvider(*embedProvider, *embedDims, *embedEndpoint, *embedModel, *embedKeyEnv)
+	embedProviderImpl, err := buildEmbedProvider(*embedProvider, *embedDims, *embedEndpoint, *embedModel, *embedKeyEnv, *embedInputType)
 	if err != nil {
 		return err
 	}
@@ -447,7 +448,7 @@ func validateRealMode(executor, generator string, allowSynthetic bool) error {
 // hash is the offline default so indexing never needs the network; openai
 // requires a configured endpoint and model; off disables indexing (embed jobs
 // succeed as skipped and the status surface reports indexing disabled).
-func buildEmbedProvider(name string, dims int, endpoint, model, keyEnv string) (semantic.Provider, error) {
+func buildEmbedProvider(name string, dims int, endpoint, model, keyEnv string, inputType bool) (semantic.Provider, error) {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "", "hash":
 		return semantic.NewHashProvider(dims), nil
@@ -468,11 +469,12 @@ func buildEmbedProvider(name string, dims int, endpoint, model, keyEnv string) (
 			apiKey = os.Getenv(keyEnv)
 		}
 		return &semantic.OpenAICompatProvider{
-			Endpoint:   endpoint,
-			APIKey:     apiKey,
-			ModelName:  model,
-			Dimensions: dims,
-			HTTPClient: &http.Client{Timeout: 60 * time.Second},
+			Endpoint:      endpoint,
+			APIKey:        apiKey,
+			ModelName:     model,
+			Dimensions:    dims,
+			HTTPClient:    &http.Client{Timeout: 60 * time.Second},
+			SendInputType: inputType,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown embed provider %q (want hash, openai or off)", name)

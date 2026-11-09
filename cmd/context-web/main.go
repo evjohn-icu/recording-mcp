@@ -134,6 +134,7 @@ func main() {
 	semanticEndpoint := flag.String("semantic-endpoint", "", "OpenAI-compatible embeddings endpoint (required when --semantic-provider=openai)")
 	semanticModel := flag.String("semantic-model", "", "embedding model name (required when --semantic-provider=openai)")
 	semanticKeyEnv := flag.String("semantic-key-env", "", "environment variable holding the embeddings API key (openai only)")
+	semanticInputType := flag.Bool("semantic-input-type", false, "send the non-standard input_type field (needed by the bundled Qwen embedding server)")
 	decisionURL := flag.String("decision-url", "", "optional Decision engine endpoint used to rerank hybrid search items (empty disables reranking)")
 	sufficiencyURL := flag.String("sufficiency-url", "", "optional Decision endpoint for v2 evidence sufficiency (empty disables assessment)")
 	sufficiencyModel := flag.String("sufficiency-model", "", "model identity for v2 evidence sufficiency")
@@ -247,7 +248,7 @@ func main() {
 			}
 			retriever, err := semantic.RetrieverFromConfig(semantic.Config{IndexPath: indexPath,
 				Provider: *semanticProvider, Dims: *semanticDims, Endpoint: *semanticEndpoint,
-				Model: *semanticModel, KeyEnv: *semanticKeyEnv,
+				Model: *semanticModel, KeyEnv: *semanticKeyEnv, InputTypeField: *semanticInputType,
 			}, store.DB())
 			if err != nil {
 				events.Close()
@@ -382,11 +383,12 @@ func main() {
 		indexPath = filepath.Join(indexDir, "semantic.vec")
 	}
 	retriever, err := semantic.RetrieverFromConfig(semantic.Config{IndexPath: indexPath,
-		Provider: *semanticProvider,
-		Dims:     *semanticDims,
-		Endpoint: *semanticEndpoint,
-		Model:    *semanticModel,
-		KeyEnv:   *semanticKeyEnv,
+		Provider:       *semanticProvider,
+		Dims:           *semanticDims,
+		Endpoint:       *semanticEndpoint,
+		Model:          *semanticModel,
+		KeyEnv:         *semanticKeyEnv,
+		InputTypeField: *semanticInputType,
 	}, store.DB())
 	if err != nil {
 		log.Fatal(err)

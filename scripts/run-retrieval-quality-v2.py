@@ -417,6 +417,8 @@ def _run(binary: str, args: argparse.Namespace, split_path: Path, version: str,
     if provider == "openai":
         cmd += ["--embed-endpoint", args.embed_endpoint, "--embed-model", args.embed_model,
                 "--embed-key-env", args.embed_key_env, "--embed-dims", str(args.embed_dims)]
+        if args.embed_input_type:
+            cmd += ["--embed-input-type"]
     if rerank:
         cmd += ["--rerank-decision-url", args.rerank_url, "--rerank-decision-model", args.rerank_model]
     if args.assessor_url and args.assessor_model:
@@ -567,6 +569,8 @@ def main() -> int:
     parser.add_argument("--embed-key-env", default="")
     parser.add_argument("--embed-dims", type=int, default=0,
                         help="required with --embed-endpoint/--embed-model; keeps real embeddings NOT_RUN when omitted")
+    parser.add_argument("--embed-input-type", action="store_true",
+                        help="send input_type (needed by the bundled Qwen embedding server)")
     parser.add_argument("--rerank-url", default="")
     parser.add_argument("--rerank-model", default="")
     parser.add_argument("--assessor-url", default="")

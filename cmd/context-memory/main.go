@@ -597,6 +597,7 @@ func main() {
 	semanticEndpoint := flag.String("semantic-endpoint", "", "OpenAI-compatible embeddings endpoint (required when --semantic-provider=openai)")
 	semanticModel := flag.String("semantic-model", "", "embedding model name (required when --semantic-provider=openai)")
 	semanticKeyEnv := flag.String("semantic-key-env", "", "environment variable holding the embeddings API key (openai only)")
+	semanticInputType := flag.Bool("semantic-input-type", false, "send the non-standard input_type field (needed by the bundled Qwen embedding server)")
 	flag.Parse()
 	if flag.NArg() != 0 {
 		log.Fatalf("unexpected arguments: %v", flag.Args())
@@ -654,12 +655,13 @@ func main() {
 		indexPath = filepath.Join(dir, "semantic.vec")
 	}
 	retriever, e := semantic.RetrieverFromConfig(semantic.Config{
-		IndexPath: indexPath,
-		Provider:  *semanticProvider,
-		Dims:      *semanticDims,
-		Endpoint:  *semanticEndpoint,
-		Model:     *semanticModel,
-		KeyEnv:    *semanticKeyEnv,
+		IndexPath:      indexPath,
+		Provider:       *semanticProvider,
+		Dims:           *semanticDims,
+		Endpoint:       *semanticEndpoint,
+		Model:          *semanticModel,
+		KeyEnv:         *semanticKeyEnv,
+		InputTypeField: *semanticInputType,
 	}, store.DB())
 	if e != nil {
 		log.Fatal(e)

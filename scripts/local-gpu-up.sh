@@ -50,6 +50,7 @@ case "$CYCLES" in ''|*[!0-9]*) echo "local-gpu-up: cycles must be numeric" >&2; 
 if [ "$CYCLES" -lt 1 ]; then echo "local-gpu-up: --cycles must be at least 1" >&2; exit 2; fi
 case "$BACKEND" in ark|qwen) ;; *) echo "local-gpu-up: backend must be ark or qwen" >&2; exit 2 ;; esac
 WORKER_HEALTH_PORT=${WORKER_HEALTH_PORT:-$((PORT + 1))}
+die() { echo "local-gpu-up: $*" >&2; exit 1; }
 
 if [ -n "$ENV_FILE" ]; then
   if [ ! -f "$ENV_FILE" ]; then echo "local-gpu-up: env file not found: $ENV_FILE" >&2; exit 1; fi
@@ -78,6 +79,8 @@ ARTIFACTS_DIR=$ROOT/artifacts/local-gpu
 PYTHON=$ROOT/.venv-asr/bin/python
 ASR_RUNNER=$ROOT/scripts/local-asr.py
 ASR_PROBE_CMD=
+EMBED_CMD=
+EMBED_HEALTH_CMD=
 WEB_BIN=$ROOT/bin/context-web
 WORKER_BIN=$ROOT/bin/context-worker
 PROFILE_BIN=$ROOT/bin/context-profile
@@ -121,8 +124,6 @@ for key in PATH HOME TMPDIR TEMP LANG LC_ALL CUDA_VISIBLE_DEVICES CUDA_HOME LD_L
 done
 
 mkdir -p "$ARTIFACTS_DIR"
-
-die() { echo "local-gpu-up: $*" >&2; exit 1; }
 
 pin() {
   python3 - "$ROOT/scripts/model-revisions.json" "$1" "$2" <<'PY'
@@ -281,7 +282,7 @@ start_embedding() {
   if [ "$device" != cpu ]; then
     args+=(--gpu-lock "$PROFILES_ROOT/$PROFILE/gpu.lock")
   fi
-  if [ -n "$EMBED_CMD" ]; then
+  if [ -n "${EMBED_CMD:-}" ]; then
     sh -c "$EMBED_CMD" &
   else
     "${CLEAN_ENV[@]}" "$PYTHON" "$ROOT/scripts/local-embed.py" "${args[@]}" &
@@ -290,7 +291,7 @@ start_embedding() {
   local deadline=$((SECONDS + HEALTH_TIMEOUT))
   while [ "$SECONDS" -lt "$deadline" ]; do
     if ! kill -0 "$EMBED_PID" 2>/dev/null; then die "embedding server exited during startup"; fi
-    if [ -n "$EMBED_HEALTH_CMD" ]; then
+    if [ -n "${EMBED_HEALTH_CMD:-}" ]; then
       sh -c "$EMBED_HEALTH_CMD" >/dev/null 2>&1
       healthy=$?
     else

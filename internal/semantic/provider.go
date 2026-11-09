@@ -209,6 +209,11 @@ type OpenAICompatProvider struct {
 	ModelName  string
 	Dimensions int
 	HTTPClient *http.Client
+	// SendInputType opts in to the non-standard input_type field. The bundled
+	// Qwen server uses it to prepend the query instruction; strict
+	// OpenAI-compatible endpoints reject unknown body fields, so it is off by
+	// default.
+	SendInputType bool
 }
 
 func (p OpenAICompatProvider) ID() string { return "openai-compat" }
@@ -238,8 +243,8 @@ func (p OpenAICompatProvider) Embed(ctx context.Context, texts []string) ([]Vect
 	return p.EmbedRole(ctx, texts, RoleDocument)
 }
 
-// EmbedRole sends input_type when the role is set. External
-// OpenAI-compatible endpoints ignore the extra field.
+// EmbedRole optionally sends input_type. The bundled local server needs it for
+// query instruction selection; other endpoints can reject the field.
 func (p OpenAICompatProvider) EmbedRole(ctx context.Context, texts []string, role EmbedRole) ([]Vector, error) {
 	endpoint := strings.TrimSpace(p.Endpoint)
 	if endpoint == "" {
@@ -249,7 +254,7 @@ func (p OpenAICompatProvider) EmbedRole(ctx context.Context, texts []string, rol
 		return nil, errors.New("semantic: no texts to embed")
 	}
 	inputType := ""
-	if role == RoleDocument || role == RoleQuery {
+	if p.SendInputType && (role == RoleDocument || role == RoleQuery) {
 		inputType = string(role)
 	}
 	body, err := json.Marshal(embedRequest{Model: p.ModelName, Input: texts, InputType: inputType})

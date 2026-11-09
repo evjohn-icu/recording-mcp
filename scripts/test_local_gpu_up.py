@@ -153,6 +153,18 @@ class GPUUpTests(unittest.TestCase):
         self.assertIn("nvidia-smi not found", proc.stderr)
         self.assertFalse((self.artifacts / "probe.json").exists(), "preflight must stop before the probe")
 
+    def test_env_file_permissions_fail_with_clean_error(self):
+        # die() must be defined before the .env validation block; a broken
+        # ordering turns this into "die: command not found" (exit 127).
+        env_file = self.root / ".env"
+        env_file.write_text("")
+        env_file.chmod(0o644)
+        proc = self.run_launcher("--env-file", str(env_file), "--no-build",
+                                 LOCAL_GPU_UP_TEST_MODE="0")
+        self.assertEqual(proc.returncode, 1, proc.stderr)
+        self.assertIn("env file must not be group/world accessible", proc.stderr)
+        self.assertNotIn("command not found", proc.stderr)
+
     def test_preflight_rejects_low_vram(self):
         proc = self.run_launcher("--profile", "fixture", "--backend", "qwen", "--no-build",
                                  STUB_VRAM_FREE="1024")

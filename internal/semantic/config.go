@@ -27,6 +27,9 @@ type Config struct {
 	// IndexPath opts in to a rebuildable pure-Go HNSW sidecar. Empty keeps the
 	// exact SQLite scan backend.
 	IndexPath string
+	// InputTypeField sends the non-standard input_type field. Only the bundled
+	// Qwen embedding server needs it; strict OpenAI endpoints reject it.
+	InputTypeField bool
 }
 
 // ProviderFromConfig returns the embedding provider named by cfg. It returns
@@ -57,7 +60,7 @@ func ProviderFromConfig(cfg Config) (Provider, error) {
 		// memory_embeddings rows are keyed by the exact dims the server filters
 		// on; a mismatched endpoint fails loudly at embed time instead of
 		// silently poisoning the index.
-		return OpenAICompatProvider{Endpoint: endpoint, APIKey: key, ModelName: model, Dimensions: cfg.Dims}, nil
+		return OpenAICompatProvider{Endpoint: endpoint, APIKey: key, ModelName: model, Dimensions: cfg.Dims, SendInputType: cfg.InputTypeField}, nil
 	default:
 		return nil, fmt.Errorf("unsupported semantic provider %q (want off, hash, or openai)", strings.TrimSpace(cfg.Provider))
 	}

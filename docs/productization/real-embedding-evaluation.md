@@ -28,9 +28,11 @@ PYTHONPATH="$TMPDIR/jev-tf" .venv-asr/bin/python scripts/decision-local-server.p
 python3 scripts/run-retrieval-quality-v2.py --binary bin/context-eval \
   --out docs/evals/sprint3-real-embedding \
   --embed-endpoint http://127.0.0.1:8790/v1/embeddings \
-  --embed-model Qwen/Qwen3-Embedding-0.6B --embed-dims 1024 \
+  --embed-model Qwen/Qwen3-Embedding-0.6B --embed-dims 1024 --embed-input-type \
   --assessor-url http://127.0.0.1:8791/v1/systemone --assessor-model decision-v3-0.8b
 ```
+
+`--embed-input-type` 仅对内置 Qwen 服务发送 `input_type`（query 指令）；默认不发送，避免严格 OpenAI 兼容端点因未知字段返回 400。
 
 ## 结果
 
