@@ -83,9 +83,9 @@
     },
     {
       "command": "RUN_DOCKER_DEPLOYMENT_TEST=1 python3 -m unittest scripts.test_productization_deploy -v",
-      "status": "NOT_RUN",
-      "evidence": "",
-      "reason_if_not_run": "Docker registry unreachable through the configured proxy; no deployment image can be pulled or built"
+      "status": "PASS",
+      "evidence": "6/6 deployment tests OK in 72.9s using local recording-mcp:beta and base images (no registry pull)",
+      "reason_if_not_run": ""
     },
     {
       "command": "python3 scripts/run-product-browser.py",

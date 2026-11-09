@@ -39,7 +39,7 @@
 | `npm run typecheck --prefix web` | 退出 0 |
 | `npm run build --prefix web` | 退出 0 |
 | `python3 -m unittest discover -s scripts -p 'test_*.py' -v` | 退出 0；93 tests, OK (skipped=8) |
-| `RUN_DOCKER_DEPLOYMENT_TEST=1 python3 -m unittest scripts.test_productization_deploy -v` | NOT_RUN：Docker daemon 可连但镜像仓库代理不可达，无法拉取部署镜像 |
+| `RUN_DOCKER_DEPLOYMENT_TEST=1 python3 -m unittest scripts.test_productization_deploy -v` | 基线时 NOT_RUN：镜像仓库代理不可达。步骤 5 用本地已有镜像重跑，6/6 通过（72.9 s） |
 | `python3 scripts/run-product-browser.py` | NOT_RUN：基线轮未执行浏览器套件（Sprint 3 在步骤 4.3/5.2 执行） |
 
 ## 模块分类

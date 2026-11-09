@@ -57,7 +57,7 @@ python3 scripts/long-audio-reliability.py --mode synthetic
 | T1-ark | 120 s | ARK-ASR 0.6B float16 | 5 | 120 000 ms | 0.177 | 3338 MiB | PASS |
 | T2 | 36.95 min（拼接） | Qwen3-ASR 1.7B float16 | 80 | 2 216 891 ms | 0.034 | 5398 MiB | PASS |
 
-T1 的墙钟包含模型加载与 ffmpeg 解码；RTF 是墙钟/音频时长。T2 的 80 个窗口全部完成，窗口覆盖 2 216 891 ms 等于拼接时长；按轮次区间统计只有 722 891 ms，因为 54 个窗口没有非空文本（静音/无语音），这正说明覆盖必须来自窗口记账而不是 turn 区间。
+T1 的墙钟包含模型加载与 ffmpeg 解码；RTF 是墙钟/音频时长。T2 的 80 个窗口全部完成，窗口覆盖 2 216 891 ms 等于拼接时长；按轮次区间统计只有 722 891 ms，因为 54 个窗口没有非空文本。这不是零填充：拼接 WAV 实测 `mean_volume=-35.7 dB, max_volume=-0.7 dB`，`silencedetect=-40dB:5s` 找到 51 段、共 590 s 低电平区间——该录音本身低语音密度，空窗口与静音/无语音一致。RTF 0.034 因此主要反映空窗口快速结束，不代表满语音吞吐；满语音参考是 T1 的 0.24。
 
 ### 五次连续导入（SMART-01 验收）
 
