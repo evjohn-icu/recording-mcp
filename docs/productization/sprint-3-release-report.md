@@ -10,7 +10,7 @@
 | SMART-02 | 长录音可靠转写 | 2 h 故障注入中断后只补未完成窗口；覆盖=时长；无重复活跃片段；OOM/超时动作 | T3 2 h：258/258 窗口、覆盖 7 200 000 ms、2 次 SIGKILL、无重复；T4–T10 PASS | PASS（真实 2 h 本机 ASR 未运行） | `long-audio-reliability.md` |
 | SMART-03 | 真实中文 embedding 评估 | 角色化边界；本地服务；冻结门禁；未通过不换默认 | 见 C 节 | 真实 embedding 校准未通过门禁（误报率 0.95、p95 超 1.5×、v2-openai 召回低于 v1）；未创建 holdout lock，默认保持 v1 + hash | `real-embedding-evaluation.md`、`docs/evals/sprint3-real-embedding/` |
 | SMART-04 | 证据充分性可见 | 20 场景（≥5 不可回答）；三种状态；有效引用；UI 可核对 | 21 场景 21/21（11 不可回答）；浏览器 11/11 | PASS | `sufficiency-scenarios.md`、`artifacts/sufficiency/v1/results.json` |
-| SMART-05 | 发布验证 | 12 步演示；命令清单；真实回归 | 12/12 步通过（含重启持久化与 MCP 读取）；清单可机读；`go vet`、`go test`、`go test -race`、`make build`、`make spec-validate`、Web typecheck/build、Python 114 项、浏览器 13/13 与 11/11、Docker 部署 6/6 均通过 | PASS | `release-commands.json`、`artifacts/sprint3-demo/result.json` |
+| SMART-05 | 发布验证 | 12 步演示；命令清单；真实回归 | 12/12 步通过（含重启持久化、非空决策轨迹与 MCP 读取）；`go vet`、`go test`、`go test -race`、`make build`、`make spec-validate`、Web typecheck/build、Python 117 项、浏览器 13/13 与 11/11、Docker 6/6、Android 单测/APK、cloud-ingest 74 项均通过；e2e-cloud NOT_RUN（本机 wrangler 无进展） | PASS | `release-commands.json`、`artifacts/sprint3-demo/result.json` |
 
 ## B. 工程交付
 
@@ -94,6 +94,8 @@
 - SMART-04：21 个场景（11 不可回答）与三种状态 UI 均通过。
 - SMART-05：12 步演示全部通过，重启与 MCP 读取可复现。
 - 未发现数据完整性或 profile 隔离失败；默认仍是 v1 + hash。
+- 评审后修正了 embedding 左填充池化缺陷并重跑冻结评测（首轮数字作废，不引用）；v1-openai Recall@5 修正为 0.85，v2 候选仍未过门禁，结论不变。
+- 每一条 Sprint 3 提交均通过 `check_spec_test_map.py`（基线提交包含 29 个 pending 映射，随里程碑转 covered）。
 
 未完成/限制（逐项 `NOT_RUN` 及原因）：
 
