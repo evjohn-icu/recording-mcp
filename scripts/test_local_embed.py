@@ -57,7 +57,14 @@ class LocalEmbedProtocolTests(unittest.TestCase):
                         return
             except Exception:  # noqa: BLE001
                 time.sleep(0.1)
-        raise TimeoutError("local-embed did not become healthy")
+        cls.proc.terminate()
+        try:
+            cls.proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            cls.proc.kill()
+            cls.proc.wait(timeout=5)
+        detail = cls.proc.stderr.read()[-800:] if cls.proc.stderr else ""
+        raise TimeoutError(f"local-embed did not become healthy: {detail}")
 
     @classmethod
     def tearDownClass(cls):
