@@ -9,8 +9,8 @@
 | SMART-01 | 单命令离线 GPU 部署 | `--check` 真实模型探针；`--cycles 5` 五次干净关闭；五次连续本机 ASR 作业 | 探针 PASS（加载 10.4 s，峰值 2210 MiB）；五轮 PASS（冷启动 1.59–1.60 s，关闭 ≤254 ms）；short-jobs 5/5 | PASS | `artifacts/local-gpu/`、`gpu-deployment.md`、`artifacts/long-audio-reliability/results.json` |
 | SMART-02 | 长录音可靠转写 | 2 h 故障注入中断后只补未完成窗口；覆盖=时长；无重复活跃片段；OOM/超时动作 | T3 2 h：258/258 窗口、覆盖 7 200 000 ms、2 次 SIGKILL、无重复；T4–T10 PASS | PASS（真实 2 h 本机 ASR 未运行） | `long-audio-reliability.md` |
 | SMART-03 | 真实中文 embedding 评估 | 角色化边界；本地服务；冻结门禁；未通过不换默认 | 见 C 节 | 真实 embedding 校准未通过门禁（误报率 0.95、p95 超 1.5×、v2-openai 召回低于 v1）；未创建 holdout lock，默认保持 v1 + hash | `real-embedding-evaluation.md`、`docs/evals/sprint3-real-embedding/` |
-| SMART-04 | 证据充分性可见 | 20 场景（≥5 不可回答）；三种状态；有效引用；UI 可核对 | 21 场景 21/21（11 不可回答）；浏览器 11/11 | PASS | `sufficiency-scenarios.md`、`artifacts/sufficiency/v1/results.json` |
-| SMART-05 | 发布验证 | 12 步演示；命令清单；真实回归 | 12/12 步通过（含重启持久化、非空决策轨迹与 MCP 读取）；`go vet`、`go test`、`go test -race`、`make build`、`make spec-validate`、Web typecheck/build、Python 117 项、浏览器 13/13 与 11/11、Docker 6/6、Android 单测/APK、cloud-ingest 74 项、e2e-cloud 10/10 场景均通过 | PASS | `release-commands.json`、`artifacts/sprint3-demo/result.json` |
+| SMART-04 | 证据充分性可见 | 20 场景（≥5 不可回答）；三种状态；有效引用；UI 可核对 | 21 场景 21/21（11 不可回答）；浏览器 12/12 | PASS | `sufficiency-scenarios.md`、`artifacts/sufficiency/v1/results.json` |
+| SMART-05 | 发布验证 | 12 步演示；命令清单；真实回归 | 12/12 步通过（含重启持久化、非空决策轨迹与 MCP 读取）；`go vet`、`go test`、`go test -race`、`make build`、`make spec-validate`、Web typecheck/build、Python 117 项、浏览器 14/14 与 12/12、Docker 6/6、Android 单测/APK、cloud-ingest 74 项、e2e-cloud 10/10 场景均通过 | PASS | `release-commands.json`、`artifacts/sprint3-demo/result.json` |
 
 ## B. 工程交付
 

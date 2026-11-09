@@ -695,14 +695,6 @@ export function DetailPage() {
                 <summary>诊断（实验）</summary>
                 <div className="diagnostics-body">
                   <p>语义索引：{INDEXING_LABELS[data.processing.indexing_status] || data.processing.indexing_status}</p>
-                  {data.processing.asr_state && data.processing.asr_state !== 'none' && (
-                    <p data-testid="asr-coverage">
-                      转写覆盖：{data.processing.asr_completed_chunks ?? 0}/{data.processing.asr_expected_chunks ?? 0} 窗口
-                      {data.processing.asr_state === 'partial' ? '（部分完成）' : ''}
-                      {`（${formatDuration(data.processing.asr_coverage_ms ?? 0)}/${formatDuration(data.processing.asr_duration_ms ?? 0)}）`}
-                      {data.processing.asr_last_error ? `：${data.processing.asr_last_error}` : ''}
-                    </p>
-                  )}
                   <p>未分类轮次：{data.processing.unclassified_turns}</p>
                   <p>环境音轮次：{data.processing.ambient_turns}</p>
                   <p>身份未确认轮次：{data.processing.identity_unconfirmed_turns}</p>
@@ -729,6 +721,15 @@ export function DetailPage() {
                   })()}
                   <span>{processing.generator_enabled ? '候选生成器已启用' : processing.worker_alive ? '候选生成器已关闭' : '候选生成器状态未知'}</span>
                 </header>
+                  {data.processing.asr_state && data.processing.asr_state !== 'none' && (
+                    <p data-testid="asr-coverage">
+                      转写覆盖：{data.processing.asr_completed_chunks ?? 0}/{data.processing.asr_expected_chunks ?? 0} 窗口
+                      {data.processing.asr_state === 'partial' ? '（部分完成）' : ''}
+                      {`（${formatDuration(data.processing.asr_coverage_ms ?? 0)}/${formatDuration(data.processing.asr_duration_ms ?? 0)}）`}
+                      {data.processing.asr_last_error ? `：${data.processing.asr_last_error}` : ''}
+                    </p>
+                  )}
+
                 <ol className="processing-phases" data-testid="processing-phases">
                   {(processing.phases ?? []).map((phase) => (
                     <li key={phase.name} data-testid={`phase-${phase.name}`} data-state={phase.state} className={`phase phase-${phase.state}`.trim()}>

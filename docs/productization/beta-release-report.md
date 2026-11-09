@@ -9,7 +9,7 @@
 - 可理解的进度：`ProcessingSnapshot.phases/current_stage/asr_available/worker_alive`，失败阶段带 `error_code/error_action`。
 - 决策轨迹：Worldline + 事件平面确定性投影六态；人工确认/拒绝/重新打开；来源失效与遗忘降级。
 - MCP：只新增只读 `get_decision_trail`（`decision-trail-v1`），并修复 profile 模式事件平面路径。
-- 质量：产品浏览器 13/13、决策浏览器 14/14、MCP 15 项、导入 9 项、检索 4 份指标。
+- 质量：产品浏览器 14/14、决策浏览器 14/14、MCP 15 项、导入 9 项、检索 4 份指标。
 
 不重写 Event Plane、Worldline、ASR Pipeline、检索主体或 ingest-v1；默认检索版本仍为 v1。
 
@@ -20,7 +20,7 @@
 | SMART-01 部署 | 容器 + 健康 + 备份恢复 | 镜像构建成功；`docker compose config` 通过；部署测试 6 项 | PASS（见 C） | `Dockerfile`、`docker-compose.yml`、`docs/productization/deployment-verification.md` |
 | SMART-02 导入/进度 | 8 场景 + 阶段投影 | 9 个 Go 测试（含真实 ffmpeg 格式） | PASS | `internal/ingest/import_test.go`、`internal/app/processing_test.go` |
 | SMART-03 音频 E2E | synthetic 三段 + real NOT_RUN | 3/25/120 分钟三段跑通 | PASS（synthetic） | `docs/productization/real-audio-e2e.md` |
-| SMART-04 Web 工作流 | 8 步 + 刷新/移动/无错误 | 13/13 检查 | PASS | `artifacts/product-browser/product-workflow-results.json` |
+| SMART-04 Web 工作流 | 8 步 + 刷新/移动/无错误 | 14/14 检查 | PASS | `artifacts/product-browser/product-workflow-results.json` |
 | SMART-05 检索 | 4 配置 + 报告 + 默认 v1 | 指标与泄漏已记录 | PASS（真实模型 NOT_RUN） | `docs/productization/retrieval-quality-report.md` |
 | SMART-06 决策后端 | 24 个具名断言 | 24/24 | PASS | `internal/app/decision_trail_scenarios_test.go` |
 | SMART-07 决策 Web | 8 项 + 4 附加 | 14/14 | PASS | `scripts/decision-trail-browser.py` |
@@ -36,7 +36,7 @@
 - `go test -race -count=1` 于 `internal/app`、`internal/ingest`、`internal/web`、`internal/worker`、`internal/process`、`internal/memory`、`internal/migrations`、`internal/profile`、`cmd/context-*` — 退出 0。
 - `python3 scripts/run-local-browser-tests.py` — 退出 0（既有合成浏览器套件）。
 - `make build`、`make spec-validate` — 通过。
-- `python3 scripts/run-product-browser.py` — 13/13。
+- `python3 scripts/run-product-browser.py` — 14/14。
 - `python3 scripts/product-audio-e2e.py --mode synthetic` — PASS：148 音频分钟、148 turns、零覆盖缺口、13.29 秒 wall time。
 - `python3 scripts/beta-demo.py` — 10/10。
 - `RUN_DOCKER_DEPLOYMENT_TEST=1 python3 -m unittest ... test_productization_deploy.py` — 6/6（最终复跑 25.4 秒），见 `deployment-verification.md`。

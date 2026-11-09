@@ -1137,6 +1137,10 @@ code,
     width: 100%;
   }
 
+  .search-input-label {
+    flex: 0 1 auto;
+  }
+
   .modal-backdrop {
     align-items: safe center;
     padding: max(0.5rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right)) max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));

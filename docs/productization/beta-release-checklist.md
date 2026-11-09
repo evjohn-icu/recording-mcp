@@ -26,7 +26,7 @@
 | SMART-01 部署 | `Dockerfile`、`docker-compose.yml`、`scripts/docker-profile-init.sh`、`docs/productization/deployment*.md` | `docker compose config`、`RUN_DOCKER_DEPLOYMENT_TEST=1` 的 6 项检查 |
 | SMART-02 导入/进度 | `internal/ingest`、`POST /api/imports`、`GET /api/capabilities`、`phases` 投影 | `internal/ingest/import_test.go` 9 项、`TestProcessingSnapshotProjectsPhases` |
 | SMART-03 音频 E2E | `scripts/product-audio-e2e.py`、`docs/productization/real-audio-e2e.md` | synthetic 三段结果；real 模式 `NOT_RUN` |
-| SMART-04 Web 工作流 | `ImportPanel`、阶段 UI、`run-product-browser.py` | `artifacts/product-browser/product-workflow-results.json` 13/13 |
+| SMART-04 Web 工作流 | `ImportPanel`、阶段 UI、`run-product-browser.py` | `artifacts/product-browser/product-workflow-results.json` 14/14 |
 | SMART-05 检索 | `fixtures/eval/product-review-v1/`、`retrieval-quality-report.md` | 4 份指标 JSON；默认仍 v1 |
 | SMART-06/07 决策 | `internal/app/decision_trail*.go`、决策面板 | 24 个场景子测试 + 浏览器 14/14 |
 | SMART-08 MCP | `get_decision_trail`、profile 事件平面修复 | 15 个 MCP 契约测试 |

@@ -70,6 +70,11 @@ async def test_product_workflow(page, base: str, wav: pathlib.Path, record) -> s
         await page.wait_for_timeout(500)
     detail_text = await page.locator(".processing-progress").inner_text()
     record("web-processing-phases", terminal, detail_text)
+    coverage = page.get_by_test_id("asr-coverage")
+    coverage_visible = await coverage.is_visible()
+    coverage_text = await coverage.inner_text() if coverage_visible else ""
+    record("web-asr-coverage", coverage_visible and "窗口" in coverage_text,
+           f"visible={coverage_visible} text={coverage_text[:120]}")
     await page.locator(".turn-row").first.wait_for(timeout=20000)
     transcript = await page.locator(".turn-row").first.inner_text()
     record("web-transcript-visible", "fixture transcript" in transcript, transcript[:160])
@@ -108,7 +113,8 @@ async def test_mobile_and_desktop_layout(page, base: str, conversation_url: str,
     await page.goto(conversation_url, wait_until="domcontentloaded")
     await page.get_by_test_id("processing-phases").wait_for(timeout=20000)
     overflow = await page.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
-    mobile_ok = overflow <= 1 and await page.get_by_test_id("import-panel").count() == 0
+    mobile_ok = (overflow <= 1 and await page.get_by_test_id("import-panel").count() == 0
+                 and await page.get_by_test_id("asr-coverage").is_visible())
     mobile_shot = out / "product-workflow-mobile.png"
     await page.screenshot(path=str(mobile_shot), full_page=True)
     screenshots.append(str(mobile_shot))

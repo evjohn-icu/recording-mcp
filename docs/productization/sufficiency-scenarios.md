@@ -52,7 +52,7 @@ BROWSER_ARTIFACT_DIR=artifacts/sufficiency-browser BASE_URL=http://127.0.0.1:417
   python scripts/sufficiency-browser.py
 ```
 
-2026-11-09 本地运行：11/11 检查通过；截图写入运行时的 `BROWSER_ARTIFACT_DIR`（本机为临时目录，`artifacts/` 不入库），发布报告记录命令与检查数。
+2026-11-09 本地运行：12/12 检查通过（新增 390px 移动布局检查，断言无横向溢出且面板可见）；截图写入运行时的 `BROWSER_ARTIFACT_DIR`（本机为临时目录，`artifacts/` 不入库），发布报告记录命令与检查数。
 
 ## 边界
 

@@ -93,13 +93,13 @@
     {
       "command": "python3 scripts/run-product-browser.py",
       "status": "PASS",
-      "evidence": "13/13 checks; run with a playwright 1.60.0 venv; artifacts in the run's artifact dir",
+      "evidence": "14/14 checks; run with a playwright 1.60.0 venv; artifacts in the run's artifact dir",
       "reason_if_not_run": ""
     },
     {
       "command": "python3 scripts/sufficiency-browser.py",
       "status": "PASS",
-      "evidence": "11/11 checks; run with a playwright 1.60.0 venv; screenshot in BROWSER_ARTIFACT_DIR",
+      "evidence": "12/12 checks; run with a playwright 1.60.0 venv; desktop and mobile screenshots in BROWSER_ARTIFACT_DIR",
       "reason_if_not_run": ""
     },
     {

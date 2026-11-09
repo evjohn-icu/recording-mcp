@@ -126,6 +126,17 @@ async def test_sufficiency_panel(page, check) -> None:
     await page.locator(".search-results").wait_for(timeout=15000)
     check("sufficiency-v1-hidden", await page.get_by_test_id("sufficiency-panel").count() == 0)
 
+    await page.set_viewport_size({"width": 390, "height": 844})
+    await open_case("sufficient-case")
+    overflow = await page.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
+    mobile_panel = page.get_by_test_id("sufficiency-panel")
+    keyword_height = await page.locator(".search-input-label").evaluate("e => e.getBoundingClientRect().height")
+    check("sufficiency-mobile-layout", overflow <= 1 and await mobile_panel.is_visible() and keyword_height <= 80,
+          f"overflow={overflow} keyword-label-height={keyword_height}")
+    mobile_shot = OUT / "sufficiency-panel-mobile.png"
+    await page.screenshot(path=str(mobile_shot), full_page=True)
+    await page.set_viewport_size({"width": 1280, "height": 900})
+
     screenshot = OUT / "sufficiency-panel.png"
     await page.goto(f"{BASE}/search?q=sufficient-case&hybrid=1&retrieval_version=v2", wait_until="domcontentloaded")
     await page.get_by_test_id("sufficiency-panel").wait_for(timeout=15000)
