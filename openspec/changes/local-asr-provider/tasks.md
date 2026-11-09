@@ -7,4 +7,6 @@
 - [x] Unit tests: mapping, float16 flags, runner failure, invalid output, provider selection, probe.
 - [x] Real-model smoke: run both checkpoints on a speech sample and record the transcript
   (`docs/productization/local-asr-smoke.md`, 2026-11-09, RTX 2070, float16).
+- [x] Score a real 120 s recording against an existing transcript: Qwen CER 5.6%, ARK 10.4%
+  (`docs/productization/real-audio-local-asr.md`; audio/transcript not committed).
 - [x] Document install, download, flags, VRAM and limitations (`docs/productization/local-asr.md`).
