@@ -32,7 +32,8 @@ while True: time.sleep(1)
 import os,signal,sys,time
 open(os.environ['ARGS_LOG'],'a').write('web '+ ' '.join(sys.argv[1:])+'\\n')
 signal.signal(signal.SIGTERM, lambda *_: (open(os.environ['STOP_MARKER'],'w').write('stopped'), sys.exit(0)))
-if os.environ['FAIL_CHILD']=='web': sys.exit(9)
+if os.environ['FAIL_CHILD']=='web':
+ time.sleep(.3); sys.exit(9)
 while True: time.sleep(1)
 """,
             }
