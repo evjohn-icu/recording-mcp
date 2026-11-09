@@ -1,0 +1,199 @@
+{
+  "description": "Release command accounting for Sprint 3. PASS/FAIL require evidence; NOT_RUN requires a reason. Validated by scripts/test_release_commands.py.",
+  "updated_at": "2026-11-09",
+  "required": [
+    "go vet ./...",
+    "go test -count=1 ./...",
+    "go test -race -count=1 ./...",
+    "make build",
+    "make spec-validate",
+    "npm run typecheck --prefix web",
+    "npm run build --prefix web",
+    "python3 -m unittest discover -s scripts -p 'test_*.py' -v",
+    "RUN_DOCKER_DEPLOYMENT_TEST=1 python3 -m unittest scripts.test_productization_deploy -v",
+    "python3 scripts/run-product-browser.py",
+    "python3 scripts/sufficiency-browser.py",
+    "RUN_SPRINT3_DEMO=1 python3 -m unittest scripts.test_sprint3_demo -v"
+  ],
+  "narrow_required": [
+    "go test ./internal/cloudsync -count=1",
+    "go test ./internal/ingest -count=1",
+    "go test ./internal/semantic -count=1",
+    "go test ./internal/contextbuild -run TestSufficiencyScenarios -count=1",
+    "go test ./internal/app -run TestCapabilities|TestDecisionTrailSufficiencyScenarios -count=1",
+    "go test ./internal/migrations -count=1",
+    "python3 -m unittest scripts.test_local_asr -v",
+    "python3 -m unittest scripts.test_local_gpu_up -v",
+    "python3 -m unittest scripts.test_local_embed -v",
+    "python3 -m unittest scripts.test_model_pins -v",
+    "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root /tmp/sprint3/profiles --backend ark --check",
+    "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root /tmp/sprint3/profiles --backend ark --cycles 5 --no-build",
+    "python3 scripts/long-audio-reliability.py --mode synthetic",
+    "python3 scripts/long-audio-reliability.py --mode real",
+    "python3 scripts/run-retrieval-quality-v2.py --binary bin/context-eval --out docs/evals/sprint3-real-embedding"
+  ],
+  "commands": [
+    {
+      "command": "go vet ./...",
+      "status": "PASS",
+      "evidence": "exit 0",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "go test -count=1 ./...",
+      "status": "PASS",
+      "evidence": "exit 0; 40 packages ok (see /tmp/sprint3/final-test.log)",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "go test -race -count=1 ./...",
+      "status": "PASS",
+      "evidence": "exit 0",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "make build",
+      "status": "PASS",
+      "evidence": "exit 0; 16 binaries",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "make spec-validate",
+      "status": "PASS",
+      "evidence": "15 passed, 0 failed; scenario map OK (155 scenarios, one legacy pending)",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "npm run typecheck --prefix web",
+      "status": "PASS",
+      "evidence": "exit 0",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "npm run build --prefix web",
+      "status": "PASS",
+      "evidence": "vite build ok",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "python3 -m unittest discover -s scripts -p 'test_*.py' -v",
+      "status": "PASS",
+      "evidence": "114 tests, OK (skipped=9)",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "RUN_DOCKER_DEPLOYMENT_TEST=1 python3 -m unittest scripts.test_productization_deploy -v",
+      "status": "NOT_RUN",
+      "evidence": "",
+      "reason_if_not_run": "Docker registry unreachable through the configured proxy; no deployment image can be pulled or built"
+    },
+    {
+      "command": "python3 scripts/run-product-browser.py",
+      "status": "PASS",
+      "evidence": "13/13 checks; run with /tmp/sprint3/pwenv/bin/python (playwright 1.60.0); artifacts /tmp/sprint3/product-browser",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "python3 scripts/sufficiency-browser.py",
+      "status": "PASS",
+      "evidence": "11/11 checks; run with /tmp/sprint3/pwenv/bin/python; screenshot /tmp/sprint3/browser/sufficiency-panel.png",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "RUN_SPRINT3_DEMO=1 python3 -m unittest scripts.test_sprint3_demo -v",
+      "status": "PASS",
+      "evidence": "12/12 steps PASS in 44s; artifacts/sprint3-demo/result.json",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "go test ./internal/cloudsync -count=1",
+      "status": "PASS",
+      "evidence": "ok recordingmcp/internal/cloudsync",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "go test ./internal/ingest -count=1",
+      "status": "PASS",
+      "evidence": "ok recordingmcp/internal/ingest",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "go test ./internal/semantic -count=1",
+      "status": "PASS",
+      "evidence": "ok recordingmcp/internal/semantic",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "go test ./internal/contextbuild -run TestSufficiencyScenarios -count=1",
+      "status": "PASS",
+      "evidence": "21/21 scenarios; artifacts/sufficiency/v1/results.json",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "go test ./internal/app -run TestCapabilities|TestDecisionTrailSufficiencyScenarios -count=1",
+      "status": "PASS",
+      "evidence": "capabilities + 3 decision-trail subtests",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "go test ./internal/migrations -count=1",
+      "status": "PASS",
+      "evidence": "v22 upgrade and fresh-schema assertions pass",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "python3 -m unittest scripts.test_local_asr -v",
+      "status": "PASS",
+      "evidence": "10/10",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "python3 -m unittest scripts.test_local_gpu_up -v",
+      "status": "PASS",
+      "evidence": "7/7",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "python3 -m unittest scripts.test_local_embed -v",
+      "status": "PASS",
+      "evidence": "3/3",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "python3 -m unittest scripts.test_model_pins -v",
+      "status": "PASS",
+      "evidence": "3/3",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root /tmp/sprint3/profiles --backend ark --check",
+      "status": "PASS",
+      "evidence": "probe ok: load=10402ms vram_total=8191MiB vram_free=4804MiB vram_peak=2210MiB",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root /tmp/sprint3/profiles --backend ark --cycles 5 --no-build",
+      "status": "PASS",
+      "evidence": "5/5 cycles; cold start 1588-1873ms; shutdown 252-254ms; artifacts/local-gpu/startup.json",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "python3 scripts/long-audio-reliability.py --mode synthetic",
+      "status": "PASS",
+      "evidence": "T3 2h: 258/258 windows, coverage=duration, 2 SIGKILL restarts; merged with T1/T2 in results.json",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "python3 scripts/long-audio-reliability.py --mode real",
+      "status": "PASS",
+      "evidence": "T1 qwen RTF 0.241/5398MiB, T1-ark RTF 0.182/3338MiB, T2 80/80 windows coverage=2216891ms RTF 0.034; artifacts/long-audio-reliability/results.json",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "python3 scripts/run-retrieval-quality-v2.py --binary bin/context-eval --out docs/evals/sprint3-real-embedding",
+      "status": "PASS",
+      "evidence": "calibration exit 0; manifest.json: no v2 candidate passed every gate; quality_gate_passed=false, default_changed=false, test_touched=false",
+      "reason_if_not_run": ""
+    }
+  ]
+}

@@ -156,6 +156,7 @@ jobs:
           for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
           cd ..
           BROWSER_ARTIFACT_DIR=artifacts/decision-browser BASE_URL=http://127.0.0.1:4173 python scripts/decision-trail-browser.py
+          BROWSER_ARTIFACT_DIR=artifacts/sufficiency-browser BASE_URL=http://127.0.0.1:4173 python scripts/sufficiency-browser.py
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -163,6 +164,7 @@ jobs:
           path: |
             artifacts/product-browser/
             artifacts/decision-browser/
+            artifacts/sufficiency-browser/
           if-no-files-found: ignore
 
   docker-deployment:
