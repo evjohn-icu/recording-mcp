@@ -11,9 +11,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
+	"recordingmcp/internal/asrinput"
 	"recordingmcp/internal/cloudsync"
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/process"
@@ -352,26 +354,209 @@ func (s *Service) RunASRJob(ctx context.Context, job process.Job) (string, error
 	if strings.TrimSpace(s.resource) != "" {
 		meta.ResourceID = new(s.resource)
 	}
+	chunker, chunked := s.trans.(cloudsync.ChunkTranscriber)
+	if !chunked {
+		return s.runASRWholeFile(ctx, p, meta, pcmAbs)
+	}
+	durationMS := p.DurationMS
+	if info, statErr := os.Stat(pcmAbs); statErr == nil && info.Size() > 0 {
+		if computed := info.Size() / 32; computed > 0 {
+			durationMS = computed
+		}
+	}
+	windowMS, overlapMS := int64(30000), int64(0)
+	if planner, ok := s.trans.(interface{ WindowPlan() (int64, int64) }); ok {
+		windowMS, overlapMS = planner.WindowPlan()
+	}
+	plan, err := cloudsync.PlanWindows(durationMS, windowMS, overlapMS)
+	if err != nil {
+		return "", &Error{Code: "asr_plan_failed", Message: "无法规划转写窗口", Action: "检查 --asr-window-ms/--asr-overlap-ms 配置", FatalFlag: true, Err: err}
+	}
+	// source_attachments is the checkpoint: an active attachment for the
+	// current revision means that window is already paid for.
+	existing, intervals, err := s.loadASRWindows(ctx, memory.RecordingID(p.DeviceID, p.ProviderRecordingID), s.revision)
+	if err != nil {
+		return "", &Error{Code: "ingest_failed", Message: "无法读取已提交窗口", Err: err}
+	}
+	completed := 0
+	skip := make([]int, 0, len(plan))
+	for _, window := range plan {
+		if existing[window.Index] {
+			completed++
+			skip = append(skip, window.Index)
+		}
+	}
+	coverage := unionCoverage(intervals)
+	if completed == len(plan) && len(plan) > 0 {
+		if _, err := s.db.ExecContext(ctx, `UPDATE sync_recordings SET total_chunks=?, completed_chunks=?, coverage_ms=?, state='ingested', transcription_state='done', last_error=NULL, updated_at=? WHERE recording_id=?`,
+			len(plan), completed, coverage, s.now().UnixMilli(), p.ProviderRecordingID); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("asr:%d", completed), nil
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE sync_recordings SET total_chunks=?, completed_chunks=?, coverage_ms=?, transcription_state='partial', last_error=NULL, updated_at=? WHERE recording_id=?`,
+		len(plan), completed, coverage, s.now().UnixMilli(), p.ProviderRecordingID); err != nil {
+		return "", err
+	}
+	err = chunker.TranscribeChunks(ctx, pcmAbs, meta, skip, func(result asrinput.Result) error {
+		if _, err := s.store.IngestTranscript(ctx, result); err != nil {
+			return err
+		}
+		if index := windowIndex(result.Source.SegmentID); index > 0 {
+			existing[index] = true
+		}
+		intervals = append(intervals, [2]int64{result.Source.SegmentOffsetMS, result.Source.SegmentOffsetMS + result.Source.SegmentDurationMS})
+		completed++
+		coverage = unionCoverage(intervals)
+		s.updateASRProgress(context.WithoutCancel(ctx), p.ProviderRecordingID, completed, coverage)
+		return nil
+	})
+	if err != nil {
+		if ctx.Err() != nil {
+			// Cancellation keeps transcription_state='partial' so a restart
+			// resumes instead of treating committed windows as failed work.
+			return "", err
+		}
+		s.markASRFailedWithProgress(context.WithoutCancel(ctx), p.ProviderRecordingID, completed, err)
+		code, message, action := s.asrFailureDetails(err)
+		return "", &Error{Code: code, Message: message, Action: action, Err: err}
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE sync_recordings SET total_chunks=?, completed_chunks=?, coverage_ms=?, state='ingested', transcription_state='done', last_error=NULL, updated_at=? WHERE recording_id=?`,
+		len(plan), completed, coverage, s.now().UnixMilli(), p.ProviderRecordingID); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("asr:%d", completed), nil
+}
+
+// runASRWholeFile keeps the all-at-once path for providers without window
+// callbacks (doubao, fixture) and still records the progress projection.
+func (s *Service) runASRWholeFile(ctx context.Context, p asrPayload, meta cloudsync.MetaBasis, pcmAbs string) (string, error) {
 	results, err := s.trans.Transcribe(ctx, pcmAbs, meta)
 	if err != nil {
 		s.markASRFailed(context.WithoutCancel(ctx), p.ProviderRecordingID, err)
-		action := "检查 ASR 凭据与网络后重试"
-		switch s.provider {
-		case "ark", "qwen", "local":
-			action = "确认 .venv-asr 可用、本地模型已下载且 GPU 显存足够后重试"
-		}
-		return "", &Error{Code: "asr_failed", Message: "语音转写失败", Action: action, Err: err}
+		code, message, action := s.asrFailureDetails(err)
+		return "", &Error{Code: code, Message: message, Action: action, Err: err}
 	}
+	intervals := make([][2]int64, 0, len(results))
 	for _, result := range results {
 		if _, err := s.store.IngestTranscript(ctx, result); err != nil {
 			s.markASRFailed(context.WithoutCancel(ctx), p.ProviderRecordingID, err)
 			return "", &Error{Code: "ingest_failed", Message: "转写结果写入失败", Err: err}
 		}
+		intervals = append(intervals, [2]int64{result.Source.SegmentOffsetMS, result.Source.SegmentOffsetMS + result.Source.SegmentDurationMS})
 	}
-	if _, err := s.db.ExecContext(ctx, `UPDATE sync_recordings SET state='ingested', transcription_state='done', last_error=NULL, updated_at=? WHERE recording_id=?`, s.now().UnixMilli(), p.ProviderRecordingID); err != nil {
+	if _, err := s.db.ExecContext(ctx, `UPDATE sync_recordings SET state='ingested', transcription_state='done', total_chunks=?, completed_chunks=?, failed_chunks=0, coverage_ms=?, last_error=NULL, updated_at=? WHERE recording_id=?`,
+		len(results), len(results), unionCoverage(intervals), s.now().UnixMilli(), p.ProviderRecordingID); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("asr:%d", len(results)), nil
+}
+
+// asrFailureDetails maps a typed runner error onto an actionable message. The
+// code lands in processing_attempts.error_json and the UI action line.
+func (s *Service) asrFailureDetails(err error) (code, message, action string) {
+	var runner *cloudsync.RunnerError
+	if errors.As(err, &runner) {
+		switch runner.Code {
+		case "asr_oom":
+			return "asr_oom", "GPU 显存不足", "显存不足：关闭其他 GPU 进程或改用 ARK/更小窗口后重试"
+		case "asr_model_load_failed":
+			return "asr_model_load_failed", "本机 ASR 模型加载失败", "确认钉住模型已下载（scripts/fetch-local-models.sh）后重试"
+		case "asr_timeout":
+			return "asr_timeout", "本机 ASR 超时", "检查 GPU 状态或调大 ASR_WINDOW_TIMEOUT 后重试"
+		}
+	}
+	action = "检查 ASR 凭据与网络后重试"
+	if cloudsync.IsLocalProvider(s.provider) {
+		action = "确认 .venv-asr 可用、本地模型已下载且 GPU 显存足够后重试"
+	}
+	return "asr_failed", "语音转写失败", action
+}
+
+func (s *Service) loadASRWindows(ctx context.Context, attachmentRecordingID, revision string) (map[int]bool, [][2]int64, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT segment_id, result_json FROM source_attachments WHERE recording_id=? AND transcript_revision=? AND active=1`, attachmentRecordingID, revision)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	indexes := map[int]bool{}
+	var intervals [][2]int64
+	for rows.Next() {
+		var segmentID, resultJSON string
+		if err := rows.Scan(&segmentID, &resultJSON); err != nil {
+			return nil, nil, err
+		}
+		if index := windowIndex(segmentID); index > 0 {
+			indexes[index] = true
+		}
+		var result asrinput.Result
+		if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
+			return nil, nil, fmt.Errorf("ingest: decode stored ASR window %s: %w", segmentID, err)
+		}
+		start, end := result.Source.SegmentOffsetMS, result.Source.SegmentOffsetMS+result.Source.SegmentDurationMS
+		if end > start {
+			intervals = append(intervals, [2]int64{start, end})
+		}
+	}
+	return indexes, intervals, rows.Err()
+}
+
+func windowIndex(segmentID string) int {
+	var index int
+	if _, err := fmt.Sscanf(segmentID, "segment-%d", &index); err != nil {
+		return 0
+	}
+	return index
+}
+
+// unionCoverage returns the length covered by at least one interval. Overlapping
+// windows must not be summed: coverage is a claim about audio, not work.
+func unionCoverage(intervals [][2]int64) int64 {
+	if len(intervals) == 0 {
+		return 0
+	}
+	ordered := append([][2]int64(nil), intervals...)
+	sort.Slice(ordered, func(i, j int) bool {
+		if ordered[i][0] == ordered[j][0] {
+			return ordered[i][1] < ordered[j][1]
+		}
+		return ordered[i][0] < ordered[j][0]
+	})
+	var total int64
+	current := ordered[0]
+	for _, interval := range ordered[1:] {
+		if interval[0] > current[1] {
+			total += current[1] - current[0]
+			current = interval
+			continue
+		}
+		if interval[1] > current[1] {
+			current[1] = interval[1]
+		}
+	}
+	return total + current[1] - current[0]
+}
+
+func (s *Service) updateASRProgress(ctx context.Context, providerRecordingID string, completed int, coverage int64) {
+	_, _ = s.db.ExecContext(ctx, `UPDATE sync_recordings SET completed_chunks=?, coverage_ms=?, updated_at=? WHERE recording_id=?`,
+		completed, coverage, s.now().UnixMilli(), providerRecordingID)
+}
+
+// markASRFailedWithProgress records a failed attempt without destroying the
+// committed progress: any committed window means the recording is partial and
+// resumable, not failed. failed_chunks counts the window that broke the run.
+func (s *Service) markASRFailedWithProgress(ctx context.Context, providerRecordingID string, completed int, cause error) {
+	state := "failed"
+	if completed > 0 {
+		state = "partial"
+	}
+	failedInc := ""
+	var runner *cloudsync.RunnerError
+	if errors.As(cause, &runner) && runner.Index > 0 {
+		failedInc = ", failed_chunks=failed_chunks+1"
+	}
+	_, _ = s.db.ExecContext(ctx, `UPDATE sync_recordings SET transcription_state=?`+failedInc+`, last_error=?, updated_at=? WHERE recording_id=?`,
+		state, cause.Error(), s.now().UnixMilli(), providerRecordingID)
 }
 
 func (s *Service) markASRFailed(ctx context.Context, providerRecordingID string, cause error) {
