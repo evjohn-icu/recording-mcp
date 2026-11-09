@@ -21,6 +21,12 @@ type Heartbeat struct {
 	GeneratorEnabled bool      `json:"generator_enabled"`
 	ASRProvider      string    `json:"asr_provider,omitempty"`
 	ASRAvailable     bool      `json:"asr_available"`
+	GPUName          string    `json:"gpu_name,omitempty"`
+	VRAMTotalMB      int       `json:"vram_total_mb"`
+	VRAMFreeMB       int       `json:"vram_free_mb"`
+	ASRDevice        string    `json:"asr_device,omitempty"`
+	ASRDtype         string    `json:"asr_dtype,omitempty"`
+	ASRError         string    `json:"asr_error,omitempty"`
 	EmbedProvider    string    `json:"embed_provider,omitempty"`
 	LastSeenAt       time.Time `json:"last_seen_at"`
 	Alive            bool      `json:"alive"`
@@ -31,7 +37,7 @@ func WriteHeartbeat(ctx context.Context, db *sql.DB, h Heartbeat, now time.Time)
 	if err != nil {
 		return err
 	}
-	_, err = db.ExecContext(ctx, `INSERT INTO worker_heartbeats(worker_id,pid,stages_json,generator_enabled,asr_provider,asr_available,embed_provider,last_seen_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(worker_id) DO UPDATE SET pid=excluded.pid,stages_json=excluded.stages_json,generator_enabled=excluded.generator_enabled,asr_provider=excluded.asr_provider,asr_available=excluded.asr_available,embed_provider=excluded.embed_provider,last_seen_at=excluded.last_seen_at`, h.WorkerID, h.PID, string(stages), boolInt(h.GeneratorEnabled), h.ASRProvider, boolInt(h.ASRAvailable), h.EmbedProvider, now.UnixMilli())
+	_, err = db.ExecContext(ctx, `INSERT INTO worker_heartbeats(worker_id,pid,stages_json,generator_enabled,asr_provider,asr_available,gpu_name,vram_total_mb,vram_free_mb,asr_device,asr_dtype,asr_error,embed_provider,last_seen_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(worker_id) DO UPDATE SET pid=excluded.pid,stages_json=excluded.stages_json,generator_enabled=excluded.generator_enabled,asr_provider=excluded.asr_provider,asr_available=excluded.asr_available,gpu_name=excluded.gpu_name,vram_total_mb=excluded.vram_total_mb,vram_free_mb=excluded.vram_free_mb,asr_device=excluded.asr_device,asr_dtype=excluded.asr_dtype,asr_error=excluded.asr_error,embed_provider=excluded.embed_provider,last_seen_at=excluded.last_seen_at`, h.WorkerID, h.PID, string(stages), boolInt(h.GeneratorEnabled), h.ASRProvider, boolInt(h.ASRAvailable), h.GPUName, h.VRAMTotalMB, h.VRAMFreeMB, h.ASRDevice, h.ASRDtype, h.ASRError, h.EmbedProvider, now.UnixMilli())
 	return err
 }
 
@@ -41,7 +47,7 @@ func RemoveHeartbeat(ctx context.Context, db *sql.DB, workerID string) error {
 }
 
 func ReadHeartbeats(ctx context.Context, db *sql.DB, now time.Time, staleAfter time.Duration) ([]Heartbeat, error) {
-	rows, err := db.QueryContext(ctx, `SELECT worker_id,pid,stages_json,generator_enabled,asr_provider,asr_available,embed_provider,last_seen_at FROM worker_heartbeats ORDER BY worker_id`)
+	rows, err := db.QueryContext(ctx, `SELECT worker_id,pid,stages_json,generator_enabled,asr_provider,asr_available,gpu_name,vram_total_mb,vram_free_mb,asr_device,asr_dtype,asr_error,embed_provider,last_seen_at FROM worker_heartbeats ORDER BY worker_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +58,9 @@ func ReadHeartbeats(ctx context.Context, db *sql.DB, now time.Time, staleAfter t
 		var raw string
 		var enabled, asrAvailable int
 		var stamp int64
-		if err := rows.Scan(&h.WorkerID, &h.PID, &raw, &enabled, &h.ASRProvider, &asrAvailable, &h.EmbedProvider, &stamp); err != nil {
+		if err := rows.Scan(&h.WorkerID, &h.PID, &raw, &enabled, &h.ASRProvider, &asrAvailable,
+			&h.GPUName, &h.VRAMTotalMB, &h.VRAMFreeMB, &h.ASRDevice, &h.ASRDtype, &h.ASRError,
+			&h.EmbedProvider, &stamp); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(raw), &h.Stages)

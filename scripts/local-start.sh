@@ -30,17 +30,36 @@ trap 'exit 143' TERM
 cd "$ROOT"
 # Generation stays off unless explicitly configured. Secrets are passed through
 # the worker's existing key-env mechanism, never expanded onto its command line.
-WORKER_ARGS=(--profile "$PROFILE" --profiles-root "$PROFILES_ROOT" --generator "${GENERATOR_PROVIDER:-off}" --embed-provider hash --asr-provider "${ASR_PROVIDER:-off}")
+# Embedding stays offline by default. "local" is the launcher-facing name for
+# an OpenAI-compatible local server; both processes must agree on the provider.
+EMBED_PROVIDER_ARG=${EMBED_PROVIDER:-hash}
+case "$EMBED_PROVIDER_ARG" in local) EMBED_PROVIDER_ARG=openai ;; esac
+SEMANTIC_PROVIDER_ARG=${SEMANTIC_PROVIDER:-${EMBED_PROVIDER:-hash}}
+case "$SEMANTIC_PROVIDER_ARG" in local) SEMANTIC_PROVIDER_ARG=openai ;; esac
+WORKER_ARGS=(--profile "$PROFILE" --profiles-root "$PROFILES_ROOT" --generator "${GENERATOR_PROVIDER:-off}" --embed-provider "$EMBED_PROVIDER_ARG" --asr-provider "${ASR_PROVIDER:-off}")
 if [ -n "${GENERATOR_ENDPOINT:-}" ]; then WORKER_ARGS+=(--generator-url "$GENERATOR_ENDPOINT"); fi
 if [ -n "${GENERATOR_MODEL:-}" ]; then WORKER_ARGS+=(--generator-model "$GENERATOR_MODEL"); fi
 if [ -n "${GENERATOR_KEY_ENV:-}" ]; then WORKER_ARGS+=(--generator-key-env "$GENERATOR_KEY_ENV"); fi
-WEB_ARGS=(--profile "$PROFILE" --profiles-root "$PROFILES_ROOT" --addr "127.0.0.1:$PORT" --web-dir "$ROOT/web/dist" --semantic-provider hash --asr-provider "${ASR_PROVIDER:-off}")
+WEB_ARGS=(--profile "$PROFILE" --profiles-root "$PROFILES_ROOT" --addr "127.0.0.1:$PORT" --web-dir "$ROOT/web/dist" --semantic-provider "$SEMANTIC_PROVIDER_ARG" --asr-provider "${ASR_PROVIDER:-off}")
+for value in EMBED_ENDPOINT EMBED_MODEL EMBED_DIMS; do
+  if [ -n "${!value:-}" ]; then WORKER_ARGS+=("--${value,,}" "${!value}"); fi
+done
+if [ -n "${EMBED_KEY_ENV+set}" ]; then WORKER_ARGS+=(--embed-key-env "$EMBED_KEY_ENV"); fi
+for value in SEMANTIC_ENDPOINT SEMANTIC_MODEL SEMANTIC_DIMS; do
+  if [ -n "${!value:-}" ]; then WEB_ARGS+=("--${value,,}" "${!value}"); fi
+done
+if [ -n "${SEMANTIC_KEY_ENV+set}" ]; then WEB_ARGS+=(--semantic-key-env "$SEMANTIC_KEY_ENV"); fi
 # Local ASR settings must reach both processes so provider/config agree.
 if [ -n "${ASR_BACKEND:-}" ]; then WORKER_ARGS+=(--asr-backend "$ASR_BACKEND"); WEB_ARGS+=(--asr-backend "$ASR_BACKEND"); fi
 if [ -n "${ASR_MODEL:-}" ]; then WORKER_ARGS+=(--asr-model "$ASR_MODEL"); WEB_ARGS+=(--asr-model "$ASR_MODEL"); fi
 if [ -n "${ASR_PYTHON:-}" ]; then WORKER_ARGS+=(--asr-python "$ASR_PYTHON"); WEB_ARGS+=(--asr-python "$ASR_PYTHON"); fi
 if [ -n "${ASR_DEVICE:-}" ]; then WORKER_ARGS+=(--asr-device "$ASR_DEVICE"); WEB_ARGS+=(--asr-device "$ASR_DEVICE"); fi
 if [ -n "${ASR_REVISION:-}" ]; then WORKER_ARGS+=(--asr-revision "$ASR_REVISION"); WEB_ARGS+=(--asr-revision "$ASR_REVISION"); fi
+if [ -n "${ASR_TIMEOUT:-}" ]; then WORKER_ARGS+=(--asr-timeout "$ASR_TIMEOUT"); fi
+if [ -n "${ASR_LOAD_TIMEOUT:-}" ]; then WORKER_ARGS+=(--asr-load-timeout "$ASR_LOAD_TIMEOUT"); fi
+if [ -n "${ASR_WINDOW_TIMEOUT:-}" ]; then WORKER_ARGS+=(--asr-window-timeout "$ASR_WINDOW_TIMEOUT"); fi
+if [ -n "${ASR_LOCK:-}" ]; then WORKER_ARGS+=(--asr-lock "$ASR_LOCK"); fi
+if [ -n "${ASR_LOCK_TIMEOUT:-}" ]; then WORKER_ARGS+=(--asr-lock-timeout "$ASR_LOCK_TIMEOUT"); fi
 # Brief polishing is independent of memory generation and only reaches Web.
 if [ -n "${BRIEF_POLISH_PI_PROVIDER:-}" ]; then WEB_ARGS+=(--brief-polish-pi-provider "$BRIEF_POLISH_PI_PROVIDER"); fi
 if [ -n "${BRIEF_POLISH_PI_MODELS_FILE:-}" ]; then WEB_ARGS+=(--brief-polish-pi-models-file "$BRIEF_POLISH_PI_MODELS_FILE"); fi
@@ -52,6 +71,7 @@ if [ -n "${WORLDLINE_DECISION_MODEL:-}" ]; then WORKER_ARGS+=(--worldline-decisi
 if [ -n "${WORLDLINE_DECISION_URL:-}" ]; then WEB_ARGS+=(--worldline-decision-url "$WORLDLINE_DECISION_URL"); fi
 if [ -n "${WORLDLINE_DECISION_MODEL:-}" ]; then WEB_ARGS+=(--worldline-decision-model "$WORLDLINE_DECISION_MODEL"); fi
 if [ -n "${WORLDLINE_EVENTS_DB:-}" ]; then WORKER_ARGS+=(--worldline-events-db "$WORLDLINE_EVENTS_DB"); fi
+WORKER_ARGS+=(--health-addr "127.0.0.1:${WORKER_HEALTH_PORT:-$((PORT + 1))}")
 "$ROOT/bin/context-worker" "${WORKER_ARGS[@]}" &
 WORKER_PID=$!
 "$ROOT/bin/context-web" "${WEB_ARGS[@]}" &

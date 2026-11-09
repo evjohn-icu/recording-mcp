@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -77,3 +78,125 @@ class DryRunTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _FakeSlice:
+    def __init__(self, raw: bytes):
+        self.raw = raw
+
+    def tobytes(self) -> bytes:
+        return self.raw
+
+
+class _FakeSamples:
+    def __init__(self, path: str):
+        with open(path, "rb") as handle:
+            self.raw = handle.read()
+
+    def __getitem__(self, item):
+        return _FakeSlice(self.raw[item.start * 2:item.stop * 2])
+
+
+class FakeNumpy:
+    """Stands in for numpy.memmap so protocol tests never need the real wheel."""
+
+    def memmap(self, path, dtype, mode):
+        return _FakeSamples(path)
+
+
+class ProtocolTests(unittest.TestCase):
+    """Probe/stream/skip/timeout protocol; the model itself is faked."""
+
+    def setUp(self):
+        self.runner = load_runner()
+
+    def run_main(self, argv):
+        import contextlib
+        import io
+        from unittest import mock
+
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(sys, "argv", ["local-asr.py", *argv]), \
+             mock.patch.dict(sys.modules, {"numpy": FakeNumpy()}), \
+             contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            try:
+                code = self.runner.main()
+            except SystemExit as exc:
+                if isinstance(exc.code, int):
+                    code = exc.code
+                else:
+                    code = 1
+                    print(exc.code, file=err)
+        return code, out.getvalue(), err.getvalue()
+
+    def pcm(self, tmp, seconds):
+        path = pathlib.Path(tmp) / "audio.pcm"
+        path.write_bytes(b"\0" * (seconds * 1000 * 32))
+        return str(path)
+
+    def test_probe_prints_one_json_object(self):
+        self.runner.load_model_with_timeout = lambda args: ("ark", None)
+        code, out, _ = self.run_main(
+            ["--backend", "ark", "--device", "cpu", "--probe", "--load-timeout", "5"])
+        self.assertEqual(code, 0)
+        payload = json.loads(out)
+        self.assertEqual(payload["device"], "cpu")
+        self.assertEqual(payload["dtype"], "float16")
+        self.assertEqual(payload["vram_total_mb"], 0)
+        self.assertIn("model_load_ms", payload)
+        self.assertEqual(payload["revision"], self.runner.DEFAULT_REVISIONS["ark"])
+
+    def test_probe_load_failure_exits_4(self):
+        def boom(args):
+            raise RuntimeError("no CUDA device")
+
+        self.runner.load_model_with_timeout = boom
+        code, out, err = self.run_main(["--backend", "qwen", "--probe"])
+        self.assertEqual(code, 4)
+        self.assertEqual(out, "")
+        self.assertIn("model load failed: no CUDA device", err)
+
+    def test_stream_skips_committed_windows(self):
+        self.runner.load_model_with_timeout = lambda args: ("ark", None)
+        seen = []
+
+        def fake(args, handle, wav):
+            seen.append(os.path.basename(wav))
+            return "text", ""
+
+        self.runner.transcribe_window = fake
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out, _ = self.run_main([
+                "--backend", "ark", "--model", "unused", "--pcm", self.pcm(tmp, 31),
+                "--window-ms", "30000", "--overlap-ms", "2000", "--stream", "--skip", "2",
+                "--device", "cpu"])
+        self.assertEqual(code, 0)
+        lines = [json.loads(line) for line in out.splitlines() if line.strip()]
+        self.assertEqual([line["index"] for line in lines], [1])
+        self.assertEqual(lines[0]["text"], "text")
+        self.assertEqual(len(seen), 1)
+
+    def test_skip_outside_plan_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out, err = self.run_main([
+                "--backend", "ark", "--model", "unused", "--pcm", self.pcm(tmp, 31),
+                "--stream", "--skip", "7"])
+        self.assertNotEqual(code, 0)
+        self.assertIn("outside the", err)
+
+    def test_window_timeout_exits_5(self):
+        import time
+
+        self.runner.load_model_with_timeout = lambda args: ("ark", None)
+
+        def slow(args, handle, wav):
+            time.sleep(2)
+            return "", ""
+
+        self.runner.transcribe_window = slow
+        with tempfile.TemporaryDirectory() as tmp:
+            code, _, err = self.run_main([
+                "--backend", "ark", "--model", "unused", "--pcm", self.pcm(tmp, 4),
+                "--stream", "--device", "cpu", "--window-timeout", "1"])
+        self.assertEqual(code, 5)
+        self.assertIn("window timeout", err)

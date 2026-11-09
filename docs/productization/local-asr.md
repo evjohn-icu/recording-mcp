@@ -85,3 +85,19 @@ runner 也可单独运行，便于排查：
 - 模型加载按任务计费；长录音建议先用 `--asr-window-ms` 控制单窗口长度。
 - ARK 使用 `trust_remote_code=True`，模型代码以 worker 用户身份执行；runner 只继承 `PATH/HOME/CUDA/HF_*` 等白名单变量，不继承 API key 或 profile 密码。自定义模型必须显式固定 revision。
 - `scripts/local-start.sh` 会透传 `ASR_BACKEND/ASR_MODEL/ASR_PYTHON/ASR_DEVICE/ASR_REVISION`；compose 不转发这些变量。
+
+## 探针、流式与续跑（Sprint 3）
+
+runner 新增四个可观察行为，供启动器与长录音续跑使用：
+
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| `--probe` | 关 | 只加载模型，stdout 输出一行 JSON：`backend/model/revision/device/dtype/model_load_ms/vram_total_mb/vram_free_mb/vram_peak_mb`；不需要 `--pcm` |
+| `--stream` | 关 | 每个完成窗口输出一行 JSON（`index/start_ms/end_ms/text/language`）并立即 flush；不再输出最终文档 |
+| `--skip` | 空 | 逗号分隔的 1-based 窗口号；越界即报错，被跳过窗口不生成 WAV、不推断文本 |
+| `--load-timeout` | 300 秒 | 加载模型超时：守护线程内加载，超时或异常时退出码 4 |
+| `--window-timeout` | 300 秒 | 单窗口超时：`SIGALRM` 中断，退出码 5 |
+
+`--dry-run` 行为不变；`--pcm` 仅在 `--probe` 时可省略。窗口计划必须与 Go 的 `cloudsync.PlanWindows` 完全一致，由 `TestPlanWindowsMatchesRunnerDryRun` 锁定；否则 `--skip` 会跳过错误窗口。
+
+worker 侧新增 `--asr-timeout`（默认 2h）、`--asr-load-timeout`（5m）、`--asr-window-timeout`（5m）、`--asr-lock`、`--asr-lock-timeout`（10m）。`--asr-lock` 使用 `flock` 独占，避免 ASR 与本地 embedding 同时占用显存。`scripts/local-gpu-up.sh` 总是传入同一锁路径。

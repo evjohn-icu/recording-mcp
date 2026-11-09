@@ -98,6 +98,13 @@ export interface ProcessingStatus {
   identity_unconfirmed_turns: number
   analysis_status: AnalysisStatus
   indexing_status: IndexingStatus
+  asr_state?: string
+  asr_expected_chunks?: number
+  asr_completed_chunks?: number
+  asr_failed_chunks?: number
+  asr_coverage_ms?: number
+  asr_duration_ms?: number
+  asr_last_error?: string
 }
 
 export interface ProcessingJob {
@@ -106,6 +113,9 @@ export interface ProcessingJob {
 }
 export interface WorkerHeartbeat {
   worker_id: string; pid: number; stages: string[]; generator_enabled: boolean
+  asr_provider?: string; asr_available: boolean
+  gpu_name?: string; vram_total_mb: number; vram_free_mb: number
+  asr_device?: string; asr_dtype?: string; asr_error?: string
   last_seen_at: string; alive: boolean
 }
 export type PhaseState = 'pending' | 'running' | 'done' | 'failed' | 'skipped'
@@ -136,6 +146,12 @@ export interface ASRCapability {
   worker_available: boolean
   available: boolean
   reason?: string
+  gpu_name?: string
+  vram_total_mb: number
+  vram_free_mb: number
+  device?: string
+  dtype?: string
+  error?: string
 }
 export interface Capabilities {
   version: string
@@ -350,6 +366,10 @@ export interface ContextPackage {
   truncated: boolean
   degraded: boolean
   degrade_reason: string
+  sufficiency?: {
+    status: 'sufficient' | 'insufficient' | 'unknown' | string
+    evidence_refs: string[]
+  }
   trace: {
     lexical: { query: string; hit_ids: string[] }
     semantic: {

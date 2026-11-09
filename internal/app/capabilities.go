@@ -9,12 +9,20 @@ import (
 )
 
 // ASRCapability describes whether an upload can be transcribed right now.
+// GPU diagnostics come from the freshest live worker so the UI can explain a
+// degraded local runtime instead of only reporting a boolean.
 type ASRCapability struct {
 	Provider        string `json:"provider"`
 	Configured      bool   `json:"configured"`
 	WorkerAvailable bool   `json:"worker_available"`
 	Available       bool   `json:"available"`
 	Reason          string `json:"reason,omitempty"`
+	GPUName         string `json:"gpu_name,omitempty"`
+	VRAMTotalMB     int    `json:"vram_total_mb"`
+	VRAMFreeMB      int    `json:"vram_free_mb"`
+	Device          string `json:"device,omitempty"`
+	Dtype           string `json:"dtype,omitempty"`
+	Error           string `json:"error,omitempty"`
 }
 
 // GeneratorCapability reports whether candidate extraction is enabled.
@@ -71,7 +79,8 @@ func (s *Service) Capabilities(ctx context.Context) (Capabilities, error) {
 	if err != nil {
 		return Capabilities{}, err
 	}
-	for _, w := range workers {
+	var freshest *process.Heartbeat
+	for i, w := range workers {
 		if !w.Alive {
 			continue
 		}
@@ -83,14 +92,33 @@ func (s *Service) Capabilities(ctx context.Context) (Capabilities, error) {
 		if w.ASRAvailable {
 			out.ASR.WorkerAvailable = true
 		}
+		if freshest == nil || w.LastSeenAt.After(freshest.LastSeenAt) {
+			freshest = &workers[i]
+		}
+	}
+	if freshest != nil {
+		out.ASR.GPUName = freshest.GPUName
+		out.ASR.VRAMTotalMB = freshest.VRAMTotalMB
+		out.ASR.VRAMFreeMB = freshest.VRAMFreeMB
+		out.ASR.Device = freshest.ASRDevice
+		out.ASR.Dtype = freshest.ASRDtype
+		out.ASR.Error = freshest.ASRError
+	}
+	asrReason := strings.TrimSpace(s.ASRInitError)
+	if asrReason == "" && freshest != nil {
+		asrReason = strings.TrimSpace(freshest.ASRError)
 	}
 
-	out.ASR.Available = out.ASR.Configured && out.Worker.Alive && out.ASR.WorkerAvailable
+	out.ASR.Available = out.ASR.Configured && out.Worker.Alive && out.ASR.WorkerAvailable && asrReason == ""
 	switch {
 	case !out.ASR.Configured:
 		out.ASR.Reason = "asr_not_configured"
 	case !out.Worker.Alive:
 		out.ASR.Reason = "worker_offline"
+	case strings.HasPrefix(asrReason, "gpu_unavailable"):
+		out.ASR.Reason = "gpu_unavailable"
+	case asrReason != "":
+		out.ASR.Reason = "model_probe_failed"
 	case !out.ASR.WorkerAvailable:
 		out.ASR.Reason = "worker_asr_mismatch"
 	}

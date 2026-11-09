@@ -24,6 +24,13 @@ type TranscriberConfig struct {
 	Language                                      string
 	WindowMS                                      int64
 	MaxNewTokens                                  int
+	// Timeout, LoadTimeout, WindowTimeout and the lock fields bound one local
+	// ASR run and serialize GPU inference across processes.
+	Timeout       time.Duration
+	LoadTimeout   time.Duration
+	WindowTimeout time.Duration
+	LockPath      string
+	LockTimeout   time.Duration
 	// ProbePython verifies the interpreter, runner script and required modules
 	// at startup. The worker sets it; tests can disable it.
 	ProbePython bool
@@ -37,6 +44,16 @@ const (
 	defaultQwenModel    = "Qwen/Qwen3-ASR-1.7B"
 	defaultQwenRevision = "7278e1e70fe206f11671096ffdd38061171dd6e5"
 )
+
+// IsLocalProvider reports whether the provider runs model code on this host.
+// Only these may degrade at startup: a missing doubao key stays a hard error.
+func IsLocalProvider(provider string) bool {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "ark", "qwen", "local":
+		return true
+	}
+	return false
+}
 
 // SelectTranscriber builds the configured adapter. "off" returns (nil, nil) so
 // callers can advertise uploads as unavailable.
@@ -120,6 +137,8 @@ func SelectTranscriber(cfg TranscriberConfig) (Transcriber, error) {
 			Python: python, Script: script, Backend: backend, Model: model, Revision: revision,
 			Dtype: dtype, Device: cfg.Device, Language: cfg.Language,
 			SegmentMS: windowMS, OverlapMS: cfg.OverlapMS, MaxNewTokens: cfg.MaxNewTokens,
+			Timeout: cfg.Timeout, LoadTimeout: cfg.LoadTimeout, WindowTimeout: cfg.WindowTimeout,
+			LockPath: cfg.LockPath, LockTimeout: cfg.LockTimeout,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown --asr-provider %q (want off, fixture, doubao, ark, qwen or local)", cfg.Provider)

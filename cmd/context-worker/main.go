@@ -89,6 +89,11 @@ func run() error {
 	asrLanguage := flag.String("asr-language", "", "optional local ASR language hint, e.g. Chinese")
 	asrWindowMS := flag.Int64("asr-window-ms", 30000, "local ASR window length in milliseconds")
 	asrMaxNewTokens := flag.Int("asr-max-new-tokens", 512, "local ASR generation limit per window")
+	asrTimeout := flag.Duration("asr-timeout", 2*time.Hour, "total budget for one local ASR recording; zero means two hours")
+	asrLoadTimeout := flag.Duration("asr-load-timeout", 5*time.Minute, "budget for loading a local ASR model")
+	asrWindowTimeout := flag.Duration("asr-window-timeout", 5*time.Minute, "budget for one local ASR window")
+	asrLock := flag.String("asr-lock", "", "exclusive lock file serializing local GPU inference across processes")
+	asrLockTimeout := flag.Duration("asr-lock-timeout", 10*time.Minute, "how long to wait for the local ASR GPU lock")
 	ffmpegPath := flag.String("ffmpeg", "ffmpeg", "ffmpeg binary used by the ingest stage")
 	ffprobePath := flag.String("ffprobe", "ffprobe", "ffprobe binary used by the ingest stage")
 	audioDir := flag.String("audio-dir", "", "audio directory (legacy mode; profile mode uses the profile audio directory)")
@@ -163,7 +168,7 @@ func run() error {
 	if strings.TrimSpace(*audioDir) == "" {
 		*audioDir = filepath.Join(filepath.Dir(absDBPath), "synced-audio")
 	}
-	transcriber, err := cloudsync.SelectTranscriber(cloudsync.TranscriberConfig{
+	transcriber, selectErr := cloudsync.SelectTranscriber(cloudsync.TranscriberConfig{
 		Provider: *asrProvider, KeyEnv: *asrKeyEnv, Endpoint: *asrEndpoint,
 		ResourceID: *asrResourceID, Model: *asrModel, Revision: *asrRevision,
 		SegmentMS: *asrSegmentMS, OverlapMS: *asrOverlapMS, Concurrency: *asrConcurrency,
@@ -171,9 +176,27 @@ func run() error {
 		LocalBackend:    *asrBackend, Python: *asrPython, Script: *asrScript,
 		Dtype: *asrDtype, Device: *asrDevice, Language: *asrLanguage,
 		WindowMS: *asrWindowMS, MaxNewTokens: *asrMaxNewTokens, ProbePython: true,
+		Timeout: *asrTimeout, LoadTimeout: *asrLoadTimeout, WindowTimeout: *asrWindowTimeout,
+		LockPath: *asrLock, LockTimeout: *asrLockTimeout,
 	})
-	if err != nil {
-		return err
+	// A broken local runtime must not stop the worker: other stages stay
+	// usable and RunASRJob reports asr_unavailable with an action.
+	localASR := cloudsync.IsLocalProvider(*asrProvider)
+	asrInitError := ""
+	if selectErr != nil {
+		if localASR {
+			logger.Printf("context-worker: ASR unavailable: %v", selectErr)
+			asrInitError = "model_probe_failed: " + selectErr.Error()
+			transcriber = nil
+		} else {
+			return selectErr
+		}
+	}
+	if transcriber != nil && localASR {
+		if probeErr := cloudsync.ProbeLocalCUDA(*asrPython, *asrDevice); probeErr != nil {
+			logger.Printf("context-worker: ASR unavailable: %v", probeErr)
+			asrInitError = "gpu_unavailable: " + probeErr.Error()
+		}
 	}
 	importer, err := ingest.New(ingest.Config{
 		Store: store, DB: db, AudioDir: *audioDir,
@@ -228,13 +251,23 @@ func run() error {
 			inner:  inner,
 		},
 	}
+	gpuName, vramTotal, vramFree := "", 0, 0
+	if localASR {
+		gpuName, vramTotal, vramFree = cloudsync.GPUInfo()
+	}
 	heartbeat := process.Heartbeat{
 		WorkerID:         cfg.WorkerID,
 		PID:              os.Getpid(),
 		Stages:           cfg.Stages,
 		GeneratorEnabled: gen != nil,
 		ASRProvider:      strings.TrimSpace(*asrProvider),
-		ASRAvailable:     transcriber != nil && containsStage(jobStages, "asr"),
+		ASRAvailable:     transcriber != nil && containsStage(jobStages, "asr") && asrInitError == "",
+		GPUName:          gpuName,
+		VRAMTotalMB:      vramTotal,
+		VRAMFreeMB:       vramFree,
+		ASRDevice:        strings.TrimSpace(*asrDevice),
+		ASRDtype:         strings.TrimSpace(*asrDtype),
+		ASRError:         asrInitError,
 		EmbedProvider:    strings.TrimSpace(*embedProvider),
 	}
 	if err := process.WriteHeartbeat(ctx, db, heartbeat, time.Now()); err != nil {
