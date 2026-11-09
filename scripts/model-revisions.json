@@ -1,0 +1,23 @@
+{
+  "description": "Pinned model snapshots shared by code, launcher, fetch script and docs. Revisions are Hugging Face commit SHAs; safetensors_sha256 is the verified file digest where available.",
+  "models": {
+    "asr_ark": {
+      "repo_id": "Edge0/ARK-ASR-0.6B",
+      "revision": "45776b56d58cdfb2e2eb632f7e110f38684633e0"
+    },
+    "asr_qwen": {
+      "repo_id": "Qwen/Qwen3-ASR-1.7B",
+      "revision": "7278e1e70fe206f11671096ffdd38061171dd6e5"
+    },
+    "embed_qwen": {
+      "repo_id": "Qwen/Qwen3-Embedding-0.6B",
+      "revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+      "safetensors_sha256": "0437e45c94563b09e13cb7a64478fc406947a93cb34a7e05870fc8dcd48e23fd"
+    },
+    "decision_jev": {
+      "repo_id": "chaoliangUNSW/Jev-Style-0.8B-Decision-v3",
+      "revision": "b023d1f9c7858fbf01504577a3bfc349ea5c7385",
+      "safetensors_sha256": "0f8c861605dcdfb356a63e056baa2106e81042e8981e8d0d26fe50b34599541e"
+    }
+  }
+}

@@ -880,6 +880,151 @@
       "spec": "openspec/changes/local-asr-provider/specs/local-asr/spec.md",
       "test_file": "internal/cloudsync/select_test.go",
       "test_anchor": "TestSelectTranscriberProbesPythonAndScript"
+    },
+    {
+      "id": "local-gpu.preflight",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md"
+    },
+    {
+      "id": "local-gpu.cold-start",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md"
+    },
+    {
+      "id": "local-gpu.five-cycles",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md"
+    },
+    {
+      "id": "local-gpu.concurrency",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md"
+    },
+    {
+      "id": "local-gpu.degraded",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md"
+    },
+    {
+      "id": "local-gpu.vram-diagnostics",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md"
+    },
+    {
+      "id": "local-gpu.no-paid-fallback",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md"
+    },
+    {
+      "id": "long-audio.window-resume",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md"
+    },
+    {
+      "id": "long-audio.coverage",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md"
+    },
+    {
+      "id": "long-audio.partial-failure",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md"
+    },
+    {
+      "id": "long-audio.duplicate-import",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md"
+    },
+    {
+      "id": "long-audio.oom-actionable",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md"
+    },
+    {
+      "id": "long-audio.indexing-restart",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md"
+    },
+    {
+      "id": "long-audio.progress-projection",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md"
+    },
+    {
+      "id": "embedding.local-provider",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/real-embeddings/spec.md"
+    },
+    {
+      "id": "embedding.role-query",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/real-embeddings/spec.md"
+    },
+    {
+      "id": "embedding.failure-degrade",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/real-embeddings/spec.md"
+    },
+    {
+      "id": "embedding.frozen-gates",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/real-embeddings/spec.md"
+    },
+    {
+      "id": "embedding.no-promotion-without-gates",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/real-embeddings/spec.md"
+    },
+    {
+      "id": "sufficiency.three-states",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md"
+    },
+    {
+      "id": "sufficiency.valid-refs",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md"
+    },
+    {
+      "id": "sufficiency.no-false-sufficient",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md"
+    },
+    {
+      "id": "sufficiency.stale-forgotten",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md"
+    },
+    {
+      "id": "sufficiency.unknown-time",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md"
+    },
+    {
+      "id": "sufficiency.unconfirmed-proposal",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md"
+    },
+    {
+      "id": "sufficiency.ui-trace",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md"
+    },
+    {
+      "id": "release.demo-twelve",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/release-validation/spec.md"
+    },
+    {
+      "id": "release.regression-commands",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/release-validation/spec.md"
+    },
+    {
+      "id": "release.not-run-accounting",
+      "status": "pending",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/release-validation/spec.md"
     }
   ]
 }
