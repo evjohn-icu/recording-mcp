@@ -93,7 +93,7 @@ func (r *SQLiteRetriever) Search(ctx context.Context, query string, opts SearchO
 	if q == "" {
 		return nil, nil
 	}
-	vectors, err := r.Provider.Embed(ctx, []string{q})
+	vectors, err := EmbedTexts(ctx, r.Provider, []string{q}, RoleQuery)
 	if err != nil {
 		return nil, err
 	}

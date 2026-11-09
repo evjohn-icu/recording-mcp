@@ -235,7 +235,7 @@ func (r *HNSWRetriever) SearchWithDiagnostics(ctx context.Context, query string,
 	if query == "" {
 		return nil, diag, nil
 	}
-	vectors, err := r.Provider.Embed(ctx, []string{query})
+	vectors, err := EmbedTexts(ctx, r.Provider, []string{query}, RoleQuery)
 	if err != nil {
 		return nil, diag, err
 	}
