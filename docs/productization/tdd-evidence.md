@@ -56,3 +56,4 @@
 | MCP 子进程非 session leader、stderr 未排空、失败路径不关闭 | 代码分析 | `start_new_session`、`DEVNULL`、`finally close` |
 | T3 PASS 不校验覆盖/重复 | 代码分析 | 增加 `status_coverage_ms` 与 `duplicate_turns` 门槛；2 h 重跑 258/258、覆盖=时长、重复 0 |
 | probe/embedding 继承 API key；测试钩子未受 TEST_MODE 限制；`.env` 权限未校验 | 安全评审 | `env -i` 白名单、钩子仅 TEST_MODE、属主/600 校验 |
+| e2e-cloud 本地卡在 `npx wrangler`（解析/网络） | 本地运行 15 分钟无输出；直接调用本地 wrangler 后 `dev` 10 秒就绪 | 脚本改用 `./node_modules/.bin/wrangler`；本地 10/10 场景通过 |

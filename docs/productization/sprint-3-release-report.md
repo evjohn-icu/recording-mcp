@@ -10,7 +10,7 @@
 | SMART-02 | 长录音可靠转写 | 2 h 故障注入中断后只补未完成窗口；覆盖=时长；无重复活跃片段；OOM/超时动作 | T3 2 h：258/258 窗口、覆盖 7 200 000 ms、2 次 SIGKILL、无重复；T4–T10 PASS | PASS（真实 2 h 本机 ASR 未运行） | `long-audio-reliability.md` |
 | SMART-03 | 真实中文 embedding 评估 | 角色化边界；本地服务；冻结门禁；未通过不换默认 | 见 C 节 | 真实 embedding 校准未通过门禁（误报率 0.95、p95 超 1.5×、v2-openai 召回低于 v1）；未创建 holdout lock，默认保持 v1 + hash | `real-embedding-evaluation.md`、`docs/evals/sprint3-real-embedding/` |
 | SMART-04 | 证据充分性可见 | 20 场景（≥5 不可回答）；三种状态；有效引用；UI 可核对 | 21 场景 21/21（11 不可回答）；浏览器 11/11 | PASS | `sufficiency-scenarios.md`、`artifacts/sufficiency/v1/results.json` |
-| SMART-05 | 发布验证 | 12 步演示；命令清单；真实回归 | 12/12 步通过（含重启持久化、非空决策轨迹与 MCP 读取）；`go vet`、`go test`、`go test -race`、`make build`、`make spec-validate`、Web typecheck/build、Python 117 项、浏览器 13/13 与 11/11、Docker 6/6、Android 单测/APK、cloud-ingest 74 项均通过；e2e-cloud NOT_RUN（本机 wrangler 无进展） | PASS | `release-commands.json`、`artifacts/sprint3-demo/result.json` |
+| SMART-05 | 发布验证 | 12 步演示；命令清单；真实回归 | 12/12 步通过（含重启持久化、非空决策轨迹与 MCP 读取）；`go vet`、`go test`、`go test -race`、`make build`、`make spec-validate`、Web typecheck/build、Python 117 项、浏览器 13/13 与 11/11、Docker 6/6、Android 单测/APK、cloud-ingest 74 项、e2e-cloud 10/10 场景均通过 | PASS | `release-commands.json`、`artifacts/sprint3-demo/result.json` |
 
 ## B. 工程交付
 
@@ -103,7 +103,6 @@
 |---|---|
 | Docker GPU 探针与 GPU 容器支持 | GPU 镜像仓库代理不可达（`172.22.23.142:7890` 拒绝连接），daemon 无 `nvidia` runtime；本轮不发布 GPU 镜像。非 GPU Docker 部署测试用本地镜像 6/6 通过 |
 | 真实 2 h 本机 ASR | 时间/显存预算限制；T3 用故障注入 runner 验证 2 h 机制，未在 2 h 文件上运行真实模型 |
-| `sh scripts/e2e-cloud.sh` | 本机 `wrangler` 开发服务器 15 分钟无进展（需要 Cloudflare 登录/网络），该 job 由 CI 的 GitHub runner 执行 |
 | `EMBED_DEVICE=cuda:0` 的 embedding 延迟复跑 | 真实 embedding 同时失败召回与 MRR 门禁，换设备不改变结论 |
 | Embedding 索引构建时间/内存单列指标 | 冻结评测 manifest 只记录调用次数/失败数；未单独测量索引构建耗时与 RSS |
 | Docker Compose GPU profile | 本轮明确不交付（需要多 GB CUDA/torch 镜像与模型缓存卷），不是失败项 |

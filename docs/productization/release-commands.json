@@ -200,9 +200,9 @@
     },
     {
       "command": "sh scripts/e2e-cloud.sh",
-      "status": "NOT_RUN",
-      "evidence": "",
-      "reason_if_not_run": "local wrangler dev made no progress in 15 minutes (Cloudflare login/network); CI runs this job on GitHub runners"
+      "status": "PASS",
+      "evidence": "10/10 scenarios PASS in 287s with local wrangler 4.129.0 + workerd (no Cloudflare account/network)",
+      "reason_if_not_run": ""
     },
     {
       "command": "npm test --prefix apps/cloud-ingest",
