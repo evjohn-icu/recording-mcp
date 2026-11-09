@@ -1244,3 +1244,21 @@ code,
   .decision-header, .decision-record-head, .decision-actions { flex-direction: column; align-items: flex-start; }
   .decision-actions button { width: 100%; }
 }
+
+/* Evidence sufficiency */
+.sufficiency-panel { border: 1px solid var(--border, #ddd); border-radius: .5rem; padding: 1rem; margin: 1rem 0; }
+.sufficiency-header { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline; }
+.sufficiency-badge { font-weight: 600; padding: .1rem .5rem; border-radius: 999px; border: 1px solid currentColor; }
+.sufficiency-sufficient { border-color: var(--success, #1a7f37); }
+.sufficiency-sufficient .sufficiency-badge { color: var(--success, #1a7f37); }
+.sufficiency-insufficient { border-color: var(--warning, #8a5a00); }
+.sufficiency-insufficient .sufficiency-badge { color: var(--warning, #8a5a00); }
+.sufficiency-unknown { border-color: var(--border, #ddd); }
+.sufficiency-unknown .sufficiency-badge { color: var(--muted, #666); }
+.sufficiency-explanation { color: var(--muted, #666); font-size: .9rem; }
+.sufficiency-evidence { list-style: none; margin: .75rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+.sufficiency-evidence a { display: flex; gap: .75rem; align-items: baseline; text-decoration: none; color: inherit; }
+.sufficiency-time { color: var(--muted, #666); font-variant-numeric: tabular-nums; font-size: .85rem; }
+.sufficiency-text { border-left: 3px solid var(--accent, #2a6df4); padding-left: .5rem; }
+.sufficiency-gaps { margin: .5rem 0 0; padding-left: 1.25rem; color: var(--warning, #8a5a00); font-size: .9rem; }
+.sufficiency-degraded { margin: .5rem 0 0; color: var(--muted, #666); font-size: .85rem; }

@@ -452,3 +452,58 @@ func decisionContains(values []string, target string) bool {
 	}
 	return false
 }
+
+// TestDecisionTrailSufficiencyScenarios pins the decision-state half of the
+// sufficiency contract: a proposal is not a confirmation, a forgotten source
+// cannot stay current, and an unknown recording time is never invented.
+func TestDecisionTrailSufficiencyScenarios(t *testing.T) {
+	t.Run("unconfirmed_proposal_is_not_current", func(t *testing.T) {
+		env := newDecisionEnv(t)
+		env.setNote(t, "note:one", "suggestion", "提议采用方案 A，尚未确认")
+		env.removeNote(t, "note:two")
+		topic := env.topic(t)
+		if topic.Current != nil {
+			t.Fatalf("unconfirmed proposal is current: %+v", topic.Current)
+		}
+		if topic.CurrentState == DecisionConfirmed {
+			t.Fatalf("state = %s, want not confirmed", topic.CurrentState)
+		}
+		if topic.Counts.Candidates == 0 {
+			t.Fatalf("candidate count = 0, want the proposal recorded")
+		}
+	})
+
+	t.Run("forgotten_decision_is_not_resurrected", func(t *testing.T) {
+		env := newDecisionEnv(t)
+		env.setNote(t, "note:one", "suggestion", "最终确定采用方案 A")
+		env.removeNote(t, "note:two")
+		id := candidateID(t, env.topic(t), "方案 A")
+		env.review(t, DecisionReview{ExpectedVersion: trailVersion(t, env), CandidateID: id, Action: "confirm", RequestID: "req-forget"})
+		if env.topic(t).Current == nil {
+			t.Fatal("setup: confirmation did not become current")
+		}
+		if err := env.ds.Time.PurgeContent(context.Background(), []string{
+			"decision-review-" + shortHash(env.scope+"\x00req-forget"),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if current := env.topic(t).Current; current != nil {
+			t.Fatalf("forgotten decision still current: %+v", current)
+		}
+	})
+
+	t.Run("unknown_time_keeps_valid_from_null", func(t *testing.T) {
+		env := newDecisionEnv(t)
+		env.setNote(t, "note:one", "suggestion", "最终确定采用方案 B")
+		env.removeNote(t, "note:two")
+		id := candidateID(t, env.topic(t), "方案 B")
+		env.review(t, DecisionReview{ExpectedVersion: trailVersion(t, env), CandidateID: id, Action: "confirm", RequestID: "req-unknown-time"})
+		current := env.topic(t).Current
+		if current == nil {
+			t.Fatal("confirmation did not become current")
+		}
+		if current.ValidFrom != nil {
+			t.Fatalf("valid_from = %v, want nil for an unknown recording time", *current.ValidFrom)
+		}
+	})
+}
