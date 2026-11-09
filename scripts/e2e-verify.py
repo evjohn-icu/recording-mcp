@@ -97,8 +97,8 @@ def main():
 
     listing = rpc("tools/list")
     tools = (listing.get("result") or {}).get("tools") or []
-    if len(tools) != 27:
-        fail(f"tools/list returned {len(tools)} tools, want 27")
+    if len(tools) != 30:
+        fail(f"tools/list returned {len(tools)} tools, want 30")
 
     # 检索：先整句短语；若检索器分词导致整句不命中，退到更短的稳定前缀，
     # 但最终断言不变：命中文本必须包含完整 expect-phrase。

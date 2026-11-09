@@ -62,3 +62,17 @@
 `search_events` 与时间线查询返回历史记录，包含已过期的事件；`get_current_state` 会排除尚未发生、尚未观察、尚未生效或已过期的证据。有效区间为左闭右开，TTL 从事件发生时间起计算。省略 `time` 时，查询按服务时钟计算；启动服务时通过 `--at` 可固定演示时间。状态支持 `commitment`、`person`、`task`、`topic` 四个维度；同一维度和对象 ID 的新事件替换旧状态，`target_id` 反馈则合并已有字段并累积 provenance。最新状态过期后不会恢复先前的旧状态。
 
 历史搜索的文本匹配是大小写不敏感的字面子串匹配。人物可按 `actors` 或 `entities` 中的精确值匹配，topics 为标签或实体的任一匹配。时间范围含起止边界，`deadline_before` 严格早于给定时间。分页默认 100，最大 500，返回 `events`、`total` 与可选的 `next_offset`。
+
+## `get_decision_trail`（只读，decision-trail-v1）
+
+输入：`topic_id`（可选，缺省返回所有含决策的 macro topic）、`known_at`（RFC3339，按系统记录时间过滤历史）、`include_history`（默认 true）、`limit`（默认 50，上限 200）、`max_bytes`（默认 16000，范围 256–262144）。
+
+输出：`schema_version: "decision-trail-v1"`、`version`、`topics[]`、`truncated`。
+
+- 每主题有 `current_state`（observation/proposal/decision_candidate/confirmed/superseded/unresolved）、`current`、`history`、`unresolved_reasons`、`counts`。
+- `confirmed` 只来自人工 review 事件；讨论与候选不会自动确认。
+- `valid_from`/`valid_until` 未显式给出时保持 `null`，绝不从 `recorded_at` 推断；`recorded_at` 是系统记录时间。
+- 来源 revision 失效 → `source_invalidated`；无证据 → `source_unknown`；多个候选未裁决 → `multiple_candidates`。
+- 已遗忘（purged）的 review 事件不返回；不会复活。
+- 响应不含 `confidence`，消费方不得把候选或复核当事实真实性。
+- `scope` 由服务器按 profile 解析，调用方传入的 `scope` 被忽略。

@@ -175,8 +175,18 @@ func runJob(parent context.Context, cfg Config, job process.Job) {
 	finalCtx := context.WithoutCancel(parent)
 	now := time.Now()
 	if execErr != nil {
-		errorJSON, _ := json.Marshal(map[string]string{"error": execErr.Error()})
-		_ = process.Fail(finalCtx, cfg.DB, job.ID, job.LeaseToken, string(errorJSON), true, now)
+		details := map[string]string{"error": execErr.Error()}
+		if structured, ok := execErr.(interface{ ErrorDetails() map[string]string }); ok {
+			for key, value := range structured.ErrorDetails() {
+				details[key] = value
+			}
+		}
+		errorJSON, _ := json.Marshal(details)
+		retryable := true
+		if fatal, ok := execErr.(interface{ Fatal() bool }); ok && fatal.Fatal() {
+			retryable = false
+		}
+		_ = process.Fail(finalCtx, cfg.DB, job.ID, job.LeaseToken, string(errorJSON), retryable, now)
 		return
 	}
 	_ = process.Complete(finalCtx, cfg.DB, job.ID, job.LeaseToken, resultRef, now)

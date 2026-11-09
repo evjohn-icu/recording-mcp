@@ -84,7 +84,13 @@ func (p *Profiles) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, "/api/") {
-		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+		// The profile router must not truncate multipart uploads before the
+		// child server applies its own per-route limit.
+		limit := int64(maxRequestBody)
+		if r.URL.Path == "/api/imports" {
+			limit = maxUploadBody
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, limit)
 	}
 	if r.URL.Path == "/api/auth-info" && r.Method == http.MethodGet {
 		names, err := p.manager.List()

@@ -12,6 +12,8 @@ __pycache__/
 /context-associate
 /context-memory
 /context-worker
+/.venv-asr/
+/.cache/
 .DS_Store
 .env
 .env.*
@@ -32,3 +34,6 @@ apps/android/.gradle/
 apps/android/build/
 apps/android/app/build/
 apps/android/.idea/
+
+# Productization verification outputs (screenshots, logs, temp profiles)
+/artifacts/

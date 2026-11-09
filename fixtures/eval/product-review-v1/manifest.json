@@ -1,0 +1,6 @@
+{
+  "corpus.json": "36b3563c4158a8085b08ceb612b62e91a06a30f0219b80162945b8b3421a9317",
+  "retrieval.json": "660864d908bb40d56f5e6ddd290afa0030a6900d4ec50d4e9e44f516623486af",
+  "author": "local-review",
+  "note": "人工审查集，非冻结基准；修改需同步 REVIEW.md 与报告。"
+}

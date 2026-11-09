@@ -467,6 +467,419 @@
       "spec": "openspec/changes/2026-10-25-real-retrieval-validation/specs/scoped-retrieval/spec.md",
       "test_file": "scripts/retrieval-version-browser.py",
       "test_anchor": "main"
+    },
+    {
+      "id": "productization.deploy-compose-config",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/test_productization_deploy.py",
+      "test_anchor": "test_compose_config_is_valid"
+    },
+    {
+      "id": "productization.deploy-clean-start",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/test_productization_deploy.py",
+      "test_anchor": "test_clean_start_and_independent_health"
+    },
+    {
+      "id": "productization.deploy-restart-persistence",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/test_productization_deploy.py",
+      "test_anchor": "test_three_restarts_keep_imported_data"
+    },
+    {
+      "id": "productization.deploy-no-external-api",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/test_productization_deploy.py",
+      "test_anchor": "test_startup_without_external_api_reports_unavailable"
+    },
+    {
+      "id": "productization.deploy-backup-restore",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/test_productization_deploy.py",
+      "test_anchor": "test_backup_restore_preserves_sources"
+    },
+    {
+      "id": "productization.deploy-non-root",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/test_productization_deploy.py",
+      "test_anchor": "test_container_runs_as_non_root"
+    },
+    {
+      "id": "productization.import-normal",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "internal/ingest/import_test.go",
+      "test_anchor": "TestImportNormal"
+    },
+    {
+      "id": "productization.import-duplicate",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "internal/ingest/import_test.go",
+      "test_anchor": "TestImportDuplicateIsIdempotent"
+    },
+    {
+      "id": "productization.import-unsupported-format",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "internal/ingest/import_test.go",
+      "test_anchor": "TestImportRejectsUnsupportedFormat"
+    },
+    {
+      "id": "productization.import-corrupt-audio",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "internal/ingest/import_test.go",
+      "test_anchor": "TestImportRejectsCorruptAudio"
+    },
+    {
+      "id": "productization.import-restart",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "internal/ingest/import_test.go",
+      "test_anchor": "TestImportSurvivesServerRestart"
+    },
+    {
+      "id": "productization.import-worker-crash",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "internal/ingest/import_test.go",
+      "test_anchor": "TestASRJobRecoversAfterWorkerLeaseExpiry"
+    },
+    {
+      "id": "productization.import-asr-unavailable",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "internal/ingest/import_test.go",
+      "test_anchor": "TestImportRejectedWhenASRUnavailable"
+    },
+    {
+      "id": "productization.import-retry",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "internal/ingest/import_test.go",
+      "test_anchor": "TestFailedASRJobRetryDoesNotDuplicateRecords"
+    },
+    {
+      "id": "productization.import-progress-projection",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "internal/app/processing_test.go",
+      "test_anchor": "TestProcessingSnapshotProjectsPhases"
+    },
+    {
+      "id": "productization.web-workflow",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/product-workflow-browser.py",
+      "test_anchor": "test_product_workflow"
+    },
+    {
+      "id": "productization.web-refresh-state",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/product-workflow-browser.py",
+      "test_anchor": "test_refresh_restores_state"
+    },
+    {
+      "id": "productization.web-mobile-layout",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/product-workflow-browser.py",
+      "test_anchor": "test_mobile_and_desktop_layout"
+    },
+    {
+      "id": "productization.web-no-page-errors",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/product-workflow-browser.py",
+      "test_anchor": "test_no_blocking_page_errors"
+    },
+    {
+      "id": "productization.web-stale-not-exposed",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "internal/app/forget_visibility_test.go",
+      "test_anchor": "TestForgottenTurnIsNotSearchableOrPlayable"
+    },
+    {
+      "id": "productization.retrieval-quality-report",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/test_productization_retrieval.py",
+      "test_anchor": "test_report_contains_required_metrics"
+    },
+    {
+      "id": "productization.retrieval-default-v1",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "internal/web/web_test.go",
+      "test_anchor": "TestHybridRetrievalVersionSelection"
+    },
+    {
+      "id": "productization.retrieval-leakage-zero",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/test_productization_retrieval.py",
+      "test_anchor": "test_leakage_counts_are_zero"
+    },
+    {
+      "id": "productization.demo-ten-steps",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/test_beta_demo.py",
+      "test_anchor": "test_ten_step_demo"
+    },
+    {
+      "id": "productization.beta-checklist",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/productization/spec.md",
+      "test_file": "scripts/test_beta_demo.py",
+      "test_anchor": "test_beta_checklist_artifacts"
+    },
+    {
+      "id": "decision-trail.scenario-a",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "internal/app/decision_trail_scenarios_test.go",
+      "test_anchor": "TestDecisionTrailScenarioA"
+    },
+    {
+      "id": "decision-trail.scenario-b",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "internal/app/decision_trail_scenarios_test.go",
+      "test_anchor": "TestDecisionTrailScenarioB"
+    },
+    {
+      "id": "decision-trail.scenario-c",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "internal/app/decision_trail_scenarios_test.go",
+      "test_anchor": "TestDecisionTrailScenarioC"
+    },
+    {
+      "id": "decision-trail.review-idempotent",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "internal/app/decision_trail_review_test.go",
+      "test_anchor": "TestDecisionReviewIsIdempotent"
+    },
+    {
+      "id": "decision-trail.review-traceable",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "internal/app/decision_trail_review_test.go",
+      "test_anchor": "TestDecisionReviewRecordsActorAndNote"
+    },
+    {
+      "id": "decision-trail.version-conflict",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "internal/app/decision_trail_review_test.go",
+      "test_anchor": "TestDecisionReviewRejectsStaleVersion"
+    },
+    {
+      "id": "decision-trail.unknown-valid-time",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "internal/app/decision_trail_review_test.go",
+      "test_anchor": "TestDecisionTrailDoesNotInferValidFrom"
+    },
+    {
+      "id": "decision-trail.history-order",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "internal/app/decision_trail_review_test.go",
+      "test_anchor": "TestDecisionTrailOrdersByDeclaredTimeBasis"
+    },
+    {
+      "id": "decision-trail.source-invalidated",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "internal/app/decision_trail_review_test.go",
+      "test_anchor": "TestDecisionTrailInvalidatesStaleSource"
+    },
+    {
+      "id": "decision-trail.forgotten-not-resurrected",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "internal/app/decision_trail_review_test.go",
+      "test_anchor": "TestDecisionTrailSkipsPurgedEvents"
+    },
+    {
+      "id": "decision-trail.profile-isolation",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "internal/web/decision_trail_test.go",
+      "test_anchor": "TestDecisionTrailProfileIsolation"
+    },
+    {
+      "id": "decision-trail.web-workflow",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "scripts/decision-trail-browser.py",
+      "test_anchor": "test_decision_trail_ui"
+    },
+    {
+      "id": "decision-trail.web-no-confidence",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "scripts/decision-trail-browser.py",
+      "test_anchor": "test_confidence_is_not_rendered_as_truth"
+    },
+    {
+      "id": "decision-trail.web-unresolved",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "scripts/decision-trail-browser.py",
+      "test_anchor": "test_unresolved_state_is_visible"
+    },
+    {
+      "id": "decision-trail.web-review-refresh",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/decision-trail/spec.md",
+      "test_file": "scripts/decision-trail-browser.py",
+      "test_anchor": "test_review_persists_after_refresh"
+    },
+    {
+      "id": "mcp-context.current",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailCurrent"
+    },
+    {
+      "id": "mcp-context.history",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailHistory"
+    },
+    {
+      "id": "mcp-context.no-evidence",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailNoEvidence"
+    },
+    {
+      "id": "mcp-context.conflict",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailConflict"
+    },
+    {
+      "id": "mcp-context.stale-source",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailStaleSource"
+    },
+    {
+      "id": "mcp-context.unconfirmed",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailUnconfirmedCandidate"
+    },
+    {
+      "id": "mcp-context.confirmed",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailConfirmed"
+    },
+    {
+      "id": "mcp-context.multi-session",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailMultiSession"
+    },
+    {
+      "id": "mcp-context.known-at",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailKnownAt"
+    },
+    {
+      "id": "mcp-context.profile-isolation",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailProfileIsolation"
+    },
+    {
+      "id": "mcp-context.byte-budget",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailByteBudget"
+    },
+    {
+      "id": "mcp-context.deterministic-repeat",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailDeterministicRepeat"
+    },
+    {
+      "id": "mcp-context.schema-version",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailSchemaVersion"
+    },
+    {
+      "id": "mcp-context.read-only-registration",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPDecisionTrailReadOnlyRegistration"
+    },
+    {
+      "id": "mcp-context.profile-event-plane",
+      "status": "covered",
+      "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
+      "test_file": "cmd/context-memory/decision_trail_test.go",
+      "test_anchor": "TestMCPProfileUsesProfileEventPlane"
+    },
+    {
+      "id": "local-asr.provider-selection",
+      "status": "covered",
+      "spec": "openspec/changes/local-asr-provider/specs/local-asr/spec.md",
+      "test_file": "internal/cloudsync/select_test.go",
+      "test_anchor": "TestSelectTranscriberLocalBackends"
+    },
+    {
+      "id": "local-asr.float16-window-mapping",
+      "status": "covered",
+      "spec": "openspec/changes/local-asr-provider/specs/local-asr/spec.md",
+      "test_file": "internal/cloudsync/local_asr_test.go",
+      "test_anchor": "TestLocalTranscriberMapsWindows"
+    },
+    {
+      "id": "local-asr.invalid-runner-output",
+      "status": "covered",
+      "spec": "openspec/changes/local-asr-provider/specs/local-asr/spec.md",
+      "test_file": "internal/cloudsync/local_asr_test.go",
+      "test_anchor": "TestLocalTranscriberRejectsInvalidOutput"
+    },
+    {
+      "id": "local-asr.startup-probe",
+      "status": "covered",
+      "spec": "openspec/changes/local-asr-provider/specs/local-asr/spec.md",
+      "test_file": "internal/cloudsync/select_test.go",
+      "test_anchor": "TestSelectTranscriberProbesPythonAndScript"
     }
   ]
 }

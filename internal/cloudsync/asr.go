@@ -57,12 +57,23 @@ func fileSize(path string) (int64, error) {
 const fixtureSegmentMS = 5000
 
 // FixtureTranscriber produces deterministic, zero-network transcripts used by
-// tests and the local e2e loop. One turn per 5 s window; the text encodes the
-// recording id and window bounds so e2e assertions can search for it.
-type FixtureTranscriber struct{}
+// tests and the local e2e loop. One turn per window (5 s by default); the text
+// encodes the recording id and window bounds so e2e assertions can search for
+// it.
+type FixtureTranscriber struct {
+	// WindowMS overrides the 5 s window, for demos that need fewer results.
+	WindowMS int64
+}
+
+func (f FixtureTranscriber) windowMS() int64 {
+	if f.WindowMS > 0 {
+		return f.WindowMS
+	}
+	return fixtureSegmentMS
+}
 
 // Transcribe implements Transcriber.
-func (FixtureTranscriber) Transcribe(ctx context.Context, pcmPath string, meta MetaBasis) ([]asrinput.Result, error) {
+func (f FixtureTranscriber) Transcribe(ctx context.Context, pcmPath string, meta MetaBasis) ([]asrinput.Result, error) {
 	size, err := fileSize(pcmPath)
 	if err != nil {
 		return nil, err
@@ -71,10 +82,11 @@ func (FixtureTranscriber) Transcribe(ctx context.Context, pcmPath string, meta M
 	if durationMS <= 0 {
 		return nil, nil
 	}
+	window := f.windowMS()
 	var results []asrinput.Result
 	for i := int64(0); ; i++ {
-		start := i * fixtureSegmentMS
-		end := start + fixtureSegmentMS
+		start := i * window
+		end := start + window
 		if end > durationMS {
 			end = durationMS
 		}

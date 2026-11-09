@@ -107,6 +107,22 @@ func realDirectoryPath(path string) (string, error) {
 
 func vacuumReadOnlyInto(ctx context.Context, source, destination string) error {
 	u := url.URL{Scheme: "file", Path: filepath.ToSlash(source)}
+	// WAL mode keeps recent commits in the -wal file. VACUUM INTO from a
+	// read-only handle cannot always read that state (and may need the -shm
+	// index), so checkpoint first through a read-write handle. If the source is
+	// genuinely read-only, fall back to the previous read-only behavior.
+	if db, err := sql.Open("sqlite", u.String()+"?_pragma=busy_timeout(5000)"); err == nil {
+		db.SetMaxOpenConns(1)
+		if _, err := db.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`); err == nil {
+			_, err = db.ExecContext(ctx, `VACUUM INTO ?`, destination)
+			db.Close()
+			if err == nil {
+				return nil
+			}
+		} else {
+			db.Close()
+		}
+	}
 	db, err := sql.Open("sqlite", u.String()+"?mode=ro")
 	if err != nil {
 		return err

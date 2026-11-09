@@ -26,6 +26,7 @@ import {
   type WorldlineTopic,
 } from '../api/worldline'
 import { useAudio } from '../components/AudioBar'
+import { DecisionTrailPanel } from '../components/DecisionTrailPanel'
 import './worldline.css'
 
 type Zoom = 'all' | 'day' | 'week' | 'month'
@@ -597,6 +598,7 @@ function WorldlineThreadsView({ query, refreshKey, zoom, setZoom, windowCenter, 
       </div>
       {error && <div className="wl-inline-error" role="alert">{error}</div>}
       {selected && selectedTopic && selectedLane && selectedClaim && <ClaimInspector claim={selectedClaim} topic={selectedTopic} lane={selectedLane} play={play} onClose={() => setSelected(null)} onFeedback={(action) => feedbackTarget(selected.thread, selected.entry, action, data.version)} mentionContext={{ relation: relationLabel(selected.entry.relation), date: selected.entry.mentioned_at || undefined }} />}
+      {selected && <DecisionTrailPanel topicId={selected.thread.macro_topic_id} topicTitle={selected.thread.macro_topic_title} />}
     </div>
     <UnknownValidityThreadPanel threads={data.threads} details={details} onSelect={selectEntry} />
   </div>

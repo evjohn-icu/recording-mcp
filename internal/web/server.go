@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"crypto/subtle"
 	"errors"
 	"log"
@@ -10,6 +11,7 @@ import (
 
 	"recordingmcp/internal/app"
 	"recordingmcp/internal/decision"
+	"recordingmcp/internal/ingest"
 )
 
 // contentSecurityPolicy is the exact policy the frontend is built for: one
@@ -27,6 +29,10 @@ type Config struct {
 	// event scope (or "local" in legacy bootstrap mode).
 	TimeService       *app.TimeService
 	WorldlineDecision decision.Engine
+	// Worldline and DecisionTrail are optional; when TimeService is set they
+	// are constructed internally so existing callers keep working.
+	Worldline     *app.WorldlineService
+	DecisionTrail *app.DecisionTrailService
 	// WebDir is the built frontend directory (web/dist). Empty disables static
 	// serving while the API keeps working.
 	WebDir string
@@ -46,7 +52,10 @@ type Config struct {
 	// ProfileName is set; it must be backed by the trusted profile registry.
 	VerifyProfilePassword func(password string) bool
 	ChangeProfilePassword func(oldPassword, newPassword string) error
-	Logger                *log.Logger
+	// Importer accepts browser uploads. Nil disables POST /api/imports with a
+	// 503 that explains the missing configuration.
+	Importer *ingest.Service
+	Logger   *log.Logger
 }
 
 // Server is the local web application: one JSON API, one static SPA and one
@@ -62,7 +71,9 @@ type Server struct {
 	verifyProfilePassword func(string) bool
 	changeProfilePassword func(string, string) error
 	timeService           *app.TimeService
+	decisionTrail         *app.DecisionTrailService
 	loginGate             *loginGate
+	importer              *ingest.Service
 
 	bootstrap       string
 	bootstrapExpiry time.Time
@@ -101,6 +112,8 @@ func New(cfg Config) (*Server, error) {
 		verifyProfilePassword: cfg.VerifyProfilePassword,
 		changeProfilePassword: cfg.ChangeProfilePassword,
 		loginGate:             newLoginGate(),
+		importer:              cfg.Importer,
+		decisionTrail:         cfg.DecisionTrail,
 	}
 	for _, origin := range cfg.DevOrigins {
 		if origin = strings.TrimSpace(origin); origin != "" {
@@ -119,6 +132,8 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("POST /api/login", s.handleProfileLogin)
 	mux.HandleFunc("POST /api/logout", s.handleLogout)
 	mux.HandleFunc("POST /api/profile/password", s.handleProfilePasswordChange)
+	mux.HandleFunc("GET /api/capabilities", s.handleCapabilities)
+	mux.HandleFunc("POST /api/imports", s.handleImport)
 	mux.HandleFunc("GET /api/conversations", s.handleConversations)
 	mux.HandleFunc("GET /api/conversations/{id}", s.handleConversation)
 	mux.HandleFunc("GET /api/conversations/{id}/processing", s.handleProcessing)
@@ -142,7 +157,15 @@ func New(cfg Config) (*Server, error) {
 			return "local"
 		}
 		RegisterTimeRoutes(mux, cfg.TimeService, profileScope)
-		registerWorldlineRoutes(mux, &app.WorldlineService{Time: cfg.TimeService, DecisionEngine: cfg.WorldlineDecision}, profileScope)
+		worldline := cfg.Worldline
+		if worldline == nil {
+			worldline = &app.WorldlineService{Time: cfg.TimeService, DecisionEngine: cfg.WorldlineDecision}
+		}
+		if s.decisionTrail == nil {
+			s.decisionTrail = &app.DecisionTrailService{Worldline: worldline, Time: cfg.TimeService}
+		}
+		registerWorldlineRoutes(mux, worldline, profileScope)
+		s.registerDecisionRoutes(mux, profileScope)
 	}
 	s.registerHighlightRoutes(mux)
 	s.registerCorrectionRoutes(mux)
@@ -187,7 +210,11 @@ func (s *Server) wrap(next http.Handler) http.Handler {
 		}
 		api := strings.HasPrefix(r.URL.Path, "/api/")
 		if api {
-			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+			limit := int64(maxRequestBody)
+			if r.URL.Path == "/api/imports" {
+				limit = maxUploadBody
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
 			sessionEndpoint := r.URL.Path == "/api/session"
 			bootstrapPost := sessionEndpoint && r.Method == http.MethodPost
 			profileLogin := r.URL.Path == "/api/login" && r.Method == http.MethodPost
@@ -229,6 +256,15 @@ func (s *Server) wrap(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
+	caps, err := s.svc.Capabilities(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorBody{Error: errorDetail{Code: app.CodeInternal, Message: err.Error()}})
+		return
+	}
+	writeJSON(w, http.StatusOK, caps)
+}
+
 func (s *Server) handleAuthInfo(w http.ResponseWriter, _ *http.Request) {
 	mode := "token"
 	info := map[string]string{"mode": mode}
@@ -250,7 +286,13 @@ func (s *Server) handleCatchAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	if err := s.svc.Store.DB().PingContext(ctx); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "degraded", "database": "unavailable"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "database": "ok"})
 }
 
 func (s *Server) handleSessionCreate(w http.ResponseWriter, r *http.Request) {

@@ -144,7 +144,7 @@ func TestM1IngestPublishAutoIndexServesEvidence(t *testing.T) {
 	}
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, app.New(store, nil, nil, ""), nil, false).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

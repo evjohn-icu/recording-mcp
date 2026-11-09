@@ -1,0 +1,497 @@
+{
+  "description": "Productization Beta 人工审查检索集：4 个虚构业务会话，全部为合成文本。",
+  "conversations": [
+    {
+      "conversation_id": "c-atlas-kickoff",
+      "description": "Atlas 项目启动",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-product-review",
+            "provider_request_id": "req-seg-a1",
+            "device_id": "device-c-atlas-kickoff",
+            "recording_id": "rec-c-atlas-kickoff",
+            "conversation_id": "c-atlas-kickoff",
+            "segment_id": "seg-a1",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "r1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_audio_sha256": null,
+            "source_ref": null,
+            "received_at": null,
+            "model": "synthetic-curated",
+            "resource_id": null,
+            "server_log_id": null,
+            "raw_envelope": {}
+          },
+          "turns": [
+            {
+              "id": "fact",
+              "original_index": 1,
+              "text": "项目预算确定为二十万元，六月前完成第一阶段。",
+              "global_start_ms": 0,
+              "global_end_ms": 8000,
+              "local_start_ms": 0,
+              "local_end_ms": 8000,
+              "speaker_scoped_id": "speaker:host",
+              "speaker_entity_id": null,
+              "confidence": 0.97
+            }
+          ],
+          "raw_source": {}
+        },
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-product-review",
+            "provider_request_id": "req-seg-a2",
+            "device_id": "device-c-atlas-kickoff",
+            "recording_id": "rec-c-atlas-kickoff",
+            "conversation_id": "c-atlas-kickoff",
+            "segment_id": "seg-a2",
+            "segment_offset_ms": 30000,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "r1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_audio_sha256": null,
+            "source_ref": null,
+            "received_at": null,
+            "model": "synthetic-curated",
+            "resource_id": null,
+            "server_log_id": null,
+            "raw_envelope": {}
+          },
+          "turns": [
+            {
+              "id": "plan",
+              "original_index": 1,
+              "text": "建议先采用方案 A 快速上线，风险是维护成本偏高。",
+              "global_start_ms": 30000,
+              "global_end_ms": 38000,
+              "local_start_ms": 0,
+              "local_end_ms": 8000,
+              "speaker_scoped_id": "speaker:host",
+              "speaker_entity_id": null,
+              "confidence": 0.97
+            }
+          ],
+          "raw_source": {}
+        },
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-product-review",
+            "provider_request_id": "req-seg-a3",
+            "device_id": "device-c-atlas-kickoff",
+            "recording_id": "rec-c-atlas-kickoff",
+            "conversation_id": "c-atlas-kickoff",
+            "segment_id": "seg-a3",
+            "segment_offset_ms": 60000,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "r1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_audio_sha256": null,
+            "source_ref": null,
+            "received_at": null,
+            "model": "synthetic-curated",
+            "resource_id": null,
+            "server_log_id": null,
+            "raw_envelope": {}
+          },
+          "turns": [
+            {
+              "id": "client",
+              "original_index": 1,
+              "text": "客户希望提前到五月发布，团队暂未同意。",
+              "global_start_ms": 60000,
+              "global_end_ms": 68000,
+              "local_start_ms": 0,
+              "local_end_ms": 8000,
+              "speaker_scoped_id": "speaker:host",
+              "speaker_entity_id": null,
+              "confidence": 0.97
+            }
+          ],
+          "raw_source": {}
+        }
+      ]
+    },
+    {
+      "conversation_id": "c-atlas-review",
+      "description": "Atlas 项目复盘",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-product-review",
+            "provider_request_id": "req-seg-b1",
+            "device_id": "device-c-atlas-review",
+            "recording_id": "rec-c-atlas-review",
+            "conversation_id": "c-atlas-review",
+            "segment_id": "seg-b1",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "r1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_audio_sha256": null,
+            "source_ref": null,
+            "received_at": null,
+            "model": "synthetic-curated",
+            "resource_id": null,
+            "server_log_id": null,
+            "raw_envelope": {}
+          },
+          "turns": [
+            {
+              "id": "cost",
+              "original_index": 1,
+              "text": "方案 A 的维护成本每月两万元，超出原定预算。",
+              "global_start_ms": 0,
+              "global_end_ms": 8000,
+              "local_start_ms": 0,
+              "local_end_ms": 8000,
+              "speaker_scoped_id": "speaker:host",
+              "speaker_entity_id": null,
+              "confidence": 0.97
+            }
+          ],
+          "raw_source": {}
+        },
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-product-review",
+            "provider_request_id": "req-seg-b2",
+            "device_id": "device-c-atlas-review",
+            "recording_id": "rec-c-atlas-review",
+            "conversation_id": "c-atlas-review",
+            "segment_id": "seg-b2",
+            "segment_offset_ms": 30000,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "r1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_audio_sha256": null,
+            "source_ref": null,
+            "received_at": null,
+            "model": "synthetic-curated",
+            "resource_id": null,
+            "server_log_id": null,
+            "raw_envelope": {}
+          },
+          "turns": [
+            {
+              "id": "switch",
+              "original_index": 1,
+              "text": "改为采用方案 B，分两阶段交付。",
+              "global_start_ms": 30000,
+              "global_end_ms": 38000,
+              "local_start_ms": 0,
+              "local_end_ms": 8000,
+              "speaker_scoped_id": "speaker:host",
+              "speaker_entity_id": null,
+              "confidence": 0.97
+            }
+          ],
+          "raw_source": {}
+        },
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-product-review",
+            "provider_request_id": "req-seg-b3",
+            "device_id": "device-c-atlas-review",
+            "recording_id": "rec-c-atlas-review",
+            "conversation_id": "c-atlas-review",
+            "segment_id": "seg-b3",
+            "segment_offset_ms": 60000,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "r1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_audio_sha256": null,
+            "source_ref": null,
+            "received_at": null,
+            "model": "synthetic-curated",
+            "resource_id": null,
+            "server_log_id": null,
+            "raw_envelope": {}
+          },
+          "turns": [
+            {
+              "id": "timeline",
+              "original_index": 1,
+              "text": "第一阶段延后到七月，第二阶段在九月完成。",
+              "global_start_ms": 60000,
+              "global_end_ms": 68000,
+              "local_start_ms": 0,
+              "local_end_ms": 8000,
+              "speaker_scoped_id": "speaker:host",
+              "speaker_entity_id": null,
+              "confidence": 0.97
+            }
+          ],
+          "raw_source": {}
+        }
+      ]
+    },
+    {
+      "conversation_id": "c-client-sync",
+      "description": "客户沟通",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-product-review",
+            "provider_request_id": "req-seg-c1",
+            "device_id": "device-c-client-sync",
+            "recording_id": "rec-c-client-sync",
+            "conversation_id": "c-client-sync",
+            "segment_id": "seg-c1",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "r1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_audio_sha256": null,
+            "source_ref": null,
+            "received_at": null,
+            "model": "synthetic-curated",
+            "resource_id": null,
+            "server_log_id": null,
+            "raw_envelope": {}
+          },
+          "turns": [
+            {
+              "id": "change",
+              "original_index": 1,
+              "text": "客户同意方案 B，但要求六月前完成第一阶段。",
+              "global_start_ms": 0,
+              "global_end_ms": 8000,
+              "local_start_ms": 0,
+              "local_end_ms": 8000,
+              "speaker_scoped_id": "speaker:host",
+              "speaker_entity_id": null,
+              "confidence": 0.97
+            }
+          ],
+          "raw_source": {}
+        },
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-product-review",
+            "provider_request_id": "req-seg-c2",
+            "device_id": "device-c-client-sync",
+            "recording_id": "rec-c-client-sync",
+            "conversation_id": "c-client-sync",
+            "segment_id": "seg-c2",
+            "segment_offset_ms": 30000,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "r1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_audio_sha256": null,
+            "source_ref": null,
+            "received_at": null,
+            "model": "synthetic-curated",
+            "resource_id": null,
+            "server_log_id": null,
+            "raw_envelope": {}
+          },
+          "turns": [
+            {
+              "id": "training",
+              "original_index": 1,
+              "text": "培训安排在发布后的第二周，共两次。",
+              "global_start_ms": 30000,
+              "global_end_ms": 38000,
+              "local_start_ms": 0,
+              "local_end_ms": 8000,
+              "speaker_scoped_id": "speaker:host",
+              "speaker_entity_id": null,
+              "confidence": 0.97
+            }
+          ],
+          "raw_source": {}
+        },
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-product-review",
+            "provider_request_id": "req-seg-c3",
+            "device_id": "device-c-client-sync",
+            "recording_id": "rec-c-client-sync",
+            "conversation_id": "c-client-sync",
+            "segment_id": "seg-c3",
+            "segment_offset_ms": 60000,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "r1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_audio_sha256": null,
+            "source_ref": null,
+            "received_at": null,
+            "model": "synthetic-curated",
+            "resource_id": null,
+            "server_log_id": null,
+            "raw_envelope": {}
+          },
+          "turns": [
+            {
+              "id": "owner",
+              "original_index": 1,
+              "text": "交付负责人是林晨，接口人是周岚。",
+              "global_start_ms": 60000,
+              "global_end_ms": 68000,
+              "local_start_ms": 0,
+              "local_end_ms": 8000,
+              "speaker_scoped_id": "speaker:host",
+              "speaker_entity_id": null,
+              "confidence": 0.97
+            }
+          ],
+          "raw_source": {}
+        }
+      ]
+    },
+    {
+      "conversation_id": "c-budget-check",
+      "description": "预算复核",
+      "segments": [
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-product-review",
+            "provider_request_id": "req-seg-d1",
+            "device_id": "device-c-budget-check",
+            "recording_id": "rec-c-budget-check",
+            "conversation_id": "c-budget-check",
+            "segment_id": "seg-d1",
+            "segment_offset_ms": 0,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "r1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_audio_sha256": null,
+            "source_ref": null,
+            "received_at": null,
+            "model": "synthetic-curated",
+            "resource_id": null,
+            "server_log_id": null,
+            "raw_envelope": {}
+          },
+          "turns": [
+            {
+              "id": "budget",
+              "original_index": 1,
+              "text": "新的预算调整为二十六万元，包含运维。",
+              "global_start_ms": 0,
+              "global_end_ms": 8000,
+              "local_start_ms": 0,
+              "local_end_ms": 8000,
+              "speaker_scoped_id": "speaker:host",
+              "speaker_entity_id": null,
+              "confidence": 0.97
+            }
+          ],
+          "raw_source": {}
+        },
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-product-review",
+            "provider_request_id": "req-seg-d2",
+            "device_id": "device-c-budget-check",
+            "recording_id": "rec-c-budget-check",
+            "conversation_id": "c-budget-check",
+            "segment_id": "seg-d2",
+            "segment_offset_ms": 30000,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "r1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_audio_sha256": null,
+            "source_ref": null,
+            "received_at": null,
+            "model": "synthetic-curated",
+            "resource_id": null,
+            "server_log_id": null,
+            "raw_envelope": {}
+          },
+          "turns": [
+            {
+              "id": "saving",
+              "original_index": 1,
+              "text": "方案 B 相比方案 A 每年节省四万元。",
+              "global_start_ms": 30000,
+              "global_end_ms": 38000,
+              "local_start_ms": 0,
+              "local_end_ms": 8000,
+              "speaker_scoped_id": "speaker:host",
+              "speaker_entity_id": null,
+              "confidence": 0.97
+            }
+          ],
+          "raw_source": {}
+        },
+        {
+          "contract_version": "asr-input/0.1",
+          "source": {
+            "provider": "synthetic-product-review",
+            "provider_request_id": "req-seg-d3",
+            "device_id": "device-c-budget-check",
+            "recording_id": "rec-c-budget-check",
+            "conversation_id": "c-budget-check",
+            "segment_id": "seg-d3",
+            "segment_offset_ms": 60000,
+            "segment_duration_ms": 30000,
+            "transcript_revision": "r1",
+            "completion_status": "final",
+            "recording_started_at": "2026-01-05T09:00:00+08:00",
+            "capture_timezone": "Asia/Shanghai",
+            "source_audio_sha256": null,
+            "source_ref": null,
+            "received_at": null,
+            "model": "synthetic-curated",
+            "resource_id": null,
+            "server_log_id": null,
+            "raw_envelope": {}
+          },
+          "turns": [
+            {
+              "id": "final",
+              "original_index": 1,
+              "text": "最终敲定方案 B，预算二十六万元，七月启动第一阶段。",
+              "global_start_ms": 60000,
+              "global_end_ms": 68000,
+              "local_start_ms": 0,
+              "local_end_ms": 8000,
+              "speaker_scoped_id": "speaker:host",
+              "speaker_entity_id": null,
+              "confidence": 0.97
+            }
+          ],
+          "raw_source": {}
+        }
+      ]
+    }
+  ]
+}

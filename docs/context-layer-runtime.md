@@ -80,3 +80,15 @@ make build
 转写来源修订与记忆注释修订是不同操作。已接收分片可通过 `supersedes_revision` 替换为新的 `transcript_revision`：新修订必须显式指明被替换的活动修订，替换后旧附件置为非活动但保留原始结果与原话作为审计历史；由旧附件派生的笔记与候选记忆被标记为 stale，不再出现在常规检索中，同时自动为新修订入队重新提炼与发布。每个分片任意时刻只有一个活动修订，同键不同内容仍然拒绝，跨分片替换不允许。stale 内容仍可显式审计：`search_memory` 与 `get_context_item` 支持 `include_stale`，`get_evidence_context` 的结果带 `stale` 标记（标明目标轮次来自已被替换的分片），`get_annotation_history` 保留旧注释版本。
 
 这是独立的实验接口，不宣称完整兼容领域 0.1 草案的快照分页、双时间与状态推导；`build_context` 提供实验性的字节预算与覆盖缺口，但其契约不是草案契约。客户端使用 [配置模板](../examples/context-memory.json) 并替换路径；项目不会自动修改用户的 MCP 配置。
+
+## 决策轨迹工具
+
+`cmd/context-memory` 额外注册只读工具 `get_decision_trail`（`schema_version: "decision-trail-v1"`）。实现位于 `internal/app/decision_trail.go`：
+
+- 候选由 Worldline current claims 通过固定 cue 规则 `rule-v1` 判定（`candidate_source: "rule-v1"`）；
+- 状态只由 claim 与 `decision.review` 事件确定性推导，同一输入重复调用字节一致；
+- `known_at` 使用系统记录时间过滤复核事件；未知提及时间的候选不进入历史视图；
+- 来源失效、遗忘内容与多候选分别降级为 `unresolved` 并给出原因；
+- profile 模式读取 profile 的 `plane/events.db`，不再打开记忆库内的事件表。
+
+只读注册：`--read-only` 下该工具仍可用，且不暴露任何写工具。

@@ -833,3 +833,19 @@ func TestHybridRetrievalVersionSelection(t *testing.T) {
 		t.Fatalf("omitted retrieval_version differs from explicit v1\ndefault: %s\nv1: %s", defaultBody, v1Body)
 	}
 }
+
+func TestHealthReflectsDatabaseFailure(t *testing.T) {
+	env := newTestEnv(t, "")
+	if err := env.store.DB().Close(); err != nil {
+		t.Fatal(err)
+	}
+	resp := env.raw(t, http.MethodGet, "/healthz", "", nil)
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("healthz after database close: %d %s", resp.StatusCode, body)
+	}
+	if !strings.Contains(string(body), `"degraded"`) || !strings.Contains(string(body), `"unavailable"`) {
+		t.Fatalf("healthz body: %s", body)
+	}
+}

@@ -95,6 +95,19 @@ def wait_http(url: str, process: subprocess.Popen, log: Path, timeout: float = 4
     raise TimeoutError(f"server did not become ready at {url}; see {log}")
 
 
+def create_profiles(profiles_root: Path, db: Path, audio: Path, env: dict) -> dict:
+    """Create disposable profiles, clearing only this runner's own directory."""
+    import shutil as _shutil
+    _shutil.rmtree(profiles_root, ignore_errors=True)
+    profiles_root.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run([sys.executable, str(ROOT/'scripts/synthetic-profile-fixture.py'),
+                             '--profiles-root', str(profiles_root), '--db', str(db),
+                             '--audio-dir', str(audio)], cwd=ROOT, env=env, text=True, capture_output=True)
+    if result.returncode != 0:
+        raise RuntimeError(f'profile fixture failed ({result.returncode}): {result.stderr.strip()}')
+    return __import__('json').loads(result.stdout.splitlines()[-1])
+
+
 def run() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--artifacts', type=Path, help='output directory (defaults to a fresh temporary directory)')
@@ -130,11 +143,8 @@ def run() -> int:
             raise RuntimeError('synthetic web-demo did not report its temporary fixture directory')
         fixture_dir = Path(demo_dir_line)
         profiles_root = artifacts/'profiles'
-        fixture = subprocess.run([sys.executable, str(ROOT/'scripts/synthetic-profile-fixture.py'),
-                                  '--profiles-root', str(profiles_root), '--db', str(fixture_dir/'synthetic-eval.db'),
-                                  '--audio-dir', str(fixture_dir/'synthetic-audio')],
-                                 cwd=ROOT, env=env, text=True, capture_output=True, check=True)
-        credentials = __import__('json').loads(fixture.stdout.splitlines()[-1])
+        credentials = create_profiles(profiles_root, fixture_dir/'synthetic-eval.db',
+                                      fixture_dir/'synthetic-audio', env)
         profile_port = free_port()
         profile_base = f'http://127.0.0.1:{profile_port}'
         profile_log_path = artifacts/'profile-web.log'
@@ -154,11 +164,8 @@ def run() -> int:
             # operations. Give that flow its own freshly adopted profile so the
             # existing local-v2 suite retains the pristine synthetic fixture.
             feature_profiles = artifacts/'highlights-brief-profiles'
-            feature_fixture = subprocess.run([sys.executable, str(ROOT/'scripts/synthetic-profile-fixture.py'),
-                                              '--profiles-root', str(feature_profiles), '--db', str(fixture_dir/'synthetic-eval.db'),
-                                              '--audio-dir', str(fixture_dir/'synthetic-audio')],
-                                             cwd=ROOT, env=env, text=True, capture_output=True, check=True)
-            feature_credentials = __import__('json').loads(feature_fixture.stdout.splitlines()[-1])
+            feature_credentials = create_profiles(feature_profiles, fixture_dir/'synthetic-eval.db',
+                                                  fixture_dir/'synthetic-audio', env)
             feature_port = free_port()
             feature_base = f'http://127.0.0.1:{feature_port}'
             FakePolishHandler.requests = []

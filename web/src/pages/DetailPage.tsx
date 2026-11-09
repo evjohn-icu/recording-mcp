@@ -230,7 +230,7 @@ function TranscriptTab({ conversation, onOpenEvidence, onChanged }: { conversati
             includeAmbient={includeAmbient}
             onOpenEvidence={onOpenEvidence}
             onChanged={onChanged}
-            key={recording.recording_id}
+            key={`${recording.recording_id}:${conversation.processing.original_turns}`}
           />
         ))}
     </div>
@@ -561,6 +561,22 @@ function HistoryTab({ conversationId, current }: { conversationId: string; curre
   )
 }
 
+const PHASE_LABELS: Record<string, string> = { ingest: '音频接收', asr: '语音转写', extract: '信息提炼', publish: '发布', index: '索引' }
+const PHASE_STATE_LABELS: Record<string, string> = { pending: '等待', running: '处理中', done: '完成', failed: '失败', skipped: '跳过' }
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatDuration(ms: number): string {
+  const total = Math.round(ms / 1000)
+  const minutes = Math.floor(total / 60)
+  const seconds = total % 60
+  return minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`
+}
+
 export function DetailPage() {
   const { conversationId = '' } = useParams()
   const [searchParams] = useSearchParams()
@@ -614,6 +630,19 @@ export function DetailPage() {
     return () => window.removeEventListener(CLOSE_EVENT, onClose)
   }, [])
 
+  const previousStageRef = useRef('')
+  useEffect(() => {
+    if (!processing) return
+    const stage = processing.current_stage || ''
+    if (previousStageRef.current !== 'completed' && stage === 'completed') {
+      // The page may have loaded before ingest/asr produced any rows; refresh
+      // once the pipeline reports completion so the transcript appears without
+      // a manual reload.
+      reload()
+    }
+    previousStageRef.current = stage
+  }, [processing, reload])
+
   useEffect(() => {
     setTab('transcript')
     setEvidenceTurn(null)
@@ -650,6 +679,13 @@ export function DetailPage() {
               <ForgetAction profile={sessionStorage.getItem('recording-profile') || ''} request={{ scope: 'conversation', conversation_id: conversationId }} label="永久遗忘整个会话" onDone={reload} />
               <p className="detail-meta">
                 <time dateTime={data.recording_started_at || undefined}>{formatDate(data.recording_started_at)}</time>
+                {data.recordings?.[0]?.source_file && (
+                  <span data-testid="recording-source-meta">
+                    {data.recordings[0].source_file}
+                    {data.recordings[0].source_bytes ? ` · ${formatBytes(data.recordings[0].source_bytes)}` : ''}
+                    {data.recordings[0].duration_ms ? ` · ${formatDuration(data.recordings[0].duration_ms)}` : ''}
+                  </span>
+                )}
                 <StatusBadge status={data.processing.analysis_status} />
                 <span className="annotation-version">
                   {data.annotation_version === '' ? '尚未生成 AI 归纳' : `归纳版本 ${data.annotation_version}`}
@@ -665,13 +701,32 @@ export function DetailPage() {
                 </div>
               </details>
               {processing && <section className="processing-progress" aria-live="polite">
-                <strong>后台处理</strong>
-                <span>{(processing.workers ?? []).some((worker) => worker.alive) ? '工作进程在线' : '未检测到工作进程'}</span>
-                <span>{processing.generator_enabled ? '候选生成器已启用' : (processing.workers ?? []).some((worker) => worker.alive) ? '候选生成器已关闭' : '候选生成器状态未知'}</span>
-                {(processing.jobs ?? []).filter((job) => ['queued', 'running', 'retry_wait', 'failed'].includes(job.status)).map((job) => <p key={job.id}>
-                  {job.stage}：{job.status}（{job.attempt_count}/{job.max_attempts}）
-                  {job.status === 'failed' && <button type="button" className="secondary-button" onClick={() => void retryJob(job.id, job.attempt_count)}>重试</button>}
-                </p>)}
+                <header className="processing-header">
+                  <strong>后台处理</strong>
+                  <span data-testid="asr-capability">
+                    {processing.asr_provider && processing.asr_provider !== 'off'
+                      ? `语音转写：${processing.asr_provider}${processing.asr_available ? '（可用）' : '（worker 未就绪）'}`
+                      : '语音转写：未配置'}
+                    {' · '}
+                    {processing.worker_alive ? '工作进程在线' : '未检测到工作进程'}
+                  </span>
+                  <span>{processing.generator_enabled ? '候选生成器已启用' : processing.worker_alive ? '候选生成器已关闭' : '候选生成器状态未知'}</span>
+                </header>
+                <ol className="processing-phases" data-testid="processing-phases">
+                  {(processing.phases ?? []).map((phase) => (
+                    <li key={phase.name} data-testid={`phase-${phase.name}`} data-state={phase.state} className={`phase phase-${phase.state}`.trim()}>
+                      <span className="phase-name">{PHASE_LABELS[phase.name] || phase.name}</span>
+                      <span className="phase-state">{PHASE_STATE_LABELS[phase.state] || phase.state}</span>
+                      {phase.state === 'failed' && (
+                        <div className="phase-error">
+                          {phase.error && <span>{phase.error}</span>}
+                          {phase.error_action && <span className="phase-action">下一步：{phase.error_action}</span>}
+                          {phase.job_id && <button type="button" className="secondary-button" onClick={() => void retryJob(phase.job_id as string, phase.attempt ?? 0)}>重试</button>}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ol>
                 {retryError && <p role="alert" className="note-error">{retryError}</p>}
               </section>}
             </header>

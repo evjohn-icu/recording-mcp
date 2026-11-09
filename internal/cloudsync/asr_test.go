@@ -115,3 +115,20 @@ func TestPCMDurationMS(t *testing.T) {
 		t.Errorf("pcmDurationMS(32000) = %d, want 1000", got)
 	}
 }
+
+func TestFixtureTranscriberCustomWindow(t *testing.T) {
+	// 120 s of audio with a 60 s window must produce exactly two segments.
+	path := writeTestPCM(t, 120*16000)
+	results, err := FixtureTranscriber{WindowMS: 60000}.Transcribe(context.Background(), path, MetaBasis{
+		DeviceID: "d", RecordingID: "r", ConversationID: "r", Revision: "asr-v1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("segments=%d want 2", len(results))
+	}
+	if results[0].Turns[0].GlobalEndMS == nil || *results[0].Turns[0].GlobalEndMS != 60000 {
+		t.Fatalf("first window end=%v", results[0].Turns[0].GlobalEndMS)
+	}
+}

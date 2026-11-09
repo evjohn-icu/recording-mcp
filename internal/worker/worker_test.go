@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -214,5 +215,47 @@ func TestRunStopsOnContextCancel(t *testing.T) {
 	}
 	if err := Run(ctx, cfg); err != nil {
 		t.Fatalf("Run on cancelled ctx = %v, want nil", err)
+	}
+}
+
+type fatalExecError struct{}
+
+func (fatalExecError) Error() string { return "fatal: audio missing" }
+func (fatalExecError) Fatal() bool   { return true }
+func (fatalExecError) ErrorDetails() map[string]string {
+	return map[string]string{"code": "audio_source_missing", "action": "re-upload the file"}
+}
+
+func TestFatalErrorSkipsRetryAndPersistsDetails(t *testing.T) {
+	db := openTestDB(t)
+	id := enqueueJob(t, db, "fatal")
+	cfg := Config{
+		DB:       db,
+		WorkerID: "w1",
+		Executor: executorFunc(func(ctx context.Context, job process.Job) (string, error) {
+			return "", fatalExecError{}
+		}),
+	}
+	ran, err := RunOnce(context.Background(), cfg)
+	if err != nil || !ran {
+		t.Fatalf("RunOnce = (%v, %v)", ran, err)
+	}
+	job, err := process.Get(context.Background(), db, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.Status != "failed" {
+		t.Fatalf("status = %q, want failed (fatal errors are not retried)", job.Status)
+	}
+	var errorJSON string
+	if err := db.QueryRow(`SELECT error_json FROM processing_attempts WHERE job_id=? ORDER BY attempt DESC LIMIT 1`, id).Scan(&errorJSON); err != nil {
+		t.Fatal(err)
+	}
+	var details map[string]string
+	if err := json.Unmarshal([]byte(errorJSON), &details); err != nil {
+		t.Fatal(err)
+	}
+	if details["code"] != "audio_source_missing" || details["action"] == "" || details["error"] == "" {
+		t.Fatalf("attempt details=%v", details)
 	}
 }

@@ -72,12 +72,52 @@ type Service struct {
 }
 
 func New(repo Repository) *Service { return &Service{repo: repo} }
+func immediateTxDSN(path string) string {
+	if path == "" || path == ":memory:" || path == "::memory:" || strings.HasPrefix(path, "file::memory:") || strings.Contains(path, "mode=memory") {
+		return path
+	}
+	separator := "?"
+	if strings.Contains(path, "?") {
+		separator = "&"
+	}
+	return path + separator + "_txlock=immediate"
+}
+
+func planeEnsureWAL(db *sql.DB) error {
+	var lastErr error
+	for attempt := 0; attempt < 100; attempt++ {
+		var mode string
+		if err := db.QueryRow(`PRAGMA journal_mode`).Scan(&mode); err == nil && mode == "wal" {
+			return nil
+		}
+		if err := db.QueryRow(`PRAGMA journal_mode=WAL`).Scan(&mode); err == nil && mode == "wal" {
+			return nil
+		} else if err != nil {
+			lastErr = err
+		} else {
+			lastErr = fmt.Errorf("journal_mode=%q", mode)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("enable WAL journal: %w", lastErr)
+}
+
 func Open(path string) (*Service, error) {
-	db, err := sql.Open("sqlite", path)
+	db, err := sql.Open("sqlite", immediateTxDSN(path))
 	if err != nil {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
+	if _, err := db.Exec(`PRAGMA busy_timeout=5000; PRAGMA secure_delete=ON`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if path != "" && path != ":memory:" && path != "::memory:" {
+		if err := planeEnsureWAL(db); err != nil {
+			db.Close()
+			return nil, err
+		}
+	}
 	_, err = db.Exec(`PRAGMA busy_timeout=5000; PRAGMA secure_delete=ON; CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY,payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS plane_control(id INTEGER PRIMARY KEY CHECK(id=1),retired INTEGER NOT NULL DEFAULT 0 CHECK(retired IN (0,1))); INSERT OR IGNORE INTO plane_control(id,retired) VALUES(1,0); CREATE TRIGGER IF NOT EXISTS events_no_update BEFORE UPDATE ON events BEGIN SELECT RAISE(ABORT,'immutable events'); END; CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events WHEN NOT EXISTS(SELECT 1 FROM plane_control WHERE id=1 AND retired=1) BEGIN SELECT RAISE(ABORT,'immutable events'); END; CREATE TRIGGER IF NOT EXISTS events_no_insert BEFORE INSERT ON events WHEN EXISTS(SELECT 1 FROM plane_control WHERE id=1 AND retired=1) BEGIN SELECT RAISE(ABORT,'profile event store is retired'); END;`)
 	if err != nil {
 		db.Close()

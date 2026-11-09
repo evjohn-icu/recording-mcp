@@ -31,7 +31,7 @@ func TestMCPToolsExposeQueryAndConversationMemory(t *testing.T) {
 		t.Fatal(err)
 	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, app.New(store, nil, nil, ""), nil, false).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestGetCurrentContextProjectsSeededMemory(t *testing.T) {
 		}
 	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, app.New(store, nil, nil, ""), nil, false).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestGetCurrentContextPinnedScopeIsNotWidened(t *testing.T) {
 		}
 	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, app.New(store, nil, nil, ""), nil, false).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ func TestGetCurrentContextReportsNoHitsUnderPinnedScope(t *testing.T) {
 		}
 	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, app.New(store, nil, nil, ""), nil, false).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +340,7 @@ func TestNeutralIngestAnnotateAndTrackCoverageOverMCP(t *testing.T) {
 	}
 	defer store.Close()
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(store, app.New(store, nil, nil, ""), nil, false).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -486,7 +486,7 @@ func TestRetrievalToolsOverMCP(t *testing.T) {
 	}
 	defer store.Close()
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, st, nil)
+	ss, err := newServer(store, app.New(store, nil, nil, ""), nil, false).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -550,7 +550,7 @@ func TestMCPReplayPreservesRawProviderNumbers(t *testing.T) {
 		t.Fatal(err)
 	}
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, st, nil)
+	ss, err := newServer(store, app.New(store, nil, nil, ""), nil, false).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -605,7 +605,7 @@ func TestMemoryLinkToolsOverMCP(t *testing.T) {
 	}
 
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, st, nil)
+	ss, err := newServer(store, app.New(store, nil, nil, ""), nil, false).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -716,7 +716,7 @@ func TestReadOnlyServerExposesOnlyReadTools(t *testing.T) {
 	}
 	defer store.Close()
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, app.New(store, nil, nil, ""), true).Connect(ctx, st, nil)
+	ss, err := newServer(store, app.New(store, nil, nil, ""), nil, true).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -740,7 +740,7 @@ func TestReadOnlyServerExposesOnlyReadTools(t *testing.T) {
 		"get_processing_status", "get_annotation_history", "list_conversations",
 		"get_evidence_context", "search_memory", "build_context", "get_current_context",
 		"list_memory_links", "get_speaker_projection", "list_speaker_bindings",
-		"list_highlights", "build_context_brief",
+		"list_highlights", "build_context_brief", "get_decision_trail",
 	}
 	if len(got) != len(wantRead) {
 		t.Fatalf("read-only server exposes %d tools %v, want %d", len(got), got, len(wantRead))
@@ -805,7 +805,7 @@ func TestBuildContextToolSmoke(t *testing.T) {
 	}
 
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, st, nil)
+	ss, err := newServer(store, app.New(store, nil, nil, ""), nil, false).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -901,7 +901,7 @@ func TestSpeakerBindingToolsOverMCP(t *testing.T) {
 	}
 
 	st, ct := mcp.NewInMemoryTransports()
-	ss, err := newServer(store, app.New(store, nil, nil, ""), false).Connect(ctx, st, nil)
+	ss, err := newServer(store, app.New(store, nil, nil, ""), nil, false).Connect(ctx, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

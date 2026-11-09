@@ -21,6 +21,9 @@ type Service struct {
 	Semantic      semantic.SemanticRetriever
 	Reranker      contextbuild.Reranker
 	Assessor      contextbuild.EvidenceAssessor
+	// ASRProvider names the configured transcription provider ("off" or empty
+	// when uploads cannot be transcribed). It is reported by Capabilities.
+	ASRProvider string
 	// AudioDir is the cloud-sync audio directory. Every served clip must live
 	// beneath it; an empty value disables audio serving instead of allowing
 	// paths relative to the process working directory.

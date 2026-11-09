@@ -2,20 +2,21 @@
 # M1 demo: ingest a doubao ASR fixture, run the honest pipeline worker with
 # the synthetic generator (allowed explicitly for demos), then verify over
 # the context-memory MCP stdio server that the raw speech is searchable and
-# the index reports ready. Everything lives under data/demo (gitignored).
+# the index reports ready. Everything lives under a fresh temporary directory
+# so the demo can never delete or overwrite a user database.
 set -eu
 
 cd "$(dirname "$0")/.."
 
-DEMO_DIR=data/demo
+DEMO_DIR=$(mktemp -d "${TMPDIR:-/tmp}/recording-mcp-demo.XXXXXX") || {
+	echo "demo: cannot create a temporary directory" >&2
+	exit 1
+}
 DB="$DEMO_DIR/context-memory-demo.db"
+echo "demo directory: $DEMO_DIR (kept after the run)"
 
 echo "== build =="
 make build
-
-echo "== reset $DEMO_DIR =="
-rm -rf "$DEMO_DIR"
-mkdir -p "$DEMO_DIR"
 
 echo "== 1/4 normalize the doubao fixture =="
 bin/adapter-doubao \

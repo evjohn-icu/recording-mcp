@@ -19,6 +19,9 @@ type Heartbeat struct {
 	PID              int       `json:"pid"`
 	Stages           []string  `json:"stages"`
 	GeneratorEnabled bool      `json:"generator_enabled"`
+	ASRProvider      string    `json:"asr_provider,omitempty"`
+	ASRAvailable     bool      `json:"asr_available"`
+	EmbedProvider    string    `json:"embed_provider,omitempty"`
 	LastSeenAt       time.Time `json:"last_seen_at"`
 	Alive            bool      `json:"alive"`
 }
@@ -28,7 +31,7 @@ func WriteHeartbeat(ctx context.Context, db *sql.DB, h Heartbeat, now time.Time)
 	if err != nil {
 		return err
 	}
-	_, err = db.ExecContext(ctx, `INSERT INTO worker_heartbeats(worker_id,pid,stages_json,generator_enabled,last_seen_at) VALUES(?,?,?,?,?) ON CONFLICT(worker_id) DO UPDATE SET pid=excluded.pid,stages_json=excluded.stages_json,generator_enabled=excluded.generator_enabled,last_seen_at=excluded.last_seen_at`, h.WorkerID, h.PID, string(stages), boolInt(h.GeneratorEnabled), now.UnixMilli())
+	_, err = db.ExecContext(ctx, `INSERT INTO worker_heartbeats(worker_id,pid,stages_json,generator_enabled,asr_provider,asr_available,embed_provider,last_seen_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(worker_id) DO UPDATE SET pid=excluded.pid,stages_json=excluded.stages_json,generator_enabled=excluded.generator_enabled,asr_provider=excluded.asr_provider,asr_available=excluded.asr_available,embed_provider=excluded.embed_provider,last_seen_at=excluded.last_seen_at`, h.WorkerID, h.PID, string(stages), boolInt(h.GeneratorEnabled), h.ASRProvider, boolInt(h.ASRAvailable), h.EmbedProvider, now.UnixMilli())
 	return err
 }
 
@@ -38,7 +41,7 @@ func RemoveHeartbeat(ctx context.Context, db *sql.DB, workerID string) error {
 }
 
 func ReadHeartbeats(ctx context.Context, db *sql.DB, now time.Time, staleAfter time.Duration) ([]Heartbeat, error) {
-	rows, err := db.QueryContext(ctx, `SELECT worker_id,pid,stages_json,generator_enabled,last_seen_at FROM worker_heartbeats ORDER BY worker_id`)
+	rows, err := db.QueryContext(ctx, `SELECT worker_id,pid,stages_json,generator_enabled,asr_provider,asr_available,embed_provider,last_seen_at FROM worker_heartbeats ORDER BY worker_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -47,13 +50,14 @@ func ReadHeartbeats(ctx context.Context, db *sql.DB, now time.Time, staleAfter t
 	for rows.Next() {
 		var h Heartbeat
 		var raw string
-		var enabled int
+		var enabled, asrAvailable int
 		var stamp int64
-		if err := rows.Scan(&h.WorkerID, &h.PID, &raw, &enabled, &stamp); err != nil {
+		if err := rows.Scan(&h.WorkerID, &h.PID, &raw, &enabled, &h.ASRProvider, &asrAvailable, &h.EmbedProvider, &stamp); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(raw), &h.Stages)
 		h.GeneratorEnabled = enabled != 0
+		h.ASRAvailable = asrAvailable != 0
 		h.LastSeenAt = fromMS(stamp)
 		h.Alive = now.Sub(h.LastSeenAt) <= staleAfter
 		out = append(out, h)

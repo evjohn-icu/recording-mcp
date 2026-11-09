@@ -1,4 +1,7 @@
 name: ci
+
+permissions:
+  contents: read
 on: [push, pull_request]
 jobs:
   specs-and-python:
@@ -17,7 +20,7 @@ jobs:
       - run: make python-test
 
   synthetic-browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -51,6 +54,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Install ffmpeg for real decoder tests
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: go vet ./...
       - run: go test -race -count=1 ./...
       - run: make build
@@ -121,3 +126,57 @@ jobs:
           name: e2e-cloud-logs
           path: data/e2e/**/*.log
           if-no-files-found: ignore
+
+  product-browser:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm ci --prefix web
+      - run: python -m pip install -r requirements-browser.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: make build web
+      - run: python scripts/run-product-browser.py --skip-build --artifacts artifacts/product-browser
+      - name: decision trail browser suite
+        run: |
+          cd web
+          npm exec vite -- preview --host 127.0.0.1 --port 4173 --strictPort &
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+          cd ..
+          BROWSER_ARTIFACT_DIR=artifacts/decision-browser BASE_URL=http://127.0.0.1:4173 python scripts/decision-trail-browser.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-browser-artifacts
+          path: |
+            artifacts/product-browser/
+            artifacts/decision-browser/
+          if-no-files-found: ignore
+
+  docker-deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate compose file
+        run: |
+          printf 'MEMORY_PROFILE_PASSWORD=ci-only-password\n' > ci.env
+          docker compose --env-file ci.env config >/dev/null
+      - name: Build and verify a disposable stack
+        env:
+          RUN_DOCKER_DEPLOYMENT_TEST: '1'
+        run: python -m unittest discover -s scripts -p 'test_productization_deploy.py' -v

@@ -22,7 +22,7 @@ func main() {
 
 func run(args []string, getenv func(string) string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: context-profile create|list|adopt [flags]")
+		return errors.New("usage: context-profile create|verify|list|adopt [flags]")
 	}
 	command := args[0]
 	fs := flag.NewFlagSet("context-profile "+command, flag.ContinueOnError)
@@ -57,6 +57,15 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) er
 		}
 		_, err = fmt.Fprintf(stdout, "Created profile %q at %s\n", paths.Name, paths.Root)
 		return err
+	case "verify":
+		if strings.TrimSpace(*name) == "" {
+			return errors.New("--name is required")
+		}
+		if !manager.Verify(*name, getenv(*passwordEnv)) {
+			return fmt.Errorf("profile %q verification failed", *name)
+		}
+		_, err = fmt.Fprintf(stdout, "Profile %q verified\n", *name)
+		return err
 	case "adopt":
 		if strings.TrimSpace(*name) == "" || strings.TrimSpace(*legacyDB) == "" {
 			return errors.New("adopt requires --name and --db")
@@ -79,6 +88,6 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) er
 		}
 		return nil
 	default:
-		return fmt.Errorf("unknown command %q; use create, list or adopt", command)
+		return fmt.Errorf("unknown command %q; use create, verify, list or adopt", command)
 	}
 }
