@@ -88,7 +88,7 @@ def run_ark(args, wavs: list[str]) -> tuple[list[str], str]:
 
     processor, tokenizer, model, bad_words_ids = load_ark(args.model, args.device, args.revision)
     texts: list[str] = []
-    language = ""
+    language = args.language or ""
     for i, wav_path in enumerate(wavs, 1):
         log(f"window {i}/{len(wavs)}")
         conversation = [
@@ -96,7 +96,8 @@ def run_ark(args, wavs: list[str]) -> tuple[list[str], str]:
                 "role": "user",
                 "content": [
                     {"type": "audio", "path": wav_path},
-                    {"type": "text", "text": "Please transcribe this audio."},
+                    {"type": "text", "text": (f"Please transcribe this audio in {args.language}."
+                                               if args.language else "Please transcribe this audio.")},
                 ],
             }
         ]
@@ -212,7 +213,8 @@ def main() -> int:
     samples = np.memmap(args.pcm, dtype="<i2", mode="r")
     texts: list[str] = []
     language = ""
-    with tempfile.TemporaryDirectory(prefix="local-asr-") as tmp:
+    tmp_parent = os.path.dirname(os.path.abspath(args.pcm))
+    with tempfile.TemporaryDirectory(prefix=".local-asr-", dir=tmp_parent) as tmp:
         wavs = []
         for i, (start_ms, end_ms) in enumerate(windows):
             path = os.path.join(tmp, f"window-{i + 1:04d}.wav")

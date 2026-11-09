@@ -355,7 +355,12 @@ func (s *Service) RunASRJob(ctx context.Context, job process.Job) (string, error
 	results, err := s.trans.Transcribe(ctx, pcmAbs, meta)
 	if err != nil {
 		s.markASRFailed(context.WithoutCancel(ctx), p.ProviderRecordingID, err)
-		return "", &Error{Code: "asr_failed", Message: "语音转写失败", Action: "检查 ASR 凭据与网络后重试", Err: err}
+		action := "检查 ASR 凭据与网络后重试"
+		switch s.provider {
+		case "ark", "qwen", "local":
+			action = "确认 .venv-asr 可用、本地模型已下载且 GPU 显存足够后重试"
+		}
+		return "", &Error{Code: "asr_failed", Message: "语音转写失败", Action: action, Err: err}
 	}
 	for _, result := range results {
 		if _, err := s.store.IngestTranscript(ctx, result); err != nil {

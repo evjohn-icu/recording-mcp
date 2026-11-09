@@ -16,15 +16,33 @@ import pathlib
 import re
 import subprocess
 import sys
+import unicodedata
 
-DIGITS = str.maketrans({"零": "0", "〇": "0", "一": "1", "二": "2", "三": "3", "四": "4",
-                        "五": "5", "六": "6", "七": "7", "八": "8", "九": "9",
-                        "幺": "1", "两": "2"})
+CN_DIGITS = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
+             "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "幺": 1}
+CN_UNITS = {"十": 10, "百": 100, "千": 1000}
+CN_RUN = re.compile(r"[零〇一二三四五六七八九两幺十百千]+")
 KEEP = re.compile(r"[^\u4e00-\u9fffA-Za-z0-9]")
 
 
+def _cn_number(run: str) -> str:
+    if not any(ch in CN_UNITS for ch in run):
+        return "".join(str(CN_DIGITS[ch]) for ch in run)
+    total = 0
+    digit = None
+    for ch in run:
+        if ch in CN_DIGITS:
+            digit = CN_DIGITS[ch]
+        else:
+            total += (1 if digit is None else digit) * CN_UNITS[ch]
+            digit = None
+    return str(total + (digit or 0))
+
+
 def normalize(text: str) -> str:
-    return KEEP.sub("", text.translate(DIGITS))
+    text = unicodedata.normalize("NFKC", text)
+    text = CN_RUN.sub(lambda m: _cn_number(m.group(0)), text)
+    return KEEP.sub("", text)
 
 
 def load_reference(path: pathlib.Path) -> str:

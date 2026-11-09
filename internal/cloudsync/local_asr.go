@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
+	"unicode/utf8"
 
 	"recordingmcp/internal/asrinput"
 )
@@ -38,6 +40,8 @@ type LocalTranscriber struct {
 	OverlapMS int64
 	// MaxNewTokens bounds generated tokens per window.
 	MaxNewTokens int
+	// Timeout bounds one runner invocation; zero means 30 minutes.
+	Timeout time.Duration
 	// Env appends environment variables for the runner.
 	Env []string
 }
@@ -111,15 +115,25 @@ func (t LocalTranscriber) Transcribe(ctx context.Context, pcmPath string, meta M
 	if strings.TrimSpace(t.Revision) != "" {
 		args = append(args, "--revision", t.Revision)
 	}
+	timeout := t.Timeout
+	if timeout <= 0 {
+		timeout = 30 * time.Minute
+	}
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	var stdout, stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, python, args...)
-	cmd.Env = append(os.Environ(), t.Env...)
+	cmd := exec.CommandContext(runCtx, python, args...)
+	cmd.Env = localASREnv(t.Env)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		detail := strings.TrimSpace(stderr.String())
 		if len(detail) > 2000 {
-			detail = detail[len(detail)-2000:]
+			cut := len(detail) - 2000
+			for cut < len(detail) && !utf8.RuneStart(detail[cut]) {
+				cut++
+			}
+			detail = detail[cut:]
 		}
 		if detail == "" {
 			return nil, fmt.Errorf("cloudsync: local ASR runner failed: %w", err)
@@ -180,4 +194,22 @@ func (t LocalTranscriber) Transcribe(ctx context.Context, pcmPath string, meta M
 		})
 	}
 	return results, nil
+}
+
+// localASREnv passes only what the runner needs. The worker environment holds
+// API keys and the profile password; third-party model code must not inherit
+// them.
+func localASREnv(extra []string) []string {
+	keys := []string{
+		"PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL",
+		"CUDA_VISIBLE_DEVICES", "CUDA_HOME", "LD_LIBRARY_PATH",
+		"HF_HOME", "HF_HUB_CACHE", "HF_HUB_OFFLINE", "TRANSFORMERS_CACHE", "XDG_CACHE_HOME",
+	}
+	env := make([]string, 0, len(keys)+len(extra))
+	for _, key := range keys {
+		if value, ok := os.LookupEnv(key); ok {
+			env = append(env, key+"="+value)
+		}
+	}
+	return append(env, extra...)
 }

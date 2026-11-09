@@ -28,7 +28,7 @@ upload -> ingest stage (ffmpeg -> 16k mono PCM)
 
 ## Failure semantics
 
-- Missing script/modules/model path -> startup error for web/worker.
+- Missing script or Python modules -> startup error for web/worker; an unreachable model id/path fails on the first job.
 - Runner non-zero exit -> job error carrying the tail of stderr (retryable).
 - Invalid JSON, duplicate window index, or out-of-range bounds -> job error; no rows written.
 - Empty transcription text is still ingested as a window with no retained turn, preserving

@@ -84,12 +84,24 @@ func SelectTranscriber(cfg TranscriberConfig) (Transcriber, error) {
 				revision = defaultQwenRevision
 			}
 		}
+		if revision == "" {
+			if info, err := os.Stat(model); err != nil || !info.IsDir() {
+				return nil, fmt.Errorf("local ASR model %q is not pinned; pass --asr-revision <commit> or use a local model directory", model)
+			}
+		}
 		dtype := strings.TrimSpace(cfg.Dtype)
 		if dtype == "" {
 			dtype = "float16"
 		}
 		if dtype != "float16" {
 			return nil, fmt.Errorf("--asr-dtype %q is unsupported; local ASR runs float16 only", dtype)
+		}
+		windowMS := cfg.WindowMS
+		if windowMS <= 0 {
+			windowMS = 30000
+		}
+		if cfg.OverlapMS < 0 || cfg.OverlapMS >= windowMS {
+			return nil, fmt.Errorf("--asr-overlap-ms %d must be in [0, --asr-window-ms %d) for local ASR", cfg.OverlapMS, windowMS)
 		}
 		python := strings.TrimSpace(cfg.Python)
 		if python == "" {
@@ -107,7 +119,7 @@ func SelectTranscriber(cfg TranscriberConfig) (Transcriber, error) {
 		return &LocalTranscriber{
 			Python: python, Script: script, Backend: backend, Model: model, Revision: revision,
 			Dtype: dtype, Device: cfg.Device, Language: cfg.Language,
-			SegmentMS: cfg.WindowMS, OverlapMS: cfg.OverlapMS, MaxNewTokens: cfg.MaxNewTokens,
+			SegmentMS: windowMS, OverlapMS: cfg.OverlapMS, MaxNewTokens: cfg.MaxNewTokens,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown --asr-provider %q (want off, fixture, doubao, ark, qwen or local)", cfg.Provider)

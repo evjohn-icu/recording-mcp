@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func writeStub(t *testing.T, body string) string {
@@ -106,6 +107,33 @@ print(json.dumps({"windows": [{"index": 1, "start_ms": 0, "end_ms": 1000,
 		if !strings.Contains(text, want) {
 			t.Fatalf("runner args missing %q: %s", want, text)
 		}
+	}
+}
+
+func TestLocalTranscriberDoesNotLeakEnvironment(t *testing.T) {
+	requirePython(t)
+	t.Setenv("LOCAL_ASR_SECRET", "should-not-reach-runner")
+	script := writeStub(t, `import json, os, sys
+print(json.dumps({"windows": [{"index": 1, "start_ms": 0, "end_ms": 1000,
+    "text": "secret=" + os.environ.get("LOCAL_ASR_SECRET", "absent") + " path=" + str(bool(os.environ.get("PATH")))}]}))
+`)
+	tr := LocalTranscriber{Python: "python3", Script: script, Backend: "ark", Model: "m", Dtype: "float16"}
+	results, err := tr.Transcribe(context.Background(), writePCM(t, 1000), localTestMeta())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text := results[0].Turns[0].Text; text != "secret=absent path=True" {
+		t.Fatalf("runner environment = %q, want secrets filtered and PATH kept", text)
+	}
+}
+
+func TestLocalTranscriberTimeout(t *testing.T) {
+	requirePython(t)
+	script := writeStub(t, "import time\ntime.sleep(5)\n")
+	tr := LocalTranscriber{Python: "python3", Script: script, Backend: "ark", Model: "m", Dtype: "float16", Timeout: 100 * time.Millisecond}
+	_, err := tr.Transcribe(context.Background(), writePCM(t, 1000), localTestMeta())
+	if err == nil || !strings.Contains(err.Error(), "local ASR runner failed") {
+		t.Fatalf("error = %v, want timeout failure", err)
 	}
 }
 

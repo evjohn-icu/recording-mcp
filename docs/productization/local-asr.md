@@ -5,7 +5,7 @@
 | backend | 模型 | 特点 |
 |---|---|---|
 | `ark` | `Edge0/ARK-ASR-0.6B` | 0.6B 解码器 + Whisper 风格编码器；中文 CER 约 4.3%（模型卡） |
-| `qwen` | `Qwen/Qwen3-ASR-1.7B` | 52 语言/22 方言；中文 CER 约 3.6%（模型卡） |
+| `qwen` | `Qwen/Qwen3-ASR-1.7B` | 30 语言 + 22 中文方言（合计 52）；中文 CER 约 3.6%（模型卡） |
 
 两者都只以 **float16** 运行。内置模型默认固定到 2026-11-09 验证过的快照：
 
@@ -55,14 +55,14 @@ bin/context-worker ... --asr-provider local --asr-backend qwen
 |---|---|---|
 | `--asr-python` | `./.venv-asr/bin/python`（存在时），否则 `python3` | 解释器；启动时探测 `torch`/`transformers`/`numpy`（Qwen 另需 `qwen_asr`） |
 | `--asr-script` | `scripts/local-asr.py` | runner 路径；从仓库根启动或传绝对路径 |
-| `--asr-model` | 按 backend 取模型卡 id | 本地目录或 Hugging Face id |
+| `--asr-model` | 按 backend 取模型卡 id | 本地目录或 Hugging Face id；远程自定义 id 必须同时给 revision |
 | `--asr-revision` | 内置模型固定到已验证快照 | 自定义模型时显式固定 commit；ARK 使用 `trust_remote_code`，不固定会随 main 变化 |
 | `--asr-dtype` | `float16` | 仅支持 float16 |
 | `--asr-device` | `cuda:0` | `cpu` 也可，但速度显著下降 |
 | `--asr-window-ms` | `30000` | 窗口长度；ARK 上限 30 s |
 | `--asr-overlap-ms` | `2000` | 相邻窗口重叠 |
 | `--asr-max-new-tokens` | `512` | 每窗口生成上限 |
-| `--asr-language` | 空（自动） | 例如 `Chinese` |
+| `--asr-language` | 空（自动） | 例如 `Chinese`；qwen 作为参数，ark 写入提示词 |
 
 runner 也可单独运行，便于排查：
 
@@ -83,4 +83,5 @@ runner 也可单独运行，便于排查：
 - 不伪造 `confidence`、录音起始时间或 `valid_from`。
 - Docker 镜像不包含 Python/torch；本地 ASR 目前用于宿主机 worker（有 NVIDIA GPU 时）。
 - 模型加载按任务计费；长录音建议先用 `--asr-window-ms` 控制单窗口长度。
+- ARK 使用 `trust_remote_code=True`，模型代码以 worker 用户身份执行；runner 只继承 `PATH/HOME/CUDA/HF_*` 等白名单变量，不继承 API key 或 profile 密码。自定义模型必须显式固定 revision。
 - `scripts/local-start.sh` 会透传 `ASR_BACKEND/ASR_MODEL/ASR_PYTHON/ASR_DEVICE/ASR_REVISION`；compose 不转发这些变量。

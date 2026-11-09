@@ -33,7 +33,8 @@ go test ./internal/ingest -run TestLocalASREndToEndSmoke -count=1 -v
 python3 scripts/eval-asr-cer.py \
   --pcm data/full-transcription/segments/segment-01.pcm \
   --reference data/full-transcription/transcript.json \
-  --backend qwen --out artifacts/real-asr/qwen.json
+  --backend qwen --revision 7278e1e70fe206f11671096ffdd38061171dd6e5 \
+  --out artifacts/real-asr/qwen.json
 ```
 
 输出只含聚合指标，不含转写正文。

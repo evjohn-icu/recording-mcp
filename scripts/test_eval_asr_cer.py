@@ -24,6 +24,12 @@ class NormalizeTests(unittest.TestCase):
         self.assertEqual(mod.normalize("幺幺五八，八八九五。"), "11588895")
         self.assertEqual(mod.normalize("你好 世界！"), "你好世界")
 
+    def test_compound_and_full_width_digits(self):
+        mod = load_module()
+        self.assertEqual(mod.normalize("十五分钟"), "15分钟")
+        self.assertEqual(mod.normalize("十二月三日"), "12月3日")
+        self.assertEqual(mod.normalize("１２３"), "123")
+
     def test_levenshtein(self):
         mod = load_module()
         self.assertEqual(mod.levenshtein("abc", "abc"), 0)

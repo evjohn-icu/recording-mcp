@@ -43,6 +43,12 @@ func TestSelectTranscriberRejectsBadLocalConfig(t *testing.T) {
 	if _, err := SelectTranscriber(TranscriberConfig{Provider: "ark", Python: "python3", Dtype: "bfloat16"}); err == nil || !strings.Contains(err.Error(), "float16 only") {
 		t.Fatalf("error = %v, want dtype validation", err)
 	}
+	if _, err := SelectTranscriber(TranscriberConfig{Provider: "ark", Python: "python3", WindowMS: 2000, OverlapMS: 2000}); err == nil || !strings.Contains(err.Error(), "asr-overlap-ms") {
+		t.Fatalf("error = %v, want overlap validation", err)
+	}
+	if _, err := SelectTranscriber(TranscriberConfig{Provider: "ark", Python: "python3", Model: "custom/model"}); err == nil || !strings.Contains(err.Error(), "not pinned") {
+		t.Fatalf("error = %v, want unpinned custom model rejection", err)
+	}
 }
 
 func TestSelectTranscriberProbesPythonAndScript(t *testing.T) {
