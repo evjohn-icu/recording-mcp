@@ -12,6 +12,7 @@ PORT="${PORT:-8787}"
 SERVER="http://127.0.0.1:$PORT"
 ADMIN_TOKEN="e2e-admin"
 export WRANGLER_SEND_METRICS=false
+export NO_UPDATE_NOTIFIER=1
 E2E_ROOT=data/e2e
 SCENARIOS="normal offline-recover crash-restart duplicate bad-checksum gap r2-after-write d1-manifest d1-event response-drop"
 

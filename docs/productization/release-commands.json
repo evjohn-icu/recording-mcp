@@ -201,7 +201,7 @@
     {
       "command": "sh scripts/e2e-cloud.sh",
       "status": "PASS",
-      "evidence": "10/10 scenarios PASS in 287s with local wrangler 4.129.0 + workerd (no Cloudflare account/network)",
+      "evidence": "10/10 scenarios PASS in 94s with local wrangler 4.129.0 + workerd (no Cloudflare account/network; update check disabled)",
       "reason_if_not_run": ""
     },
     {
