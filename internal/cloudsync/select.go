@@ -16,6 +16,7 @@ import (
 // by one is accepted by the other.
 type TranscriberConfig struct {
 	Provider, KeyEnv, Endpoint, ResourceID, Model string
+	Revision                                      string
 	SegmentMS, OverlapMS                          int64
 	Concurrency                                   int
 	FixtureWindowMS                               int64
@@ -27,6 +28,15 @@ type TranscriberConfig struct {
 	// at startup. The worker sets it; tests can disable it.
 	ProbePython bool
 }
+
+// Default model ids and the snapshots verified on 2026-11-09. Pinning matters
+// because ARK ships remote code; a moving main branch can change it silently.
+const (
+	defaultARKModel     = "Edge0/ARK-ASR-0.6B"
+	defaultARKRevision  = "45776b56d58cdfb2e2eb632f7e110f38684633e0"
+	defaultQwenModel    = "Qwen/Qwen3-ASR-1.7B"
+	defaultQwenRevision = "7278e1e70fe206f11671096ffdd38061171dd6e5"
+)
 
 // SelectTranscriber builds the configured adapter. "off" returns (nil, nil) so
 // callers can advertise uploads as unavailable.
@@ -60,9 +70,18 @@ func SelectTranscriber(cfg TranscriberConfig) (Transcriber, error) {
 		model := strings.TrimSpace(cfg.Model)
 		if model == "" {
 			if backend == "ark" {
-				model = "Edge0/ARK-ASR-0.6B"
+				model = defaultARKModel
 			} else {
-				model = "Qwen/Qwen3-ASR-1.7B"
+				model = defaultQwenModel
+			}
+		}
+		revision := strings.TrimSpace(cfg.Revision)
+		if revision == "" {
+			switch model {
+			case defaultARKModel:
+				revision = defaultARKRevision
+			case defaultQwenModel:
+				revision = defaultQwenRevision
 			}
 		}
 		dtype := strings.TrimSpace(cfg.Dtype)
@@ -86,7 +105,7 @@ func SelectTranscriber(cfg TranscriberConfig) (Transcriber, error) {
 			}
 		}
 		return &LocalTranscriber{
-			Python: python, Script: script, Backend: backend, Model: model,
+			Python: python, Script: script, Backend: backend, Model: model, Revision: revision,
 			Dtype: dtype, Device: cfg.Device, Language: cfg.Language,
 			SegmentMS: cfg.WindowMS, OverlapMS: cfg.OverlapMS, MaxNewTokens: cfg.MaxNewTokens,
 		}, nil

@@ -2,6 +2,7 @@
 
 执行日期：2026-11-09。硬件：WSL2，NVIDIA RTX 2070 8 GB（驱动 610.88），12 vCPU，23 GB RAM。
 运行时：`.venv-asr`（Python 3.12.13，torch 2.8.0+cu126，transformers 4.57.6）。
+模型快照：ARK `45776b56d58cdfb2e2eb632f7e110f38684633e0`，Qwen `7278e1e70fe206f11671096ffdd38061171dd6e5`。
 
 样例：Qwen3-ASR 模型卡公开样例 `asr_zh.wav`（4.203 s），转成 16 kHz mono S16LE PCM。
 不包含用户私人录音。
@@ -12,13 +13,13 @@
 .venv-asr/bin/python scripts/local-asr.py \
   --backend ark --model Edge0/ARK-ASR-0.6B \
   --pcm .cache/asr-samples/asr_zh.pcm --dtype float16 --device cuda:0
-# 退出码 0，wall 13.1 s
+# 退出码 0，wall 13–15 s
 # {"backend":"ark",...,"text":"甚至出现交易几乎停滞的情况。"}
 
 .venv-asr/bin/python scripts/local-asr.py \
   --backend qwen --model Qwen/Qwen3-ASR-1.7B \
   --pcm .cache/asr-samples/asr_zh.pcm --dtype float16 --device cuda:0
-# 退出码 0，wall 14.0 s
+# 退出码 0，wall 14–15 s
 # {"backend":"qwen","language":"Chinese",...,"text":"甚至出现交易几乎停滞的情况。"}
 ```
 

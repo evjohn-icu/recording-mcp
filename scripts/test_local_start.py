@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 class LocalStartTests(unittest.TestCase):
-    def run_fake_pair(self, failing, configured=False):
+    def run_fake_pair(self, failing, configured=False, local_asr=False):
         with tempfile.TemporaryDirectory(prefix="local-start-test-") as tmp:
             root = Path(tmp)
             (root / "scripts").mkdir()
@@ -40,8 +40,10 @@ while True: time.sleep(1)
                 path = root / "bin" / name
                 path.write_text(textwrap.dedent(body))
                 path.chmod(0o755)
-            env = {k:v for k,v in os.environ.items() if not k.startswith(("GENERATOR_", "WORLDLINE_", "BRIEF_POLISH_"))}
+            env = {k:v for k,v in os.environ.items() if not k.startswith(("GENERATOR_", "WORLDLINE_", "BRIEF_POLISH_", "ASR_"))}
             env.update(ARGS_LOG=str(log), STOP_MARKER=str(stopped), FAIL_CHILD=failing)
+            if local_asr:
+                env.update(ASR_PROVIDER="ark", ASR_BACKEND="ark", ASR_MODEL="/models/ark", ASR_PYTHON="/opt/asr/bin/python", ASR_DEVICE="cuda:1", ASR_REVISION="deadbeef")
             if configured:
                 env.update(BRIEF_POLISH_PI_PROVIDER="fixture-provider", BRIEF_POLISH_MODEL="fixture-model", BRIEF_POLISH_PI_MODELS_FILE="/tmp/synthetic models.json", GENERATOR_PROVIDER="openai", GENERATOR_ENDPOINT="http://127.0.0.1:18080/v1/chat/completions", GENERATOR_MODEL="synthetic-config-only", WORLDLINE_DECISION_URL="http://127.0.0.1:18799/v1/systemone")
             proc = subprocess.run([str(root / "scripts" / "local-start.sh"), "fixture", "28771", str(root / "profiles with spaces")], env=env, capture_output=True, text=True, timeout=5)
@@ -62,6 +64,9 @@ while True: time.sleep(1)
             else:
                 self.assertIn("--generator off --embed-provider hash", args)
                 self.assertNotIn("--brief-polish", args)
+            if local_asr:
+                for flag in ("--asr-backend ark", "--asr-model /models/ark", "--asr-python /opt/asr/bin/python", "--asr-device cuda:1", "--asr-revision deadbeef"):
+                    self.assertEqual(args.count(flag), 2, flag)
 
     def test_worker_exit_stops_web_and_propagates_status(self):
         self.run_fake_pair("worker")
@@ -71,6 +76,9 @@ while True: time.sleep(1)
 
     def test_explicit_model_configuration_reaches_both_services(self):
         self.run_fake_pair("worker", configured=True)
+
+    def test_local_asr_configuration_reaches_both_services(self):
+        self.run_fake_pair("worker", local_asr=True)
 
     def test_missing_built_site_fails_before_launch(self):
         with tempfile.TemporaryDirectory(prefix="local-start-test-") as tmp:

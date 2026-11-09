@@ -76,6 +76,7 @@ func run() error {
 	asrEndpoint := flag.String("asr-endpoint", "", "doubao ASR endpoint override")
 	asrResourceID := flag.String("asr-resource-id", "", "doubao ASR resource id")
 	asrModel := flag.String("asr-model", "", "ASR model identifier; local backends default to Edge0/ARK-ASR-0.6B or Qwen/Qwen3-ASR-1.7B")
+	asrRevision := flag.String("asr-revision", "", "Hugging Face revision for local ASR; empty pins the verified snapshot of the built-in model")
 	asrSegmentMS := flag.Int64("asr-segment-ms", 300000, "doubao window length in milliseconds")
 	asrOverlapMS := flag.Int64("asr-overlap-ms", 2000, "ASR window overlap in milliseconds")
 	asrConcurrency := flag.Int("asr-concurrency", 2, "maximum concurrent doubao recognition sessions")
@@ -164,7 +165,7 @@ func run() error {
 	}
 	transcriber, err := cloudsync.SelectTranscriber(cloudsync.TranscriberConfig{
 		Provider: *asrProvider, KeyEnv: *asrKeyEnv, Endpoint: *asrEndpoint,
-		ResourceID: *asrResourceID, Model: *asrModel,
+		ResourceID: *asrResourceID, Model: *asrModel, Revision: *asrRevision,
 		SegmentMS: *asrSegmentMS, OverlapMS: *asrOverlapMS, Concurrency: *asrConcurrency,
 		FixtureWindowMS: *fixtureWindowMS,
 		LocalBackend:    *asrBackend, Python: *asrPython, Script: *asrScript,

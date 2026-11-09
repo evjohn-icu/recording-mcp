@@ -8,10 +8,10 @@ import (
 )
 
 func TestSelectTranscriberLocalBackends(t *testing.T) {
-	for _, tc := range []struct{ provider, backend, wantModel string }{
-		{"ark", "ark", "Edge0/ARK-ASR-0.6B"},
-		{"qwen", "qwen", "Qwen/Qwen3-ASR-1.7B"},
-		{"local", "qwen", "Qwen/Qwen3-ASR-1.7B"},
+	for _, tc := range []struct{ provider, backend, wantModel, wantRevision string }{
+		{"ark", "ark", "Edge0/ARK-ASR-0.6B", defaultARKRevision},
+		{"qwen", "qwen", "Qwen/Qwen3-ASR-1.7B", defaultQwenRevision},
+		{"local", "qwen", "Qwen/Qwen3-ASR-1.7B", defaultQwenRevision},
 	} {
 		tr, err := SelectTranscriber(TranscriberConfig{
 			Provider: tc.provider, LocalBackend: tc.backend, Python: "python3",
@@ -26,6 +26,9 @@ func TestSelectTranscriberLocalBackends(t *testing.T) {
 		}
 		if local.Model != tc.wantModel || local.Backend != tc.backend {
 			t.Fatalf("%s: backend=%q model=%q", tc.provider, local.Backend, local.Model)
+		}
+		if local.Revision != tc.wantRevision {
+			t.Fatalf("%s: revision=%q, want %q", tc.provider, local.Revision, tc.wantRevision)
 		}
 		if local.Dtype != "float16" || local.SegmentMS != 30000 || local.OverlapMS != 2000 {
 			t.Fatalf("%s: config lost: %+v", tc.provider, local)

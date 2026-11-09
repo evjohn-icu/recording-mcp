@@ -35,6 +35,12 @@ if [ -n "${GENERATOR_ENDPOINT:-}" ]; then WORKER_ARGS+=(--generator-url "$GENERA
 if [ -n "${GENERATOR_MODEL:-}" ]; then WORKER_ARGS+=(--generator-model "$GENERATOR_MODEL"); fi
 if [ -n "${GENERATOR_KEY_ENV:-}" ]; then WORKER_ARGS+=(--generator-key-env "$GENERATOR_KEY_ENV"); fi
 WEB_ARGS=(--profile "$PROFILE" --profiles-root "$PROFILES_ROOT" --addr "127.0.0.1:$PORT" --web-dir "$ROOT/web/dist" --semantic-provider hash --asr-provider "${ASR_PROVIDER:-off}")
+# Local ASR settings must reach both processes so provider/config agree.
+if [ -n "${ASR_BACKEND:-}" ]; then WORKER_ARGS+=(--asr-backend "$ASR_BACKEND"); WEB_ARGS+=(--asr-backend "$ASR_BACKEND"); fi
+if [ -n "${ASR_MODEL:-}" ]; then WORKER_ARGS+=(--asr-model "$ASR_MODEL"); WEB_ARGS+=(--asr-model "$ASR_MODEL"); fi
+if [ -n "${ASR_PYTHON:-}" ]; then WORKER_ARGS+=(--asr-python "$ASR_PYTHON"); WEB_ARGS+=(--asr-python "$ASR_PYTHON"); fi
+if [ -n "${ASR_DEVICE:-}" ]; then WORKER_ARGS+=(--asr-device "$ASR_DEVICE"); WEB_ARGS+=(--asr-device "$ASR_DEVICE"); fi
+if [ -n "${ASR_REVISION:-}" ]; then WORKER_ARGS+=(--asr-revision "$ASR_REVISION"); WEB_ARGS+=(--asr-revision "$ASR_REVISION"); fi
 # Brief polishing is independent of memory generation and only reaches Web.
 if [ -n "${BRIEF_POLISH_PI_PROVIDER:-}" ]; then WEB_ARGS+=(--brief-polish-pi-provider "$BRIEF_POLISH_PI_PROVIDER"); fi
 if [ -n "${BRIEF_POLISH_PI_MODELS_FILE:-}" ]; then WEB_ARGS+=(--brief-polish-pi-models-file "$BRIEF_POLISH_PI_MODELS_FILE"); fi

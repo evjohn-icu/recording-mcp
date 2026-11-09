@@ -94,7 +94,7 @@ print(json.dumps({"windows": [{"index": 1, "start_ms": 0, "end_ms": 1000,
 `)
 	tr := LocalTranscriber{
 		Python: "python3", Script: script, Backend: "qwen", Model: "Qwen/Qwen3-ASR-1.7B",
-		Dtype: "float16", Device: "cuda:0", Language: "Chinese",
+		Dtype: "float16", Device: "cuda:0", Language: "Chinese", Revision: "abc123",
 		SegmentMS: 30000, OverlapMS: 2000, MaxNewTokens: 512,
 	}
 	results, err := tr.Transcribe(context.Background(), writePCM(t, 1000), localTestMeta())
@@ -102,7 +102,7 @@ print(json.dumps({"windows": [{"index": 1, "start_ms": 0, "end_ms": 1000,
 		t.Fatal(err)
 	}
 	text := results[0].Turns[0].Text
-	for _, want := range []string{"--backend qwen", "--model Qwen/Qwen3-ASR-1.7B", "--dtype float16", "--device cuda:0", "--language Chinese", "--window-ms 30000", "--overlap-ms 2000"} {
+	for _, want := range []string{"--backend qwen", "--model Qwen/Qwen3-ASR-1.7B", "--dtype float16", "--device cuda:0", "--language Chinese", "--revision abc123", "--window-ms 30000", "--overlap-ms 2000"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("runner args missing %q: %s", want, text)
 		}

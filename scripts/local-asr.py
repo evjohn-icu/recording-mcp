@@ -54,20 +54,21 @@ def clean_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def load_ark(model_path: str, device: str):
+def load_ark(model_path: str, device: str, revision: str):
     import torch
     from transformers import AutoModelForCausalLM, AutoProcessor, AutoTokenizer
 
-    log(f"loading ARK-ASR from {model_path} (float16, {device})")
-    processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
-    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    log(f"loading ARK-ASR from {model_path}@{revision or 'main'} (float16, {device})")
+    revision = revision or None
+    processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True, revision=revision)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True, revision=revision)
     try:
         model = AutoModelForCausalLM.from_pretrained(
-            model_path, trust_remote_code=True, dtype=torch.float16, attn_implementation="sdpa"
+            model_path, trust_remote_code=True, dtype=torch.float16, attn_implementation="sdpa", revision=revision
         )
     except TypeError:
         model = AutoModelForCausalLM.from_pretrained(
-            model_path, trust_remote_code=True, torch_dtype=torch.float16, attn_implementation="sdpa"
+            model_path, trust_remote_code=True, torch_dtype=torch.float16, attn_implementation="sdpa", revision=revision
         )
     model = model.to(device).eval()
     eos = tokenizer.eos_token_id
@@ -85,7 +86,7 @@ def load_ark(model_path: str, device: str):
 def run_ark(args, wavs: list[str]) -> tuple[list[str], str]:
     import torch
 
-    processor, tokenizer, model, bad_words_ids = load_ark(args.model, args.device)
+    processor, tokenizer, model, bad_words_ids = load_ark(args.model, args.device, args.revision)
     texts: list[str] = []
     language = ""
     for i, wav_path in enumerate(wavs, 1):
@@ -129,17 +130,18 @@ def run_ark(args, wavs: list[str]) -> tuple[list[str], str]:
     return texts, language
 
 
-def load_qwen(model_path: str, device: str, max_new_tokens: int):
+def load_qwen(model_path: str, device: str, max_new_tokens: int, revision: str):
     import torch
     from qwen_asr import Qwen3ASRModel
 
-    log(f"loading Qwen3-ASR from {model_path} (float16, {device})")
+    log(f"loading Qwen3-ASR from {model_path}@{revision or 'main'} (float16, {device})")
     model = Qwen3ASRModel.from_pretrained(
         model_path,
         dtype=torch.float16,
         device_map=device,
         max_inference_batch_size=1,
         max_new_tokens=max_new_tokens,
+        revision=revision or None,
     )
     return model
 
@@ -147,7 +149,7 @@ def load_qwen(model_path: str, device: str, max_new_tokens: int):
 def run_qwen(args, wavs: list[str]) -> tuple[list[str], str]:
     import torch
 
-    model = load_qwen(args.model, args.device, args.max_new_tokens)
+    model = load_qwen(args.model, args.device, args.max_new_tokens, args.revision)
     texts: list[str] = []
     language = args.language or ""
     batch = 1
@@ -172,6 +174,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="offline ASR runner (float16)")
     p.add_argument("--backend", choices=["ark", "qwen"], required=True)
     p.add_argument("--model", default="", help="local model dir or Hugging Face id")
+    p.add_argument("--revision", default="", help="Hugging Face revision (commit); empty uses the default branch")
     p.add_argument("--pcm", required=True, help="16 kHz mono S16LE PCM input")
     p.add_argument("--dtype", default="float16", help="only float16 is supported")
     p.add_argument("--device", default="cuda:0")

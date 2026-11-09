@@ -25,6 +25,8 @@ type LocalTranscriber struct {
 	Backend string
 	// Model is a local directory or Hugging Face id.
 	Model string
+	// Revision pins the Hugging Face snapshot (commit) when set.
+	Revision string
 	// Dtype is passed to the runner, e.g. "float16".
 	Dtype string
 	// Device is the inference device, e.g. "cuda:0".
@@ -105,6 +107,9 @@ func (t LocalTranscriber) Transcribe(ctx context.Context, pcmPath string, meta M
 	}
 	if strings.TrimSpace(t.Language) != "" {
 		args = append(args, "--language", t.Language)
+	}
+	if strings.TrimSpace(t.Revision) != "" {
+		args = append(args, "--revision", t.Revision)
 	}
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, python, args...)
