@@ -56,5 +56,5 @@ for name, model in pins.items():
     print(f"  {status}")
 if failed:
     raise SystemExit("fetch-local-models: verification failed; do not run the model")
-print("fetch-local-models: all pinned snapshots verified")
+print("fetch-local-models: all pinned snapshots fetched; digest-pinned files verified where a SHA-256 pin exists")
 PY

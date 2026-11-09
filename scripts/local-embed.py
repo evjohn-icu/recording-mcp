@@ -29,7 +29,7 @@ DEFAULT_MODEL = "Qwen/Qwen3-Embedding-0.6B"
 DEFAULT_DIMS = 1024
 MAX_INPUTS = 128
 MAX_BODY = 4 << 20
-LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+LOOPBACK = {"127.0.0.1", "localhost"}
 
 
 def log(message: str) -> None:
@@ -104,7 +104,7 @@ class FakeEncoder:
 
 
 class QwenEncoder:
-    def __init__(self, model: str, revision: str, device: str, dtype: str, max_length: int, lock: GPULock | None):
+    def __init__(self, model: str, revision: str, device: str, dtype: str, max_length: int, lock: GPULock | None, source: str = ""):
         import torch
         from transformers import AutoModel, AutoTokenizer
 
@@ -123,8 +123,9 @@ class QwenEncoder:
         if lock:
             lock.acquire()
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained(model, revision=revision or None, padding_side="left")
-            self.model = AutoModel.from_pretrained(model, revision=revision or None, dtype=torch_dtype)
+            weights = source or model
+            self.tokenizer = AutoTokenizer.from_pretrained(weights, revision=revision or None, padding_side="left")
+            self.model = AutoModel.from_pretrained(weights, revision=revision or None, dtype=torch_dtype)
             self.model = self.model.to(device).eval()
         finally:
             if lock:
@@ -141,10 +142,10 @@ class QwenEncoder:
             with torch.inference_mode():
                 outputs = self.model(**batch)
             hidden = outputs.last_hidden_state
-            mask = batch["attention_mask"]
-            # Last non-padding token per row (left padding).
-            lengths = mask.sum(dim=1) - 1
-            pooled = hidden[torch.arange(hidden.shape[0], device=hidden.device), lengths]
+            # Left padding puts every real token at the end of the row, so the
+            # last position is the last real token for every row. Indexing by
+            # (mask.sum-1) would select the FIRST real token of short rows.
+            pooled = hidden[:, -1]
             normalized = torch.nn.functional.normalize(pooled, p=2, dim=1)
             return normalized.to(torch.float32).cpu().tolist()
         finally:
@@ -162,6 +163,7 @@ class Service:
         self.sha_ok = False
         self.lock = None
         self._compat_lock = threading.Lock()
+        self._infer_lock = threading.Lock()
         self.last_request = time.monotonic()
         self.encoder = None
 
@@ -176,7 +178,8 @@ class Service:
             self.loaded = True
             self.sha_ok = True
             return
-        if pin:
+        verify = self.args.verify_model or self.args.model == DEFAULT_MODEL
+        if verify:
             if not self.revision:
                 self.revision = pin.get("revision", "")
             expected = pin.get("safetensors_sha256", "")
@@ -207,16 +210,17 @@ class Service:
         return True
 
     def ensure_encoder(self):
-        if self.encoder is not None:
+        with self._compat_lock:
+            if self.encoder is not None:
+                return self.encoder
+            if self.args.device.startswith("cuda") and self.args.gpu_lock:
+                self.lock = GPULock(self.args.gpu_lock, self.args.lock_timeout)
+            self.encoder = QwenEncoder(self.model, self.revision, self.args.device, self.args.dtype,
+                                       self.args.max_length, self.lock, source=self.args.model_dir)
+            self.dims = self.encoder.dims
+            self.loaded = True
+            log(f"model ready: {self.model}@{self.revision or 'main'} dims={self.dims} device={self.args.device}")
             return self.encoder
-        if self.args.device.startswith("cuda") and self.args.gpu_lock:
-            self.lock = GPULock(self.args.gpu_lock, self.args.lock_timeout)
-        self.encoder = QwenEncoder(self.model, self.revision, self.args.device, self.args.dtype,
-                                   self.args.max_length, self.lock)
-        self.dims = self.encoder.dims
-        self.loaded = True
-        log(f"model ready: {self.model}@{self.revision or 'main'} dims={self.dims} device={self.args.device}")
-        return self.encoder
 
     def embed(self, texts: list[str], input_type: str) -> list[list[float]]:
         prepared = []
@@ -227,8 +231,11 @@ class Service:
                 prepared.append(text)
         encoder = self.ensure_encoder()
         out: list[list[float]] = []
-        for start in range(0, len(prepared), self.args.batch_size):
-            out.extend(encoder.encode(prepared[start:start + self.args.batch_size]))
+        # One model instance is shared by the threaded HTTP server; serialize
+        # inference so concurrent requests cannot interleave CUDA calls.
+        with self._infer_lock:
+            for start in range(0, len(prepared), self.args.batch_size):
+                out.extend(encoder.encode(prepared[start:start + self.args.batch_size]))
         return out
 
     def health(self) -> dict:
@@ -241,6 +248,7 @@ class Service:
             "dims": self.dims,
             "loaded": self.loaded,
             "model_sha256_ok": self.sha_ok,
+            "verified": self.args.verify_model or self.model == DEFAULT_MODEL,
         }
 
 
