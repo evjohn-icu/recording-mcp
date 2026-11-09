@@ -414,9 +414,15 @@ func TestFailedASRJobRetryDoesNotDuplicateRecords(t *testing.T) {
 func TestImportDecodesRealFormatsWithFFmpeg(t *testing.T) {
 	ffmpeg, err := exec.LookPath("ffmpeg")
 	if err != nil {
+		if os.Getenv("CI") != "" {
+			t.Fatal("ffmpeg is required in CI; install ffmpeg in the test job")
+		}
 		t.Skip("ffmpeg/ffprobe not installed")
 	}
 	if _, err := exec.LookPath("ffprobe"); err != nil {
+		if os.Getenv("CI") != "" {
+			t.Fatal("ffprobe is required in CI; install ffmpeg in the test job")
+		}
 		t.Skip("ffmpeg/ffprobe not installed")
 	}
 	env := newTestEnv(t, func(cfg *Config) {

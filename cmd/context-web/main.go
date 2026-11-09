@@ -335,7 +335,11 @@ func main() {
 			*dbPath = "data/context-memory.db"
 		}
 		if *audioDir == "" {
-			*audioDir = "data/synced-audio"
+			absDBPath, err := filepath.Abs(*dbPath)
+			if err != nil {
+				log.Fatalf("context-web: resolve database path: %v", err)
+			}
+			*audioDir = filepath.Join(filepath.Dir(absDBPath), "synced-audio")
 		}
 	}
 	if planePath == "" {

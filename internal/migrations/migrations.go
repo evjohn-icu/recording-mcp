@@ -232,6 +232,23 @@ func applyOne(ctx context.Context, db *sql.DB, m migration) error {
 		return fmt.Errorf("migration %d %q: begin: %w", m.version, m.name, err)
 	}
 	defer tx.Rollback()
+	// Claim the version before running statements. INSERT OR IGNORE takes the
+	// write lock, so two processes starting together serialize here; the loser
+	// sees zero rows and skips instead of replaying the migration.
+	claim, err := tx.ExecContext(ctx,
+		`INSERT OR IGNORE INTO schema_migrations(version, name, applied_at) VALUES(?, ?, ?)`,
+		m.version, m.name, time.Now().UnixMilli(),
+	)
+	if err != nil {
+		return fmt.Errorf("migration %d %q: claim: %w", m.version, m.name, err)
+	}
+	claimed, err := claim.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("migration %d %q: claim result: %w", m.version, m.name, err)
+	}
+	if claimed == 0 {
+		return nil
+	}
 	for _, stmt := range m.statements {
 		if _, err := tx.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("migration %d %q: exec: %w", m.version, m.name, err)
@@ -241,12 +258,6 @@ func applyOne(ctx context.Context, db *sql.DB, m migration) error {
 		if err := m.run(ctx, tx); err != nil {
 			return fmt.Errorf("migration %d %q: %w", m.version, m.name, err)
 		}
-	}
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO schema_migrations(version, name, applied_at) VALUES(?, ?, ?)`,
-		m.version, m.name, time.Now().UnixMilli(),
-	); err != nil {
-		return fmt.Errorf("migration %d %q: record: %w", m.version, m.name, err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("migration %d %q: commit: %w", m.version, m.name, err)

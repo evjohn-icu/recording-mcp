@@ -1,4 +1,7 @@
 name: ci
+
+permissions:
+  contents: read
 on: [push, pull_request]
 jobs:
   specs-and-python:
@@ -51,6 +54,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Install ffmpeg for real decoder tests
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: go vet ./...
       - run: go test -race -count=1 ./...
       - run: make build
