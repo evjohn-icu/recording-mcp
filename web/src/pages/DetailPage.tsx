@@ -721,14 +721,18 @@ export function DetailPage() {
                   })()}
                   <span>{processing.generator_enabled ? '候选生成器已启用' : processing.worker_alive ? '候选生成器已关闭' : '候选生成器状态未知'}</span>
                 </header>
-                  {data.processing.asr_state && data.processing.asr_state !== 'none' && (
-                    <p data-testid="asr-coverage">
-                      转写覆盖：{data.processing.asr_completed_chunks ?? 0}/{data.processing.asr_expected_chunks ?? 0} 窗口
-                      {data.processing.asr_state === 'partial' ? '（部分完成）' : ''}
-                      {`（${formatDuration(data.processing.asr_coverage_ms ?? 0)}/${formatDuration(data.processing.asr_duration_ms ?? 0)}）`}
-                      {data.processing.asr_last_error ? `：${data.processing.asr_last_error}` : ''}
-                    </p>
-                  )}
+                  {(() => {
+                    const coverage = processing.status ?? data.processing
+                    if (!coverage.asr_state || coverage.asr_state === 'none') return null
+                    return (
+                      <p data-testid="asr-coverage">
+                        转写覆盖：{coverage.asr_completed_chunks ?? 0}/{coverage.asr_expected_chunks ?? 0} 窗口
+                        {coverage.asr_state === 'partial' ? '（部分完成）' : ''}
+                        {`（${formatDuration(coverage.asr_coverage_ms ?? 0)}/${formatDuration(coverage.asr_duration_ms ?? 0)}）`}
+                        {coverage.asr_last_error ? `：${coverage.asr_last_error}` : ''}
+                      </p>
+                    )
+                  })()}
 
                 <ol className="processing-phases" data-testid="processing-phases">
                   {(processing.phases ?? []).map((phase) => (

@@ -71,7 +71,11 @@ async def test_product_workflow(page, base: str, wav: pathlib.Path, record) -> s
     detail_text = await page.locator(".processing-progress").inner_text()
     record("web-processing-phases", terminal, detail_text)
     coverage = page.get_by_test_id("asr-coverage")
-    coverage_visible = await coverage.is_visible()
+    try:
+        await coverage.wait_for(state="visible", timeout=15000)
+        coverage_visible = True
+    except Exception:
+        coverage_visible = False
     coverage_text = await coverage.inner_text() if coverage_visible else ""
     record("web-asr-coverage", coverage_visible and "窗口" in coverage_text,
            f"visible={coverage_visible} text={coverage_text[:120]}")
