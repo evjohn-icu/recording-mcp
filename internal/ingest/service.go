@@ -108,7 +108,7 @@ func (s *Service) Import(ctx context.Context, r io.Reader, filename string, size
 	if s.provider == "" || s.provider == "off" || s.trans == nil {
 		return ImportResult{}, &Error{
 			Code: "asr_unavailable", Message: "音频导入未启用：未配置 ASR", Status: 409,
-			Action: "设置 ASR_PROVIDER=doubao 并在环境中提供 VOLC_API_KEY，或使用明确的 fixture 演示模式",
+			Action: "设置 ASR_PROVIDER=doubao 并提供 VOLC_API_KEY，或设置 ASR_PROVIDER=ark|qwen 使用本地 float16 模型，或使用明确的 fixture 演示模式",
 		}
 	}
 	name := filepath.Base(strings.TrimSpace(filename))
@@ -331,7 +331,12 @@ func (s *Service) RunASRJob(ctx context.Context, job process.Job) (string, error
 		return "", &Error{Code: "invalid_job_payload", Message: "asr job payload is incomplete", FatalFlag: true}
 	}
 	if s.trans == nil {
-		return "", &Error{Code: "asr_unavailable", Message: "ASR provider is not configured", Action: "设置 ASR_PROVIDER=doubao 并提供 VOLC_API_KEY", FatalFlag: true}
+		action := "设置 ASR_PROVIDER=doubao 并提供 VOLC_API_KEY"
+		switch s.provider {
+		case "ark", "qwen", "local":
+			action = "确认 .venv-asr 可用、本地模型已下载且 GPU 显存足够后重试"
+		}
+		return "", &Error{Code: "asr_unavailable", Message: "ASR provider is not configured", Action: action, FatalFlag: true}
 	}
 	pcmAbs, err := s.resolve(p.PCMPath)
 	if err != nil {

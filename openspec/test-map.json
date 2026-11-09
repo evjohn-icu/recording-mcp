@@ -852,6 +852,34 @@
       "spec": "openspec/changes/recording-mcp-productization-beta/specs/mcp-context/spec.md",
       "test_file": "cmd/context-memory/decision_trail_test.go",
       "test_anchor": "TestMCPProfileUsesProfileEventPlane"
+    },
+    {
+      "id": "local-asr.provider-selection",
+      "status": "covered",
+      "spec": "openspec/changes/local-asr-provider/specs/local-asr/spec.md",
+      "test_file": "internal/cloudsync/select_test.go",
+      "test_anchor": "TestSelectTranscriberLocalBackends"
+    },
+    {
+      "id": "local-asr.float16-window-mapping",
+      "status": "covered",
+      "spec": "openspec/changes/local-asr-provider/specs/local-asr/spec.md",
+      "test_file": "internal/cloudsync/local_asr_test.go",
+      "test_anchor": "TestLocalTranscriberMapsWindows"
+    },
+    {
+      "id": "local-asr.invalid-runner-output",
+      "status": "covered",
+      "spec": "openspec/changes/local-asr-provider/specs/local-asr/spec.md",
+      "test_file": "internal/cloudsync/local_asr_test.go",
+      "test_anchor": "TestLocalTranscriberRejectsInvalidOutput"
+    },
+    {
+      "id": "local-asr.startup-probe",
+      "status": "covered",
+      "spec": "openspec/changes/local-asr-provider/specs/local-asr/spec.md",
+      "test_file": "internal/cloudsync/select_test.go",
+      "test_anchor": "TestSelectTranscriberProbesPythonAndScript"
     }
   ]
 }

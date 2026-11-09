@@ -12,6 +12,8 @@ __pycache__/
 /context-associate
 /context-memory
 /context-worker
+/.venv-asr/
+/.cache/
 .DS_Store
 .env
 .env.*

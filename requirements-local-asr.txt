@@ -1,0 +1,11 @@
+# Local ASR runtime (float16). Python 3.12 recommended.
+# Install with the CUDA 12.6 wheel index; see docs/productization/local-asr.md.
+--extra-index-url https://download.pytorch.org/whl/cu126
+torch>=2.6
+torchaudio>=2.6
+qwen-asr
+transformers>=4.57
+accelerate
+numpy
+soundfile
+huggingface_hub

@@ -71,15 +71,23 @@ func run() error {
 	embedEndpoint := flag.String("embed-endpoint", "", "OpenAI-compatible embeddings endpoint used by the openai embed provider")
 	embedModel := flag.String("embed-model", "", "embedding model name used by the openai embed provider")
 	embedKeyEnv := flag.String("embed-key-env", "EMBED_API_KEY", "environment variable holding the embedding API key")
-	asrProvider := flag.String("asr-provider", "off", "ASR provider for the asr stage: off|fixture|doubao")
+	asrProvider := flag.String("asr-provider", "off", "ASR provider for the asr stage: off|fixture|doubao|ark|qwen|local")
 	asrKeyEnv := flag.String("asr-key-env", "VOLC_API_KEY", "environment variable holding the doubao ASR API key")
 	asrEndpoint := flag.String("asr-endpoint", "", "doubao ASR endpoint override")
 	asrResourceID := flag.String("asr-resource-id", "", "doubao ASR resource id")
-	asrModel := flag.String("asr-model", "", "ASR model identifier recorded on transcript results")
+	asrModel := flag.String("asr-model", "", "ASR model identifier; local backends default to Edge0/ARK-ASR-0.6B or Qwen/Qwen3-ASR-1.7B")
 	asrSegmentMS := flag.Int64("asr-segment-ms", 300000, "doubao window length in milliseconds")
-	asrOverlapMS := flag.Int64("asr-overlap-ms", 2000, "doubao window overlap in milliseconds")
+	asrOverlapMS := flag.Int64("asr-overlap-ms", 2000, "ASR window overlap in milliseconds")
 	asrConcurrency := flag.Int("asr-concurrency", 2, "maximum concurrent doubao recognition sessions")
 	fixtureWindowMS := flag.Int64("fixture-window-ms", 5000, "fixture transcriber window length in milliseconds")
+	asrBackend := flag.String("asr-backend", "ark", "local ASR model family when --asr-provider local: ark|qwen")
+	asrPython := flag.String("asr-python", "", "Python interpreter for local ASR; empty auto-detects ./.venv-asr/bin/python, then python3")
+	asrScript := flag.String("asr-script", "scripts/local-asr.py", "offline ASR runner script")
+	asrDtype := flag.String("asr-dtype", "float16", "local ASR compute dtype (float16 only)")
+	asrDevice := flag.String("asr-device", "cuda:0", "local ASR device, e.g. cuda:0 or cpu")
+	asrLanguage := flag.String("asr-language", "", "optional local ASR language hint, e.g. Chinese")
+	asrWindowMS := flag.Int64("asr-window-ms", 30000, "local ASR window length in milliseconds")
+	asrMaxNewTokens := flag.Int("asr-max-new-tokens", 512, "local ASR generation limit per window")
 	ffmpegPath := flag.String("ffmpeg", "ffmpeg", "ffmpeg binary used by the ingest stage")
 	ffprobePath := flag.String("ffprobe", "ffprobe", "ffprobe binary used by the ingest stage")
 	audioDir := flag.String("audio-dir", "", "audio directory (legacy mode; profile mode uses the profile audio directory)")
@@ -154,7 +162,15 @@ func run() error {
 	if strings.TrimSpace(*audioDir) == "" {
 		*audioDir = filepath.Join(filepath.Dir(absDBPath), "synced-audio")
 	}
-	transcriber, err := buildASRTranscriber(*asrProvider, *asrKeyEnv, *asrEndpoint, *asrResourceID, *asrModel, *asrSegmentMS, *asrOverlapMS, *asrConcurrency, *fixtureWindowMS)
+	transcriber, err := cloudsync.SelectTranscriber(cloudsync.TranscriberConfig{
+		Provider: *asrProvider, KeyEnv: *asrKeyEnv, Endpoint: *asrEndpoint,
+		ResourceID: *asrResourceID, Model: *asrModel,
+		SegmentMS: *asrSegmentMS, OverlapMS: *asrOverlapMS, Concurrency: *asrConcurrency,
+		FixtureWindowMS: *fixtureWindowMS,
+		LocalBackend:    *asrBackend, Python: *asrPython, Script: *asrScript,
+		Dtype: *asrDtype, Device: *asrDevice, Language: *asrLanguage,
+		WindowMS: *asrWindowMS, MaxNewTokens: *asrMaxNewTokens, ProbePython: true,
+	})
 	if err != nil {
 		return err
 	}
@@ -430,31 +446,6 @@ func (s *stageExecutor) Execute(ctx context.Context, job process.Job) (string, e
 		return "", fmt.Errorf("context-worker: no executor for stage %q", job.Stage)
 	}
 	return exec.Execute(ctx, job)
-}
-
-// buildASRTranscriber selects the ASR adapter. "off" returns nil so the worker
-// advertises no ASR capability and uploads are rejected before queueing.
-func buildASRTranscriber(name, keyEnv, endpoint, resourceID, model string, segmentMS, overlapMS int64, concurrency int, fixtureWindowMS int64) (cloudsync.Transcriber, error) {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "", "off":
-		return nil, nil
-	case "fixture":
-		return &cloudsync.FixtureTranscriber{WindowMS: fixtureWindowMS}, nil
-	case "doubao":
-		apiKey := ""
-		if strings.TrimSpace(keyEnv) != "" {
-			apiKey = os.Getenv(keyEnv)
-		}
-		if strings.TrimSpace(apiKey) == "" {
-			return nil, fmt.Errorf("--asr-provider doubao requires %s in the environment", keyEnv)
-		}
-		return &cloudsync.DoubaoTranscriber{
-			APIKey: apiKey, Endpoint: endpoint, ResourceID: resourceID, ModelName: model,
-			SegmentMS: segmentMS, OverlapMS: overlapMS, MaxConcurrent: concurrency,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unknown --asr-provider %q (want off, fixture or doubao)", name)
-	}
 }
 
 // ingestStage dispatches the two importer-owned stages.

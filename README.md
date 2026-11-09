@@ -63,7 +63,7 @@ docker compose up -d --build
 # 打开 http://127.0.0.1:8788，选择 profile 并登录
 ```
 
-- `ASR_PROVIDER=off` 时服务可用但不能上传：`/api/capabilities` 返回 `asr_not_configured`，上传返回 409 并给出下一步。配置 `ASR_PROVIDER=doubao` + `VOLC_API_KEY`（或使用明确的 `fixture` 演示模式）后，Web 与 worker 必须使用同一个值。
+- `ASR_PROVIDER=off` 时服务可用但不能上传：`/api/capabilities` 返回 `asr_not_configured`，上传返回 409 并给出下一步。配置 `ASR_PROVIDER=doubao` + `VOLC_API_KEY`（或使用明确的 `fixture` 演示模式）后，Web 与 worker 必须使用同一个值。离线场景可用 `ASR_PROVIDER=ark|qwen` 在宿主机以 float16 运行本地模型（[docs/productization/local-asr.md](docs/productization/local-asr.md)）。
 - 上传上限 2 GiB；服务端先按扩展名过滤，再用 `ffprobe` 真实探测；失败返回 `invalid_audio`。
 - 阶段进度：音频接收 → 语音转写 → 信息提炼 → 发布 → 索引；失败阶段带 `error_code`/`error_action` 与重试。
 - 部署、备份、升级与排障：[docs/productization/deployment.md](docs/productization/deployment.md)。
