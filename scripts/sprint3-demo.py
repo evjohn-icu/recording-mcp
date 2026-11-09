@@ -205,7 +205,13 @@ def wait_terminal(client: Client, conversation_id: str, timeout: float = 1800) -
     raise TimeoutError(f"processing did not finish; last={snapshot.get('current_stage')}")
 
 
+def _stop_on_signal(signum, _frame):
+    raise SystemExit(128 + signum)
+
+
 def main() -> int:
+    signal.signal(signal.SIGTERM, _stop_on_signal)
+    signal.signal(signal.SIGINT, _stop_on_signal)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=ROOT / "artifacts/sprint3-demo")
     parser.add_argument("--backend", choices=("ark", "qwen"), default="ark")

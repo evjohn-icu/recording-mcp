@@ -278,6 +278,28 @@ def stitch_t2(run_json: Path, out: Path) -> tuple[int, int]:
     return total, len(segments)
 
 
+def audio_profile(path: Path) -> dict:
+    """Measured level/silence of the uploaded WAV, so low-speech results are
+    verifiable from the artifact instead of a hand-written claim."""
+    vol = subprocess.run(["ffmpeg", "-nostdin", "-i", str(path), "-af", "volumedetect", "-f", "null", "-"],
+                         capture_output=True, text=True)
+    mean = max_db = None
+    for line in (vol.stderr or "").splitlines():
+        if "mean_volume:" in line:
+            mean = float(line.split("mean_volume:")[1].split("dB")[0].strip())
+        elif "max_volume:" in line:
+            max_db = float(line.split("max_volume:")[1].split("dB")[0].strip())
+    sil = subprocess.run(["ffmpeg", "-nostdin", "-i", str(path), "-af", "silencedetect=noise=-40dB:d=5", "-f", "null", "-"],
+                         capture_output=True, text=True)
+    spans = sum(1 for line in (sil.stderr or "").splitlines() if "silence_start:" in line)
+    seconds = 0.0
+    for line in (sil.stderr or "").splitlines():
+        if "silence_duration:" in line:
+            seconds += float(line.split("silence_duration:")[1].split("s")[0].strip())
+    return {"audio_mean_db": mean, "audio_max_db": max_db,
+            "silence_spans": spans, "silence_seconds": round(seconds, 2)}
+
+
 def vram_sampler(stop_event: threading.Event, samples: list[int]) -> None:
     while not stop_event.is_set():
         try:
@@ -445,6 +467,7 @@ def run_real_audio(temp: Path, args, wav: Path, backend: str, scenario_id: str, 
         for line in log.splitlines():
             if "model loaded" in line or "model_load" in line:
                 load_ms = line
+        entry.update(audio_profile(wav))
         entry.update({
             "status": "PASS" if status.get("asr_state") == "done" and covered >= duration else "FAIL",
             "note": note,

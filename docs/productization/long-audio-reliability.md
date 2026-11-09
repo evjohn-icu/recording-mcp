@@ -54,11 +54,11 @@ python3 scripts/long-audio-reliability.py --mode synthetic
 
 | ID | 音频 | 后端 | 窗口 | 覆盖 | RTF | 峰值显存 | 状态 |
 |---|---|---|---|---|---|---|---|
-| T1 | 120 s | Qwen3-ASR 1.7B float16 | 5 | 120 000 ms | 0.241 | 5398 MiB | PASS |
-| T1-ark | 120 s | ARK-ASR 0.6B float16 | 5 | 120 000 ms | 0.182 | 3338 MiB | PASS |
-| T2 | 36.95 min（拼接） | Qwen3-ASR 1.7B float16 | 80 | 2 216 891 ms | 0.034 | 5398 MiB | PASS |
+| T1 | 120 s | Qwen3-ASR 1.7B float16 | 5 | 120 000 ms | 0.263 | 5398 MiB | PASS |
+| T1-ark | 120 s | ARK-ASR 0.6B float16 | 5 | 120 000 ms | 0.179 | 3338 MiB | PASS |
+| T2 | 36.95 min（拼接） | Qwen3-ASR 1.7B float16 | 80 | 2 216 891 ms | 0.033 | 5398 MiB | PASS |
 
-T1 的墙钟包含模型加载与 ffmpeg 解码；RTF 是墙钟/音频时长。T2 的 80 个窗口全部完成，窗口覆盖 2 216 891 ms 等于拼接时长；按轮次区间统计只有 722 891 ms，因为 54 个窗口没有非空文本。这不是零填充：拼接 WAV 实测 `mean_volume=-35.7 dB, max_volume=-0.7 dB`，`silencedetect=-40dB:5s` 找到 51 段、共 590 s 低电平区间——该录音本身低语音密度，空窗口与静音/无语音一致（测量命令：`ffmpeg -i <wav> -af volumedetect -f null -` 与 `-af silencedetect=noise=-40dB:d=5`；该次测量未写入 `results.json`）。RTF 0.034 因此主要反映空窗口快速结束，不代表满语音吞吐；满语音参考是 T1 的 0.24。
+T1 的墙钟包含模型加载与 ffmpeg 解码；RTF 是墙钟/音频时长。T2 的 80 个窗口全部完成，窗口覆盖 2 216 891 ms 等于拼接时长；按轮次区间统计只有 722 891 ms，因为 54 个窗口没有非空文本。这不是零填充：`results.json` 的 T2 条目记录实测 `audio_mean_db=-35.7`、`audio_max_db=-0.7`、`silence_spans=51`、`silence_seconds=590.06`（`ffmpeg volumedetect` / `silencedetect=noise=-40dB:d=5`）——该录音本身低语音密度，空窗口与静音/无语音一致。RTF 0.034 因此主要反映空窗口快速结束，不代表满语音吞吐；满语音参考是 T1 的 0.24。
 
 ### 五次连续导入（SMART-01 验收）
 

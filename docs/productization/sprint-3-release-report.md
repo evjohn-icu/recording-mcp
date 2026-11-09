@@ -56,9 +56,9 @@
 |---|---|---|---|---|---|---|---|
 | ARK float16 探针 | — | RTX 2070 8 GB | — | — | 2210 MiB | 加载 10.4 s | PASS |
 | 合成故障注入 | 2 h | CPU 协议桩 | 258 | 7 200 000 ms | — | 26.3 s / 0.0037 | PASS（非真实 ASR） |
-| Qwen3-ASR 真实 | 120 s | RTX 2070 | 5 | 120 000 ms | 5398 MiB | 0.241 | PASS |
+| Qwen3-ASR 真实 | 120 s | RTX 2070 | 5 | 120 000 ms | 5398 MiB | 0.263 | PASS |
 | ARK 真实 | 120 s | RTX 2070 | 5 | 120 000 ms | 3338 MiB | 0.177 | PASS |
-| Qwen3-ASR 真实 | 36.95 min | RTX 2070 | 80 | 2 216 891 ms | 5398 MiB | 0.034（低语音密度；T1 满语音 0.24） | PASS |
+| Qwen3-ASR 真实 | 36.95 min | RTX 2070 | 80 | 2 216 891 ms | 5398 MiB | 0.033（低语音密度；T1 满语音 0.26） | PASS |
 
 ### 检索（冻结评测，`docs/evals/sprint3-real-embedding/manifest.json`）
 

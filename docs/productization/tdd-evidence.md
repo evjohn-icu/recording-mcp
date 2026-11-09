@@ -52,3 +52,7 @@
 | worker CUDA 探针用系统 python3 而非 `.venv-asr`，误报 gpu_unavailable | 代码分析；本机系统 python3 无 torch | 修正为使用 transcriber 解析出的解释器；探针失败置空 transcriber |
 | 单周期/中断的 cycles 退出码与 artifact 不真实 | 评审用 stub 复现 exit 0 与空 cycles | `test_interrupted_cycles_exit_nonzero` |
 | health `curl` 无超时 | 评审复现挂起 | `--connect-timeout 2 --max-time 5` |
+| demo 第 9/11 步对空决策轨迹也 PASS | 代码分析（恒真断言） | 断言改为 topics>0；demo 重跑 12/12 |
+| MCP 子进程非 session leader、stderr 未排空、失败路径不关闭 | 代码分析 | `start_new_session`、`DEVNULL`、`finally close` |
+| T3 PASS 不校验覆盖/重复 | 代码分析 | 增加 `status_coverage_ms` 与 `duplicate_turns` 门槛；2 h 重跑 258/258、覆盖=时长、重复 0 |
+| probe/embedding 继承 API key；测试钩子未受 TEST_MODE 限制；`.env` 权限未校验 | 安全评审 | `env -i` 白名单、钩子仅 TEST_MODE、属主/600 校验 |

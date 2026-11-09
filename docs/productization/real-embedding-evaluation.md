@@ -12,7 +12,7 @@
 | 冻结协议 | `fixtures/eval/quality-v2-r3/`，`--max-items 10 --max-bytes 65536`，test 未触碰 |
 | 服务 | `scripts/local-embed.py`（127.0.0.1:8790）、`scripts/decision-local-server.py`（127.0.0.1:8791） |
 
-评估器运行时需要支持 `qwen3_5` 的 transformers。`.venv-asr` 固定 4.57.6（ASR 依赖），因此本轮把 `transformers 5.22.2` 及兼容的 `huggingface_hub/tokenizers/safetensors/httpx2/httpcore2/truststore/certifi` 安装到独立目录 `/tmp/sprint3/jev-tf`，用 `PYTHONPATH` 只影响评估器进程；未改动 `.venv-asr`。这是运行环境差异，不是模型版本差异。
+评估器运行时需要支持 `qwen3_5` 的 transformers。`.venv-asr` 固定 4.57.6（ASR 依赖），因此本轮把 `transformers 5.22.2` 及兼容的 `huggingface_hub/tokenizers/safetensors/httpx2/httpcore2/truststore/certifi` 安装到独立目录 `$TMPDIR/jev-tf`，用 `PYTHONPATH` 只影响评估器进程；未改动 `.venv-asr`。这是运行环境差异，不是模型版本差异。
 
 命令：
 
@@ -21,7 +21,7 @@
   --model Qwen/Qwen3-Embedding-0.6B --revision 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3 \
   --device cpu --dtype auto --preload
 
-PYTHONPATH=/tmp/sprint3/jev-tf .venv-asr/bin/python scripts/decision-local-server.py \
+PYTHONPATH="$TMPDIR/jev-tf" .venv-asr/bin/python scripts/decision-local-server.py \
   --model-dir "$HOME/.cache/huggingface/hub/models--chaoliangUNSW--Jev-Style-0.8B-Decision-v3/snapshots/b023d1f9c7858fbf01504577a3bfc349ea5c7385" \
   --addr 127.0.0.1:8791 --device cuda --dtype float16
 

@@ -26,8 +26,8 @@
     "python3 -m unittest scripts.test_local_gpu_up -v",
     "python3 -m unittest scripts.test_local_embed -v",
     "python3 -m unittest scripts.test_model_pins -v",
-    "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root /tmp/sprint3/profiles --backend ark --check",
-    "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root /tmp/sprint3/profiles --backend ark --cycles 5 --no-build",
+    "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root $TMPDIR/sprint3-profiles --backend ark --check",
+    "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root $TMPDIR/sprint3-profiles --backend ark --cycles 5 --no-build",
     "python3 scripts/long-audio-reliability.py --mode synthetic",
     "python3 scripts/long-audio-reliability.py --mode real",
     "python3 scripts/run-retrieval-quality-v2.py --binary bin/context-eval --out docs/evals/sprint3-real-embedding",
@@ -45,7 +45,7 @@
     {
       "command": "go test -count=1 ./...",
       "status": "PASS",
-      "evidence": "exit 0; 40 packages ok (see /tmp/sprint3/final-test.log)",
+      "evidence": "exit 0; 40 packages ok",
       "reason_if_not_run": ""
     },
     {
@@ -93,13 +93,13 @@
     {
       "command": "python3 scripts/run-product-browser.py",
       "status": "PASS",
-      "evidence": "13/13 checks; run with /tmp/sprint3/pwenv/bin/python (playwright 1.60.0); artifacts /tmp/sprint3/product-browser",
+      "evidence": "13/13 checks; run with a playwright 1.60.0 venv; artifacts in the run's artifact dir",
       "reason_if_not_run": ""
     },
     {
       "command": "python3 scripts/sufficiency-browser.py",
       "status": "PASS",
-      "evidence": "11/11 checks; run with /tmp/sprint3/pwenv/bin/python; screenshot /tmp/sprint3/browser/sufficiency-panel.png",
+      "evidence": "11/11 checks; run with a playwright 1.60.0 venv; screenshot in BROWSER_ARTIFACT_DIR",
       "reason_if_not_run": ""
     },
     {
@@ -169,13 +169,13 @@
       "reason_if_not_run": ""
     },
     {
-      "command": "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root /tmp/sprint3/profiles --backend ark --check",
+      "command": "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root $TMPDIR/sprint3-profiles --backend ark --check",
       "status": "PASS",
       "evidence": "probe ok: load=10402ms vram_total=8191MiB vram_free=4804MiB vram_peak=2210MiB",
       "reason_if_not_run": ""
     },
     {
-      "command": "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root /tmp/sprint3/profiles --backend ark --cycles 5 --no-build",
+      "command": "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root $TMPDIR/sprint3-profiles --backend ark --cycles 5 --no-build",
       "status": "PASS",
       "evidence": "5/5 cycles after shell fixes: cold 1590-1597ms, load 9207ms, peak 2210MiB, shutdown 253-254ms; artifacts/local-gpu/startup.json",
       "reason_if_not_run": ""
@@ -189,7 +189,7 @@
     {
       "command": "python3 scripts/long-audio-reliability.py --mode real",
       "status": "PASS",
-      "evidence": "T1 qwen RTF 0.241/5398MiB, T1-ark RTF 0.182/3338MiB, T2 80/80 windows coverage=2216891ms RTF 0.034; artifacts/long-audio-reliability/results.json",
+      "evidence": "T1 qwen RTF 0.263/5398MiB, T1-ark RTF 0.179/3338MiB, T2 80/80 windows coverage=2216891ms RTF 0.033 with measured volume/silence; artifacts/long-audio-reliability/results.json",
       "reason_if_not_run": ""
     },
     {

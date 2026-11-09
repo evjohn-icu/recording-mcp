@@ -183,7 +183,15 @@ def coverage(intervals: list[tuple[int, int]], duration_ms: int) -> tuple[list[t
     return merged, gaps
 
 
+def _stop_on_signal(signum, _frame):
+    # Default SIGTERM handling skips finally blocks; convert it to SystemExit
+    # so the web/worker children and the temp profile are always cleaned up.
+    raise SystemExit(128 + signum)
+
+
 def main() -> int:
+    signal.signal(signal.SIGTERM, _stop_on_signal)
+    signal.signal(signal.SIGINT, _stop_on_signal)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("synthetic", "real-audio-mock-asr", "real-asr"), default="synthetic")
     parser.add_argument("--audio", action="append", default=[], help="explicit audio file for real modes (repeatable)")
