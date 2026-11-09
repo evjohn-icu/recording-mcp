@@ -15,6 +15,7 @@
 |---|---|---|---:|---:|---:|
 | `ark` | `Edge0/ARK-ASR-0.6B` @ `45776b56` | 500 | 496 | 52 | **10.4%** |
 | `qwen` | `Qwen/Qwen3-ASR-1.7B` @ `7278e1e7` | 500 | 499 | 28 | **5.6%** |
+| magpie chat | `ev-ma03/3106-agent/doubao-seed-2.1-lite` | 500 | 500 | 19 | **3.8%** |
 
 同一录音经 Go 管线（ffmpeg → ingest → asr → SQLite）跑通：
 
@@ -37,14 +38,20 @@ python3 scripts/eval-asr-cer.py \
 
 输出只含聚合指标，不含转写正文。
 
-## 关于 magpie 的云端模型
+## magpie 渠道实测
 
-- `ev-ma03/3106-agent/volc.seedasr.sauc.duration` 经 magpie 的 `/v1/audio/transcriptions`
-  返回上游 404：该 Volc 资源走 WebSocket `plan/sauc/bigmodel_async`，不是 OpenAI 音频路由；
-  magpie 的聊天路由也拒绝（`UnsupportedModel`）。
-- `ev-ma03/agy-cli/gemini-3.8-flash` 的音频请求被上游以 `FAILED_PRECONDITION: User location
-  is not supported` 拒绝。
-- `ev-ma03/3106-agent/doubao-seed-2.1-lite` 文本调用可用，但本次未把包含个人信息的转写正文发往云端。
+| 模型 | 协议 | 结果 |
+|---|---|---|
+| `ev-ma03/3106-agent/doubao-seed-2.1-lite` | `/v1/chat/completions` + `input_audio`（base64 wav） | **可用**；公开样例逐字正确，120 s 真实录音 CER 3.8%（11.7 s） |
+| `ev-ma03/3106-agent/volc.seedasr.sauc.duration` | `/v1/audio/transcriptions` | 上游 Ark 404；聊天路由 `UnsupportedModel`（agent plan） |
+| `ev-ma03/group/asr` | `/v1/audio/transcriptions` | 同上游 Ark 404 |
+| `ev-ma03/agy-cli/gemini-3.8-flash` | chat / `generateContent` + inline audio | 上游地区封锁 `FAILED_PRECONDITION` |
+| `doubao-seed-2.1-pro` | chat + `input_audio` | 明确不支持音频输入 |
+| `Qwen3.8-*` / `MiniCPM*` / `nemotron-vl` | chat + `input_audio` | 返回空、拒绝音频或无音频端点 |
+
+`seedasr.sauc` 的权威路径仍是火山 WSS `plan/sauc/bigmodel_async`（`data/full-transcription/run.json`），
+magpie 没有把它包成 HTTP 转写接口。参考稿本身来自该 WSS 通道，因此 3.8% 是“同厂商模型间的一致度”，
+不是独立人工金标。音频经用户授权后发往 magpie；转写正文未入库。
 
 ## 限制
 

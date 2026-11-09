@@ -78,7 +78,7 @@ runner 也可单独运行，便于排查：
 
 - 单元测试：`go test ./internal/cloudsync -run 'TestLocalTranscriber|TestSelectTranscriber'`
 - 真实模型冒烟：见 [local-asr-smoke.md](local-asr-smoke.md)。
-- 真实录音 CER（Qwen 5.6%、ARK 10.4%，单条 120 s）：见 [real-audio-local-asr.md](real-audio-local-asr.md)。
+- 真实录音 CER（Qwen 5.6%、ARK 10.4%、magpie doubao-lite 3.8%，单条 120 s）：见 [real-audio-local-asr.md](real-audio-local-asr.md)。
 - 时间戳精度是窗口边界，不是逐字对齐；需要字级时间请另接 forced aligner。
 - 不伪造 `confidence`、录音起始时间或 `valid_from`。
 - Docker 镜像不包含 Python/torch；本地 ASR 目前用于宿主机 worker（有 NVIDIA GPU 时）。
