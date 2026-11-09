@@ -1,0 +1,825 @@
+{
+  "description": "20 labeled evidence-sufficiency scenarios for v2 context builds. Expected status is derived by a deterministic assessor from required/forbidden terms over the final budgeted evidence, so the fixture does not encode an assessor implementation.",
+  "version": "v1",
+  "scenarios": [
+    {
+      "id": "direct-factual",
+      "category": "direct-factual",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:direct",
+            "title": "预算会议",
+            "started_at": "2026-03-01T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:direct:1",
+                "text": "季度预算已批准，金额为八十万元，截止日期是三月十五日。",
+                "start_ms": 0
+              }
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "季度预算的金额和截止日期",
+      "expected_status": "sufficient",
+      "expected_evidence_turns": [
+        "turn:direct:1"
+      ],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "八十万元",
+        "三月十五日"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": false,
+      "notes": "Direct factual answer fully present in one turn."
+    },
+    {
+      "id": "partial-factual",
+      "category": "partial-factual",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:partial",
+            "title": "预算会议",
+            "started_at": "2026-03-01T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:partial:1",
+                "text": "季度预算已批准，金额为八十万元。",
+                "start_ms": 0
+              }
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "季度预算的截止日期",
+      "expected_status": "insufficient",
+      "expected_evidence_turns": [
+        "turn:partial:1"
+      ],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "三月十五日"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": true,
+      "notes": "Relevant evidence exists but never states the deadline."
+    },
+    {
+      "id": "cross-session-decision",
+      "category": "cross-session",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:move-a",
+            "title": "搬家讨论",
+            "started_at": "2026-03-02T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:move:a1",
+                "text": "搬家决定：搬去珠海定居。",
+                "start_ms": 0
+              }
+            ]
+          },
+          {
+            "id": "conv:move-b",
+            "title": "搬家时间",
+            "started_at": "2026-03-05T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:move:b1",
+                "text": "搬家时间确认在九月。",
+                "start_ms": 0
+              }
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "搬家去了哪里",
+      "expected_status": "sufficient",
+      "expected_evidence_turns": [
+        "turn:move:a1"
+      ],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "珠海"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": false,
+      "notes": "The decision spans two sessions; the destination is enough for this query."
+    },
+    {
+      "id": "changed-decision",
+      "category": "changed-decision",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:changed",
+            "title": "方案选择",
+            "started_at": "2026-03-03T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:changed:old",
+                "text": "曾经采用方案甲。",
+                "start_ms": 0
+              },
+              {
+                "id": "turn:changed:new",
+                "text": "最终采用方案乙。",
+                "start_ms": 1000
+              }
+            ],
+            "notes": [
+              {
+                "id": "note:changed:old",
+                "summary": "曾确认采用方案甲",
+                "kind": "observation",
+                "evidence_turns": [
+                  "turn:changed:old"
+                ],
+                "stale": true
+              },
+              {
+                "id": "note:changed:new",
+                "summary": "最终采用方案乙",
+                "kind": "observation",
+                "evidence_turns": [
+                  "turn:changed:new"
+                ],
+                "stale": false
+              }
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "最终采用方案乙",
+      "expected_status": "insufficient",
+      "expected_evidence_turns": [
+        "turn:changed:new"
+      ],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "方案乙"
+      ],
+      "forbidden_terms": [
+        "方案甲"
+      ],
+      "unanswerable": false,
+      "notes": "The superseded note is excluded from items, but the raw old turn remains transcript evidence; the assessor must refuse to claim the old and new decisions together.",
+      "forbidden_item_ids": [
+        "note:changed:old"
+      ]
+    },
+    {
+      "id": "unconfirmed-proposal",
+      "category": "proposal",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:proposal",
+            "title": "采购提议",
+            "started_at": "2026-03-04T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:proposal:1",
+                "text": "提议采购方案丙，尚未确认。",
+                "start_ms": 0
+              }
+            ],
+            "notes": [
+              {
+                "id": "note:proposal:1",
+                "summary": "提议采购方案丙，尚未确认",
+                "kind": "suggestion",
+                "evidence_turns": [
+                  "turn:proposal:1"
+                ],
+                "stale": false
+              }
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "采购方案丙是否已确认",
+      "expected_status": "insufficient",
+      "expected_evidence_turns": [
+        "turn:proposal:1"
+      ],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "已确认"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": true,
+      "notes": "A proposal is not a confirmation."
+    },
+    {
+      "id": "contradictory-statements",
+      "category": "contradiction",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:contradiction",
+            "title": "可行性争论",
+            "started_at": "2026-03-06T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:contra:1",
+                "text": "方案甲可行。",
+                "start_ms": 0
+              },
+              {
+                "id": "turn:contra:2",
+                "text": "方案甲不可行。",
+                "start_ms": 1000
+              }
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "方案甲是否可行 最终结论",
+      "expected_status": "insufficient",
+      "expected_evidence_turns": [
+        "turn:contra:1",
+        "turn:contra:2"
+      ],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "最终结论"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": true,
+      "notes": "Contradictory statements must not be collapsed into one arbitrary answer."
+    },
+    {
+      "id": "negation",
+      "category": "negation",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:negation",
+            "title": "流程变更",
+            "started_at": "2026-03-07T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:negation:1",
+                "text": "不再采用旧流程，改用手工审批。",
+                "start_ms": 0
+              }
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "现在是否还采用旧流程",
+      "expected_status": "sufficient",
+      "expected_evidence_turns": [
+        "turn:negation:1"
+      ],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "不再采用"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": false,
+      "notes": "Negation must be matched literally, not inverted."
+    },
+    {
+      "id": "unknown-date",
+      "category": "unknown-time",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:unknown-time",
+            "title": "无时间录音",
+            "started_at": null,
+            "turns": [
+              {
+                "id": "turn:unknown:1",
+                "text": "讨论了冬季旅行的安排。",
+                "start_ms": null
+              }
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "冬季旅行安排",
+      "expected_status": "sufficient",
+      "expected_evidence_turns": [
+        "turn:unknown:1"
+      ],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "冬季旅行"
+      ],
+      "forbidden_terms": [],
+      "expect_null_evidence_timestamps": [
+        "turn:unknown:1"
+      ],
+      "unanswerable": false,
+      "notes": "An unknown recording time stays unknown; it must not be invented."
+    },
+    {
+      "id": "missing-evidence",
+      "category": "missing",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:missing",
+            "title": "日常记录",
+            "started_at": "2026-03-08T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:missing:1",
+                "text": "天气不错，适合散步。",
+                "start_ms": 0
+              }
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "火星基地预算",
+      "expected_status": "insufficient",
+      "expected_evidence_turns": [],
+      "forbidden_evidence_turns": [
+        "turn:missing:1"
+      ],
+      "required_terms": [
+        "火星基地"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": true,
+      "notes": "No evidence at all for the query."
+    },
+    {
+      "id": "stale-transcript",
+      "category": "stale",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:stale",
+            "title": "已过期转写",
+            "started_at": "2026-03-09T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:stale:1",
+                "text": "无关记录：天气晴朗。",
+                "start_ms": 0
+              }
+            ],
+            "notes": [
+              {
+                "id": "note:stale:1",
+                "summary": "合同金额是一百万元",
+                "kind": "observation",
+                "evidence_turns": [
+                  "turn:stale:1"
+                ],
+                "stale": true
+              }
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "合同金额",
+      "expected_status": "insufficient",
+      "expected_evidence_turns": [],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "一百万元"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": true,
+      "notes": "A stale derived artifact must not supply evidence; the unrelated turn does not match the query.",
+      "forbidden_item_ids": [
+        "note:stale:1"
+      ]
+    },
+    {
+      "id": "forgotten-source",
+      "category": "forgotten",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:forgotten",
+            "title": "已删除来源",
+            "started_at": "2026-03-10T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:forgotten:1",
+                "text": "私密项目代号是蓝鲸。",
+                "start_ms": 0
+              }
+            ],
+            "forgotten_turns": [
+              "turn:forgotten:1"
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "私密项目代号",
+      "expected_status": "insufficient",
+      "expected_evidence_turns": [],
+      "forbidden_evidence_turns": [
+        "turn:forgotten:1"
+      ],
+      "required_terms": [
+        "蓝鲸"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": true,
+      "notes": "A forgotten source must never be cited."
+    },
+    {
+      "id": "ambient-exclusion",
+      "category": "ambient",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:ambient",
+            "title": "含环境音",
+            "started_at": "2026-03-11T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:ambient:1",
+                "text": "电视里说预算是一百万元。",
+                "start_ms": 0
+              }
+            ],
+            "ambient_turns": [
+              "turn:ambient:1"
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "预算是一百万元",
+      "expected_status": "insufficient",
+      "expected_evidence_turns": [],
+      "forbidden_evidence_turns": [
+        "turn:ambient:1"
+      ],
+      "required_terms": [
+        "一百万元"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": true,
+      "notes": "Ambient audio is not spoken evidence."
+    },
+    {
+      "id": "scope-isolation",
+      "category": "scope",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:scope-a",
+            "title": "会话A",
+            "started_at": "2026-03-12T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:scope:a1",
+                "text": "讨论了午餐。",
+                "start_ms": 0
+              }
+            ]
+          },
+          {
+            "id": "conv:scope-b",
+            "title": "会话B",
+            "started_at": "2026-03-13T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:scope:b1",
+                "text": "合同金额是九百万元。",
+                "start_ms": 0
+              }
+            ]
+          }
+        ],
+        "scope_conversation": "conv:scope-a",
+        "assessor": "ok"
+      },
+      "query": "合同金额",
+      "expected_status": "insufficient",
+      "expected_evidence_turns": [],
+      "forbidden_evidence_turns": [
+        "turn:scope:b1"
+      ],
+      "required_terms": [
+        "九百万元"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": true,
+      "notes": "Scoping to one conversation must not leak evidence from another."
+    },
+    {
+      "id": "budget-exclusion",
+      "category": "budget",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:budget",
+            "title": "预算截断",
+            "started_at": "2026-03-14T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:budget:1",
+                "text": "这是一段很长的背景说明，真正的结论是最终金额为七百万元。",
+                "start_ms": 0
+              }
+            ]
+          }
+        ],
+        "max_bytes": 32,
+        "assessor": "ok"
+      },
+      "query": "最终金额",
+      "expected_status": "insufficient",
+      "expected_evidence_turns": [],
+      "forbidden_evidence_turns": [
+        "turn:budget:1"
+      ],
+      "required_terms": [
+        "七百万元"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": true,
+      "notes": "Evidence excluded by the byte budget cannot be claimed as sufficient."
+    },
+    {
+      "id": "assessor-failure",
+      "category": "assessor-error",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:assessor-error",
+            "title": "评估器失败",
+            "started_at": "2026-03-15T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:assessor:1",
+                "text": "预算金额是五十万元。",
+                "start_ms": 0
+              }
+            ]
+          }
+        ],
+        "assessor": "error"
+      },
+      "query": "预算金额",
+      "expected_status": "unknown",
+      "expected_evidence_turns": [],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "五十万元"
+      ],
+      "forbidden_terms": [],
+      "expected_gaps": [
+        "evidence_assessment_failed"
+      ],
+      "unanswerable": false,
+      "notes": "An assessor outage is unknown, never a silent sufficient."
+    },
+    {
+      "id": "assessor-invalid-refs",
+      "category": "invalid-refs",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:invalid-refs",
+            "title": "评估器引用越界",
+            "started_at": "2026-03-16T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:refs:1",
+                "text": "预算金额是六十万元。",
+                "start_ms": 0
+              }
+            ]
+          }
+        ],
+        "assessor": "invalid_refs"
+      },
+      "query": "预算金额",
+      "expected_status": "unknown",
+      "expected_evidence_turns": [],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "六十万元"
+      ],
+      "forbidden_terms": [],
+      "expected_gaps": [
+        "evidence_assessment_failed"
+      ],
+      "unanswerable": false,
+      "notes": "References outside the budgeted evidence invalidate the assessment."
+    },
+    {
+      "id": "no-assessor",
+      "category": "unconfigured",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:no-assessor",
+            "title": "未配置评估器",
+            "started_at": "2026-03-17T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:no-assessor:1",
+                "text": "预算金额是七十万元。",
+                "start_ms": 0
+              }
+            ]
+          }
+        ],
+        "assessor": "none"
+      },
+      "query": "预算金额",
+      "expected_status": "unknown",
+      "expected_evidence_turns": [],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "七十万元"
+      ],
+      "forbidden_terms": [],
+      "expected_gaps": [
+        "evidence_assessment_unavailable"
+      ],
+      "unanswerable": false,
+      "notes": "No assessor with evidence yields unknown, not a guess."
+    },
+    {
+      "id": "no-evidence",
+      "category": "empty",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:empty",
+            "title": "空会话",
+            "started_at": "2026-03-18T09:00:00Z",
+            "turns": []
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "任何问题",
+      "expected_status": "insufficient",
+      "expected_evidence_turns": [],
+      "forbidden_evidence_turns": [],
+      "required_terms": [],
+      "forbidden_terms": [],
+      "unanswerable": true,
+      "notes": "No evidence is insufficient even when an assessor is configured."
+    },
+    {
+      "id": "sufficient-empty-refs",
+      "category": "invalid-refs",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:empty-refs",
+            "title": "空引用",
+            "started_at": "2026-03-19T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:empty-refs:1",
+                "text": "预算金额是八十万元。",
+                "start_ms": 0
+              }
+            ]
+          }
+        ],
+        "assessor": "empty_sufficient"
+      },
+      "query": "预算金额",
+      "expected_status": "unknown",
+      "expected_evidence_turns": [],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "八十万元"
+      ],
+      "forbidden_terms": [],
+      "expected_gaps": [
+        "evidence_assessment_failed"
+      ],
+      "unanswerable": false,
+      "notes": "Sufficient with no cited evidence is rejected as invalid."
+    },
+    {
+      "id": "proposal-vs-confirmed",
+      "category": "proposal",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:confirmed",
+            "title": "提案与确认",
+            "started_at": "2026-03-20T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:confirmed:proposal",
+                "text": "提议采用方案丁。",
+                "start_ms": 0
+              },
+              {
+                "id": "turn:confirmed:confirmed",
+                "text": "会议已确认采用方案丁。",
+                "start_ms": 1000
+              }
+            ],
+            "notes": [
+              {
+                "id": "note:confirmed:proposal",
+                "summary": "提议采用方案丁",
+                "kind": "suggestion",
+                "evidence_turns": [
+                  "turn:confirmed:proposal"
+                ],
+                "stale": false
+              },
+              {
+                "id": "note:confirmed:confirmed",
+                "summary": "会议已确认采用方案丁",
+                "kind": "intention",
+                "evidence_turns": [
+                  "turn:confirmed:confirmed"
+                ],
+                "stale": false
+              }
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "方案丁是否已确认",
+      "expected_status": "sufficient",
+      "expected_evidence_turns": [
+        "turn:confirmed:confirmed"
+      ],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "已确认"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": false,
+      "notes": "Only the confirmed record carries the confirmation term; the proposal must not be read as confirmation."
+    },
+    {
+      "id": "forgotten-decision",
+      "category": "forgotten",
+      "setup": {
+        "conversations": [
+          {
+            "id": "conv:forgotten-decision",
+            "title": "已忘记的决定",
+            "started_at": "2026-03-21T09:00:00Z",
+            "turns": [
+              {
+                "id": "turn:forgotten-decision:1",
+                "text": "无关记录：周末计划。",
+                "start_ms": 0
+              }
+            ],
+            "notes": [
+              {
+                "id": "note:forgotten-decision:1",
+                "summary": "已确认采用方案戊",
+                "kind": "intention",
+                "evidence_turns": [
+                  "turn:forgotten-decision:1"
+                ],
+                "stale": true
+              }
+            ]
+          }
+        ],
+        "assessor": "ok"
+      },
+      "query": "是否确认采用方案戊",
+      "expected_status": "insufficient",
+      "expected_evidence_turns": [],
+      "forbidden_evidence_turns": [],
+      "required_terms": [
+        "已确认"
+      ],
+      "forbidden_terms": [],
+      "unanswerable": true,
+      "notes": "A forgotten decision must not be resurrected through its stale note.",
+      "forbidden_item_ids": [
+        "note:forgotten-decision:1"
+      ]
+    }
+  ]
+}

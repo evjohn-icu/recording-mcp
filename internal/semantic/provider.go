@@ -28,6 +28,35 @@ type Provider interface {
 	Embed(ctx context.Context, texts []string) ([]Vector, error)
 }
 
+// EmbedRole distinguishes how a text is embedded. Retrieval models such as
+// Qwen3-Embedding are trained with a query instruction; indexing the same text
+// as a document must not get that prefix.
+type EmbedRole string
+
+const (
+	RoleDocument EmbedRole = "document"
+	RoleQuery    EmbedRole = "query"
+)
+
+// RoleProvider is the optional extension for providers that can embed with a
+// role. Providers without it keep using Embed for both sides.
+type RoleProvider interface {
+	Provider
+	EmbedRole(ctx context.Context, texts []string, role EmbedRole) ([]Vector, error)
+}
+
+// EmbedTexts uses the role-aware path when the provider supports it and falls
+// back to the plain Embed otherwise (HashProvider stays role-blind on purpose).
+func EmbedTexts(ctx context.Context, p Provider, texts []string, role EmbedRole) ([]Vector, error) {
+	if p == nil {
+		return nil, errors.New("semantic: provider is required")
+	}
+	if roleProvider, ok := p.(RoleProvider); ok {
+		return roleProvider.EmbedRole(ctx, texts, role)
+	}
+	return p.Embed(ctx, texts)
+}
+
 // HashProvider is a deterministic, offline embedder: no network, no weights.
 // It tokenizes text into lowercased letter/digit runs plus overlapping
 // 2-character grams for CJK runs, hashes each token with FNV-1a 64, sets the
@@ -189,8 +218,9 @@ func (p OpenAICompatProvider) Model() string { return p.ModelName }
 func (p OpenAICompatProvider) Dims() int { return p.Dimensions }
 
 type embedRequest struct {
-	Model string   `json:"model"`
-	Input []string `json:"input"`
+	Model     string   `json:"model"`
+	Input     []string `json:"input"`
+	InputType string   `json:"input_type,omitempty"`
 }
 
 type embedResponse struct {
@@ -202,9 +232,15 @@ type embedResponse struct {
 	} `json:"error"`
 }
 
-// Embed implements Provider. A non-2xx status, a wrong embedding count or a
-// dimension mismatch is an error carrying a bounded response snippet.
+// Embed implements Provider. It embeds as a document; a query caller must use
+// EmbedRole(ctx, texts, RoleQuery).
 func (p OpenAICompatProvider) Embed(ctx context.Context, texts []string) ([]Vector, error) {
+	return p.EmbedRole(ctx, texts, RoleDocument)
+}
+
+// EmbedRole sends input_type when the role is set. External
+// OpenAI-compatible endpoints ignore the extra field.
+func (p OpenAICompatProvider) EmbedRole(ctx context.Context, texts []string, role EmbedRole) ([]Vector, error) {
 	endpoint := strings.TrimSpace(p.Endpoint)
 	if endpoint == "" {
 		return nil, errors.New("semantic: empty embedding endpoint")
@@ -212,7 +248,11 @@ func (p OpenAICompatProvider) Embed(ctx context.Context, texts []string) ([]Vect
 	if len(texts) == 0 {
 		return nil, errors.New("semantic: no texts to embed")
 	}
-	body, err := json.Marshal(embedRequest{Model: p.ModelName, Input: texts})
+	inputType := ""
+	if role == RoleDocument || role == RoleQuery {
+		inputType = string(role)
+	}
+	body, err := json.Marshal(embedRequest{Model: p.ModelName, Input: texts, InputType: inputType})
 	if err != nil {
 		return nil, fmt.Errorf("semantic: encode embedding request: %w", err)
 	}

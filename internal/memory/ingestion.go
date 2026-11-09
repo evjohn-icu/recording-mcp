@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"time"
 
@@ -53,6 +54,17 @@ type ProcessingStatus struct {
 	// for the next successful embed job), or "disabled" (worker runs without
 	// an embedding provider).
 	IndexingStatus string `json:"indexing_status"`
+	// ASR progress is the window-level projection of the active attachments.
+	// completed counts committed windows, coverage is the union of committed
+	// intervals (never MAX(global_end_ms)), and state mirrors
+	// sync_recordings.transcription_state.
+	ASRState           string `json:"asr_state"`
+	ASRExpectedChunks  int    `json:"asr_expected_chunks"`
+	ASRCompletedChunks int    `json:"asr_completed_chunks"`
+	ASRFailedChunks    int    `json:"asr_failed_chunks"`
+	ASRCoverageMS      int64  `json:"asr_coverage_ms"`
+	ASRDurationMS      int64  `json:"asr_duration_ms"`
+	ASRLastError       string `json:"asr_last_error,omitempty"`
 }
 
 func stableKey(kind string, parts ...string) string {
@@ -389,7 +401,120 @@ func (s *Store) GetProcessingStatus(ctx context.Context, conversationID string) 
 	if err != nil {
 		return ProcessingStatus{}, err
 	}
+	if err := deriveASRProgress(ctx, s.db, conversationID, &out); err != nil {
+		return ProcessingStatus{}, err
+	}
 	return out, nil
+}
+
+// deriveASRProgress reads the ASR window projection. The sync row is written
+// by the ingest stage; when it is absent (legacy or CLI imports) the count and
+// coverage are derived from the active attachments instead of guessing.
+func deriveASRProgress(ctx context.Context, db *sql.DB, conversationID string, out *ProcessingStatus) error {
+	out.ASRState = "none"
+	var payloadJSON string
+	err := db.QueryRowContext(ctx, `SELECT payload_json FROM processing_jobs WHERE stage='asr' AND input_snapshot_id=? ORDER BY created_at DESC, rowid DESC LIMIT 1`, conversationID).Scan(&payloadJSON)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var payload struct {
+		ProviderRecordingID string `json:"provider_recording_id"`
+		DeviceID            string `json:"device_id"`
+		DurationMS          int64  `json:"duration_ms"`
+	}
+	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
+		return nil
+	}
+	out.ASRDurationMS = payload.DurationMS
+	if payload.ProviderRecordingID == "" {
+		return nil
+	}
+	var state, lastError sql.NullString
+	var total, completed, failed, coverage sql.NullInt64
+	err = db.QueryRowContext(ctx, `SELECT transcription_state, total_chunks, completed_chunks, failed_chunks, coverage_ms, last_error FROM sync_recordings WHERE recording_id=?`, payload.ProviderRecordingID).
+		Scan(&state, &total, &completed, &failed, &coverage, &lastError)
+	// Rows written before migration v22 carry total_chunks=1 and no projection
+	// counters; trust the columns only when they actually describe windows.
+	legacy := err == nil && state.String == "done" && total.Int64 == 1 && completed.Int64 == 0 && coverage.Int64 == 0
+	if err == nil && !legacy {
+		out.ASRState = state.String
+		out.ASRExpectedChunks = int(total.Int64)
+		out.ASRCompletedChunks = int(completed.Int64)
+		out.ASRFailedChunks = int(failed.Int64)
+		out.ASRCoverageMS = coverage.Int64
+		if lastError.Valid {
+			out.ASRLastError = lastError.String
+		}
+		return nil
+	}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	recordingID := stableKey("recording", payload.DeviceID, payload.ProviderRecordingID)
+	rows, err := db.QueryContext(ctx, `SELECT result_json FROM source_attachments WHERE recording_id=? AND active=1`, recordingID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	var intervals [][2]int64
+	count := 0
+	for rows.Next() {
+		var resultJSON string
+		if err := rows.Scan(&resultJSON); err != nil {
+			return err
+		}
+		count++
+		var result asrinput.Result
+		if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
+			continue
+		}
+		start, end := result.Source.SegmentOffsetMS, result.Source.SegmentOffsetMS+result.Source.SegmentDurationMS
+		if end > start {
+			intervals = append(intervals, [2]int64{start, end})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	out.ASRExpectedChunks = count
+	out.ASRCompletedChunks = count
+	out.ASRCoverageMS = unionIntervals(intervals)
+	if count == 0 {
+		out.ASRState = "pending"
+	} else {
+		out.ASRState = "done"
+	}
+	return nil
+}
+
+// unionIntervals returns the length covered by at least one interval.
+func unionIntervals(intervals [][2]int64) int64 {
+	if len(intervals) == 0 {
+		return 0
+	}
+	ordered := append([][2]int64(nil), intervals...)
+	sort.Slice(ordered, func(i, j int) bool {
+		if ordered[i][0] == ordered[j][0] {
+			return ordered[i][1] < ordered[j][1]
+		}
+		return ordered[i][0] < ordered[j][0]
+	})
+	var total int64
+	current := ordered[0]
+	for _, interval := range ordered[1:] {
+		if interval[0] > current[1] {
+			total += current[1] - current[0]
+			current = interval
+			continue
+		}
+		if interval[1] > current[1] {
+			current[1] = interval[1]
+		}
+	}
+	return total + current[1] - current[0]
 }
 
 // deriveIndexingStatus maps the latest embed-stage job of a conversation onto

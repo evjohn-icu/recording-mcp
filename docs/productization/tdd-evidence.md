@@ -20,3 +20,39 @@
 | productization.demo-ten-steps | `beta-demo.py` 首跑：step 6 `state=unresolved` 误判、step 8 `X-Audio-Start-MS` 大小写 | 修正断言后 10/10 |
 
 说明：`scripts/check_spec_test_map.py` 只验证锚点存在，不证明测试先写或覆盖充分；本表是唯一的过程证据。
+
+## Sprint 3（local-intelligence-reliability）
+
+只记录实际观察到的红/绿。未观察到红阶段的项不计为 TDD 证据，并明确标注。
+
+| 场景 ID | Red 命令与首次失败摘要 | Green 命令与结果 |
+|---|---|---|
+| model-pins | `python3 -m unittest scripts.test_model_pins`：`AssertionError: scripts/local-asr.py has no DEFAULT_MODELS` | 写入 `DEFAULT_MODELS`/`DEFAULT_REVISIONS` 后 3/3 通过 |
+| long-audio.* | 先加 `long_audio_test.go`，`go test ./internal/ingest -run TestProcessingStatusProjectsASRProgress`：`status.ASRState undefined` | 迁移 v22 + `deriveASRProgress` + 分块 `RunASRJob` 后 `go test ./internal/ingest -count=1` 通过 |
+| embedding.role-query | 先加 `role_provider_test.go`，`go test ./internal/semantic`：`undefined: EmbedRole`、`provider.EmbedRole undefined` | `RoleProvider`/`EmbedTexts` 接入索引与检索后 `go test ./internal/semantic -count=1` 通过 |
+| local-gpu.degraded | `go test ./internal/app -run TestCapabilitiesReportsGPUUnavailable`：`reason = "worker_asr_mismatch", want gpu_unavailable` | 调整能力原因优先级后通过 |
+| sufficiency.*（夹具） | `go test ./internal/contextbuild -run TestSufficiencyScenarios`：5 个场景失败（跨会话 bigram 未命中、过期 note 与原始 turn 的语义混淆） | 修正夹具语义（不动期望以掩盖实现缺陷）后 21/21 通过 |
+| release.regression-commands | `make spec-validate`：`release.regression-commands: test file not found: scripts/test_release_commands.py` | 新增清单测试后映射校验通过 |
+| local-gpu.*（脚本） | 先加 `test_local_gpu_up.py`，首跑 `test_lock_and_timeouts_are_forwarded` 失败（未传 profiles-root）并因单周期前台模式超时 | 修正测试参数/前台模式后 7/7 通过 |
+| local-asr 协议（`--probe/--stream/--skip/超时`） | 未观察到红：协议测试在 runner 实现之后编写；仅 `test_local_asr` 首跑因系统 Python 无 numpy 报错（测试环境问题，不是 TDD 红） | `python3 -m unittest scripts.test_local_asr -v` 10/10 通过 |
+| gpu_lock | 未观察到红：锁实现与测试同批提交 | `go test ./internal/cloudsync -run TestGPUFileLock -count=1` 通过 |
+| sufficiency.ui-trace | 未观察到红：浏览器脚本首跑 11/11 通过 | `scripts/sufficiency-browser.py` 11/11 |
+
+## Sprint 3 review 修复（非严格 TDD，红阶段未逐项观察到）
+
+代码评审发现并修复了以下缺陷；除注明外，修复前的失败由评审脚本/命令直接复现，回归测试在修复后加入，未观察到“先写测试再修复”的红阶段，因此不计为 TDD 证据。
+
+| 缺陷 | 证据 | 回归 |
+|---|---|---|
+| embedding 左填充池化取到首个 token，批量文档向量错误 | 评审用 torch 复现 `mask.sum-1` 选中索引 2 而非 11；冻结评测重跑后 v1-openai Recall@5 从 0.225 变为 0.85 | 修正为 `hidden[:, -1]`；`SUFFICIENCY` 无关，评测 manifest 重跑覆盖 |
+| `local-start.sh` 把 `EMBED_*` 转发成 `--embed_endpoint`（下划线），两个二进制退出 2 | 评审对已构建二进制复现 `flag provided but not defined` | 新增 `test_embedding_configuration_reaches_both_services`（先修正实现，未观察到红） |
+| `local-gpu-up.sh --with-embedding` 从未成功启动 | 同上 | 新增 `test_with_embedding_exports_openai_compatible_config` |
+| 窗口几何改变后续跑会跳过未转录音频并报 done | 代码分析 + 新测试 | `TestRunASRJobRejectsChangedWindowPlan` |
+| v21 sync 行显示 0/1 覆盖 | 代码分析 | `TestProcessingStatusDerivesLegacyProjection` |
+| worker CUDA 探针用系统 python3 而非 `.venv-asr`，误报 gpu_unavailable | 代码分析；本机系统 python3 无 torch | 修正为使用 transcriber 解析出的解释器；探针失败置空 transcriber |
+| 单周期/中断的 cycles 退出码与 artifact 不真实 | 评审用 stub 复现 exit 0 与空 cycles | `test_interrupted_cycles_exit_nonzero` |
+| health `curl` 无超时 | 评审复现挂起 | `--connect-timeout 2 --max-time 5` |
+| demo 第 9/11 步对空决策轨迹也 PASS | 代码分析（恒真断言） | 断言改为 topics>0；demo 重跑 12/12 |
+| MCP 子进程非 session leader、stderr 未排空、失败路径不关闭 | 代码分析 | `start_new_session`、`DEVNULL`、`finally close` |
+| T3 PASS 不校验覆盖/重复 | 代码分析 | 增加 `status_coverage_ms` 与 `duplicate_turns` 门槛；2 h 重跑 258/258、覆盖=时长、重复 0 |
+| probe/embedding 继承 API key；测试钩子未受 TEST_MODE 限制；`.env` 权限未校验 | 安全评审 | `env -i` 白名单、钩子仅 TEST_MODE、属主/600 校验 |

@@ -2,12 +2,16 @@ package cloudsync
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"recordingmcp/internal/asrinput"
 )
 
 func writeStub(t *testing.T, body string) string {
@@ -158,5 +162,182 @@ print(json.dumps({"windows": [{"index": 1, "start_ms": 0, "end_ms": 99999, "text
 `)
 	if _, err := tr.Transcribe(context.Background(), writePCM(t, 1000), localTestMeta()); err == nil || !strings.Contains(err.Error(), "invalid bounds") {
 		t.Fatalf("error = %v, want invalid bounds", err)
+	}
+}
+
+func TestPlanWindowsMatchesRunnerDryRun(t *testing.T) {
+	requirePython(t)
+	script := filepath.Join("..", "..", "scripts", "local-asr.py")
+	pcm := writePCM(t, 31000)
+	out, err := exec.Command("python3", script, "--backend", "ark", "--model", "unused",
+		"--pcm", pcm, "--dry-run", "--window-ms", "30000", "--overlap-ms", "2000").Output()
+	if err != nil {
+		t.Fatalf("dry-run failed: %v", err)
+	}
+	var doc struct {
+		Windows []struct {
+			StartMS int64 `json:"start_ms"`
+			EndMS   int64 `json:"end_ms"`
+		} `json:"windows"`
+	}
+	if err := json.Unmarshal(out, &doc); err != nil {
+		t.Fatalf("dry-run output: %v", err)
+	}
+	plan, err := PlanWindows(31000, 30000, 2000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan) != len(doc.Windows) {
+		t.Fatalf("plan windows = %d, runner windows = %d", len(plan), len(doc.Windows))
+	}
+	for i, window := range plan {
+		if window.StartMS != doc.Windows[i].StartMS || window.EndMS != doc.Windows[i].EndMS {
+			t.Fatalf("window %d = %d-%d, runner = %d-%d: planning drift breaks --skip",
+				i+1, window.StartMS, window.EndMS, doc.Windows[i].StartMS, doc.Windows[i].EndMS)
+		}
+	}
+}
+
+func TestLocalASREnvExcludesSecrets(t *testing.T) {
+	requirePython(t)
+	for _, key := range []string{"VOLC_API_KEY", "EMBED_API_KEY", "GENERATOR_API_KEY", "MEMORY_PROFILE_PASSWORD"} {
+		t.Setenv(key, "secret-"+key)
+	}
+	t.Setenv("CUDA_VISIBLE_DEVICES", "0")
+	t.Setenv("HF_HOME", "/tmp/hf-home")
+	script := writeStub(t, `import json, os, sys
+keys = ["VOLC_API_KEY", "EMBED_API_KEY", "GENERATOR_API_KEY", "MEMORY_PROFILE_PASSWORD",
+        "PATH", "HOME", "CUDA_VISIBLE_DEVICES", "HF_HOME"]
+print(json.dumps({"windows": [{"index": 1, "start_ms": 0, "end_ms": 1000,
+    "text": " ".join(k + "=" + ("yes" if os.environ.get(k) else "no") for k in keys)}]}))
+`)
+	tr := LocalTranscriber{Python: "python3", Script: script, Backend: "ark", Model: "m", Dtype: "float16"}
+	results, err := tr.Transcribe(context.Background(), writePCM(t, 1000), localTestMeta())
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := results[0].Turns[0].Text
+	for _, banned := range []string{"VOLC_API_KEY=yes", "EMBED_API_KEY=yes", "GENERATOR_API_KEY=yes", "MEMORY_PROFILE_PASSWORD=yes"} {
+		if strings.Contains(text, banned) {
+			t.Fatalf("runner inherited a secret: %s", text)
+		}
+	}
+	for _, kept := range []string{"PATH=yes", "HOME=yes", "CUDA_VISIBLE_DEVICES=yes", "HF_HOME=yes"} {
+		if !strings.Contains(text, kept) {
+			t.Fatalf("runner lost %s: %s", kept, text)
+		}
+	}
+}
+
+func TestLocalTranscriberStreamsCommittedWindows(t *testing.T) {
+	requirePython(t)
+	argsLog := filepath.Join(t.TempDir(), "args.txt")
+	script := writeStub(t, `import json, os, sys
+args = sys.argv[1:]
+pcm = args[args.index("--pcm") + 1]
+duration = os.path.getsize(pcm) // 32
+skip = set()
+if "--skip" in args:
+    skip = {int(x) for x in args[args.index("--skip") + 1].split(",") if x}
+open(os.environ["STREAM_ARGS"], "w").write(" ".join(args))
+for i, (s, e) in enumerate([(0, 30000), (28000, duration)], 1):
+    if i in skip:
+        continue
+    print(json.dumps({"index": i, "start_ms": s, "end_ms": e, "text": "w%d" % i, "language": "Chinese"}), flush=True)
+`)
+	tr := LocalTranscriber{
+		Python: "python3", Script: script, Backend: "ark", Model: "Edge0/ARK-ASR-0.6B",
+		Dtype: "float16", SegmentMS: 30000, OverlapMS: 2000, MaxNewTokens: 512,
+		Env: []string{"STREAM_ARGS=" + argsLog},
+	}
+	var got []int64
+	err := tr.TranscribeChunks(context.Background(), writePCM(t, 31000), localTestMeta(), []int{2},
+		func(result asrinput.Result) error {
+			got = append(got, result.Source.SegmentOffsetMS)
+			return nil
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != 0 {
+		t.Fatalf("emitted windows = %v, want only the uncommitted first window", got)
+	}
+	recorded, err := os.ReadFile(argsLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"--stream", "--skip 2"} {
+		if !strings.Contains(string(recorded), want) {
+			t.Fatalf("runner args missing %q: %s", want, recorded)
+		}
+	}
+}
+
+func TestLocalTranscriberClassifiesCUDAOutOfMemory(t *testing.T) {
+	requirePython(t)
+	script := writeStub(t, "import sys\nprint('torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 GiB', file=sys.stderr)\nsys.exit(1)\n")
+	tr := LocalTranscriber{Python: "python3", Script: script, Backend: "qwen", Model: "m", Dtype: "float16"}
+	err := tr.TranscribeChunks(context.Background(), writePCM(t, 1000), localTestMeta(), nil,
+		func(asrinput.Result) error { return nil })
+	var runner *RunnerError
+	if !errors.As(err, &runner) {
+		t.Fatalf("error = %v, want *RunnerError", err)
+	}
+	if runner.Code != "asr_oom" {
+		t.Fatalf("code = %q, want asr_oom", runner.Code)
+	}
+	if !strings.Contains(err.Error(), "out of memory") {
+		t.Fatalf("error lost the runner detail: %v", err)
+	}
+}
+
+func TestLocalTranscriberMapsLoadAndWindowTimeouts(t *testing.T) {
+	requirePython(t)
+	loadExit := LocalTranscriber{Python: "python3", Script: writeStub(t, "import sys\nsys.exit(4)\n"), Backend: "ark", Model: "m", Dtype: "float16"}
+	err := loadExit.TranscribeChunks(context.Background(), writePCM(t, 1000), localTestMeta(), nil, func(asrinput.Result) error { return nil })
+	var runner *RunnerError
+	if !errors.As(err, &runner) || runner.Code != "asr_model_load_failed" {
+		t.Fatalf("load failure = %v, want asr_model_load_failed", err)
+	}
+	windowExit := LocalTranscriber{Python: "python3", Script: writeStub(t, "import sys\nsys.exit(5)\n"), Backend: "ark", Model: "m", Dtype: "float16"}
+	err = windowExit.TranscribeChunks(context.Background(), writePCM(t, 1000), localTestMeta(), nil, func(asrinput.Result) error { return nil })
+	if !errors.As(err, &runner) || runner.Code != "asr_timeout" {
+		t.Fatalf("window timeout = %v, want asr_timeout", err)
+	}
+}
+
+func TestLocalTranscriberStopsOnCallbackError(t *testing.T) {
+	requirePython(t)
+	script := writeStub(t, `import json, sys
+print(json.dumps({"index": 1, "start_ms": 0, "end_ms": 30000, "text": "first"}), flush=True)
+print(json.dumps({"index": 2, "start_ms": 28000, "end_ms": 31000, "text": "second"}), flush=True)
+`)
+	tr := LocalTranscriber{Python: "python3", Script: script, Backend: "ark", Model: "m", Dtype: "float16",
+		SegmentMS: 30000, OverlapMS: 2000}
+	stop := errors.New("store unavailable")
+	calls := 0
+	err := tr.TranscribeChunks(context.Background(), writePCM(t, 31000), localTestMeta(), nil,
+		func(asrinput.Result) error {
+			calls++
+			return stop
+		})
+	if !errors.Is(err, stop) {
+		t.Fatalf("error = %v, want the callback error", err)
+	}
+	if calls != 1 {
+		t.Fatalf("callback calls = %d, want the runner stopped after the first error", calls)
+	}
+}
+
+func TestPlanWindowsRejectsImpossiblePlans(t *testing.T) {
+	if _, err := PlanWindows(1000, 0, 0); err == nil {
+		t.Fatal("zero window must be rejected")
+	}
+	if _, err := PlanWindows(1000, 30000, 30000); err == nil {
+		t.Fatal("overlap equal to the window must be rejected")
+	}
+	plan, err := PlanWindows(30000, 30000, 2000)
+	if err != nil || len(plan) != 1 {
+		t.Fatalf("single window plan = %v, %v", plan, err)
 	}
 }

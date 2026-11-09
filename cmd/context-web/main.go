@@ -174,7 +174,7 @@ func main() {
 	if err := validateListenAddress(*addr, *containerBind); err != nil {
 		log.Fatal(err)
 	}
-	transcriber, err := cloudsync.SelectTranscriber(cloudsync.TranscriberConfig{
+	transcriber, asrInitErr := cloudsync.SelectTranscriber(cloudsync.TranscriberConfig{
 		Provider: *asrProvider, KeyEnv: *asrKeyEnv, Endpoint: *asrEndpoint,
 		ResourceID: *asrResourceID, Model: *asrModel, Revision: *asrRevision,
 		SegmentMS: *asrSegmentMS, OverlapMS: *asrOverlapMS, Concurrency: *asrConcurrency,
@@ -183,8 +183,14 @@ func main() {
 		Dtype: *asrDtype, Device: *asrDevice, Language: *asrLanguage,
 		WindowMS: *asrWindowMS, MaxNewTokens: *asrMaxNewTokens, ProbePython: true,
 	})
-	if err != nil {
-		log.Fatal(err)
+	asrInitMessage := ""
+	if asrInitErr != nil {
+		if !cloudsync.IsLocalProvider(*asrProvider) {
+			log.Fatal(asrInitErr)
+		}
+		log.Printf("context-web: ASR unavailable: %v", asrInitErr)
+		asrInitMessage = asrInitErr.Error()
+		transcriber = nil
 	}
 	newImporter := func(store *memory.Store, audioDir string) (*ingest.Service, error) {
 		return ingest.New(ingest.Config{
@@ -254,6 +260,7 @@ func main() {
 			}
 			svc := app.New(store, retriever, rerank, paths.Audio)
 			svc.ASRProvider = *asrProvider
+			svc.ASRInitError = asrInitMessage
 			svc.BriefPolisher = briefPolisher
 			if strings.TrimSpace(*sufficiencyURL) != "" {
 				svc.Assessor = &contextbuild.DecisionEvidenceAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
@@ -315,6 +322,7 @@ func main() {
 		if password == "" {
 			log.Fatalf("context-web: set %s to unlock profile %q", *profilePasswordEnv, selectedProfile)
 		}
+		var err error
 		profileManager, err = profile.Open(root)
 		if err != nil {
 			log.Fatal(err)
@@ -389,6 +397,7 @@ func main() {
 	}
 	svc := app.New(store, retriever, rerank, *audioDir)
 	svc.ASRProvider = *asrProvider
+	svc.ASRInitError = asrInitMessage
 	svc.BriefPolisher = briefPolisher
 	if strings.TrimSpace(*sufficiencyURL) != "" {
 		svc.Assessor = &contextbuild.DecisionEvidenceAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}

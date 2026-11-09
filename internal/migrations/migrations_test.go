@@ -391,3 +391,129 @@ func TestActiveHeadEnforcedByDatabase(t *testing.T) {
 		t.Fatalf("active heads for seg-1 = %d, want 1", active)
 	}
 }
+
+func columnsOf(t *testing.T, db *sql.DB, table string) map[string]bool {
+	t.Helper()
+	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	found := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, kind string
+		var notNull, pk int
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &kind, &notNull, &defaultValue, &pk); err != nil {
+			t.Fatal(err)
+		}
+		found[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return found
+}
+
+// applyUpTo builds the exact schema of an older release by running the real
+// migrations below max, so upgrade tests do not guess column shapes.
+func applyUpTo(t *testing.T, ctx context.Context, db *sql.DB, max int) {
+	t.Helper()
+	if _, err := db.Exec(schemaMigrationsDDL); err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range migrations {
+		if m.version > max {
+			continue
+		}
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, stmt := range m.statements {
+			if _, err := tx.ExecContext(ctx, stmt); err != nil {
+				tx.Rollback()
+				t.Fatalf("v%d %s: %v", m.version, m.name, err)
+			}
+		}
+		if m.run != nil {
+			if err := m.run(ctx, tx); err != nil {
+				tx.Rollback()
+				t.Fatalf("v%d %s run: %v", m.version, m.name, err)
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version,name,applied_at) VALUES(?,?,?)`, m.version, m.name, 1); err != nil {
+			tx.Rollback()
+			t.Fatal(err)
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestASRProgressUpgradesV21(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	applyUpTo(t, ctx, db, 21)
+	for table, columns := range map[string][]string{
+		"sync_recordings":   {"completed_chunks", "failed_chunks", "coverage_ms"},
+		"worker_heartbeats": {"gpu_name", "vram_total_mb", "vram_free_mb", "asr_device", "asr_dtype", "asr_error"},
+	} {
+		have := columnsOf(t, db, table)
+		for _, column := range columns {
+			if have[column] {
+				t.Fatalf("%s.%s already exists before v22; fixture is not a v21 schema", table, column)
+			}
+		}
+	}
+	// A v21 database may already hold rows; the ALTERs must keep them.
+	if _, err := db.Exec(`INSERT INTO sync_recordings(recording_id,owner,device_id,state,updated_at) VALUES('r1','import','d1','downloaded',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO worker_heartbeats(worker_id,pid,stages_json,generator_enabled,asr_provider,asr_available,embed_provider,last_seen_at) VALUES('w1',1,'[]',0,'',0,'',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Apply(ctx, db); err != nil {
+		t.Fatalf("Apply on v21: %v", err)
+	}
+	if got := mustVersion(t, ctx, db); got != len(migrations) {
+		t.Fatalf("Version() = %d, want %d", got, len(migrations))
+	}
+	var completed, failed, coverage int
+	var state string
+	if err := db.QueryRow(`SELECT completed_chunks,failed_chunks,coverage_ms,transcription_state FROM sync_recordings WHERE recording_id='r1'`).Scan(&completed, &failed, &coverage, &state); err != nil {
+		t.Fatal(err)
+	}
+	if completed != 0 || failed != 0 || coverage != 0 || state != "none" {
+		t.Fatalf("defaults = %d/%d/%d state=%q, want zeroes and 'none'", completed, failed, coverage, state)
+	}
+	var gpu, device, dtype, asrErr string
+	var total, free int
+	if err := db.QueryRow(`SELECT gpu_name,vram_total_mb,vram_free_mb,asr_device,asr_dtype,asr_error FROM worker_heartbeats WHERE worker_id='w1'`).Scan(&gpu, &total, &free, &device, &dtype, &asrErr); err != nil {
+		t.Fatal(err)
+	}
+	if gpu != "" || total != 0 || free != 0 || device != "" || dtype != "" || asrErr != "" {
+		t.Fatalf("heartbeat defaults = %q/%d/%d/%q/%q/%q, want empty", gpu, total, free, device, dtype, asrErr)
+	}
+}
+
+func TestASRProgressColumnsOnFreshDatabase(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	if err := Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	for table, columns := range map[string][]string{
+		"sync_recordings":   {"completed_chunks", "failed_chunks", "coverage_ms"},
+		"worker_heartbeats": {"gpu_name", "vram_total_mb", "vram_free_mb", "asr_device", "asr_dtype", "asr_error"},
+	} {
+		have := columnsOf(t, db, table)
+		for _, column := range columns {
+			if !have[column] {
+				t.Fatalf("fresh database missing %s.%s", table, column)
+			}
+		}
+	}
+}

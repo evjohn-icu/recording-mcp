@@ -695,6 +695,14 @@ export function DetailPage() {
                 <summary>诊断（实验）</summary>
                 <div className="diagnostics-body">
                   <p>语义索引：{INDEXING_LABELS[data.processing.indexing_status] || data.processing.indexing_status}</p>
+                  {data.processing.asr_state && data.processing.asr_state !== 'none' && (
+                    <p data-testid="asr-coverage">
+                      转写覆盖：{data.processing.asr_completed_chunks ?? 0}/{data.processing.asr_expected_chunks ?? 0} 窗口
+                      {data.processing.asr_state === 'partial' ? '（部分完成）' : ''}
+                      {`（${formatDuration(data.processing.asr_coverage_ms ?? 0)}/${formatDuration(data.processing.asr_duration_ms ?? 0)}）`}
+                      {data.processing.asr_last_error ? `：${data.processing.asr_last_error}` : ''}
+                    </p>
+                  )}
                   <p>未分类轮次：{data.processing.unclassified_turns}</p>
                   <p>环境音轮次：{data.processing.ambient_turns}</p>
                   <p>身份未确认轮次：{data.processing.identity_unconfirmed_turns}</p>
@@ -710,6 +718,15 @@ export function DetailPage() {
                     {' · '}
                     {processing.worker_alive ? '工作进程在线' : '未检测到工作进程'}
                   </span>
+                  {(() => {
+                    const worker = (processing.workers ?? []).filter((w) => w.alive).sort((a, b) => (b.last_seen_at || '').localeCompare(a.last_seen_at || ''))[0]
+                    if (!worker || (!worker.gpu_name && !worker.asr_error)) return null
+                    const parts = [worker.gpu_name]
+                    if (worker.vram_total_mb > 0) parts.push(`显存 ${Math.round(worker.vram_free_mb / 1024)}/${Math.round(worker.vram_total_mb / 1024)} GiB 空闲`)
+                    if (worker.asr_device) parts.push(`${worker.asr_device} ${worker.asr_dtype || ''}`.trim())
+                    if (worker.asr_error) parts.push(worker.asr_error)
+                    return <span data-testid="asr-gpu-status">{parts.filter(Boolean).join(' · ')}</span>
+                  })()}
                   <span>{processing.generator_enabled ? '候选生成器已启用' : processing.worker_alive ? '候选生成器已关闭' : '候选生成器状态未知'}</span>
                 </header>
                 <ol className="processing-phases" data-testid="processing-phases">

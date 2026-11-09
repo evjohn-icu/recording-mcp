@@ -880,6 +880,209 @@
       "spec": "openspec/changes/local-asr-provider/specs/local-asr/spec.md",
       "test_file": "internal/cloudsync/select_test.go",
       "test_anchor": "TestSelectTranscriberProbesPythonAndScript"
+    },
+    {
+      "id": "local-gpu.preflight",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md",
+      "test_file": "scripts/test_local_gpu_up.py",
+      "test_anchor": "test_preflight_rejects_missing_gpu"
+    },
+    {
+      "id": "local-gpu.cold-start",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md",
+      "test_file": "scripts/test_local_gpu_up.py",
+      "test_anchor": "test_cold_start_waits_for_health"
+    },
+    {
+      "id": "local-gpu.five-cycles",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md",
+      "test_file": "scripts/test_local_gpu_up.py",
+      "test_anchor": "test_five_start_stop_cycles"
+    },
+    {
+      "id": "local-gpu.concurrency",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md",
+      "test_file": "internal/cloudsync/gpu_lock_test.go",
+      "test_anchor": "TestGPUFileLockSerializesLocalASR"
+    },
+    {
+      "id": "local-gpu.degraded",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md",
+      "test_file": "internal/app/capabilities_test.go",
+      "test_anchor": "TestCapabilitiesReportsGPUUnavailable"
+    },
+    {
+      "id": "local-gpu.vram-diagnostics",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md",
+      "test_file": "scripts/test_local_gpu_up.py",
+      "test_anchor": "test_probe_reports_vram"
+    },
+    {
+      "id": "local-gpu.no-paid-fallback",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/local-gpu-deployment/spec.md",
+      "test_file": "internal/cloudsync/local_asr_test.go",
+      "test_anchor": "TestLocalASREnvExcludesSecrets"
+    },
+    {
+      "id": "long-audio.window-resume",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md",
+      "test_file": "internal/ingest/long_audio_test.go",
+      "test_anchor": "TestRunASRJobResumesCommittedWindows"
+    },
+    {
+      "id": "long-audio.coverage",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md",
+      "test_file": "internal/ingest/long_audio_test.go",
+      "test_anchor": "TestRunASRJobCoverageAccounting"
+    },
+    {
+      "id": "long-audio.partial-failure",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md",
+      "test_file": "internal/ingest/long_audio_test.go",
+      "test_anchor": "TestRunASRJobKeepsPartialStateOnWindowFailure"
+    },
+    {
+      "id": "long-audio.duplicate-import",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md",
+      "test_file": "internal/ingest/long_audio_test.go",
+      "test_anchor": "TestImportDuplicateBytesReuseJob"
+    },
+    {
+      "id": "long-audio.oom-actionable",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md",
+      "test_file": "internal/ingest/long_audio_test.go",
+      "test_anchor": "TestRunASRJobMapsCUDAOutOfMemory"
+    },
+    {
+      "id": "long-audio.indexing-restart",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md",
+      "test_file": "internal/ingest/long_audio_test.go",
+      "test_anchor": "TestEmbedJobResumesAfterTranscriptCommit"
+    },
+    {
+      "id": "long-audio.progress-projection",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/long-audio-reliability/spec.md",
+      "test_file": "internal/ingest/long_audio_test.go",
+      "test_anchor": "TestProcessingStatusProjectsASRProgress"
+    },
+    {
+      "id": "embedding.local-provider",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/real-embeddings/spec.md",
+      "test_file": "scripts/test_local_embed.py",
+      "test_anchor": "test_embeddings_protocol_and_query_instruction"
+    },
+    {
+      "id": "embedding.role-query",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/real-embeddings/spec.md",
+      "test_file": "internal/semantic/role_provider_test.go",
+      "test_anchor": "TestSQLiteRetrieverUsesQueryRole"
+    },
+    {
+      "id": "embedding.failure-degrade",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/real-embeddings/spec.md",
+      "test_file": "internal/contextbuild/build_semantic_test.go",
+      "test_anchor": "TestSemanticOutageIsDistinctFromSuccessfulEmptyResult"
+    },
+    {
+      "id": "embedding.frozen-gates",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/real-embeddings/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_gate_is_strict_on_recall_and_checks_mrr_fp_leaks_and_p95"
+    },
+    {
+      "id": "embedding.no-promotion-without-gates",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/real-embeddings/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_retrieval_only_gate_is_diagnostic_without_assessor"
+    },
+    {
+      "id": "sufficiency.three-states",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md",
+      "test_file": "internal/contextbuild/sufficiency_scenarios_test.go",
+      "test_anchor": "TestSufficiencyScenarios"
+    },
+    {
+      "id": "sufficiency.valid-refs",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md",
+      "test_file": "internal/contextbuild/sufficiency_scenarios_test.go",
+      "test_anchor": "TestSufficiencyScenarios"
+    },
+    {
+      "id": "sufficiency.no-false-sufficient",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md",
+      "test_file": "internal/contextbuild/sufficiency_scenarios_test.go",
+      "test_anchor": "TestSufficiencyScenarios"
+    },
+    {
+      "id": "sufficiency.stale-forgotten",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md",
+      "test_file": "internal/contextbuild/sufficiency_scenarios_test.go",
+      "test_anchor": "TestSufficiencyScenarios"
+    },
+    {
+      "id": "sufficiency.unknown-time",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md",
+      "test_file": "internal/app/decision_trail_scenarios_test.go",
+      "test_anchor": "TestDecisionTrailSufficiencyScenarios"
+    },
+    {
+      "id": "sufficiency.unconfirmed-proposal",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md",
+      "test_file": "internal/app/decision_trail_scenarios_test.go",
+      "test_anchor": "TestDecisionTrailSufficiencyScenarios"
+    },
+    {
+      "id": "sufficiency.ui-trace",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/evidence-sufficiency/spec.md",
+      "test_file": "scripts/sufficiency-browser.py",
+      "test_anchor": "test_sufficiency_panel"
+    },
+    {
+      "id": "release.demo-twelve",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/release-validation/spec.md",
+      "test_file": "scripts/test_sprint3_demo.py",
+      "test_anchor": "test_demo_twelve_steps"
+    },
+    {
+      "id": "release.regression-commands",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/release-validation/spec.md",
+      "test_file": "scripts/test_release_commands.py",
+      "test_anchor": "test_release_command_manifest"
+    },
+    {
+      "id": "release.not-run-accounting",
+      "status": "covered",
+      "spec": "openspec/changes/local-intelligence-reliability/specs/release-validation/spec.md",
+      "test_file": "scripts/test_release_commands.py",
+      "test_anchor": "test_not_run_requires_reason"
     }
   ]
 }

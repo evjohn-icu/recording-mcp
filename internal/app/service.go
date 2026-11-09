@@ -24,6 +24,9 @@ type Service struct {
 	// ASRProvider names the configured transcription provider ("off" or empty
 	// when uploads cannot be transcribed). It is reported by Capabilities.
 	ASRProvider string
+	// ASRInitError is non-empty when local ASR failed to initialize at startup.
+	// The rest of the product keeps working; Capabilities reports the reason.
+	ASRInitError string
 	// AudioDir is the cloud-sync audio directory. Every served clip must live
 	// beneath it; an empty value disables audio serving instead of allowing
 	// paths relative to the process working directory.

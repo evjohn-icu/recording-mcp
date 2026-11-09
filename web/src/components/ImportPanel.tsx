@@ -11,6 +11,15 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function gpuDetail(caps: Capabilities): string {
+  const parts: string[] = []
+  if (caps.asr.gpu_name) parts.push(caps.asr.gpu_name)
+  if (caps.asr.vram_total_mb > 0) parts.push(`显存 ${Math.round(caps.asr.vram_free_mb / 1024)}/${Math.round(caps.asr.vram_total_mb / 1024)} GiB 空闲`)
+  if (caps.asr.device) parts.push(caps.asr.device)
+  if (caps.asr.error) parts.push(caps.asr.error)
+  return parts.length > 0 ? `：${parts.join('，')}` : ''
+}
+
 function capabilityMessage(caps: Capabilities | null): string {
   if (!caps) return '正在读取本地能力…'
   if (caps.asr.available) return `语音转写已就绪（${caps.asr.provider}）`
@@ -21,6 +30,10 @@ function capabilityMessage(caps: Capabilities | null): string {
       return '后台工作进程未运行：启动 worker 后才能转写（可先排队）'
     case 'worker_asr_mismatch':
       return '工作进程没有启用该 ASR provider：请让 web 与 worker 使用同一个 ASR_PROVIDER'
+    case 'gpu_unavailable':
+      return `本机 GPU 不可用${gpuDetail(caps)}`
+    case 'model_probe_failed':
+      return `本机 ASR 模型初始化失败${gpuDetail(caps)}`
     default:
       return '当前无法转写音频'
   }

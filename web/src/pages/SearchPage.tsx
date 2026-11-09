@@ -6,6 +6,7 @@ import { useApi } from '../hooks/useApi'
 import { Filters, type FilterValues } from '../components/Filters'
 import { SearchResults } from '../components/SearchResults'
 import { StateView } from '../components/StateView'
+import { SufficiencyPanel } from '../components/SufficiencyPanel'
 
 type Scope = 'raw' | 'derived' | 'both'
 
@@ -245,6 +246,7 @@ function SearchPageContent() {
       </div>
       <Filters value={filters} topics={topicList} onChange={updateFilters} />
       {hybridEnabled && hybrid.data && <Diagnostics hybrid={hybrid.data} />}
+      {hybridEnabled && hybrid.data && <SufficiencyPanel pkg={hybrid.data} retrievalVersion={retrievalVersion} />}
       {!searched ? (
         <div className="state-view empty-state">输入关键词开始搜索</div>
       ) : (

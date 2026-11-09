@@ -118,7 +118,7 @@ func (ix *Indexer) indexBatch(ctx context.Context, arts []artifact, rep *IndexRe
 	}
 	rep.EmbedRequests++
 	rep.EmbeddedItems += len(texts)
-	vectors, err := ix.Provider.Embed(ctx, texts)
+	vectors, err := EmbedTexts(ctx, ix.Provider, texts, RoleDocument)
 	if err != nil {
 		return err
 	}
