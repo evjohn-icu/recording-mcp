@@ -360,8 +360,10 @@ def synthetic_run(args, temp: Path) -> dict:
         expected = int(status.get("asr_expected_chunks") or 0)
         completed = int(status.get("asr_completed_chunks") or 0)
         covered, turns = coverage_ms(client, conversation_id, recording_id)
+        status_coverage = int(status.get("asr_coverage_ms") or 0)
         entry.update({
-            "status": "PASS" if completed == expected and expected > 0 and status.get("asr_state") == "done" else "FAIL",
+            "status": "PASS" if completed == expected and expected > 0 and status.get("asr_state") == "done"
+            and status_coverage >= duration_ms and turns <= expected else "FAIL",
             "wall_seconds": wall,
             "rtf": round(wall / args.t3_seconds, 4),
             "expected_chunks": expected,
@@ -369,10 +371,11 @@ def synthetic_run(args, temp: Path) -> dict:
             "failed_chunks": int(status.get("asr_failed_chunks") or 0),
             "retried_attempts": stack.restarts,
             "coverage_ms": covered,
+            "status_coverage_ms": status_coverage,
             "duration_ms": duration_ms,
             "turns": turns,
             "asr_state": status.get("asr_state"),
-            "duplicate_suppression": "covered by T9",
+            "duplicate_turns": max(0, turns - expected),
             "local_only": True,
         })
     except Exception as exc:  # noqa: BLE001

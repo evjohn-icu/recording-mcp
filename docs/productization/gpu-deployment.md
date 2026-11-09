@@ -32,7 +32,7 @@ scripts/local-gpu-up.sh --profile sprint3 --backend ark --cycles 5 --no-build
 scripts/local-gpu-up.sh --profile sprint3 --backend ark --with-embedding
 ```
 
-`--env-file` 默认读取仓库根 `.env`。profile 不存在且设置了 `MEMORY_PROFILE_PASSWORD` 时会自动创建，否则报错退出。`--check` 在探针后停止，不启动 web/worker。
+`--env-file` 默认读取仓库根 `.env`；文件必须属于当前用户且不可被 group/other 读写（`chmod 600`），否则拒绝。它是被 `source` 的 shell 文件，视为可信输入。profile 不存在且设置了 `MEMORY_PROFILE_PASSWORD` 时会自动创建，否则报错退出。`--check` 在探针后停止，不启动 web/worker。`LOCAL_GPU_UP_*` 测试钩子仅在 `LOCAL_GPU_UP_TEST_MODE=1` 时生效。
 
 ## 探针与显存
 
@@ -56,7 +56,8 @@ scripts/local-gpu-up.sh --profile sprint3 --backend ark --with-embedding
 
 ## 降级
 
-- 本机 ASR 选择失败（例如 `.venv-asr` 缺模块）或 CUDA 探针失败时，worker 与 web **不退出**：`transcriber=nil`，其他阶段继续；ASR 任务返回 `asr_unavailable` 与动作。
+- 本机 ASR 选择失败（例如 `.venv-asr` 缺模块）或 CUDA 探针失败时，worker 与 web **不退出**：`transcriber=nil`，其他阶段继续；ASR 任务返回 `asr_unavailable` 与动作。CUDA 探针使用 transcriber 实际解析出的解释器（空 `--asr-python` 时是 `.venv-asr`），探针失败同样置空 transcriber。
+- 探针与可选 embedding 服务以 `env -i` 白名单环境启动（PATH/HOME/CUDA/HF_*），不继承 API key 或 profile 密码。
 - `GET /api/capabilities` 返回 `asr.available=false` 与原因（`asr_not_configured`/`worker_offline`/`worker_asr_mismatch`/`gpu_unavailable`/`model_probe_failed`），并带 `gpu_name`、`vram_total_mb`、`vram_free_mb`、`device`、`dtype`、`error`。
 - Web 的导入面板与详情页显示原因、GPU 名称、显存与错误文本；其余功能保持可用。
 - `doubao` 缺 key 仍是启动错误，不降级。
@@ -83,7 +84,7 @@ dial tcp 172.22.23.142:7890: connectex: No connection could be made because the 
 
 | 项 | 值 |
 |---|---|
-| 模型加载 | 10402 ms（首次）/ 8295 ms（五轮前重跑） |
+| 模型加载 | 10402 ms（首轮）/ 9207 ms（五轮前重跑） |
 | 探针总耗时 | 11255 ms |
 | 加载后空闲显存 | 4804 MiB / 8191 MiB |
 | 峰值显存 | 2210 MiB |
@@ -92,12 +93,12 @@ dial tcp 172.22.23.142:7890: connectex: No connection could be made because the 
 
 | 轮次 | 冷启动 | 模型加载 | 峰值显存 | 关闭 |
 |---|---|---|---|---|
-| 1 | 1873 ms | 8295 ms | 2210 MiB | 254 ms |
-| 2 | 1593 ms | 8295 ms | 2210 MiB | 253 ms |
-| 3 | 1596 ms | 8295 ms | 2210 MiB | 252 ms |
-| 4 | 1602 ms | 8295 ms | 2210 MiB | 254 ms |
-| 5 | 1588 ms | 8295 ms | 2210 MiB | 253 ms |
+| 1 | 1590 ms | 9207 ms | 2210 MiB | 253 ms |
+| 2 | 1597 ms | 9207 ms | 2210 MiB | 253 ms |
+| 3 | 1591 ms | 9207 ms | 2210 MiB | 253 ms |
+| 4 | 1593 ms | 9207 ms | 2210 MiB | 254 ms |
+| 5 | 1590 ms | 9207 ms | 2210 MiB | 253 ms |
 
-`artifacts/local-gpu/startup.json` 保存同样数据。冷启动不含模型加载（探针先于启动完成），加载耗时单独记录；关闭均在 260 ms 内完成。
+`artifacts/local-gpu/startup.json` 保存同样数据（2026-11-09 修正 shell 后重跑）。冷启动不含模型加载（探针先于启动完成），加载耗时单独记录；关闭均在 260 ms 内完成。单周期前台模式在 TERM 时实测关闭耗时并写入 `shutdown_ms`。
 
 模型快照下载（`scripts/fetch-local-models.sh`）：ARK 2.44 GiB、Qwen3-ASR 4.38 GiB、Qwen3-Embedding 1.12 GiB（SHA-256 校验通过）、Jev Decision 1.42 GiB（SHA-256 校验通过）。

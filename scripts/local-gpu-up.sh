@@ -47,6 +47,7 @@ done
 case "$PROFILE" in ''|*[!a-zA-Z0-9_-]*) echo "local-gpu-up: invalid profile name" >&2; exit 2 ;; esac
 case "$PORT" in ''|*[!0-9]*) echo "local-gpu-up: port must be numeric" >&2; exit 2 ;; esac
 case "$CYCLES" in ''|*[!0-9]*) echo "local-gpu-up: cycles must be numeric" >&2; exit 2 ;; esac
+if [ "$CYCLES" -lt 1 ]; then echo "local-gpu-up: --cycles must be at least 1" >&2; exit 2; fi
 case "$BACKEND" in ark|qwen) ;; *) echo "local-gpu-up: backend must be ark or qwen" >&2; exit 2 ;; esac
 WORKER_HEALTH_PORT=${WORKER_HEALTH_PORT:-$((PORT + 1))}
 
@@ -56,26 +57,64 @@ elif [ -f "$ROOT/.env" ]; then
   ENV_FILE="$ROOT/.env"
 fi
 if [ -n "$ENV_FILE" ]; then
+  env_owner=$(stat -c %u "$ENV_FILE")
+  [ "$env_owner" = "$(id -u)" ] || die "env file must be owned by the current user: $ENV_FILE"
+  env_mode=$(stat -c %a "$ENV_FILE")
+  if [ $(( 0$env_mode & 077 )) -ne 0 ]; then
+    die "env file must not be group/world accessible (chmod 600): $ENV_FILE"
+  fi
   set -a
   # shellcheck disable=SC1090
   . "$ENV_FILE"
   set +a
+  # Re-validate anything the file may have overridden.
+  case "$PROFILE" in ''|*[!a-zA-Z0-9_-]*) die "invalid profile name from env file" ;; esac
+  case "$PORT" in ''|*[!0-9]*) die "port must be numeric" ;; esac
+  case "$BACKEND" in ark|qwen) ;; *) die "backend must be ark or qwen" ;; esac
 fi
 
 TEST_MODE=${LOCAL_GPU_UP_TEST_MODE:-0}
-ARTIFACTS_DIR=${LOCAL_GPU_UP_ARTIFACTS_DIR:-$ROOT/artifacts/local-gpu}
-PYTHON=${LOCAL_GPU_UP_PYTHON:-$ROOT/.venv-asr/bin/python}
-ASR_RUNNER=${LOCAL_GPU_UP_ASR_RUNNER:-$ROOT/scripts/local-asr.py}
-ASR_PROBE_CMD=${LOCAL_GPU_UP_ASR_PROBE:-}
-WEB_BIN=${LOCAL_GPU_UP_WEB_BIN:-$ROOT/bin/context-web}
-WORKER_BIN=${LOCAL_GPU_UP_WORKER_BIN:-$ROOT/bin/context-worker}
-PROFILE_BIN=${LOCAL_GPU_UP_PROFILE_BIN:-$ROOT/bin/context-profile}
-START_SCRIPT=${LOCAL_GPU_UP_START_SCRIPT:-$ROOT/scripts/local-start.sh}
-HEALTH_CMD=${LOCAL_GPU_UP_HEALTH_CMD:-}
-WORKER_HEALTH_CMD=${LOCAL_GPU_UP_WORKER_HEALTH_CMD:-}
-NVIDIA_SMI=${LOCAL_GPU_UP_NVIDIA_SMI:-nvidia-smi}
-HEALTH_TIMEOUT=${LOCAL_GPU_UP_HEALTH_TIMEOUT:-120}
-HF_ROOT=${LOCAL_GPU_UP_HF_ROOT:-${HF_HOME:-$HOME/.cache/huggingface}/hub}
+ARTIFACTS_DIR=$ROOT/artifacts/local-gpu
+PYTHON=$ROOT/.venv-asr/bin/python
+ASR_RUNNER=$ROOT/scripts/local-asr.py
+ASR_PROBE_CMD=
+WEB_BIN=$ROOT/bin/context-web
+WORKER_BIN=$ROOT/bin/context-worker
+PROFILE_BIN=$ROOT/bin/context-profile
+START_SCRIPT=$ROOT/scripts/local-start.sh
+HEALTH_CMD=
+WORKER_HEALTH_CMD=
+NVIDIA_SMI=nvidia-smi
+HEALTH_TIMEOUT=120
+HF_ROOT=${HF_HOME:-$HOME/.cache/huggingface}/hub
+# Test-only hooks are inert unless LOCAL_GPU_UP_TEST_MODE=1: they execute
+# commands and redirect binaries, so an accidental environment value (or a
+# sourced .env) must not be able to reach them.
+if [ "$TEST_MODE" = 1 ]; then
+  ARTIFACTS_DIR=${LOCAL_GPU_UP_ARTIFACTS_DIR:-$ARTIFACTS_DIR}
+  PYTHON=${LOCAL_GPU_UP_PYTHON:-$PYTHON}
+  ASR_RUNNER=${LOCAL_GPU_UP_ASR_RUNNER:-$ASR_RUNNER}
+  ASR_PROBE_CMD=${LOCAL_GPU_UP_ASR_PROBE:-}
+  WEB_BIN=${LOCAL_GPU_UP_WEB_BIN:-$WEB_BIN}
+  WORKER_BIN=${LOCAL_GPU_UP_WORKER_BIN:-$WORKER_BIN}
+  PROFILE_BIN=${LOCAL_GPU_UP_PROFILE_BIN:-$PROFILE_BIN}
+  START_SCRIPT=${LOCAL_GPU_UP_START_SCRIPT:-$START_SCRIPT}
+  HEALTH_CMD=${LOCAL_GPU_UP_HEALTH_CMD:-}
+  WORKER_HEALTH_CMD=${LOCAL_GPU_UP_WORKER_HEALTH_CMD:-}
+  NVIDIA_SMI=${LOCAL_GPU_UP_NVIDIA_SMI:-$NVIDIA_SMI}
+  HEALTH_TIMEOUT=${LOCAL_GPU_UP_HEALTH_TIMEOUT:-$HEALTH_TIMEOUT}
+  HF_ROOT=${LOCAL_GPU_UP_HF_ROOT:-$HF_ROOT}
+  EMBED_CMD=${LOCAL_GPU_UP_EMBED_CMD:-}
+  EMBED_HEALTH_CMD=${LOCAL_GPU_UP_EMBED_HEALTH_CMD:-}
+fi
+
+# Model code must not inherit API keys or the profile password, matching the
+# Go runner's whitelist (internal/cloudsync.localASREnv).
+CLEAN_ENV=(env -i)
+for key in PATH HOME TMPDIR TEMP LANG LC_ALL CUDA_VISIBLE_DEVICES CUDA_HOME LD_LIBRARY_PATH \
+           HF_HOME HF_HUB_CACHE HF_HUB_OFFLINE TRANSFORMERS_CACHE XDG_CACHE_HOME; do
+  if [ -n "${!key+set}" ]; then CLEAN_ENV+=("$key=${!key}"); fi
+done
 
 mkdir -p "$ARTIFACTS_DIR"
 
@@ -168,7 +207,7 @@ run_probe() {
     # Test-only: a stub that prints the same JSON contract.
     sh -c "$ASR_PROBE_CMD" >"$out"
   else
-    "$PYTHON" "$ASR_RUNNER" --backend "$BACKEND" --probe --device cuda:0 --dtype float16 \
+    "${CLEAN_ENV[@]}" "$PYTHON" "$ASR_RUNNER" --backend "$BACKEND" --probe --device cuda:0 --dtype float16 \
       --load-timeout "${ASR_PROBE_TIMEOUT:-900}" >"$out"
   fi
   ended=$(date +%s%3N)
@@ -209,7 +248,9 @@ stop_stack() {
     waited=$((waited + 1))
   done
   if kill -0 "$STACK_PID" 2>/dev/null; then
-    kill -KILL "$STACK_PID" 2>/dev/null || true
+    # Escalate to the whole session: the wrapper's children must not survive
+    # as orphans holding the profile DB or the web port.
+    kill -KILL -- "-$STACK_PID" 2>/dev/null || kill -KILL "$STACK_PID" 2>/dev/null || true
   fi
   wait "$STACK_PID" 2>/dev/null || true
   STACK_PID=
@@ -232,16 +273,27 @@ start_embedding() {
   local revision
   revision=$(pin embed_qwen revision)
   local args=(--serve --host 127.0.0.1 --port "$port" --model Qwen/Qwen3-Embedding-0.6B
-              --revision "$revision" --device "$device" --dtype auto --preload)
+              --revision "$revision" --device "$device" --dtype auto --preload --verify-model)
   if [ "$device" != cpu ]; then
     args+=(--gpu-lock "$PROFILES_ROOT/$PROFILE/gpu.lock")
   fi
-  "$PYTHON" "$ROOT/scripts/local-embed.py" "${args[@]}" &
+  if [ -n "$EMBED_CMD" ]; then
+    sh -c "$EMBED_CMD" &
+  else
+    "${CLEAN_ENV[@]}" "$PYTHON" "$ROOT/scripts/local-embed.py" "${args[@]}" &
+  fi
   EMBED_PID=$!
   local deadline=$((SECONDS + HEALTH_TIMEOUT))
   while [ "$SECONDS" -lt "$deadline" ]; do
     if ! kill -0 "$EMBED_PID" 2>/dev/null; then die "embedding server exited during startup"; fi
-    if curl -fsS "http://127.0.0.1:$port/healthz" >/dev/null 2>&1; then
+    if [ -n "$EMBED_HEALTH_CMD" ]; then
+      sh -c "$EMBED_HEALTH_CMD" >/dev/null 2>&1
+      healthy=$?
+    else
+      curl -fsS --connect-timeout 2 --max-time 5 "http://127.0.0.1:$port/healthz" >/dev/null 2>&1
+      healthy=$?
+    fi
+    if [ "$healthy" -eq 0 ]; then
       echo "local-gpu-up: embedding server ready on 127.0.0.1:$port (device=$device)" >&2
       export EMBED_PROVIDER=local
       export EMBED_ENDPOINT="http://127.0.0.1:$port/v1/embeddings"
@@ -264,12 +316,12 @@ health_ok() {
   if [ -n "$HEALTH_CMD" ]; then
     sh -c "$HEALTH_CMD" >/dev/null 2>&1 || return 1
   else
-    curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 || return 1
+    curl -fsS --connect-timeout 2 --max-time 5 "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 || return 1
   fi
   if [ -n "$WORKER_HEALTH_CMD" ]; then
     sh -c "$WORKER_HEALTH_CMD" >/dev/null 2>&1 || return 1
   else
-    curl -fsS "http://127.0.0.1:$WORKER_HEALTH_PORT/healthz" >/dev/null 2>&1 || return 1
+    curl -fsS --connect-timeout 2 --max-time 5 "http://127.0.0.1:$WORKER_HEALTH_PORT/healthz" >/dev/null 2>&1 || return 1
   fi
   return 0
 }
@@ -282,7 +334,7 @@ start_stack() {
   ASR_TIMEOUT=2h ASR_LOAD_TIMEOUT=5m ASR_WINDOW_TIMEOUT=5m \
   ASR_LOCK="$PROFILES_ROOT/$PROFILE/gpu.lock" ASR_LOCK_TIMEOUT=10m \
   WORKER_HEALTH_PORT="$WORKER_HEALTH_PORT" \
-    "$START_SCRIPT" "$PROFILE" "$PORT" "$PROFILES_ROOT" &
+    setsid "$START_SCRIPT" "$PROFILE" "$PORT" "$PROFILES_ROOT" &
   STACK_PID=$!
   local deadline=$((SECONDS + HEALTH_TIMEOUT))
   while [ "$SECONDS" -lt "$deadline" ]; do
@@ -337,18 +389,41 @@ print(json.dumps({
 CYCLE
 }
 
+CYCLES_JSON=""
 finish_launcher() {
+  local shutdown_started shutdown_ms
+  shutdown_started=$(date +%s%3N)
   stop_stack
   stop_embedding
+  shutdown_ms=$(( $(date +%s%3N) - shutdown_started ))
+  if [ "$CYCLES" -eq 1 ] && [ -n "$CYCLES_JSON" ]; then
+    CYCLES_JSON=$(cycle_json 1 "$shutdown_ms")
+  fi
   write_artifacts
   SHUTDOWN_DONE=1
   echo "local-gpu-up: stopped (artifacts: $ARTIFACTS_DIR/startup.json)"
+  if [ "$CYCLES" -eq 1 ]; then
+    exit 0
+  fi
+  # Multi-cycle mode is an acceptance run: an interrupt before every cycle
+  # completed must not look like success.
+  completed=$(python3 - "$ARTIFACTS_DIR/startup.json" <<'COUNT'
+import json, sys
+try:
+    print(len(json.load(open(sys.argv[1], encoding="utf-8")).get("cycles") or []))
+except Exception:
+    print(0)
+COUNT
+)
+  if [ "$completed" -lt "$CYCLES" ]; then
+    echo "local-gpu-up: interrupted after $completed/$CYCLES cycles" >&2
+    exit 130
+  fi
   exit 0
 }
 trap finish_launcher INT TERM
 
 start_embedding
-CYCLES_JSON=""
 if [ "$CYCLES" -eq 1 ]; then
   # One command, one long-lived stack: stay in the foreground until TERM/INT so
   # the caller can use the advertised address.

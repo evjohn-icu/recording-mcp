@@ -327,3 +327,42 @@ func asrProgress(t *testing.T, env *testEnv, res ImportResult) (state string, co
 	}
 	return state, completed, failed, expected
 }
+
+func TestRunASRJobRejectsChangedWindowPlan(t *testing.T) {
+	stub := &stubChunkTranscriber{windowMS: 5000}
+	env, job, res := chunkEnv(t, stub)
+	stub.emitLimit = 2
+	_ = env.runASR(job)
+	// A different tiling must not reuse segment indexes as checkpoints: the same
+	// segment-%02d would cover different audio and silently skip undecoded spans.
+	env.svc.trans = &stubChunkTranscriber{windowMS: 10000}
+	_, err := env.svc.RunASRJob(context.Background(), job)
+	var structured *Error
+	if !errors.As(err, &structured) || structured.ErrorDetails()["code"] != "asr_plan_mismatch" {
+		t.Fatalf("error = %v, want asr_plan_mismatch", err)
+	}
+	state, _, _, _ := asrProgress(t, env, res)
+	if state == "done" {
+		t.Fatal("changed window plan must not report done")
+	}
+}
+
+func TestProcessingStatusDerivesLegacyProjection(t *testing.T) {
+	stub := &stubChunkTranscriber{windowMS: 5000}
+	env, job, res := chunkEnv(t, stub)
+	if err := env.runASR(job); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a pre-v22 row: the projection columns are zero/default but the
+	// recording is done and its attachments are current.
+	if _, err := env.store.DB().Exec(`UPDATE sync_recordings SET total_chunks=1, completed_chunks=0, failed_chunks=0, coverage_ms=0, transcription_state='done' WHERE recording_id=?`, providerRecordingID(res)); err != nil {
+		t.Fatal(err)
+	}
+	status, err := env.store.GetProcessingStatus(context.Background(), res.ConversationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.ASRExpectedChunks != 7 || status.ASRCompletedChunks != 7 || status.ASRCoverageMS != 31000 {
+		t.Fatalf("legacy projection = %+v, want 7/7 and 31000ms from attachments", status)
+	}
+}

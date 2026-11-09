@@ -18,13 +18,13 @@ import http.client
 import json
 import os
 import secrets
+import select
 import signal
 import socket
 import subprocess
 import sys
 import tempfile
 import time
-import urllib.request
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
@@ -125,7 +125,8 @@ class Client:
 class MCPClient:
     def __init__(self, command: list[str], env: dict[str, str]):
         self.process = subprocess.Popen(command, cwd=ROOT, env=env, stdin=subprocess.PIPE,
-                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+                                        start_new_session=True)
 
     def call(self, request_id: int, method: str, params: dict | None = None) -> dict:
         message = {"jsonrpc": "2.0", "id": request_id, "method": method}
@@ -166,13 +167,21 @@ def start_launcher(env: dict[str, str], profiles: Path, profile: str, port: int,
          "--profiles-root", str(profiles), "--backend", backend, "--no-build"],
         cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=log.open("a"), text=True, start_new_session=True)
     deadline = time.monotonic() + 900
-    while time.monotonic() < deadline:
+    while True:
+        if proc.poll() is not None:
+            raise RuntimeError(f"launcher exited before readiness; see {log}")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            stop(proc)
+            raise TimeoutError("launcher did not become ready")
+        ready = select.select([proc.stdout], [], [], min(remaining, 1.0))[0]
+        if not ready:
+            continue
         line = proc.stdout.readline()
         if not line:
             raise RuntimeError(f"launcher exited before readiness; see {log}")
         if "Recording-MCP ready" in line:
             return proc, time.monotonic() - started
-    raise TimeoutError("launcher did not become ready")
 
 
 def stop_launcher(proc: subprocess.Popen) -> None:
@@ -312,8 +321,9 @@ def main() -> int:
 
         # 9. decision trail
         trail = client.json("GET", "/api/decisions")
-        step("9. 决策轨迹", isinstance(trail.get("topics"), list) and "version" in trail,
-             f"version={trail.get('version')} topics={len(trail.get('topics') or [])}")
+        trail_topics = trail.get("topics") or []
+        step("9. 决策轨迹", "version" in trail and len(trail_topics) > 0,
+             f"version={trail.get('version')} topics={len(trail_topics)}")
 
         # 10. restart the stack
         stop_launcher(launcher)
@@ -328,16 +338,18 @@ def main() -> int:
         # 11. MCP read-back
         mcp = MCPClient([str(ROOT / "bin/context-memory"), "--profile", profile,
                          "--profiles-root", str(profiles), "--read-only"], env)
-        mcp.call(1, "initialize", {"protocolVersion": "2024-11-05", "capabilities": {},
-                                   "clientInfo": {"name": "sprint3-demo", "version": "1"}})
-        mcp.notify("notifications/initialized")
-        context_result = mcp.call(2, "tools/call", {"name": "build_context",
-                                                    "arguments": {"query": args.mcp_query, "retrieval_version": "v2"}})
-        trail_result = mcp.call(3, "tools/call", {"name": "get_decision_trail", "arguments": {}})
-        mcp.close()
+        try:
+            mcp.call(1, "initialize", {"protocolVersion": "2024-11-05", "capabilities": {},
+                                       "clientInfo": {"name": "sprint3-demo", "version": "1"}})
+            mcp.notify("notifications/initialized")
+            context_result = mcp.call(2, "tools/call", {"name": "build_context",
+                                                        "arguments": {"query": args.mcp_query, "retrieval_version": "v2"}})
+            trail_result = mcp.call(3, "tools/call", {"name": "get_decision_trail", "arguments": {}})
+        finally:
+            mcp.close()
         structured = context_result.get("structuredContent") or {}
         trail_structured = trail_result.get("structuredContent") or {}
-        step("11. MCP 读取", bool(structured.get("items")) and "topics" in trail_structured,
+        step("11. MCP 读取", bool(structured.get("items")) and len(trail_structured.get("topics") or []) > 0,
              f"items={len(structured.get('items') or [])} topics={len(trail_structured.get('topics') or [])}")
 
         # 12. persisted state and source integrity

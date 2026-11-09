@@ -289,7 +289,13 @@ func (t LocalTranscriber) transcribe(ctx context.Context, pcmPath string, meta M
 	var results []asrinput.Result
 	var raw bytes.Buffer
 	committed := make(map[int]bool, len(plan))
-	nextIndex := 1
+	nextIndex := 0
+	for _, window := range plan {
+		if !skipSet[window.Index] {
+			nextIndex = window.Index
+			break
+		}
+	}
 	var callbackErr error
 	for scanner.Scan() {
 		line := bytes.TrimSpace(scanner.Bytes())
@@ -316,7 +322,13 @@ func (t LocalTranscriber) transcribe(ctx context.Context, pcmPath string, meta M
 			break
 		}
 		committed[window.Index] = true
-		nextIndex = window.Index + 1
+		nextIndex = 0
+		for _, candidate := range plan {
+			if candidate.Index > window.Index && !skipSet[candidate.Index] {
+				nextIndex = candidate.Index
+				break
+			}
+		}
 		results = append(results, result)
 		if err := onResult(result); err != nil {
 			callbackErr = err
@@ -325,6 +337,10 @@ func (t LocalTranscriber) transcribe(ctx context.Context, pcmPath string, meta M
 		}
 	}
 	scanErr := scanner.Err()
+	if scanErr != nil {
+		// Stop the child before Wait: the scanner no longer drains the pipe.
+		cancel()
+	}
 	waitErr := cmd.Wait()
 	if callbackErr != nil {
 		return nil, callbackErr

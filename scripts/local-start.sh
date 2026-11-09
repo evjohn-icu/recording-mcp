@@ -42,11 +42,17 @@ if [ -n "${GENERATOR_MODEL:-}" ]; then WORKER_ARGS+=(--generator-model "$GENERAT
 if [ -n "${GENERATOR_KEY_ENV:-}" ]; then WORKER_ARGS+=(--generator-key-env "$GENERATOR_KEY_ENV"); fi
 WEB_ARGS=(--profile "$PROFILE" --profiles-root "$PROFILES_ROOT" --addr "127.0.0.1:$PORT" --web-dir "$ROOT/web/dist" --semantic-provider "$SEMANTIC_PROVIDER_ARG" --asr-provider "${ASR_PROVIDER:-off}")
 for value in EMBED_ENDPOINT EMBED_MODEL EMBED_DIMS; do
-  if [ -n "${!value:-}" ]; then WORKER_ARGS+=("--${value,,}" "${!value}"); fi
+  if [ -n "${!value:-}" ]; then
+    flag=${value,,}; flag=${flag//_/-}
+    WORKER_ARGS+=("--$flag" "${!value}")
+  fi
 done
 if [ -n "${EMBED_KEY_ENV+set}" ]; then WORKER_ARGS+=(--embed-key-env "$EMBED_KEY_ENV"); fi
 for value in SEMANTIC_ENDPOINT SEMANTIC_MODEL SEMANTIC_DIMS; do
-  if [ -n "${!value:-}" ]; then WEB_ARGS+=("--${value,,}" "${!value}"); fi
+  if [ -n "${!value:-}" ]; then
+    flag=${value,,}; flag=${flag//_/-}
+    WEB_ARGS+=("--$flag" "${!value}")
+  fi
 done
 if [ -n "${SEMANTIC_KEY_ENV+set}" ]; then WEB_ARGS+=(--semantic-key-env "$SEMANTIC_KEY_ENV"); fi
 # Local ASR settings must reach both processes so provider/config agree.

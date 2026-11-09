@@ -45,7 +45,7 @@ def flag_value(argv: list[str], flag: str) -> str:
 
 
 class LocalStartTests(unittest.TestCase):
-    def run_fake_pair(self, failing, configured=False, local_asr=False):
+    def run_fake_pair(self, failing, configured=False, local_asr=False, embedding=False):
         with tempfile.TemporaryDirectory(prefix="local-start-test-") as tmp:
             root = Path(tmp)
             (root / "scripts").mkdir()
@@ -66,6 +66,11 @@ class LocalStartTests(unittest.TestCase):
             if local_asr:
                 env.update(ASR_PROVIDER="ark", ASR_BACKEND="ark", ASR_MODEL="/models/ark",
                            ASR_PYTHON="/opt/asr/bin/python", ASR_DEVICE="cuda:1", ASR_REVISION="deadbeef")
+            if embedding:
+                env.update(EMBED_PROVIDER="local", EMBED_ENDPOINT="http://127.0.0.1:8790/v1/embeddings",
+                           EMBED_MODEL="Qwen/Qwen3-Embedding-0.6B", EMBED_DIMS="1024", EMBED_KEY_ENV="",
+                           SEMANTIC_PROVIDER="openai", SEMANTIC_ENDPOINT="http://127.0.0.1:8790/v1/embeddings",
+                           SEMANTIC_MODEL="Qwen/Qwen3-Embedding-0.6B", SEMANTIC_DIMS="1024", SEMANTIC_KEY_ENV="")
             if configured:
                 env.update(BRIEF_POLISH_PI_PROVIDER="fixture-provider", BRIEF_POLISH_MODEL="fixture-model",
                            BRIEF_POLISH_PI_MODELS_FILE="/tmp/synthetic models.json",
@@ -103,9 +108,24 @@ class LocalStartTests(unittest.TestCase):
                                  "http://127.0.0.1:18799/v1/systemone")
             else:
                 self.assertEqual(flag_value(argv["worker"], "--generator"), "off")
-                self.assertEqual(flag_value(argv["worker"], "--embed-provider"), "hash")
+                if not embedding:
+                    self.assertEqual(flag_value(argv["worker"], "--embed-provider"), "hash")
                 for role in ("web", "worker"):
                     self.assertNotIn("--brief-polish", argv[role])
+            if embedding:
+                worker, web = argv["worker"], argv["web"]
+                self.assertEqual(flag_value(worker, "--embed-provider"), "openai")
+                self.assertEqual(flag_value(worker, "--embed-endpoint"), "http://127.0.0.1:8790/v1/embeddings")
+                self.assertEqual(flag_value(worker, "--embed-model"), "Qwen/Qwen3-Embedding-0.6B")
+                self.assertEqual(flag_value(worker, "--embed-dims"), "1024")
+                self.assertEqual(flag_value(worker, "--embed-key-env"), "")
+                self.assertNotIn("--embed_endpoint", worker)
+                self.assertEqual(flag_value(web, "--semantic-provider"), "openai")
+                self.assertEqual(flag_value(web, "--semantic-endpoint"), "http://127.0.0.1:8790/v1/embeddings")
+                self.assertEqual(flag_value(web, "--semantic-model"), "Qwen/Qwen3-Embedding-0.6B")
+                self.assertEqual(flag_value(web, "--semantic-dims"), "1024")
+                self.assertEqual(flag_value(web, "--semantic-key-env"), "")
+                self.assertNotIn("--semantic_endpoint", web)
             if local_asr:
                 for role in ("web", "worker"):
                     args = argv[role]
@@ -127,6 +147,9 @@ class LocalStartTests(unittest.TestCase):
 
     def test_local_asr_configuration_reaches_both_services(self):
         self.run_fake_pair("worker", local_asr=True)
+
+    def test_embedding_configuration_reaches_both_services(self):
+        self.run_fake_pair("worker", embedding=True)
 
     def test_missing_built_site_fails_before_launch(self):
         with tempfile.TemporaryDirectory(prefix="local-start-test-") as tmp:

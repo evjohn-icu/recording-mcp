@@ -1,6 +1,6 @@
 # 证据充分性场景（SMART-04）
 
-20 个具名场景位于 `fixtures/sufficiency/v1/scenarios.json`，通过真实 v2 构建器执行。每个场景使用确定性评估器：只接收最终预算后的证据，按 `required_terms`/`forbidden_terms` 返回三种状态；错误、越界引用、空引用由固定脚本注入。因此期望状态不依赖真实评估器实现，真实评估器质量在 `docs/productization/real-embedding-evaluation.md` 单独记录。
+21 个具名场景位于 `fixtures/sufficiency/v1/scenarios.json`，通过真实 v2 构建器执行。每个场景使用确定性评估器：只接收最终预算后的证据，按 `required_terms`/`forbidden_terms` 返回三种状态；错误、越界引用、空引用由固定脚本注入。因此期望状态不依赖真实评估器实现，真实评估器质量在 `docs/productization/real-embedding-evaluation.md` 单独记录。
 
 ## 执行命令
 
@@ -52,7 +52,7 @@ BROWSER_ARTIFACT_DIR=artifacts/sufficiency-browser BASE_URL=http://127.0.0.1:417
   python scripts/sufficiency-browser.py
 ```
 
-2026-11-09 本地运行：11/11 检查通过，截图 `artifacts/sufficiency-browser/sufficiency-panel.png`（本地为 `/tmp/sprint3/browser`）。
+2026-11-09 本地运行：11/11 检查通过；截图写入运行时的 `BROWSER_ARTIFACT_DIR`（本机为临时目录，`artifacts/` 不入库），发布报告记录命令与检查数。
 
 ## 边界
 

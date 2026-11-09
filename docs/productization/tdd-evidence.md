@@ -37,3 +37,18 @@
 | local-asr 协议（`--probe/--stream/--skip/超时`） | 未观察到红：协议测试在 runner 实现之后编写；仅 `test_local_asr` 首跑因系统 Python 无 numpy 报错（测试环境问题，不是 TDD 红） | `python3 -m unittest scripts.test_local_asr -v` 10/10 通过 |
 | gpu_lock | 未观察到红：锁实现与测试同批提交 | `go test ./internal/cloudsync -run TestGPUFileLock -count=1` 通过 |
 | sufficiency.ui-trace | 未观察到红：浏览器脚本首跑 11/11 通过 | `scripts/sufficiency-browser.py` 11/11 |
+
+## Sprint 3 review 修复（非严格 TDD，红阶段未逐项观察到）
+
+代码评审发现并修复了以下缺陷；除注明外，修复前的失败由评审脚本/命令直接复现，回归测试在修复后加入，未观察到“先写测试再修复”的红阶段，因此不计为 TDD 证据。
+
+| 缺陷 | 证据 | 回归 |
+|---|---|---|
+| embedding 左填充池化取到首个 token，批量文档向量错误 | 评审用 torch 复现 `mask.sum-1` 选中索引 2 而非 11；冻结评测重跑后 v1-openai Recall@5 从 0.225 变为 0.85 | 修正为 `hidden[:, -1]`；`SUFFICIENCY` 无关，评测 manifest 重跑覆盖 |
+| `local-start.sh` 把 `EMBED_*` 转发成 `--embed_endpoint`（下划线），两个二进制退出 2 | 评审对已构建二进制复现 `flag provided but not defined` | 新增 `test_embedding_configuration_reaches_both_services`（先修正实现，未观察到红） |
+| `local-gpu-up.sh --with-embedding` 从未成功启动 | 同上 | 新增 `test_with_embedding_exports_openai_compatible_config` |
+| 窗口几何改变后续跑会跳过未转录音频并报 done | 代码分析 + 新测试 | `TestRunASRJobRejectsChangedWindowPlan` |
+| v21 sync 行显示 0/1 覆盖 | 代码分析 | `TestProcessingStatusDerivesLegacyProjection` |
+| worker CUDA 探针用系统 python3 而非 `.venv-asr`，误报 gpu_unavailable | 代码分析；本机系统 python3 无 torch | 修正为使用 transcriber 解析出的解释器；探针失败置空 transcriber |
+| 单周期/中断的 cycles 退出码与 artifact 不真实 | 评审用 stub 复现 exit 0 与空 cycles | `test_interrupted_cycles_exit_nonzero` |
+| health `curl` 无超时 | 评审复现挂起 | `--connect-timeout 2 --max-time 5` |

@@ -30,7 +30,10 @@
     "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root /tmp/sprint3/profiles --backend ark --cycles 5 --no-build",
     "python3 scripts/long-audio-reliability.py --mode synthetic",
     "python3 scripts/long-audio-reliability.py --mode real",
-    "python3 scripts/run-retrieval-quality-v2.py --binary bin/context-eval --out docs/evals/sprint3-real-embedding"
+    "python3 scripts/run-retrieval-quality-v2.py --binary bin/context-eval --out docs/evals/sprint3-real-embedding",
+    "sh scripts/e2e-cloud.sh",
+    "npm test --prefix apps/cloud-ingest",
+    "./gradlew :app:testDebugUnitTest :app:assembleDebug"
   ],
   "commands": [
     {
@@ -48,7 +51,7 @@
     {
       "command": "go test -race -count=1 ./...",
       "status": "PASS",
-      "evidence": "exit 0",
+      "evidence": "exit 0; no DATA RACE",
       "reason_if_not_run": ""
     },
     {
@@ -78,7 +81,7 @@
     {
       "command": "python3 -m unittest discover -s scripts -p 'test_*.py' -v",
       "status": "PASS",
-      "evidence": "114 tests, OK (skipped=9)",
+      "evidence": "114 tests OK (skipped=9)",
       "reason_if_not_run": ""
     },
     {
@@ -102,7 +105,7 @@
     {
       "command": "RUN_SPRINT3_DEMO=1 python3 -m unittest scripts.test_sprint3_demo -v",
       "status": "PASS",
-      "evidence": "12/12 steps PASS in 44s; artifacts/sprint3-demo/result.json",
+      "evidence": "12/12 steps PASS with non-empty Decision Trail assertions; artifacts/sprint3-demo/result.json",
       "reason_if_not_run": ""
     },
     {
@@ -174,7 +177,7 @@
     {
       "command": "scripts/local-gpu-up.sh --profile sprint3check --port 18788 --profiles-root /tmp/sprint3/profiles --backend ark --cycles 5 --no-build",
       "status": "PASS",
-      "evidence": "5/5 cycles; cold start 1588-1873ms; shutdown 252-254ms; artifacts/local-gpu/startup.json",
+      "evidence": "5/5 cycles after shell fixes: cold 1590-1597ms, load 9207ms, peak 2210MiB, shutdown 253-254ms; artifacts/local-gpu/startup.json",
       "reason_if_not_run": ""
     },
     {
@@ -193,6 +196,24 @@
       "command": "python3 scripts/run-retrieval-quality-v2.py --binary bin/context-eval --out docs/evals/sprint3-real-embedding",
       "status": "PASS",
       "evidence": "calibration exit 0; manifest.json: no v2 candidate passed every gate; quality_gate_passed=false, default_changed=false, test_touched=false",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "sh scripts/e2e-cloud.sh",
+      "status": "NOT_RUN",
+      "evidence": "",
+      "reason_if_not_run": "local wrangler dev made no progress in 15 minutes (Cloudflare login/network); CI runs this job on GitHub runners"
+    },
+    {
+      "command": "npm test --prefix apps/cloud-ingest",
+      "status": "PASS",
+      "evidence": "7 test files, 74 tests passed; typecheck exit 0",
+      "reason_if_not_run": ""
+    },
+    {
+      "command": "./gradlew :app:testDebugUnitTest :app:assembleDebug",
+      "status": "PASS",
+      "evidence": "exit 0 (apps/android)",
       "reason_if_not_run": ""
     }
   ]

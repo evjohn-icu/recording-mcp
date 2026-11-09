@@ -19,6 +19,7 @@ type sufficiencyScenario struct {
 	ExpectedStatus               string        `json:"expected_status"`
 	ExpectedEvidenceTurns        []string      `json:"expected_evidence_turns"`
 	ForbiddenEvidenceTurns       []string      `json:"forbidden_evidence_turns"`
+	ForbiddenItemIDs             []string      `json:"forbidden_item_ids"`
 	RequiredTerms                []string      `json:"required_terms"`
 	ForbiddenTerms               []string      `json:"forbidden_terms"`
 	ExpectedGaps                 []string      `json:"expected_gaps"`
@@ -243,6 +244,14 @@ func TestSufficiencyScenarios(t *testing.T) {
 						t.Errorf("forbidden evidence %q cited: %v", forbidden, refs)
 					}
 				}
+				for _, forbiddenID := range scenario.ForbiddenItemIDs {
+					for _, item := range pkg.Items {
+						if item.ID == forbiddenID {
+							passed = false
+							t.Errorf("forbidden item %q returned: %+v", forbiddenID, item)
+						}
+					}
+				}
 				for _, wanted := range scenario.ExpectedGaps {
 					if !containsString(gaps, wanted) {
 						passed = false
@@ -258,7 +267,7 @@ func TestSufficiencyScenarios(t *testing.T) {
 					}
 					if ref.GlobalStartMS != nil || ref.GlobalEndMS != nil {
 						passed = false
-						t.Errorf("evidence %q has invented timestamps %v-%v", turnID, *ref.GlobalStartMS, *ref.GlobalEndMS)
+						t.Errorf("evidence %q has timestamps start=%v end=%v, want both nil", turnID, ref.GlobalStartMS, ref.GlobalEndMS)
 					}
 				}
 			}

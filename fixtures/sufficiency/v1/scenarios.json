@@ -172,7 +172,10 @@
         "方案甲"
       ],
       "unanswerable": false,
-      "notes": "The superseded note is excluded from items, but the raw old turn remains transcript evidence; the assessor must refuse to claim the old and new decisions together."
+      "notes": "The superseded note is excluded from items, but the raw old turn remains transcript evidence; the assessor must refuse to claim the old and new decisions together.",
+      "forbidden_item_ids": [
+        "note:changed:old"
+      ]
     },
     {
       "id": "unconfirmed-proposal",
@@ -399,7 +402,10 @@
       ],
       "forbidden_terms": [],
       "unanswerable": true,
-      "notes": "A stale derived artifact must not supply evidence; the unrelated turn does not match the query."
+      "notes": "A stale derived artifact must not supply evidence; the unrelated turn does not match the query.",
+      "forbidden_item_ids": [
+        "note:stale:1"
+      ]
     },
     {
       "id": "forgotten-source",
@@ -810,7 +816,10 @@
       ],
       "forbidden_terms": [],
       "unanswerable": true,
-      "notes": "A forgotten decision must not be resurrected through its stale note."
+      "notes": "A forgotten decision must not be resurrected through its stale note.",
+      "forbidden_item_ids": [
+        "note:forgotten-decision:1"
+      ]
     }
   ]
 }

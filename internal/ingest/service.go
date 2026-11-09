@@ -378,10 +378,26 @@ func (s *Service) RunASRJob(ctx context.Context, job process.Job) (string, error
 	if err != nil {
 		return "", &Error{Code: "ingest_failed", Message: "无法读取已提交窗口", Err: err}
 	}
+	// The skip set is keyed by segment index, so the stored window bounds must
+	// match the current plan. A changed --asr-window-ms/--asr-overlap-ms would
+	// otherwise skip audio that was never decoded and still report done.
+	planned := make(map[int][2]int64, len(plan))
+	for _, window := range plan {
+		planned[window.Index] = [2]int64{window.StartMS, window.EndMS}
+	}
+	for index, bounds := range existing {
+		if want, ok := planned[index]; !ok || want != bounds {
+			return "", &Error{
+				Code: "asr_plan_mismatch", Message: "已提交窗口与当前窗口配置不一致",
+				Action:    "恢复原来的 --asr-window-ms/--asr-overlap-ms 后重试，或删除该录音后重新导入",
+				FatalFlag: true,
+			}
+		}
+	}
 	completed := 0
 	skip := make([]int, 0, len(plan))
 	for _, window := range plan {
-		if existing[window.Index] {
+		if bounds, ok := existing[window.Index]; ok && bounds == planned[window.Index] {
 			completed++
 			skip = append(skip, window.Index)
 		}
@@ -403,7 +419,7 @@ func (s *Service) RunASRJob(ctx context.Context, job process.Job) (string, error
 			return err
 		}
 		if index := windowIndex(result.Source.SegmentID); index > 0 {
-			existing[index] = true
+			existing[index] = [2]int64{result.Source.SegmentOffsetMS, result.Source.SegmentOffsetMS + result.Source.SegmentDurationMS}
 		}
 		intervals = append(intervals, [2]int64{result.Source.SegmentOffsetMS, result.Source.SegmentOffsetMS + result.Source.SegmentDurationMS})
 		completed++
@@ -473,32 +489,32 @@ func (s *Service) asrFailureDetails(err error) (code, message, action string) {
 	return "asr_failed", "语音转写失败", action
 }
 
-func (s *Service) loadASRWindows(ctx context.Context, attachmentRecordingID, revision string) (map[int]bool, [][2]int64, error) {
+func (s *Service) loadASRWindows(ctx context.Context, attachmentRecordingID, revision string) (map[int][2]int64, [][2]int64, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT segment_id, result_json FROM source_attachments WHERE recording_id=? AND transcript_revision=? AND active=1`, attachmentRecordingID, revision)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer rows.Close()
-	indexes := map[int]bool{}
+	windows := map[int][2]int64{}
 	var intervals [][2]int64
 	for rows.Next() {
 		var segmentID, resultJSON string
 		if err := rows.Scan(&segmentID, &resultJSON); err != nil {
 			return nil, nil, err
 		}
-		if index := windowIndex(segmentID); index > 0 {
-			indexes[index] = true
-		}
 		var result asrinput.Result
 		if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
 			return nil, nil, fmt.Errorf("ingest: decode stored ASR window %s: %w", segmentID, err)
 		}
 		start, end := result.Source.SegmentOffsetMS, result.Source.SegmentOffsetMS+result.Source.SegmentDurationMS
+		if index := windowIndex(segmentID); index > 0 {
+			windows[index] = [2]int64{start, end}
+		}
 		if end > start {
 			intervals = append(intervals, [2]int64{start, end})
 		}
 	}
-	return indexes, intervals, rows.Err()
+	return windows, intervals, rows.Err()
 }
 
 func windowIndex(segmentID string) int {

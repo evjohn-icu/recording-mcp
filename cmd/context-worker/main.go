@@ -193,9 +193,20 @@ func run() error {
 		}
 	}
 	if transcriber != nil && localASR {
-		if probeErr := cloudsync.ProbeLocalCUDA(*asrPython, *asrDevice); probeErr != nil {
+		// Probe the interpreter the transcriber actually resolved; an empty
+		// --asr-python defaults to .venv-asr, not the system python3.
+		probePython := strings.TrimSpace(*asrPython)
+		if probePython == "" {
+			if local, ok := transcriber.(*cloudsync.LocalTranscriber); ok {
+				probePython = local.Python
+			}
+		}
+		if probeErr := cloudsync.ProbeLocalCUDA(probePython, *asrDevice); probeErr != nil {
 			logger.Printf("context-worker: ASR unavailable: %v", probeErr)
 			asrInitError = "gpu_unavailable: " + probeErr.Error()
+			// Do not hand ASR jobs to a device this worker declares unusable;
+			// RunASRJob's asr_unavailable path is the correct action.
+			transcriber = nil
 		}
 	}
 	importer, err := ingest.New(ingest.Config{

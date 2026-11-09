@@ -14,7 +14,6 @@ import shutil
 import subprocess
 import tempfile
 import time
-import textwrap
 import unittest
 from pathlib import Path
 
@@ -36,12 +35,17 @@ PROBE_JSON = {
 
 START_STUB = """#!/usr/bin/env bash
 set -euo pipefail
+echo $$ > "$STUB_PID_FILE"
 {
   echo "start $*"
   echo "ASR_LOCK=${ASR_LOCK:-}"
   echo "ASR_PROVIDER=${ASR_PROVIDER:-}"
   echo "ASR_TIMEOUT=${ASR_TIMEOUT:-}"
   echo "WORKER_HEALTH_PORT=${WORKER_HEALTH_PORT:-}"
+  echo "EMBED_PROVIDER=${EMBED_PROVIDER:-}"
+  echo "EMBED_ENDPOINT=${EMBED_ENDPOINT:-}"
+  echo "SEMANTIC_PROVIDER=${SEMANTIC_PROVIDER:-}"
+  echo "SEMANTIC_ENDPOINT=${SEMANTIC_ENDPOINT:-}"
 } >> "$STUB_LOG"
 trap 'echo "stop" >> "$STUB_LOG"; exit 0' TERM INT
 while true; do sleep 0.05; done
@@ -86,6 +90,23 @@ class GPUUpTests(unittest.TestCase):
         self.artifacts = self.root / "artifacts"
 
     def tearDown(self):
+        # A killed launcher must not leave its stub child holding the port.
+        pid_file = self.root / "stub.pid"
+        if pid_file.exists():
+            try:
+                pid = int(pid_file.read_text().strip())
+            except ValueError:
+                pid = 0
+            if pid > 0:
+                try:
+                    cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().decode("utf-8", "replace")
+                except OSError:
+                    cmdline = ""
+                if str(self.root) in cmdline:
+                    try:
+                        os.kill(pid, 9)
+                    except ProcessLookupError:
+                        pass
         self.tmp.cleanup()
 
     def stub(self, rel: str, body: str) -> Path:
@@ -110,6 +131,7 @@ class GPUUpTests(unittest.TestCase):
             "LOCAL_GPU_UP_NVIDIA_SMI": str(self.root / "bin" / "nvidia-smi"),
             "LOCAL_GPU_UP_HF_ROOT": str(self.hf_root),
             "STUB_LOG": str(self.log),
+            "STUB_PID_FILE": str(self.root / "stub.pid"),
         })
         env.update(overrides)
         return env
@@ -199,6 +221,43 @@ class GPUUpTests(unittest.TestCase):
         self.assertIn("ASR_PROVIDER=ark", log)
         self.assertIn("ASR_TIMEOUT=2h", log)
         self.assertIn("WORKER_HEALTH_PORT=8789", log)
+
+    def test_with_embedding_exports_openai_compatible_config(self):
+        proc = self.run_launcher("--profile", "fixture", "--backend", "ark", "--with-embedding",
+                                 "--cycles", "2", "--no-build",
+                                 LOCAL_GPU_UP_EMBED_CMD="trap 'exit 0' TERM; while :; do sleep 0.05; done",
+                                 LOCAL_GPU_UP_EMBED_HEALTH_CMD="true")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("embedding server ready", proc.stderr)
+        log = self.log.read_text()
+        self.assertIn("EMBED_PROVIDER=local", log)
+        self.assertIn("EMBED_ENDPOINT=http://127.0.0.1:8790/v1/embeddings", log)
+        self.assertIn("SEMANTIC_PROVIDER=openai", log)
+        self.assertIn("SEMANTIC_ENDPOINT=http://127.0.0.1:8790/v1/embeddings", log)
+
+    def test_interrupted_cycles_exit_nonzero(self):
+        proc = subprocess.Popen(
+            [str(self.root / "scripts" / "local-gpu-up.sh"), "--profile", "fixture",
+             "--backend", "ark", "--cycles", "3", "--no-build"],
+            env=self.env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        try:
+            deadline = time.monotonic() + 60
+            while time.monotonic() < deadline:
+                line = proc.stdout.readline()
+                if not line:
+                    break
+                if "cycle 1/3 ready" in line:
+                    break
+            proc.terminate()
+            code = proc.wait(timeout=60)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=10)
+        self.assertEqual(code, 130, "an interrupted acceptance run must not exit 0")
+        startup = json.loads((self.artifacts / "startup.json").read_text())
+        self.assertLess(len(startup["cycles"]), 3)
 
     def test_unhealthy_stack_fails(self):
         proc = self.run_launcher("--profile", "fixture", "--backend", "ark", "--no-build",

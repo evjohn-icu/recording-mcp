@@ -58,12 +58,14 @@ export function SufficiencyPanel({ pkg, retrievalVersion }: { pkg: HybridView; r
         <ul className="sufficiency-evidence" data-testid="sufficiency-evidence">
           {assessment.evidence_refs.map((turnId) => {
             const evidence = byTurn.get(turnId)
+            const item = pkg.items.find((candidate) => candidate.kind === 'turn' && (candidate.id === turnId || candidate.turn_id === turnId))
             const conversationId = conversationForTurn(pkg, turnId)
-            const text = evidence?.text || '（证据文本不可用）'
+            const text = evidence?.text || item?.content || '（证据文本不可用）'
+            const startedAt = evidence?.global_start_ms ?? item?.global_start_ms ?? null
             return (
               <li key={turnId}>
                 <a href={conversationId ? `/c/${encodeURIComponent(conversationId)}?item=${encodeURIComponent(turnId)}` : undefined}>
-                  <span className="sufficiency-time">{formatTime(evidence?.global_start_ms ?? null)}</span>
+                  <span className="sufficiency-time">{formatTime(startedAt)}</span>
                   <span className="sufficiency-text">{text}</span>
                 </a>
               </li>

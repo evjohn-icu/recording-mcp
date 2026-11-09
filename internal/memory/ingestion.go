@@ -436,7 +436,10 @@ func deriveASRProgress(ctx context.Context, db *sql.DB, conversationID string, o
 	var total, completed, failed, coverage sql.NullInt64
 	err = db.QueryRowContext(ctx, `SELECT transcription_state, total_chunks, completed_chunks, failed_chunks, coverage_ms, last_error FROM sync_recordings WHERE recording_id=?`, payload.ProviderRecordingID).
 		Scan(&state, &total, &completed, &failed, &coverage, &lastError)
-	if err == nil {
+	// Rows written before migration v22 carry total_chunks=1 and no projection
+	// counters; trust the columns only when they actually describe windows.
+	legacy := err == nil && state.String == "done" && total.Int64 == 1 && completed.Int64 == 0 && coverage.Int64 == 0
+	if err == nil && !legacy {
 		out.ASRState = state.String
 		out.ASRExpectedChunks = int(total.Int64)
 		out.ASRCompletedChunks = int(completed.Int64)
@@ -447,7 +450,7 @@ func deriveASRProgress(ctx context.Context, db *sql.DB, conversationID string, o
 		}
 		return nil
 	}
-	if !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 	recordingID := stableKey("recording", payload.DeviceID, payload.ProviderRecordingID)
