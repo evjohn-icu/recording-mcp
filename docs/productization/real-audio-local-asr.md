@@ -20,7 +20,7 @@
 
 ```sh
 LOCAL_ASR_SMOKE=1 LOCAL_ASR_SAMPLE=/tmp/real-120s.wav \
-LOCAL_ASR_BACKEND=ark LOCAL_ASR_EXPECT="你好" \
+LOCAL_ASR_BACKEND=ark \
 go test ./internal/ingest -run TestLocalASREndToEndSmoke -count=1 -v
 # PASS 32.41s
 # qwen 同命令：PASS 36.61s
