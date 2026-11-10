@@ -13,7 +13,7 @@ the primary ambient model.
 | sherpa-onnx CED audio tagging (`k2-fsa/sherpa-onnx-ced-base-audio-tagging-2024-04-19`) | ambient | Apache-2.0 wrapper | **upstream CED is GPL-3.0**; model repo has no LICENSE | `RicherMans/CED` LICENSE = GNU GPL v3 |
 | PANNs CNN14 (`Cnn14_mAP=0.431.pth`) | ambient comparison | MIT (`audioset_tagging_cnn`) | CC-BY-4.0 (Zenodo record 3987831) | Zenodo API `metadata.license.id=cc-by-4.0`; HF mirror `ayushrsys/panns-cnn14`, md5 `541141fa2ee191a88f24a3219fff024e` matches Zenodo |
 | pyannote.audio | diarization runtime | MIT | n/a | project license |
-| pyannote Community-1 (`pyannote/speaker-diarization-community-1`) | diarization | MIT (pyannote.audio) | CC-BY-4.0 | official gated repo (`gated: auto`), terms accepted, downloaded at revision `3533c8cf8e36`; one session (L) scored with the official weights (DER 0.0995, identical to the mirror). The 20-session aggregate still uses the public mirror `pyannote-community/speaker-diarization-community-1` |
+| pyannote Community-1 (`pyannote/speaker-diarization-community-1`) | diarization | MIT (pyannote.audio) | CC-BY-4.0 | official gated repo (`gated: auto`), terms accepted, revision `3533c8cf8e36`; all 20 test sessions scored with the official weights (aggregate DER 0.0796, bit-identical to the public mirror used earlier) |
 | pyannote segmentation 3.0 (ONNX conversion) | diarization | MIT | MIT | `csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/LICENSE` |
 | 3D-Speaker CAM++ (`campplus_zh_en_fp32.onnx`) | voiceprint | Apache-2.0 | Apache-2.0 | third-party ONNX export `Luigi/campplus-zh-en-onnx`; upstream ModelScope 3D-Speaker. Pin/verify an official export for production. |
 | WeSpeaker CN-Celeb ResNet34-LM (`cnceleb_resnet34_LM.onnx`) | voiceprint comparison | Apache-2.0 | Apache-2.0 | `Wespeaker/wespeaker-cnceleb-resnet34-LM` model card |
@@ -31,10 +31,10 @@ the primary ambient model.
   an accuracy baseline.
 - **pyannote Community-1**: The official HF repository is gated. The terms were
   accepted and the official artifact (revision `3533c8cf8e36`) was downloaded
-  with a user token for one session (`L_R004S03C01`), where it reproduced the
-  mirror's DER exactly. The 20-session aggregate was still produced with the
-  public mirror, so a production rollout that needs every session to come
-  from the official artifact must re-run those sessions and pin the revision.
+  with a user token; all 20 test sessions were re-scored with it and produced
+  the same aggregate DER as the public mirror (`0.07958476473172268`, identical
+  per-session values). The mirror was only a temporary substitute and is no
+  longer the source of any reported number.
 - **ESC-50**: used only to measure ambient tagging; it is not redistributed
   and does not grant commercial rights. A production evaluation should use a
   commercially cleared ambient corpus.

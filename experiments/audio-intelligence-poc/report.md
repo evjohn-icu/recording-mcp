@@ -10,7 +10,7 @@
 |---|---|---|---|
 | VAD | Silero VAD ONNX（官方 `silero_vad.onnx`） | 20 session CPU RTF 0.0046；ROC-AUC 0.935；PR-AUC 0.993；2.3 MB；MIT | 默认 0.5 的 F1 0.831，0.01 时 0.958；GPU 无收益（比 CPU 慢 12–13 倍）；远场需按设备校准阈值 |
 | 环境声标签 | sherpa-onnx Zipformer Audio Tagging | mAP 0.928、Top-1 0.914；CPU RTF 0.018；Apache-2.0 | CED 精度略高但上游 GPL-3.0，不能直接用于非 GPL 产品；PANNs 作为 GPU/服务端备选 |
-| 说话人分离 | pyannote Community-1（GPU） | 20 session 聚合 DER 7.96%；GPU RTF 0.038；峰值 436 MB；官方 gated 权重（`3533c8c`）在 L 上复现同一 DER | 授权 CC-BY-4.0（需接受条款）；CPU RTF 1.14（慢 36×），边缘不实用 |
+| 说话人分离 | pyannote Community-1（GPU） | 20 session 聚合 DER 7.96%；GPU RTF 0.035；峰值 436 MB；官方 gated 权重 `3533c8c` 全量实测 | 授权 CC-BY-4.0（需接受条款）；CPU RTF 1.14（慢 36×），边缘不实用 |
 | 声纹 | 3D-Speaker CAM++（ONNX） | 4008 trials / 113 人 EER 3.24%（sherpa 提取器）：CPU RTF 0.024；28 MB；Apache-2.0 | 显式 fbank 路径同权重可到 2.30%，EER 取决于前端而非 provider；WeSpeaker 3.49% 且 minDCF 更低；2 session 的 1.51% 属偏乐观样本 |
 | 边缘/离线组合 | Silero + Zipformer + CAM++ + 可选 sherpa-onnx diarization | 全部 ONNX/CPU，可迁移 macOS / RK | sherpa oracle 人数下 20 session DER 0.2114（confusion 主导）；需可靠人数估计或人工提示，当前估计器不够用 |
 | 服务端高精度组合 | pyannote Community-1 + PANNs（可选） | 8 GB 显存足够，峰值 <0.5 GB/模型 | PyTorch 依赖重；官方模型需接受 gated 条款 |
@@ -111,7 +111,7 @@ GPU 行（自包含镜像内，`results/vad_silero_gpu.json`，同一对 L/S ses
 
 | 方案 | DER | FA | Miss | Confusion | 人数（参考/输出，逐 session 求和） | RTF | 加载（最大） | GPU 峰值 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| pyannote Community-1 GPU（自包含镜像） | **0.0796** | 849.2 s | 1151.5 s | 1164.0 s | 116 / 113 | 0.0382 | 5.96 s | 436.4 MB |
+| pyannote Community-1 GPU（**官方 gated 权重** `3533c8c`，20 session） | **0.0796** | 849.2 s | 1151.5 s | 1164.0 s | 116 / 113 | 0.0349 | 2.30 s | 436.4 MB |
 | sherpa-onnx CPU（oracle 人数） | 0.2114 | 1038.8 s | 920.8 s | **6447.8 s** | 116 / 115 | 0.0910 | 0.75 s | — |
 
 pyannote 逐 session DER 0.0252（`L_R004S06C01`）–0.1332（`L_R003S01C02`），20 个 session 中 14 个的人数与参考完全一致；分歧集中在 `L_R004S02C01`（7→4）与 `L_R004S03C01`（7→5）。
@@ -122,13 +122,13 @@ sherpa 的人数在 20 个 session 里有 19 个与参考完全一致（逐 sess
 
 | 方案 | DER | FA | Miss | Confusion | 说话人（参考/输出） | RTF | 加载 | 峰值 RSS | GPU 峰值 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pyannote Community-1 GPU | **0.0995** | 60.18 s | 36.24 s | 108.39 s | 7 / 5 | 0.0316 | 1.744 s | 2323 MB | 436.4 MB |
+| pyannote Community-1 GPU（官方权重） | **0.0995** | 60.18 s | 36.24 s | 108.39 s | 7 / 5 | 0.0315 | 1.444 s | — | 436.4 MB |
 | sherpa-onnx（oracle 人数=7） | 0.1404 | 65.56 s | 32.32 s | 191.09 s | 7 / 7 | 0.0914 | 0.266 s | 1119 MB | N/A |
 | sherpa-onnx（默认 threshold=0.5） | 0.4904 | 68.63 s | 33.31 s | 907.39 s | 7 / **114** | 0.0830 | 0.268 s | 2201 MB | N/A |
 | sherpa-onnx（threshold=0.4） | 0.6073 | — | — | — | 7 / **157** | 0.0706 | 0.329 s | — | N/A |
 
 补充：
-- **官方 gated 权重复核**：用 HF token 下载 `pyannote/speaker-diarization-community-1`（revision `3533c8cf8e36`）在 L 上重跑，DER 0.0995 与公开镜像**数值完全相同**，RTF 0.0315（镜像 0.0316，属测量噪声）；说明本次镜像结果可以作为该 session 的官方等价证据。
+- **官方 gated 权重复核**：用 HF token 接受条款并下载 `pyannote/speaker-diarization-community-1`（revision `3533c8cf8e36`），在全部 20 个 session 上重跑：聚合 DER 与公开镜像**逐位相同**（`0.07958476473172268`，20 个 per-session DER 与组件全部相等），RTF 0.0349（镜像容器内 0.0382，差值是容器开销）。因此 20 session 的结论由官方权重直接支撑，镜像只作交叉验证。
 - pyannote CPU 完整 L：DER 0.0995（与 GPU 相同），RTF **1.136**，加载 1.183 s，峰值 RSS 1322 MB；同一 session GPU RTF 0.0316，即 CPU 慢 36 倍。
 - pyannote CPU 子集（S session 前 300 s）：DER 0.0276，参考 5 / 输出 2，RTF 0.666，加载 0.734 s，RSS 1474 MB。该子集只有 2 个主要说话人，DER 不能与完整 L 直接比较，仅用于 CPU 资源。
 - sherpa 在 L 前 300 s（7 人）上阈值扫描：0.45→DER 0.316/21 人，0.5→0.266/18 人，0.55→0.266/17 人，0.6→0.263/16 人，0.7→0.168/11 人；oracle 7 人才到 0.140。说明 **未知人数时 threshold 聚类不可靠**。
@@ -214,7 +214,7 @@ sherpa 的人数在 20 个 session 里有 19 个与参考完全一致（逐 sess
 | CED tagging 权重 | 上游 CED **GPL-3.0** | 不建议进入非 GPL 产品；仅作基线 |
 | PANNs | 代码 MIT；权重 CC-BY-4.0 | 可商用，需署名 |
 | pyannote.audio | MIT | 可商用 |
-| pyannote Community-1 | CC-BY-4.0 | 官方 gated 仓库已接受条款并实测（revision `3533c8c`），与公开镜像结果一致 |
+| pyannote Community-1 | CC-BY-4.0 | 官方 gated 仓库已接受条款，20 session 全量用官方权重实测（revision `3533c8c`），与镜像逐位一致 |
 | AISHELL-4 | **CC BY-SA 4.0** | 音频分发需署名+相同方式共享；本 PoC 不重分发 |
 | ESC-50 | CC BY-NC 3.0 | 仅评测，不可商用/再分发 |
 | CAM++ / WeSpeaker | Apache-2.0 | 可商用 |
@@ -231,7 +231,7 @@ sherpa 的人数在 20 个 session 里有 19 个与参考完全一致（逐 sess
 
 以下项目没有真实执行，未用推测数字填充：
 
-- pyannote Community-1 **官方 gated 仓库**：已用 HF token 接受条款并下载官方权重（`pyannote/speaker-diarization-community-1`，revision `3533c8cf8e36`），在 `L_R004S03C01` 上跑出 DER 0.0995，与公开镜像**逐位相同**（`results/diarization_pyannote_official_cuda_L.json`，状态见 `results/pyannote_official_status.json`）。镜像 checksum 风险不再影响该 session 的结论；其余 19 个 session 仍只用镜像权重测量。
+- pyannote Community-1 **官方 gated 仓库**：已用 HF token 接受条款并下载官方权重（`pyannote/speaker-diarization-community-1`，revision `3533c8cf8e36`），20 个 session 全量重跑，聚合 DER 与公开镜像**逐位相同**（`results/diarization_pyannote_official_cuda_all.json`，状态见 `results/pyannote_official_status.json`）。镜像 checksum 风险已消除。
 - sherpa-onnx diarization 的 **GPU 执行**：`NOT_RUN`。PoC 用的 `sherpa-onnx 2.0.1` 是 CPU wheel，`--provider cuda` 会被库自己回退并打印：
   `Please compile with -DSHERPA_ONNX_ENABLE_GPU=ON. Available providers: CPUExecutionProvider, . Fallback to cpu!`
   `run_diarization.py` 捕获 fd 2 上的这条日志并在 `--provider cuda` 时 `SystemExit`，因此不会把 CPU 结果标成 CUDA。Silero、CAM++、WeSpeaker 的 GPU 行已真实执行（见 §4.1、§4.4）。
@@ -298,7 +298,13 @@ docker run --rm --gpus all --network=none --user $(id -u):$(id -g) \
 官方 gated 仓库（需要 HF token，且需在网页接受条款）：
 
 ```bash
+# 单 session 下载 + 打分（会写入 pyannote_official_status.json，含 revision）
 HF_TOKEN=... .venv-gpu/bin/python scripts/fetch_pyannote_official.py
+
+# 全部 20 个 session（权重已在 models/pyannote-official）
+HF_TOKEN=... .venv-gpu/bin/python scripts/run_diarization_all.py --engine pyannote \
+  --device cuda --tag official --pipeline models/pyannote-official \
+  --out results/diarization_pyannote_official_cuda_all.json
 ```
 
 ## 10. 契约影响
@@ -331,7 +337,7 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/fetch_pyannote_official.py
 | VAD GPU | `results/vad_silero_gpu.json` | L/S 两个 session、自包含镜像、CUDA provider | 同脚本 `--provider cuda`；`provider` 字段为硬证据 |
 | 环境声标签 | `results/audio_tagging_{zipformer,ced,panns}_cpu.json`、`audio_tagging_panns_cuda.json`、`audio_tagging_panns_docker_gpu_smoke.json` | 800 clips / 20 个有样本类（21 个候选标签） | `evaluate()` 内 mAP/Top-k |
 | pyannote 20 session | `results/diarization_pyannote_cuda_all.json` + `results/diarization_pyannote_*.rttm` | 镜像内 GPU，20 session 全量 | 聚合 DER = (FA+Miss+Conf)/Σtotal；逐 session 指标可从 RTTM 重新打分 |
-| 官方 pyannote 权重 | `results/diarization_pyannote_official_cuda_L.json`、`results/pyannote_official_status.json` | 官方 gated 仓库、revision `3533c8cf8e36`、仅 L 一个 session | 状态文件记录 revision/returncode；DER 与镜像逐位相同 |
+| 官方 pyannote 权重 | `results/diarization_pyannote_official_cuda_all.json`、`results/diarization_pyannote_official_cuda_L.json`、`results/pyannote_official_status.json` | 官方 gated 仓库、revision `3533c8cf8e36`、20 session | 状态文件记录 revision/returncode；聚合 DER 与镜像逐位相同 |
 | pyannote CPU 资源 | `results/diarization_pyannote_cpu_L.json`、`diarization_pyannote_cpu_S_first300s.json` | 完整 L；S 前 300 s 子集 | 脚本直接输出 |
 | sherpa oracle 人数 | `results/diarization_sherpa_cpu_all.json` + 20 个 `diarization_sherpa_cpu_<session>.json` | CPU、`num_clusters`=RTTM 人数 | 同上；逐 session `num_clusters` 与 `expected_speakers` 相等 |
 | 人数估计器 | `results/speaker_count_estimator.json` + `results/diarization_sherpa_est_{L,S}_*.json` | 仅 L/S 两个 session | silhouette 选阈值；估计值驱动 sherpa 的 DER 对照 oracle |
@@ -349,13 +355,13 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/fetch_pyannote_official.py
 ### 12.2 证据未归档（不当作已验证，也不当作失败）
 
 - 398-trial 的 GPU 声纹冒烟、sherpa 60 s 冒烟、VAD GPU 冒烟三份 JSON 在全量运行后已删除；它们的口径已被全量文件覆盖，报告不再把这些数字当作独立证据。
-- pyannote GPU 全量运行只有聚合 JSON 与逐 session RTTM：镜像内当时是旧版 `run_diarization_all.py`（读后即删 per-session JSON）。逐 session 指标可从 `results/diarization_pyannote_*.rttm` 用 `common.der_metrics` 重新打分——已抽查 `S_R004S04C01`（0.028814）与 `L_R003S01C02`（0.133192），与聚合 JSON 的 per_session 值在 6 位小数上一致。
+- 最早那次镜像 pyannote 全量运行只有聚合 JSON 与逐 session RTTM：镜像内当时是旧版 `run_diarization_all.py`（读后即删 per-session JSON）。随后用官方权重重跑时保留了 20 个 `results/diarization_pyannote_official_cuda_<session>.json`。任一版本都可用 `results/diarization_pyannote_*_<session>.rttm` 配 `common.der_metrics` 重新打分——已抽查 `S_R004S04C01`（0.028814）与 `L_R003S01C02`（0.133192），与聚合 JSON 的 per_session 值在 6 位小数上一致。
 
 ## 13. 采用边界（有条件推荐）
 
 | 能力 | 推荐执行路径 | 本次实际测量 | 采用前置条件 | 不得据此放行 |
 |---|---|---|---|---|
-| 说话人分离 | pyannote Community-1，服务端 GPU | 20 session；官方权重仅在 L 上实测（DER 0.0995，与镜像逐位相同）；峰值 436 MB | 固定官方 revision/hash（本次 `3533c8cf8e36`）；GPU 显存预算 ≥1 GB | 20 session 聚合 DER 仍来自镜像权重，官方权重只覆盖 1 个 session；Mac/RK 未验证 |
+| 说话人分离 | pyannote Community-1，服务端 GPU | 20 session、官方权重、DER 7.96%、峰值 436 MB | 固定官方 revision/hash（本次 `3533c8cf8e36`）；GPU 显存预算 ≥1 GB | Mac/RK 未验证；未测长会议（>1 h）与真机并发 |
 | 说话人分离（边缘） | sherpa-onnx CPU，**人数由外部给定** | 20 session、oracle 人数、DER 21.14% | 先有可靠人数来源（人工/会议先验） | 默认 threshold 聚类；估计器自动给人数 |
 | VAD | Silero ONNX，CPU | 20 session、F1 0.831@0.5、RTF 0.0046 | 按设备/房间校准阈值（0.01–0.05） | 沿用 0.5 默认值上远场新设备；GPU 部署 |
 | 声纹 | CAM++ 或 WeSpeaker + **固定显式 fbank+CMN 前端** | 4008 trials、同 session、EER 3.24%/3.49%（sherpa）与 2.30%/3.49%（显式前端） | 前端与归一化固定并经金标 trial 复核；权重来源校验 | 跨数据集 EER 横比；把 sherpa 与 ORT 的数字互换 |
@@ -374,7 +380,7 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/fetch_pyannote_official.py
 
 仍然缺失、会直接阻塞对应结论的资源：
 
-- ~~HF token + 官方条款接受~~：已具备，官方权重已在 L 上实测；其余 session 若要全官方向量重跑，需要同样的 token 与约 25 分钟 GPU。
+- ~~HF token + 官方条款接受~~：已具备，20 session 已用官方权重重跑（约 29 分钟 GPU），与镜像逐位一致；换环境复跑时仍需 token 与 revision 固定的权重。
 - **macOS / RK 真机**（迁移结论未验证）。
 - **商用授权 ambient 语料**（ESC-50 为 CC BY-NC）。
 - **产品侧 adapter/worker 设计与回归套件**（ASR/Evidence/Worldline/MCP 未改动，也未验证）。

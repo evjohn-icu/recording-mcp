@@ -31,6 +31,12 @@ def main() -> int:
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--max-seconds", type=float, default=None)
+    parser.add_argument("--pipeline", type=Path, default=None, help="pyannote pipeline directory")
+    parser.add_argument(
+        "--tag",
+        default="",
+        help="extra label inserted into per-session and aggregate file names",
+    )
     parser.add_argument(
         "--resume",
         action="store_true",
@@ -49,7 +55,8 @@ def main() -> int:
     per_session: dict[str, dict] = {}
     for session_id in session_ids:
         # One JSON per session so an aborted run keeps completed evidence.
-        session_stem = f"diarization_{args.engine}_{args.device}_{session_id}"
+        prefix = f"diarization_{args.engine}_{args.tag}_{args.device}" if args.tag else f"diarization_{args.engine}_{args.device}"
+        session_stem = f"{prefix}_{session_id}"
         if args.max_seconds:
             session_stem += f"_first{int(args.max_seconds)}s"
         session_out = RESULTS / f"{session_stem}.json"
@@ -68,6 +75,10 @@ def main() -> int:
             str(args.threads),
             "--batch-size",
             str(args.batch_size),
+        ]
+        if args.pipeline is not None:
+            argv += ["--pipeline", str(args.pipeline)]
+        argv += [
             "--out",
             str(session_out),
         ]
@@ -163,7 +174,8 @@ def main() -> int:
             "Each session is scored independently; speaker counts are compared per session, not merged.",
         ],
     }
-    out = args.out or RESULTS / f"diarization_{args.engine}_{args.device}_all.json"
+    default_name = f"diarization_{args.engine}_{args.tag}_{args.device}_all.json" if args.tag else f"diarization_{args.engine}_{args.device}_all.json"
+    out = args.out or RESULTS / default_name
     write_json(out, payload)
     print(f"aggregate DER={aggregate_der:.4f} over {len(session_ids)} sessions")
     print(f"wrote {out}")

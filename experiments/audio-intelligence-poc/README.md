@@ -83,6 +83,12 @@ python3.12 -m venv .venv-gpu
 .venv-cpu/bin/python scripts/estimate_speakers.py \
   --session L_R004S03C01 S_R004S03C01 --out results/speaker_count_estimator.json
 
+# Official gated pyannote weights (needs HF_TOKEN after accepting the terms):
+#   HF_TOKEN=... .venv-gpu/bin/python scripts/fetch_pyannote_official.py
+#   HF_TOKEN=... .venv-gpu/bin/python scripts/run_diarization_all.py --engine pyannote \
+#     --device cuda --tag official --pipeline models/pyannote-official \
+#     --out results/diarization_pyannote_official_cuda_all.json
+
 .venv-cpu/bin/python scripts/summarize.py
 ```
 

@@ -68,6 +68,20 @@
       "rtf": 0.03160993003176025,
       "scope": "full"
     },
+    "pyannote_official_cuda_all": {
+      "audio_seconds": 45811.093,
+      "components": {
+        "confusion": 1163.9456687500021,
+        "correct": 37448.17037500003,
+        "false alarm": 849.1811812500687,
+        "missed detection": 1151.4469562499617,
+        "total": 39763.56299999999
+      },
+      "der": 0.07958476473172268,
+      "engine": "pyannote-community-1",
+      "n_sessions": 20,
+      "rtf": 0.034924279147847445
+    },
     "sherpa_cpu_all": {
       "audio_seconds": 45811.093,
       "components": {

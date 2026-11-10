@@ -19,6 +19,22 @@ def optional(name: str) -> dict | None:
     return load(name) if path.exists() else None
 
 
+def aggregate_block(payload: dict | None, *, with_mode: bool = False) -> dict | None:
+    if not payload:
+        return None
+    block = {
+        "engine": payload["engine"],
+        "n_sessions": payload["n_sessions"],
+        "audio_seconds": payload["audio_seconds"],
+        "der": payload["aggregate"]["der"],
+        "components": payload["aggregate"]["components"],
+        "rtf": payload["rtf"],
+    }
+    if with_mode:
+        block["num_clusters_mode"] = payload.get("num_clusters_mode")
+    return block
+
+
 def has_cuda_provider(payload: dict | None) -> bool:
     return bool(payload) and "CUDAExecutionProvider" in (payload.get("provider") or [])
 
@@ -53,6 +69,7 @@ def main() -> int:
     vad_full_cpu = optional("vad_silero_all_cpu.json")
     vad_gpu = optional("vad_silero_gpu.json")
     diar_pyannote_all = optional("diarization_pyannote_cuda_all.json")
+    diar_pyannote_official_all = optional("diarization_pyannote_official_cuda_all.json")
     diar_sherpa_all = optional("diarization_sherpa_cpu_all.json")
     diar_pyannote_cpu_full = optional("diarization_pyannote_cpu_L.json")
     speaker_count = optional("speaker_count_estimator.json")
@@ -128,27 +145,9 @@ def main() -> int:
                 }
                 for key, value in diarization.items()
             },
-            "pyannote_cuda_all": None
-            if not diar_pyannote_all
-            else {
-                "engine": diar_pyannote_all["engine"],
-                "n_sessions": diar_pyannote_all["n_sessions"],
-                "audio_seconds": diar_pyannote_all["audio_seconds"],
-                "der": diar_pyannote_all["aggregate"]["der"],
-                "components": diar_pyannote_all["aggregate"]["components"],
-                "rtf": diar_pyannote_all["rtf"],
-            },
-            "sherpa_cpu_all": None
-            if not diar_sherpa_all
-            else {
-                "engine": diar_sherpa_all["engine"],
-                "n_sessions": diar_sherpa_all["n_sessions"],
-                "num_clusters_mode": diar_sherpa_all["num_clusters_mode"],
-                "audio_seconds": diar_sherpa_all["audio_seconds"],
-                "der": diar_sherpa_all["aggregate"]["der"],
-                "components": diar_sherpa_all["aggregate"]["components"],
-                "rtf": diar_sherpa_all["rtf"],
-            },
+            "pyannote_cuda_all": aggregate_block(diar_pyannote_all),
+            "pyannote_official_cuda_all": aggregate_block(diar_pyannote_official_all),
+            "sherpa_cpu_all": aggregate_block(diar_sherpa_all, with_mode=True),
             "pyannote_cpu_full": None
             if not diar_pyannote_cpu_full
             else {
