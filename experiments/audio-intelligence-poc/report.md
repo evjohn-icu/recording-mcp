@@ -317,3 +317,62 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/fetch_pyannote_official.py
 7. **前端数值一致性**：CAM++ 同权重下 sherpa-onnx 提取器 3.24%、显式 Kaldi fbank+CMN 2.30%，差 0.94 个百分点；同脚本的 CPU/CUDA 四位有效数字完全相同，说明差异来自前端而不是 provider。接入前必须固定前端与归一化，并用金标 trial 复核。
 8. **样本量与结论稳定性**：扩展后（20 session / 4008 trials / 800 ambient clips）多个 2-session 结论被推翻——CAM++ 优势缩小、sherpa 人数估计不可靠；报告中的数字都以全量为准，单 session 数字仅作对照。
 9. **sherpa CUDA 不可用**：`sherpa-onnx 2.0.1` 是 CPU wheel，GPU 行保持 `NOT_RUN`；边缘方案按 CPU 资源规划。
+
+## 12. 验收索引（结论 → 证据 → 范围）
+
+每条结论只对应一个权威结果文件；`results/summary.json` 是这些文件的自动汇合，不产生新数字。
+
+| 结论 | 证据文件 | 测量范围与条件 | 复算方式 |
+|---|---|---|---|
+| 数据 20/20 session | `results/aishell4_download.json`、`results/manifest_all.json` | 20 个 WAV + RTTM，45,811.1 s，channel 0 | 下载脚本自校（单向 RTTM 校验）+ `prepare_eval.py` |
+| 固定 trial 集 | `results/trials_all.json` | 4008 trials（2004/2004）、113 speaker、seed 20261110 | `prepare_eval.py --trials-out` |
+| VAD 全量 CPU | `results/vad_silero_all_cpu.json` | 20 session、4 线程、无并发负载 | `binary_metrics` + `best_f1_threshold` |
+| VAD GPU | `results/vad_silero_gpu.json` | L/S 两个 session、自包含镜像、CUDA provider | 同脚本 `--provider cuda`；`provider` 字段为硬证据 |
+| 环境声标签 | `results/audio_tagging_{zipformer,ced,panns}_cpu.json`、`audio_tagging_panns_cuda.json`、`audio_tagging_panns_docker_gpu_smoke.json` | 800 clips / 20 个有样本类（21 个候选标签） | `evaluate()` 内 mAP/Top-k |
+| pyannote 20 session | `results/diarization_pyannote_cuda_all.json` + `results/diarization_pyannote_*.rttm` | 镜像内 GPU，20 session 全量 | 聚合 DER = (FA+Miss+Conf)/Σtotal；逐 session 指标可从 RTTM 重新打分 |
+| pyannote CPU 资源 | `results/diarization_pyannote_cpu_L.json`、`diarization_pyannote_cpu_S_first300s.json` | 完整 L；S 前 300 s 子集 | 脚本直接输出 |
+| sherpa oracle 人数 | `results/diarization_sherpa_cpu_all.json` + 20 个 `diarization_sherpa_cpu_<session>.json` | CPU、`num_clusters`=RTTM 人数 | 同上；逐 session `num_clusters` 与 `expected_speakers` 相等 |
+| 人数估计器 | `results/speaker_count_estimator.json` + `results/diarization_sherpa_est_{L,S}_*.json` | 仅 L/S 两个 session | silhouette 选阈值；估计值驱动 sherpa 的 DER 对照 oracle |
+| 声纹 sherpa 路径 | `voiceprint_campplus_all_cpu.json`、`voiceprint_wespeaker_all_cpu.json` | 4008 trials，CPU | `compute_eer` |
+| 声纹显式前端 | `voiceprint_{campplus,wespeaker}_onnx_cpu_all.json`、`voiceprint_{campplus,wespeaker}_cuda_all.json` | 同 4008 trials，Kaldi fbank + CMN，CPU/CUDA | 同上；`provider` 字段为硬证据 |
+| Docker / 环境 | `results/docker_gpu_validation.json`、`docker_settings_restore.json`、`environment.json` | 构建、容器内 CUDA 自检、设置还原 | 文件内命令与返回值 |
+| 汇合 | `results/summary.json` | 上述文件的子集视图 | `scripts/summarize.py` |
+
+### 12.1 三处口径修订（与原始计划的差异）
+
+1. **WAV/RTTM 时长校验改为单向**：原计划要求两端相差 ≤2 s；实测 AISHELL-4 RTTM 末尾留白 1.8–114.1 s（`S_R004S03C01` 就有 21.0 s），对称判据会拒掉合法数据。现判据为「RTTM 不得超出音频 + 2 s」，并把 `rttm_tail_gap_seconds` 写入下载 JSON。
+2. **聚合 DER 公式**：`pyannote.metrics` 的 `total` 等于 `correct + missed + confusion`（L oracle-7：1834.90 + 32.32 + 191.09 = 2058.31），假警报在 `total` 之外，所以 `(total-correct)/total` 会漏掉 FA。实现与报告统一用 `(FA + missed + confusion) / total`。
+3. **声纹差异归因**：同脚本 CPU/CUDA 的 EER 完全一致（CAM++ 2.2954%、WeSpeaker 3.4930%），3.24% 与 2.30% 的差来自 sherpa-onnx 提取器 vs 显式 fbank 前端；原报告归因于 CUDA kernel 的说法已作废。
+
+### 12.2 证据未归档（不当作已验证，也不当作失败）
+
+- 398-trial 的 GPU 声纹冒烟、sherpa 60 s 冒烟、VAD GPU 冒烟三份 JSON 在全量运行后已删除；它们的口径已被全量文件覆盖，报告不再把这些数字当作独立证据。
+- pyannote GPU 全量运行只有聚合 JSON 与逐 session RTTM：镜像内当时是旧版 `run_diarization_all.py`（读后即删 per-session JSON）。逐 session 指标可从 `results/diarization_pyannote_*.rttm` 用 `common.der_metrics` 重新打分——已抽查 `S_R004S04C01`（0.028814）与 `L_R003S01C02`（0.133192），与聚合 JSON 的 per_session 值在 6 位小数上一致。
+
+## 13. 采用边界（有条件推荐）
+
+| 能力 | 推荐执行路径 | 本次实际测量 | 采用前置条件 | 不得据此放行 |
+|---|---|---|---|---|
+| 说话人分离 | pyannote Community-1，服务端 GPU | 20 session、公开镜像权重、DER 7.96%、峰值 436 MB | 走官方 gated 权重并固定 revision/hash；GPU 显存预算 ≥1 GB | 官方权重未评测前不作生产放行；Mac/RK 未验证 |
+| 说话人分离（边缘） | sherpa-onnx CPU，**人数由外部给定** | 20 session、oracle 人数、DER 21.14% | 先有可靠人数来源（人工/会议先验） | 默认 threshold 聚类；估计器自动给人数 |
+| VAD | Silero ONNX，CPU | 20 session、F1 0.831@0.5、RTF 0.0046 | 按设备/房间校准阈值（0.01–0.05） | 沿用 0.5 默认值上远场新设备；GPU 部署 |
+| 声纹 | CAM++ 或 WeSpeaker + **固定显式 fbank+CMN 前端** | 4008 trials、同 session、EER 3.24%/3.49%（sherpa）与 2.30%/3.49%（显式前端） | 前端与归一化固定并经金标 trial 复核；权重来源校验 | 跨数据集 EER 横比；把 sherpa 与 ORT 的数字互换 |
+| 环境声标签 | sherpa-onnx Zipformer | ESC-50 800 clips（CC BY-NC） | 换商用授权语料复测 | 用作商用结论 |
+| 人数估计 | 不作为能力 | 仅 L/S 两个 session，两例都判 reliable 但人数都错 | — | 作为 `num_clusters` 或产品输出 |
+
+## 14. 接入交接（交给独立工作项，不在本 PoC 内）
+
+接入方需要先确定的目标（本 PoC 不预设、不承诺）：
+
+- 延迟预算：单段（会议发言段）p95 处理时间，或每音频分钟的预算。
+- 内存上限：常驻 RSS 与峰值；报告已给出各模型的实测值，但整段缓存波形的基准脚本不代表产品内存模型。
+- 并发路数：pyannote GPU 单卡并发上限、sherpa/VAD/声纹的 CPU 线程预算。
+- 准确率门限：按能力分别定（VAD F1/AUC、DER、EER/minDCF），并说明可接受的误报/漏报代价。
+- 数据保留与隐私：音频与嵌入的存储位置、保留期、删除路径。
+
+仍然缺失、会直接阻塞对应结论的资源：
+
+- **HF token + 官方条款接受**（官方 gated pyannote 权重未评测）。
+- **macOS / RK 真机**（迁移结论未验证）。
+- **商用授权 ambient 语料**（ESC-50 为 CC BY-NC）。
+- **产品侧 adapter/worker 设计与回归套件**（ASR/Evidence/Worldline/MCP 未改动，也未验证）。
