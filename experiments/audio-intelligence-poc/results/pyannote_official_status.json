@@ -1,7 +1,13 @@
 {
-  "checked_at": "2026-11-10T19:44:07+0800",
+  "checked_at": "2026-11-11T00:59:02+0800",
+  "device": "cuda",
   "model": "pyannote/speaker-diarization-community-1",
-  "note": "The gated repository requires accepting the terms and an access token; the public mirror result stands as the pyannote measurement.",
-  "reason": "no HF token",
-  "status": "NOT_RUN"
+  "path": "/home/ev/code/recording-mcp/experiments/audio-intelligence-poc/models/pyannote-official",
+  "result": "/home/ev/code/recording-mcp/experiments/audio-intelligence-poc/results/diarization_pyannote_official_cuda_L.json",
+  "returncode": 0,
+  "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+  "session": "L_R004S03C01",
+  "status": "PASS",
+  "stderr": "\u001b[0;93m2026-11-11 00:57:46.750938630 [W:onnxruntime:Default, device_discovery.cc:164 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:89 ReadFileContents Failed to open file: \"/sys/class/drm/card0/device/vendor\"\u001b[m\n/home/ev/code/recording-mcp/experiments/audio-intelligence-poc/.venv-gpu/lib/python3.12/site-packages/pyannote/audio/core/io.py:47: UserWarning: \ntorchcodec is not installed correctly so built-in audio decoding will fail. Solutions are:\n* use audio preloaded in-memory as a {'waveform': (channel, time) torch.Tensor, 'sample_rate': int} dictionary;\n* fix torchcodec installation. Error message was:\n\nCould not load this library: /home/ev/code/recording-mcp/experiments/audio-intelligence-poc/.venv-gpu/lib/python3.12/site-packages/torchcodec/libtorchcodec_image.so\n  warnings.warn(\n/home/ev/code/recording-mcp/experiments/audio-intelligence-poc/.venv-gpu/lib/python3.12/site-packages/pyannote/audio/utils/reproducibility.py:74: ReproducibilityWarning: TensorFloat-32 (TF32) has been disabled as it might lead to reproducibility issues and lower accuracy.\nIt can be re-enabled by calling\n   >>> import torch\n   >>> torch.backends.cuda.matmul.allow_tf32 = True\n   >>> torch.backends.cudnn.allow_tf32 = True\nSee https://github.com/pyannote/pyannote-audio/issues/1370 for more details.\n\n  warnings.warn(\n/home/ev/code/recording-mcp/experiments/audio-intelligence-poc/.venv-gpu/lib/python3.12/site-packages/pyannote/audio/models/blocks/pooling.py:103: UserWarning: std(): degrees of freedom is <= 0. Correction should be strictly less than the reduction factor (input numel divided by output numel). (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/ReduceOps.cpp:1913.)\n  std = sequences.std(dim=-1, correction=1)\n/home/ev/code/recording-mcp/experiments/audio-intelligence-poc/.venv-gpu/lib/python3.12/site-packages/pyannote/metrics/utils.py:199: UserWarning: 'uem' was approximated by the union of 'reference' and 'hypothesis' extents.\n  warnings.warn(",
+  "stdout": "{\"engine\": \"pyannote-community-1\", \"scope\": \"full\", \"DER\": 0.09950322164817284, \"speakers_ref\": 7, \"speakers_hyp\": 5, \"rtf\": 0.0315340621743383, \"load_s\": 1.4438, \"gpu_peak_mb\": 436.44}\nwrote /home/ev/code/recording-mcp/experiments/audio-intelligence-poc/results/diarization_pyannote_official_cuda_L.json and /home/ev/code/recording-mcp/experiments/audio-intelligence-poc/results/diarization_pyannote_cuda_L_R004S03C01.rttm"
 }

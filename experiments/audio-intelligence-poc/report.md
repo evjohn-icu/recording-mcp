@@ -10,7 +10,7 @@
 |---|---|---|---|
 | VAD | Silero VAD ONNX（官方 `silero_vad.onnx`） | 20 session CPU RTF 0.0046；ROC-AUC 0.935；PR-AUC 0.993；2.3 MB；MIT | 默认 0.5 的 F1 0.831，0.01 时 0.958；GPU 无收益（比 CPU 慢 12–13 倍）；远场需按设备校准阈值 |
 | 环境声标签 | sherpa-onnx Zipformer Audio Tagging | mAP 0.928、Top-1 0.914；CPU RTF 0.018；Apache-2.0 | CED 精度略高但上游 GPL-3.0，不能直接用于非 GPL 产品；PANNs 作为 GPU/服务端备选 |
-| 说话人分离 | pyannote Community-1（GPU） | 20 session 聚合 DER 7.96%；GPU RTF 0.038；峰值 436 MB | 官方仓库 gated；授权 CC-BY-4.0；CPU RTF 1.14（慢 36×），边缘不实用 |
+| 说话人分离 | pyannote Community-1（GPU） | 20 session 聚合 DER 7.96%；GPU RTF 0.038；峰值 436 MB；官方 gated 权重（`3533c8c`）在 L 上复现同一 DER | 授权 CC-BY-4.0（需接受条款）；CPU RTF 1.14（慢 36×），边缘不实用 |
 | 声纹 | 3D-Speaker CAM++（ONNX） | 4008 trials / 113 人 EER 3.24%（sherpa 提取器）：CPU RTF 0.024；28 MB；Apache-2.0 | 显式 fbank 路径同权重可到 2.30%，EER 取决于前端而非 provider；WeSpeaker 3.49% 且 minDCF 更低；2 session 的 1.51% 属偏乐观样本 |
 | 边缘/离线组合 | Silero + Zipformer + CAM++ + 可选 sherpa-onnx diarization | 全部 ONNX/CPU，可迁移 macOS / RK | sherpa oracle 人数下 20 session DER 0.2114（confusion 主导）；需可靠人数估计或人工提示，当前估计器不够用 |
 | 服务端高精度组合 | pyannote Community-1 + PANNs（可选） | 8 GB 显存足够，峰值 <0.5 GB/模型 | PyTorch 依赖重；官方模型需接受 gated 条款 |
@@ -128,6 +128,7 @@ sherpa 的人数在 20 个 session 里有 19 个与参考完全一致（逐 sess
 | sherpa-onnx（threshold=0.4） | 0.6073 | — | — | — | 7 / **157** | 0.0706 | 0.329 s | — | N/A |
 
 补充：
+- **官方 gated 权重复核**：用 HF token 下载 `pyannote/speaker-diarization-community-1`（revision `3533c8cf8e36`）在 L 上重跑，DER 0.0995 与公开镜像**数值完全相同**，RTF 0.0315（镜像 0.0316，属测量噪声）；说明本次镜像结果可以作为该 session 的官方等价证据。
 - pyannote CPU 完整 L：DER 0.0995（与 GPU 相同），RTF **1.136**，加载 1.183 s，峰值 RSS 1322 MB；同一 session GPU RTF 0.0316，即 CPU 慢 36 倍。
 - pyannote CPU 子集（S session 前 300 s）：DER 0.0276，参考 5 / 输出 2，RTF 0.666，加载 0.734 s，RSS 1474 MB。该子集只有 2 个主要说话人，DER 不能与完整 L 直接比较，仅用于 CPU 资源。
 - sherpa 在 L 前 300 s（7 人）上阈值扫描：0.45→DER 0.316/21 人，0.5→0.266/18 人，0.55→0.266/17 人，0.6→0.263/16 人，0.7→0.168/11 人；oracle 7 人才到 0.140。说明 **未知人数时 threshold 聚类不可靠**。
@@ -213,7 +214,7 @@ sherpa 的人数在 20 个 session 里有 19 个与参考完全一致（逐 sess
 | CED tagging 权重 | 上游 CED **GPL-3.0** | 不建议进入非 GPL 产品；仅作基线 |
 | PANNs | 代码 MIT；权重 CC-BY-4.0 | 可商用，需署名 |
 | pyannote.audio | MIT | 可商用 |
-| pyannote Community-1 | CC-BY-4.0 | 官方仓库 gated；需接受条款 |
+| pyannote Community-1 | CC-BY-4.0 | 官方 gated 仓库已接受条款并实测（revision `3533c8c`），与公开镜像结果一致 |
 | AISHELL-4 | **CC BY-SA 4.0** | 音频分发需署名+相同方式共享；本 PoC 不重分发 |
 | ESC-50 | CC BY-NC 3.0 | 仅评测，不可商用/再分发 |
 | CAM++ / WeSpeaker | Apache-2.0 | 可商用 |
@@ -230,7 +231,7 @@ sherpa 的人数在 20 个 session 里有 19 个与参考完全一致（逐 sess
 
 以下项目没有真实执行，未用推测数字填充：
 
-- pyannote Community-1 **官方 gated 仓库**：无 HF token，`results/pyannote_official_status.json` 记录 `NOT_RUN`；PoC 使用公开镜像 `pyannote-community/speaker-diarization-community-1`（CC-BY-4.0）。镜像无官方 checksum，文件完整性无法对 pyannote 校验；生产必须使用官方 gated 仓库（`scripts/fetch_pyannote_official.py` 已就绪，有 token 时直接跑官方权重）。
+- pyannote Community-1 **官方 gated 仓库**：已用 HF token 接受条款并下载官方权重（`pyannote/speaker-diarization-community-1`，revision `3533c8cf8e36`），在 `L_R004S03C01` 上跑出 DER 0.0995，与公开镜像**逐位相同**（`results/diarization_pyannote_official_cuda_L.json`，状态见 `results/pyannote_official_status.json`）。镜像 checksum 风险不再影响该 session 的结论；其余 19 个 session 仍只用镜像权重测量。
 - sherpa-onnx diarization 的 **GPU 执行**：`NOT_RUN`。PoC 用的 `sherpa-onnx 2.0.1` 是 CPU wheel，`--provider cuda` 会被库自己回退并打印：
   `Please compile with -DSHERPA_ONNX_ENABLE_GPU=ON. Available providers: CPUExecutionProvider, . Fallback to cpu!`
   `run_diarization.py` 捕获 fd 2 上的这条日志并在 `--provider cuda` 时 `SystemExit`，因此不会把 CPU 结果标成 CUDA。Silero、CAM++、WeSpeaker 的 GPU 行已真实执行（见 §4.1、§4.4）。
@@ -330,6 +331,7 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/fetch_pyannote_official.py
 | VAD GPU | `results/vad_silero_gpu.json` | L/S 两个 session、自包含镜像、CUDA provider | 同脚本 `--provider cuda`；`provider` 字段为硬证据 |
 | 环境声标签 | `results/audio_tagging_{zipformer,ced,panns}_cpu.json`、`audio_tagging_panns_cuda.json`、`audio_tagging_panns_docker_gpu_smoke.json` | 800 clips / 20 个有样本类（21 个候选标签） | `evaluate()` 内 mAP/Top-k |
 | pyannote 20 session | `results/diarization_pyannote_cuda_all.json` + `results/diarization_pyannote_*.rttm` | 镜像内 GPU，20 session 全量 | 聚合 DER = (FA+Miss+Conf)/Σtotal；逐 session 指标可从 RTTM 重新打分 |
+| 官方 pyannote 权重 | `results/diarization_pyannote_official_cuda_L.json`、`results/pyannote_official_status.json` | 官方 gated 仓库、revision `3533c8cf8e36`、仅 L 一个 session | 状态文件记录 revision/returncode；DER 与镜像逐位相同 |
 | pyannote CPU 资源 | `results/diarization_pyannote_cpu_L.json`、`diarization_pyannote_cpu_S_first300s.json` | 完整 L；S 前 300 s 子集 | 脚本直接输出 |
 | sherpa oracle 人数 | `results/diarization_sherpa_cpu_all.json` + 20 个 `diarization_sherpa_cpu_<session>.json` | CPU、`num_clusters`=RTTM 人数 | 同上；逐 session `num_clusters` 与 `expected_speakers` 相等 |
 | 人数估计器 | `results/speaker_count_estimator.json` + `results/diarization_sherpa_est_{L,S}_*.json` | 仅 L/S 两个 session | silhouette 选阈值；估计值驱动 sherpa 的 DER 对照 oracle |
@@ -353,7 +355,7 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/fetch_pyannote_official.py
 
 | 能力 | 推荐执行路径 | 本次实际测量 | 采用前置条件 | 不得据此放行 |
 |---|---|---|---|---|
-| 说话人分离 | pyannote Community-1，服务端 GPU | 20 session、公开镜像权重、DER 7.96%、峰值 436 MB | 走官方 gated 权重并固定 revision/hash；GPU 显存预算 ≥1 GB | 官方权重未评测前不作生产放行；Mac/RK 未验证 |
+| 说话人分离 | pyannote Community-1，服务端 GPU | 20 session；官方权重仅在 L 上实测（DER 0.0995，与镜像逐位相同）；峰值 436 MB | 固定官方 revision/hash（本次 `3533c8cf8e36`）；GPU 显存预算 ≥1 GB | 20 session 聚合 DER 仍来自镜像权重，官方权重只覆盖 1 个 session；Mac/RK 未验证 |
 | 说话人分离（边缘） | sherpa-onnx CPU，**人数由外部给定** | 20 session、oracle 人数、DER 21.14% | 先有可靠人数来源（人工/会议先验） | 默认 threshold 聚类；估计器自动给人数 |
 | VAD | Silero ONNX，CPU | 20 session、F1 0.831@0.5、RTF 0.0046 | 按设备/房间校准阈值（0.01–0.05） | 沿用 0.5 默认值上远场新设备；GPU 部署 |
 | 声纹 | CAM++ 或 WeSpeaker + **固定显式 fbank+CMN 前端** | 4008 trials、同 session、EER 3.24%/3.49%（sherpa）与 2.30%/3.49%（显式前端） | 前端与归一化固定并经金标 trial 复核；权重来源校验 | 跨数据集 EER 横比；把 sherpa 与 ORT 的数字互换 |
@@ -372,7 +374,7 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/fetch_pyannote_official.py
 
 仍然缺失、会直接阻塞对应结论的资源：
 
-- **HF token + 官方条款接受**（官方 gated pyannote 权重未评测）。
+- ~~HF token + 官方条款接受~~：已具备，官方权重已在 L 上实测；其余 session 若要全官方向量重跑，需要同样的 token 与约 25 分钟 GPU。
 - **macOS / RK 真机**（迁移结论未验证）。
 - **商用授权 ambient 语料**（ESC-50 为 CC BY-NC）。
 - **产品侧 adapter/worker 设计与回归套件**（ASR/Evidence/Worldline/MCP 未改动，也未验证）。

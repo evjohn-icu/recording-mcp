@@ -44,9 +44,12 @@ def main() -> int:
         print(f"no HF token; wrote {STATUS}")
         return 0
 
-    from huggingface_hub import snapshot_download
+    from huggingface_hub import HfApi, snapshot_download
 
-    path = snapshot_download(args.repo, local_dir=args.model_dir, token=token)
+    # Pin the resolved commit in the status file: the gated artifact can be
+    # updated upstream, and a production rollout must record what it ran.
+    revision = HfApi(token=True).model_info(args.repo).sha
+    path = snapshot_download(args.repo, local_dir=args.model_dir, token=token, revision=revision)
     # Session ids are <L|S>_<room...>; the L/S prefix is the AISHELL-4 subset label.
     label = args.session.split("_")[0]
     out = RESULTS / f"diarization_pyannote_official_{args.device}_{label}.json"
@@ -70,6 +73,7 @@ def main() -> int:
         {
             "status": "PASS" if proc.returncode == 0 else "FAIL",
             "model": args.repo,
+            "revision": revision,
             "path": path,
             "session": args.session,
             "device": args.device,

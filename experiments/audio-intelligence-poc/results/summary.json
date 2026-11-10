@@ -287,18 +287,19 @@
     }
   },
   "not_run": [
-    "official gated pyannote Community-1 repository (public mirror used; see pyannote_official_status.json)",
     "GPU execution for sherpa-onnx diarization (CPU is the edge deployment target)",
     "macOS and RK hardware",
     "commercial ambient corpus (ESC-50 only)",
     "recording-mcp end-to-end integration and ASR/Evidence/Worldline/MCP regressions"
   ],
   "official_pyannote": {
-    "checked_at": "2026-11-10T19:44:07+0800",
+    "device": "cuda",
     "model": "pyannote/speaker-diarization-community-1",
-    "note": "The gated repository requires accepting the terms and an access token; the public mirror result stands as the pyannote measurement.",
-    "reason": "no HF token",
-    "status": "NOT_RUN"
+    "reason": null,
+    "result": "/home/ev/code/recording-mcp/experiments/audio-intelligence-poc/results/diarization_pyannote_official_cuda_L.json",
+    "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+    "session": "L_R004S03C01",
+    "status": "PASS"
   },
   "speaker_count": {
     "engine": "silero-vad + CAM++ agglomerative (cosine, average linkage)",

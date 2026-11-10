@@ -219,7 +219,12 @@ def main() -> int:
             "self_contained_gpu_image": docker_validation.get("self_contained_gpu_image"),
             "cuda_matmul": docker_validation.get("cuda_matmul"),
         },
-        "official_pyannote": official_pyannote,
+        "official_pyannote": None
+        if not official_pyannote
+        else {
+            key: official_pyannote.get(key)
+            for key in ("status", "model", "revision", "session", "device", "result", "reason")
+        },
         "not_run": [],
     }
 
