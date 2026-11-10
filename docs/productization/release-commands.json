@@ -81,7 +81,7 @@
     {
       "command": "python3 -m unittest discover -s scripts -p 'test_*.py' -v",
       "status": "PASS",
-      "evidence": "114 tests OK (skipped=9)",
+      "evidence": "118 tests OK (skipped=9); includes the launcher .env permission regression",
       "reason_if_not_run": ""
     },
     {

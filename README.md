@@ -146,7 +146,7 @@ scripts/local-gpu-up.sh --profile home --cycles 5 --no-build  # 五轮启停验�
 scripts/local-gpu-up.sh --profile home --with-embedding
 ```
 
-`--with-embedding` 启动 `scripts/local-embed.py` 并自动向 worker/web 传 `--embed-input-type` / `--semantic-input-type`；该字段是本地 Qwen 服务的 query 指令开关，默认**不发送**，以免严格 OpenAI 兼容端点因未知字段拒绝请求。直接配置 `--embed-provider openai`/`--semantic-provider openai` 指向本地服务时需显式加这两个标志。
+`--with-embedding` 启动 `scripts/local-embed.py` 并自动向 worker/web 传 `--embed-input-type` / `--semantic-input-type`；该字段是本地 Qwen 服务的 query 指令开关，默认**不发送**，以免严格 OpenAI 兼容端点因未知字段拒绝请求。直接配置 `--embed-provider openai`/`--semantic-provider openai` 指向本地服务时需显式加这两个标志，或设置 `EMBED_INPUT_TYPE=1`/`SEMANTIC_INPUT_TYPE=1`。
 
 
 ## MCP 客户端与 Web 运行限制
