@@ -1,0 +1,21 @@
+FROM debian:bookworm-slim
+
+COPY python /opt/python
+COPY ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY requirements-gpu.txt /tmp/requirements-gpu.txt
+
+ENV NUMBA_CACHE_DIR=/tmp/numba \
+    PATH=/opt/python/bin:$PATH \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
+RUN python3 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/venv/bin/pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu126 torch \
+    && /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements-gpu.txt
+
+ENV PATH=/opt/venv/bin:$PATH
+WORKDIR /poc
+COPY scripts /poc/scripts
+ENTRYPOINT ["python"]

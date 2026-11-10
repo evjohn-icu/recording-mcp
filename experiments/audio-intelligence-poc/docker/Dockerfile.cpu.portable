@@ -1,0 +1,23 @@
+FROM debian:bookworm-slim
+
+# Portable CPython 3.12 (e.g. a uv standalone build) is staged as ./python by
+# docker/build-portable.sh.  This avoids depending on apt/Docker Hub during the
+# PoC, which was unavailable in the target WSL2/RTX 2070 environment.
+COPY python /opt/python
+COPY ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY requirements-cpu.txt /tmp/requirements-cpu.txt
+
+ENV NUMBA_CACHE_DIR=/tmp/numba \
+    PATH=/opt/python/bin:$PATH \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
+RUN python3 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements-cpu.txt
+
+ENV PATH=/opt/venv/bin:$PATH
+WORKDIR /poc
+COPY scripts /poc/scripts
+ENTRYPOINT ["python"]

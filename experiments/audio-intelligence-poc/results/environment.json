@@ -1,0 +1,446 @@
+{
+  "datasets": {
+    "aishell4_test": {
+      "L_R004S03C01": {
+        "rttm_bytes": 43246,
+        "wav_bytes": 71288654
+      },
+      "S_R004S03C01": {
+        "rttm_bytes": 14069,
+        "wav_bytes": 74467886
+      }
+    },
+    "esc50": {
+      "audio_dir": "data/esc50/audio",
+      "clips": 2000
+    }
+  },
+  "docker": {
+    "context": {
+      "argv": [
+        "docker",
+        "context",
+        "ls"
+      ],
+      "returncode": 0,
+      "seconds": 0.0504,
+      "stderr": "",
+      "stdout": "NAME            DESCRIPTION                               DOCKER ENDPOINT                             ERROR\ndefault *       Current DOCKER_HOST based configuration   unix:///var/run/docker.sock                 \ndesktop-linux   Docker Desktop                            npipe:////./pipe/dockerDesktopLinuxEngine"
+    },
+    "info": {
+      "argv": [
+        "docker",
+        "info"
+      ],
+      "returncode": 0,
+      "seconds": 0.4848,
+      "stderr": "",
+      "stdout": "Client:\n Version:    29.9.2\n Context:    default\n Debug Mode: false\n Plugins:\n  agent: Docker AI Agent Runner (Docker Inc.)\n    Version:  v1.152.0\n    Path:     /usr/local/lib/docker/cli-plugins/docker-agent\n  ai: Docker AI Agent - Ask Gordon (Docker Inc.)\n    Version:  v1.33.0\n    Path:     /usr/local/lib/docker/cli-plugins/docker-ai\n  buildx: Docker Buildx (Docker Inc.)\n    Version:  v0.38.1\n    Path:     /usr/local/lib/docker/cli-plugins/docker-buildx\n  compose: Docker Compose (Docker Inc.)\n    Version:  v5.6.1\n    Path:     /usr/local/lib/docker/cli-plugins/docker-compose\n  debug: Get a shell into any image or container (Docker Inc.)\n    Version:  0.49.0\n    Path:     /usr/local/lib/docker/cli-plugins/docker-debug\n  desktop: Docker Desktop commands (Docker Inc.)\n    Version:  4.98.0\n    Path:     /usr/local/lib/docker/cli-plugins/docker-desktop\n  dhi: CLI for managing Docker Hardened Images (Docker Inc.)\n    Version:  v0.0.9\n    Path:     /usr/local/lib/docker/cli-plugins/docker-dhi\n  extension: Manages Docker extensions (Docker Inc.)\n    Version:  v0.2.32\n    Path:     /usr/local/lib/docker/cli-plugins/docker-extension\n  init: Creates Docker-related starter files for your project (Docker Inc.)\n    Version:  v1.4.1\n    Path:     /usr/local/lib/docker/cli-plugins/docker-init\n  mcp: Docker MCP Plugin (Docker Inc.)\n    Version:  v0.44.2\n    Path:     /usr/local/lib/docker/cli-plugins/docker-mcp\n  model: Docker Model Runner (Docker Inc.)\n    Version:  v1.2.9\n    Path:     /usr/local/lib/docker/cli-plugins/docker-model\n  offload: Docker Offload (Docker Inc.)\n    Version:  v0.7.35\n    Path:     /usr/local/lib/docker/cli-plugins/docker-offload\n  pass: Docker Pass Secrets Manager Plugin (beta) (Docker Inc.)\n    Version:  v0.3.2\n    Path:     /usr/local/lib/docker/cli-plugins/docker-pass\n  sandbox: \"docker sandbox\" is deprecated, use Docker Sandboxes instead (Docker Inc.)\n    Version:  v0.13.0\n    Path:     /usr/local/lib/docker/cli-plugins/docker-sandbox\n  scout: Docker Scout (Docker Inc.)\n    Version:  v1.27.0\n    Path:     /usr/local/lib/docker/cli-plugins/docker-scout\n\nServer:\n Containers: 2\n  Running: 1\n  Paused: 0\n  Stopped: 1\n Images: 7\n Server Version: 29.9.2\n Storage Driver: overlayfs\n  driver-type: io.containerd.snapshotter.v1\n Logging Driver: local\n Cgroup Driver: cgroupfs\n Cgroup Version: 2\n Plugins:\n  Volume: local\n  Network: bridge host ipvlan macvlan null overlay\n  Log: awslogs fluentd gcplogs gelf journald json-file local splunk syslog\n CDI spec directories:\n  /etc/cdi\n  /var/run/cdi\n Discovered Devices:\n  cdi: docker.com/gpu=webgpu\n Swarm: inactive\n Runtimes: io.containerd.runc.v2 nvidia runc\n Default Runtime: runc\n Init Binary: docker-init\n containerd version: b7a25261e029d68978bbf290df0a62fc819b3c51\n runc version: v1.5.2-0-g29dd3dc2\n init version: de40ad0\n Security Options:\n  seccomp\n   Profile: builtin\n  cgroupns\n Kernel Version: 6.18.54.1-microsoft-standard-WSL2\n Operating System: Docker Desktop\n OSType: linux\n Architecture: x86_64\n CPUs: 12\n Total Memory: 23.43GiB\n Name: docker-desktop\n ID: 5c4eb3e0-7eed-49de-a5f8-16c423f0efef\n Docker Root Dir: /var/lib/docker\n Debug Mode: false\n HTTP Proxy: http.docker.internal:3128\n HTTPS Proxy: http.docker.internal:3128\n No Proxy: hubproxy.docker.internal\n Labels:\n  com.docker.desktop.address=unix:///var/run/docker-cli.sock\n Experimental: false\n Insecure Registries:\n  hubproxy.docker.internal:5555\n  127.0.0.0/8\n  ::1/128\n Live Restore Enabled: false\n Firewall Backend: iptables"
+    },
+    "version": {
+      "argv": [
+        "docker",
+        "version"
+      ],
+      "returncode": 0,
+      "seconds": 0.0948,
+      "stderr": "",
+      "stdout": "Client:\n Version:           29.9.2\n API version:       1.56\n Go version:        go1.26.10\n Git commit:        a82e528\n Built:             Tue Oct 20 18:44:02 2026\n OS/Arch:           linux/amd64\n Context:           default\n\nServer: Docker Desktop 4.98.0 (245422)\n Engine:\n  Version:          29.9.2\n  API version:      1.56 (minimum version 1.40)\n  Go version:       go1.26.10\n  Git commit:       0367cbe\n  Built:            Tue Oct 20 18:45:02 2026\n  OS/Arch:          linux/amd64\n  Experimental:     false\n containerd:\n  Version:          v2.4.2\n  GitCommit:        b7a25261e029d68978bbf290df0a62fc819b3c51\n runc:\n  Version:          1.5.2\n  GitCommit:        v1.5.2-0-g29dd3dc2\n docker-init:\n  Version:          0.19.0\n  GitCommit:        de40ad0"
+    }
+  },
+  "generated_at": "2026-11-10T15:42:01+0800",
+  "git": {
+    "branch": {
+      "argv": [
+        "git",
+        "branch",
+        "--show-current"
+      ],
+      "returncode": 0,
+      "seconds": 0.0226,
+      "stderr": "",
+      "stdout": "experiment/audio-intelligence-poc"
+    },
+    "head": {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "returncode": 0,
+      "seconds": 0.0224,
+      "stderr": "",
+      "stdout": "51a73a11c3a39255d1d2de4b6b96cf5751f67bc5"
+    },
+    "status": {
+      "argv": [
+        "git",
+        "status",
+        "--short"
+      ],
+      "returncode": 0,
+      "seconds": 0.0337,
+      "stderr": "",
+      "stdout": "?? ../../.poc-tmp/\n?? ../"
+    }
+  },
+  "gpu": {
+    "driver_version": "610.88",
+    "memory_total_mib": 8192.0,
+    "memory_used_mib": 759.0,
+    "name": "NVIDIA GeForce RTX 2070",
+    "raw": {
+      "argv": [
+        "nvidia-smi",
+        "--query-gpu=name,memory.total,memory.used,driver_version,utilization.gpu",
+        "--format=csv,noheader,nounits"
+      ],
+      "returncode": 0,
+      "seconds": 0.1129,
+      "stderr": "",
+      "stdout": "NVIDIA GeForce RTX 2070, 8192, 759, 610.88, 6"
+    },
+    "utilization_gpu_pct": 6.0
+  },
+  "gpu_full": {
+    "argv": [
+      "nvidia-smi",
+      "-q"
+    ],
+    "returncode": 0,
+    "seconds": 0.2279,
+    "stderr": "",
+    "stdout": "==============NVSMI LOG==============\n\nTimestamp                                              : Tue Nov 10 15:42:01 2026\nDriver Version                                         : 610.88 [Deprecated; will be removed in CUDA 14.0. Use KMD Version instead]\nCUDA Version                                           : 13.3 [Deprecated; will be removed in CUDA 14.0. Use CUDA UMD Version instead]\nKMD Version                                            : 610.88\nCUDA UMD Version                                       : 13.3\n\nAttached GPUs                                          : 1\nGPU 00000000:2B:00.0\n    Product Name                                       : NVIDIA GeForce RTX 2070\n    Product Brand                                      : GeForce\n    Product Architecture                               : Turing\n    Display Mode                                       : Requested functionality has been deprecated\n    Display Attached                                   : Yes\n    Display Active                                     : Disabled\n    Persistence Mode                                   : Enabled\n    Addressing Mode                                    : N/A\n    MIG Mode\n        Current                                        : N/A\n        Pending                                        : N/A\n    Accounting Mode                                    : Disabled\n    Accounting Mode Buffer Size                        : 4000\n    Driver Model\n        Current                                        : WDDM\n        Pending                                        : WDDM\n    Serial Number                                      : N/A\n    GPU UUID                                           : GPU-dfacbbe7-8909-48c3-0c8f-c39d3b1891ef\n    GPU PDI                                            : 0x6581bb21d086e0d4\n    Minor Number                                       : N/A\n    VBIOS Version                                      : 90.06.0b.40.ae\n    MultiGPU Board                                     : No\n    Board ID                                           : 0x2b00\n    Board Part Number                                  : N/A\n    GPU Part Number                                    : 1F02-400-A1\n    FRU Part Number                                    : N/A\n    Platform Info\n        Chassis Serial Number                          : N/A\n        Slot Number                                    : N/A\n        Tray Index                                     : N/A\n        Host ID                                        : N/A\n        Peer Type                                      : N/A\n        Module Id                                      : 1\n        GPU Fabric GUID                                : N/A\n    Inforom Version\n        Image Version                                  : G001.0000.02.04\n        OEM Object                                     : 1.1\n        ECC Object                                     : N/A\n        Power Management Object                        : N/A\n    Inforom BBX Object Flush\n        Latest Timestamp                               : N/A\n        Latest Duration                                : N/A\n    Inforom Time Data\n        Time Run                                       : N/A\n    GPU Operation Mode\n        Current                                        : N/A\n        Pending                                        : N/A\n    GPU C2C Mode                                       : N/A\n    GPU Virtualization Mode\n        Virtualization Mode                            : None\n        Host VGPU Mode                                 : N/A\n        vGPU Heterogeneous Mode                        : N/A\n    GPU Recovery Action                                : None\n    GSP Firmware Version                               : N/A\n    IBMNPU\n        Relaxed Ordering Mode                          : N/A\n    PCI\n        Bus                                            : 0x2B\n        Device                                         : 0x00\n        Domain                                         : 0x0000\n        Device Id                                      : 0x1F0210DE\n        Bus Id                                         : 00000000:2B:00.0\n        Sub System Id                                  : 0x37C21458\n        GPU Link Info\n            PCIe Generation\n                Max                                    : 3\n                Current                                : 3\n                Device Current                         : 3\n                Device Max                             : 3\n                Host Max                               : 4\n            Link Width\n                Max                                    : 16x\n                Current                                : 16x\n        Bridge Chip\n            Type                                       : N/A\n            Firmware                                   : N/A\n        Replays Since Reset                            : 0\n        Replay Number Rollovers                        : 0\n        Tx Throughput                                  : 0 KB/s\n        Rx Throughput                                  : 4492 KB/s\n        Atomic Caps Outbound                           : N/A\n        Atomic Caps Inbound                            : N/A\n    Fan Speed                                          : 0 %\n    Performance State                                  : P8\n    Clocks Event Reasons\n        Idle                                           : Active\n        Applications Clocks Setting                    : Not Active\n        SW Power Cap                                   : Not Active\n        HW Slowdown                                    : Not Active\n            HW Thermal Slowdown                        : Not Active\n            HW Power Brake Slowdown                    : Not Active\n        Sync Boost                                     : Not Active\n        SW Thermal Slowdown                            : Not Active\n        Display Clock Setting                          : Not Active\n    Clocks Event Reasons Counters\n        SW Power Capping                               : 5433799 us\n        Sync Boost                                     : 0 us\n        SW Thermal Slowdown                            : 0 us\n        HW Thermal Slowdown                            : 0 us\n        HW Power Braking                               : 0 us\n    Sparse Operation Mode                              : N/A\n    FB Memory Usage\n        Total                                          : 8192 MiB\n        Reserved                                       : 186 MiB\n        Used                                           : 759 MiB\n        Free                                           : 7248 MiB\n    BAR1 Memory Usage\n        Total                                          : 256 MiB\n        Used                                           : 2 MiB\n        Free                                           : 254 MiB\n    Conf Compute Protected Memory Usage\n        Total                                          : N/A\n        Used                                           : N/A\n        Free                                           : N/A\n    Compute Mode                                       : Default\n    Utilization\n        GPU                                            : 6 %\n        Memory                                         : 1 %\n        Encoder                                        : 0 %\n        Decoder                                        : 0 %\n        JPEG                                           : 0 %\n        OFA                                            : 0 %\n    Encoder Stats\n        Active Sessions                                : 0\n        Average FPS                                    : 0\n        Average Latency                                : 0\n    FBC Stats\n        Active Sessions                                : 0\n        Average FPS                                    : 0\n        Average Latency                                : 0\n    DRAM Encryption Mode\n        Current                                        : N/A\n        Pending                                        : N/A\n    ECC Mode\n        Current                                        : N/A\n        Pending                                        : N/A\n    ECC Errors\n        Volatile\n            SRAM Correctable                           : N/A\n            SRAM Uncorrectable                         : N/A\n            DRAM Correctable                           : N/A\n            DRAM Uncorrectable                         : N/A\n        Aggregate\n            SRAM Correctable                           : N/A\n            SRAM Uncorrectable                         : N/A\n            DRAM Correctable                           : N/A\n            DRAM Uncorrectable                         : N/A\n    Retired Pages\n        Single Bit ECC                                 : N/A\n        Double Bit ECC                                 : N/A\n        Pending Page Blacklist                         : N/A\n    Remapped Rows                                      : N/A\n    Temperature\n        GPU Current Temp                               : 39 C\n        GPU Current T.Limit Temp                       : N/A\n        GPU Shutdown Temp                              : 94 C\n        GPU Slowdown Temp                              : 91 C\n        GPU Max Operating Temp                         : 89 C\n        GPU Target Temperature Specification           : 81 C\n        Memory Current Temp                            : N/A\n        Memory Max Operating Temp                      : N/A\n    GPU Power Readings\n        Average Power Draw                             : N/A\n        Instantaneous Power Draw                       : 10.93 W\n        GPU Ceiling Power Limit\n            Current Power Limit                        : 175.00 W\n            Requested Power Limit                      : 175.00 W\n            Default Power Limit                        : 175.00 W\n        GPU Base Power\n            Current Base Power                         : N/A\n            Requested Base Power                       : N/A\n            Default Base Power                         : N/A\n        Min Power Limit                                : 125.00 W\n        Max Power Limit                                : 200.00 W\n    GPU Memory Power Readings \n        Average Power Draw                             : N/A\n        Instantaneous Power Draw                       : N/A\n    Module Power Readings\n        Average Power Draw                             : N/A\n        Instantaneous Power Draw                       : N/A\n        Current Power Limit                            : N/A\n        Requested Power Limit                          : N/A\n        Default Power Limit                            : N/A\n        Min Power Limit                                : N/A\n        Max Power Limit                                : N/A\n    Power Smoothing                                    : N/A\n    Workload Power Profiles\n        Requested Profiles                             : N/A\n        Enforced Profiles                              : N/A\n    EDPp Multiplier                                    : N/A\n    Clocks\n        Graphics                                       : 300 MHz\n        SM                                             : 300 MHz\n        Memory                                         : 405 MHz\n        Video                                          : 540 MHz\n    Applications Clocks\n        Graphics                                       : Requested functionality has been deprecated\n        Memory                                         : Requested functionality has been deprecated\n    Default Applications Clocks\n        Graphics                                       : Requested functionality has been deprecated\n        Memory                                         : Requested functionality has been deprecated\n    Deferred Clocks\n        Memory                                         : N/A\n    Max Clocks\n        Graphics                                       : 2100 MHz\n        SM                                             : 2100 MHz\n        Memory                                         : 7001 MHz\n        Video                                          : 1950 MHz\n    Max Customer Boost Clocks\n        Graphics                                       : N/A\n    Clock Policy\n        Auto Boost                                     : N/A\n        Auto Boost Default                             : N/A\n    Fabric\n        State                                          : N/A\n        Status                                         : N/A\n        CliqueId                                       : N/A\n        ClusterUUID                                    : N/A\n        Health\n            Summary                                    : N/A\n            Bandwidth                                  : N/A\n            Route Recovery in progress                 : N/A\n            Route Unhealthy                            : N/A\n            Access Timeout Recovery                    : N/A\n            Incorrect Configuration                    : N/A\n            Partition Assigned                         : N/A\n    Processes\n        GPU instance ID                   : N/A\n        Compute instance ID               : N/A\n        Process ID                        : 47\n            Type                          : G\n            Name                          : /Xwayland\n            Used GPU Memory               : Not available in WDDM driver model\n        GPU instance ID                   : N/A\n        Compute instance ID               : N/A\n        Process ID                        : 307\n            Type                          : G\n            Name                          : /Xwayland\n            Used GPU Memory               : Not available in WDDM driver model\n        GPU instance ID                   : N/A\n        Compute instance ID               : N/A\n        Process ID                        : 449\n            Type                          : C\n            Name                          : /llama\n            Used GPU Memory               : Not available in WDDM driver model\n    Capabilities\n        EGM                                            : disabled"
+  },
+  "host": {
+    "cpu": {
+      "argv": [
+        "lscpu"
+      ],
+      "returncode": 0,
+      "seconds": 0.0117,
+      "stderr": "",
+      "stdout": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  12\nOn-line CPU(s) list:                     0-11\nVendor ID:                               AuthenticAMD\nModel name:                              AMD Ryzen 5 5600X 6-Core Processor\nCPU family:                              25\nModel:                                   33\nThread(s) per core:                      2\nCore(s) per socket:                      6\nSocket(s):                               1\nStepping:                                2\nMicrocode version:                       0xffffffff\nBogoMIPS:                                7400.06\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext perfctr_core ssbd ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves clzero xsaveerptr arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nVirtualization:                          AMD-V\nHypervisor vendor:                       Microsoft\nVirtualization type:                     full\nL1d cache:                               192 KiB (6 instances)\nL1i cache:                               192 KiB (6 instances)\nL2 cache:                                3 MiB (6 instances)\nL3 cache:                                32 MiB (1 instance)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-11\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Vulnerable: Safe RET, no microcode\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP always-on; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Vulnerable: No microcode\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected"
+    },
+    "memory": {
+      "argv": [
+        "free",
+        "-b"
+      ],
+      "returncode": 0,
+      "seconds": 0.0086,
+      "stderr": "",
+      "stdout": "total        used        free      shared  buff/cache   available\nMem:     25162444800  3975155712   296153088   203419648 21415923712 21187289088\nSwap:    34359738368   238968832 34120769536"
+    },
+    "os_release": {
+      "BUG_REPORT_URL": "https://bugs.launchpad.net/ubuntu/",
+      "HOME_URL": "https://www.ubuntu.com/",
+      "ID": "ubuntu",
+      "ID_LIKE": "debian",
+      "LOGO": "ubuntu-logo",
+      "NAME": "Ubuntu",
+      "PRETTY_NAME": "Ubuntu 24.04.5 LTS",
+      "PRIVACY_POLICY_URL": "https://www.ubuntu.com/legal/terms-and-policies/privacy-policy",
+      "SUPPORT_URL": "https://help.ubuntu.com/",
+      "UBUNTU_CODENAME": "noble",
+      "VERSION": "24.04.5 LTS (Noble Numbat)",
+      "VERSION_CODENAME": "noble",
+      "VERSION_ID": "24.04"
+    },
+    "python": "3.12.13",
+    "uname": {}
+  },
+  "models": {
+    "campplus/README.md": {
+      "bytes": 3238,
+      "path": "models/campplus/README.md",
+      "sha256": "addb7310b64517098f48bb880532019216874098777dba8bb08acb84af885a53"
+    },
+    "campplus/campplus_zh_en_fp32.onnx": {
+      "bytes": 28281164,
+      "path": "models/campplus/campplus_zh_en_fp32.onnx",
+      "sha256": "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"
+    },
+    "ced-base/README.md": {
+      "bytes": 89,
+      "path": "models/ced-base/README.md",
+      "sha256": "a8468222b4a3ca1cb7fcaf14c31d7e11b7b2660ef44aadf411f9f9fd9672987b"
+    },
+    "ced-base/class_labels_indices.csv": {
+      "bytes": 14675,
+      "path": "models/ced-base/class_labels_indices.csv",
+      "sha256": "cdd1049833c4b86127c2773ac0d14a2754b6a6d0d1798002ed5c66e699708429"
+    },
+    "ced-base/model.onnx": {
+      "bytes": 343376759,
+      "path": "models/ced-base/model.onnx",
+      "sha256": "896bda7e4b9e0814e895be92fcd4312ae511bd570291b9f24707d214cf53f773"
+    },
+    "panns-hf/model.safetensors": {
+      "bytes": 327421748,
+      "path": "models/panns-hf/model.safetensors",
+      "sha256": "9e3518fd493df37c0f7ad4030e59b4c2208ec74c5ee468c54ecc2808c5dcdd69"
+    },
+    "panns-onnx/panns_cnn14.onnx": {
+      "bytes": 327331942,
+      "path": "models/panns-onnx/panns_cnn14.onnx",
+      "sha256": "776ac28799c49d19a64905787970e7933d1fde29217cf464f47a0f4d3c137e60"
+    },
+    "panns-onnx/panns_labels.json": {
+      "bytes": 8974,
+      "path": "models/panns-onnx/panns_labels.json",
+      "sha256": "4b1d62bc36855a053d516caabf1d5c97904148778176f34bd6b1356de92f2399"
+    },
+    "panns_data/Cnn14_mAP=0.431.pth": {
+      "bytes": 327428481,
+      "path": "/home/ev/panns_data/Cnn14_mAP=0.431.pth"
+    },
+    "pyannote-community-1/.cache/huggingface/.gitignore": {
+      "bytes": 1,
+      "path": "models/pyannote-community-1/.cache/huggingface/.gitignore",
+      "sha256": "684888c0ebb17f374298b65ee2807526c066094c701bcc7ebbe1c1095f494fc1"
+    },
+    "pyannote-community-1/.cache/huggingface/CACHEDIR.TAG": {
+      "bytes": 191,
+      "path": "models/pyannote-community-1/.cache/huggingface/CACHEDIR.TAG",
+      "sha256": "f6572428f6d5e1575e73a1502895a8731f10757dfbb634909c6e154b849af91d"
+    },
+    "pyannote-community-1/.cache/huggingface/download/.gitattributes.lock": {
+      "bytes": 0,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/.gitattributes.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pyannote-community-1/.cache/huggingface/download/.gitattributes.metadata": {
+      "bytes": 101,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/.gitattributes.metadata",
+      "sha256": "8c6553e1d3ebca63af8d26e5fd1a369d6b9b2cc4b22b7befc0ad32236e5c5ed6"
+    },
+    "pyannote-community-1/.cache/huggingface/download/README.md.lock": {
+      "bytes": 0,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/README.md.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pyannote-community-1/.cache/huggingface/download/README.md.metadata": {
+      "bytes": 101,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/README.md.metadata",
+      "sha256": "29eb15270ca4e8f2804821316ea78348d85ecf6d2e11cd1c37c6d5a30c06349f"
+    },
+    "pyannote-community-1/.cache/huggingface/download/config.yaml.lock": {
+      "bytes": 0,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/config.yaml.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pyannote-community-1/.cache/huggingface/download/config.yaml.metadata": {
+      "bytes": 101,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/config.yaml.metadata",
+      "sha256": "a330797e508c638dbce0e78b779eabb12ac26d95da678adb766bc7e16be84ad9"
+    },
+    "pyannote-community-1/.cache/huggingface/download/diarization.gif.lock": {
+      "bytes": 0,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/diarization.gif.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pyannote-community-1/.cache/huggingface/download/diarization.gif.metadata": {
+      "bytes": 124,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/diarization.gif.metadata",
+      "sha256": "7a7c4d00613cef954320eaf01b7d49e4e2454260c07d5cb3cd3580e56fdb7ed8"
+    },
+    "pyannote-community-1/.cache/huggingface/download/embedding/README.md.lock": {
+      "bytes": 0,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/embedding/README.md.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pyannote-community-1/.cache/huggingface/download/embedding/README.md.metadata": {
+      "bytes": 101,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/embedding/README.md.metadata",
+      "sha256": "5ab79dd6d7f863699aeda89cb8058bf1c3c52ed9b7693d0a9ae105c158df6242"
+    },
+    "pyannote-community-1/.cache/huggingface/download/embedding/pytorch_model.bin.lock": {
+      "bytes": 0,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/embedding/pytorch_model.bin.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pyannote-community-1/.cache/huggingface/download/embedding/pytorch_model.bin.metadata": {
+      "bytes": 124,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/embedding/pytorch_model.bin.metadata",
+      "sha256": "889c826a213720ab5e2a083f4dc140d886486b6beb4bbecaa05abca27e6e9b6d"
+    },
+    "pyannote-community-1/.cache/huggingface/download/plda/README.md.lock": {
+      "bytes": 0,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/plda/README.md.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pyannote-community-1/.cache/huggingface/download/plda/README.md.metadata": {
+      "bytes": 101,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/plda/README.md.metadata",
+      "sha256": "13ed2719a056c89d162eb4bc4fd7b90bcb1417fd1f20aa94145d202e231b5de3"
+    },
+    "pyannote-community-1/.cache/huggingface/download/plda/plda.npz.lock": {
+      "bytes": 0,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/plda/plda.npz.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pyannote-community-1/.cache/huggingface/download/plda/plda.npz.metadata": {
+      "bytes": 125,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/plda/plda.npz.metadata",
+      "sha256": "6453156fa1e2c3c4ab519053adaf60708af5b0eda0da91b0d0f4a6afe6565d11"
+    },
+    "pyannote-community-1/.cache/huggingface/download/plda/xvec_transform.npz.lock": {
+      "bytes": 0,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/plda/xvec_transform.npz.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pyannote-community-1/.cache/huggingface/download/plda/xvec_transform.npz.metadata": {
+      "bytes": 125,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/plda/xvec_transform.npz.metadata",
+      "sha256": "23b8b0b2e80be58a8028e1765f0d8571c55279407e49eaa68246135495f93b95"
+    },
+    "pyannote-community-1/.cache/huggingface/download/segmentation/pytorch_model.bin.lock": {
+      "bytes": 0,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/segmentation/pytorch_model.bin.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pyannote-community-1/.cache/huggingface/download/segmentation/pytorch_model.bin.metadata": {
+      "bytes": 124,
+      "path": "models/pyannote-community-1/.cache/huggingface/download/segmentation/pytorch_model.bin.metadata",
+      "sha256": "12f1e6d957d7bbf56b767c3b074d01babb659f8760ffa28b4290dec34a22420e"
+    },
+    "pyannote-community-1/.cache/huggingface/trees/8a527374977391da736e0daaef26855d949d9685.json": {
+      "bytes": 1637,
+      "path": "models/pyannote-community-1/.cache/huggingface/trees/8a527374977391da736e0daaef26855d949d9685.json",
+      "sha256": "e208e5817925d7e3adfedb5e60d78593d7f1f1e8d62fa57b1533864625479a38"
+    },
+    "pyannote-community-1/README.md": {
+      "bytes": 9978,
+      "path": "models/pyannote-community-1/README.md",
+      "sha256": "2db91f9265bd81f1653ff088b5bff22bf6aebebea03328513af65501643f8a31"
+    },
+    "pyannote-community-1/config.yaml": {
+      "bytes": 444,
+      "path": "models/pyannote-community-1/config.yaml",
+      "sha256": "5ce2bfa9a938dc132cec1172592d65173cbb8f444ea1e4133f10f9391de155be"
+    },
+    "pyannote-community-1/diarization.gif": {
+      "bytes": 861445,
+      "path": "models/pyannote-community-1/diarization.gif",
+      "sha256": "0d925ad38995d89009260e493b0ae2e684c3e1397f495265ed841c45c4f73a35"
+    },
+    "pyannote-community-1/embedding/README.md": {
+      "bytes": 938,
+      "path": "models/pyannote-community-1/embedding/README.md",
+      "sha256": "fa9e5105ae95edb231d841476cdb91eef4be0621c372ed4f7d3421294b5f8ad7"
+    },
+    "pyannote-community-1/embedding/pytorch_model.bin": {
+      "bytes": 26646242,
+      "path": "models/pyannote-community-1/embedding/pytorch_model.bin",
+      "sha256": "6f10ff60898a1d185fa22e1d11e0bfa8a92efec811f11bca48cb8cafebefd929"
+    },
+    "pyannote-community-1/plda/README.md": {
+      "bytes": 220,
+      "path": "models/pyannote-community-1/plda/README.md",
+      "sha256": "e1316dbbeb3261431478d48ceebbd4bba395c3587e7b80c254dbab00f1209d0a"
+    },
+    "pyannote-community-1/plda/plda.npz": {
+      "bytes": 133852,
+      "path": "models/pyannote-community-1/plda/plda.npz",
+      "sha256": "9b77bcd840692710dd3496f62ecfeed8d8e5f002fd991b785079b244eab7d255"
+    },
+    "pyannote-community-1/plda/xvec_transform.npz": {
+      "bytes": 134376,
+      "path": "models/pyannote-community-1/plda/xvec_transform.npz",
+      "sha256": "325f1ce8e48f7e55e9c8aa47e05d2766b7c48c4b25b8de8dd751e7a4cc5fbe8f"
+    },
+    "pyannote-community-1/segmentation/pytorch_model.bin": {
+      "bytes": 5906507,
+      "path": "models/pyannote-community-1/segmentation/pytorch_model.bin",
+      "sha256": "7ad24338d844fb95985486eb1a464e32d229f6d7a03c9abe60f978bacf3f816e"
+    },
+    "sherpa-seg/LICENSE": {
+      "bytes": 1061,
+      "path": "models/sherpa-seg/LICENSE",
+      "sha256": "14d7016ad68e7394d6e6b78d96cc2ae431c905287b89674cfdf021e79e62b8ba"
+    },
+    "sherpa-seg/README.md": {
+      "bytes": 115,
+      "path": "models/sherpa-seg/README.md",
+      "sha256": "0380ed76a50efcc421dc62f251ed06e8349688466beac3177bee6e00dc336bfc"
+    },
+    "sherpa-seg/model.onnx": {
+      "bytes": 5992913,
+      "path": "models/sherpa-seg/model.onnx",
+      "sha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
+    },
+    "silero-official/model.onnx": {
+      "bytes": 2327524,
+      "path": "models/silero-official/model.onnx",
+      "sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3"
+    },
+    "silero/LICENSE": {
+      "bytes": 1075,
+      "path": "models/silero/LICENSE",
+      "sha256": "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b"
+    },
+    "silero/model.onnx": {
+      "bytes": 2243022,
+      "path": "models/silero/model.onnx",
+      "sha256": "a4a068cd6cf1ea8355b84327595838ca748ec29a25bc91fc82e6c299ccdc5808"
+    },
+    "wespeaker/README.md": {
+      "bytes": 31,
+      "path": "models/wespeaker/README.md",
+      "sha256": "4bcf87ecfbbb8e07a01b21415a970c8b53a5283bf6872b657040d3f45c9241f7"
+    },
+    "wespeaker/cnceleb_resnet34_LM.onnx": {
+      "bytes": 26530309,
+      "path": "models/wespeaker/cnceleb_resnet34_LM.onnx",
+      "sha256": "e7584940aeac8d5512d875e58ce6c09ba4ddad65d8128e1dac0d93aadd087ebb"
+    },
+    "wespeaker/config.yaml": {
+      "bytes": 1716,
+      "path": "models/wespeaker/config.yaml",
+      "sha256": "deef9f002d895dbdb3748768acd4d588459570bd85e9d3f235cfe5631355578e"
+    },
+    "zipformer-tagging/README.md": {
+      "bytes": 96,
+      "path": "models/zipformer-tagging/README.md",
+      "sha256": "c0ff6419f914387e343de1945e5c9d63f91ee0e41699c619d7c2391c611e9c79"
+    },
+    "zipformer-tagging/class_labels_indices.csv": {
+      "bytes": 14675,
+      "path": "models/zipformer-tagging/class_labels_indices.csv",
+      "sha256": "cdd1049833c4b86127c2773ac0d14a2754b6a6d0d1798002ed5c66e699708429"
+    },
+    "zipformer-tagging/model.onnx": {
+      "bytes": 259079137,
+      "path": "models/zipformer-tagging/model.onnx",
+      "sha256": "b0d6db680f50cad25acd7759721b4e6553e4ccd1ac06da95cf87a40dc700a36a"
+    }
+  },
+  "python_packages": {
+    "kaldi-native-fbank": "1.23.0",
+    "librosa": "1.0.0",
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.1",
+    "pandas": "3.1.1",
+    "panns-inference": "NOT_INSTALLED",
+    "psutil": "7.2.2",
+    "pyannote-metrics": "4.2.0",
+    "pyannote.audio": "NOT_INSTALLED",
+    "scikit-learn": "1.9.1",
+    "scipy": "1.18.1",
+    "sherpa-onnx": "2.0.1",
+    "soundfile": "0.14.0",
+    "torch": "NOT_INSTALLED",
+    "torchaudio": "NOT_INSTALLED"
+  },
+  "wsl": {
+    "argv": [
+      "wsl.exe",
+      "--version"
+    ],
+    "returncode": null,
+    "seconds": 0.1407,
+    "stderr": "UnicodeDecodeError: 'utf-8' codec can't decode byte 0x85 in position 34: invalid start byte",
+    "stdout": ""
+  }
+}

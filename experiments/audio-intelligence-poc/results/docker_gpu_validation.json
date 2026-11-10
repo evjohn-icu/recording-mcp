@@ -1,0 +1,46 @@
+{
+  "environment": {
+    "wsl_kernel": "6.18.54.1-microsoft-standard-WSL2",
+    "gpu": "NVIDIA GeForce RTX 2070 8192 MiB",
+    "driver": "610.88",
+    "cuda_umd": "13.3",
+    "docker": "29.9.2 (Docker Desktop 4.98.0, WSL2 engine)"
+  },
+  "gpu_all_without_wsl_libs": {
+    "result": "FAIL",
+    "detail": "container sees NVIDIA_VISIBLE_DEVICES=all but no /dev/nvidia*"
+  },
+  "gpu_all_with_wsl_libs": {
+    "result": "PASS",
+    "command": "docker run --rm --gpus all -v /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro -e LD_LIBRARY_PATH=/usr/lib/wsl/lib ... nvidia-smi",
+    "detail": "nvidia-smi reports RTX 2070 8192 MiB, driver 610.88, CUDA UMD 13.3"
+  },
+  "cuda_matmul": {
+    "result": "PASS",
+    "device": "NVIDIA GeForce RTX 2070",
+    "peak_allocated_mb": 16.1,
+    "note": "torch.matmul on 1024x1024 CUDA tensors inside the container"
+  },
+  "panns_cnn14_gpu_smoke": {
+    "result": "PASS",
+    "clips": 40,
+    "mAP": 0.881875,
+    "top1": 0.85,
+    "rtf": 0.005515245170026901,
+    "load_seconds": 2.076,
+    "gpu_peak_mb": 424.7
+  },
+  "pyannote_community1_gpu_smoke": {
+    "result": "PASS",
+    "scope": "first 60s",
+    "der": 0.06598953330174774,
+    "rtf": 0.09468750406667822,
+    "load_seconds": 5.3326,
+    "gpu_peak_mb": 436.44,
+    "note": "first 60 s only; 2 dominant speakers"
+  },
+  "self_contained_gpu_image": {
+    "status": "NOT_RUN",
+    "detail": "First build failed because panns_inference==0.2.1 does not exist; pin corrected to 0.1.1, rebuild did not complete within the session. GPU model runs used the CPU image with the host .venv-gpu mounted."
+  }
+}

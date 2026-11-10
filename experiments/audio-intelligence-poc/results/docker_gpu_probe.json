@@ -1,0 +1,99 @@
+{
+  "docker_desktop_settings": {
+    "EngineTypeWindows": "wsl2",
+    "GPU CDI devices": "docker.com/gpu=webgpu only; CUDA works via --gpus all + /usr/lib/wsl/lib bind mount",
+    "ProxyHTTPMode": "system (dead manual proxy removed during validation)"
+  },
+  "generated_at": "2026-11-10T15:42:06+0800",
+  "probes": {
+    "cdi_nvidia": {
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--device",
+        "nvidia.com/gpu=all",
+        "debian:bookworm-slim",
+        "true"
+      ],
+      "returncode": 125,
+      "seconds": 0.2343,
+      "stderr": "docker: Error response from daemon: CDI device injection failed: unresolvable CDI devices nvidia.com/gpu=all\n\nRun 'docker run --help' for more information",
+      "stdout": ""
+    },
+    "compose_gpu_all": {
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--gpus",
+        "all",
+        "--network=host",
+        "debian:bookworm-slim",
+        "sh",
+        "-c",
+        "ls -l /dev/nvidia* 2>&1; env | grep NVIDIA"
+      ],
+      "returncode": 0,
+      "seconds": 0.6523,
+      "stderr": "",
+      "stdout": "ls: cannot access '/dev/nvidia*': No such file or directory\nNVIDIA_VISIBLE_DEVICES=all"
+    },
+    "gpu_all_wsl_libs": {
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--gpus",
+        "all",
+        "-v",
+        "/usr/lib/wsl/lib:/usr/lib/wsl/lib:ro",
+        "-e",
+        "LD_LIBRARY_PATH=/usr/lib/wsl/lib",
+        "-v",
+        "/usr/lib/wsl/lib/nvidia-smi:/usr/bin/nvidia-smi:ro",
+        "--network=host",
+        "debian:bookworm-slim",
+        "nvidia-smi"
+      ],
+      "returncode": 0,
+      "seconds": 0.7077,
+      "stderr": "",
+      "stdout": "Tue Nov 10 07:42:05 2026       \n+-----------------------------------------------------------------------------------------+\n| NVIDIA-SMI 610.57.01              KMD Version: 610.88        CUDA UMD Version: 13.3     |\n+-----------------------------------------+------------------------+----------------------+\n| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n|                                         |                        |               MIG M. |\n|=========================================+========================+======================|\n|   0  NVIDIA GeForce RTX 2070        On  |   00000000:2B:00.0 Off |                  N/A |\n|  0%   39C    P8              9W /  175W |     759MiB /   8192MiB |      7%      Default |\n|                                         |                        |                  N/A |\n+-----------------------------------------+------------------------+----------------------+\n\n+-----------------------------------------------------------------------------------------+\n| Processes:                                                                              |\n|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n|        ID   ID                                                               Usage      |\n|=========================================================================================|\n|    0   N/A  N/A              47      G   /Xwayland                             N/A      |\n|    0   N/A  N/A             307      G   /Xwayland                             N/A      |\n|    0   N/A  N/A             449      C   /llama                                N/A      |\n+-----------------------------------------------------------------------------------------+"
+    },
+    "host_nvidia_smi": {
+      "argv": [
+        "nvidia-smi"
+      ],
+      "returncode": 0,
+      "seconds": 0.0795,
+      "stderr": "",
+      "stdout": "Tue Nov 10 15:42:04 2026       \n+-----------------------------------------------------------------------------------------+\n| NVIDIA-SMI 610.57.01              KMD Version: 610.88        CUDA UMD Version: 13.3     |\n+-----------------------------------------+------------------------+----------------------+\n| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n|                                         |                        |               MIG M. |\n|=========================================+========================+======================|\n|   0  NVIDIA GeForce RTX 2070        On  |   00000000:2B:00.0 Off |                  N/A |\n|  0%   39C    P8             11W /  175W |     759MiB /   8192MiB |      5%      Default |\n|                                         |                        |                  N/A |\n+-----------------------------------------+------------------------+----------------------+\n\n+-----------------------------------------------------------------------------------------+\n| Processes:                                                                              |\n|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n|        ID   ID                                                               Usage      |\n|=========================================================================================|\n|    0   N/A  N/A              47      G   /Xwayland                             N/A      |\n|    0   N/A  N/A             307      G   /Xwayland                             N/A      |\n|    0   N/A  N/A             449      C   /llama                                N/A      |\n+-----------------------------------------------------------------------------------------+"
+    },
+    "privileged_dxg": {
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--privileged",
+        "--device",
+        "/dev/dxg",
+        "--device",
+        "/dev/dri",
+        "-v",
+        "/usr/lib/wsl/lib:/usr/lib/wsl/lib:ro",
+        "-e",
+        "LD_LIBRARY_PATH=/usr/lib/wsl/lib",
+        "-v",
+        "/usr/lib/wsl/lib/nvidia-smi:/usr/bin/nvidia-smi:ro",
+        "--network=host",
+        "debian:bookworm-slim",
+        "nvidia-smi"
+      ],
+      "returncode": 255,
+      "seconds": 0.4547,
+      "stderr": "",
+      "stdout": "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running.\n\nFailed to properly shut down NVML: Driver Not Loaded"
+    }
+  }
+}

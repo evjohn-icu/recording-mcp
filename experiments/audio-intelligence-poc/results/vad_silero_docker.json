@@ -1,0 +1,71 @@
+{
+  "aggregate": {
+    "accuracy": 0.8090975344801508,
+    "best_f1": {
+      "f1": 0.9726229116393101,
+      "threshold": 0.02
+    },
+    "confusion": {
+      "fn": 13866,
+      "fp": 17,
+      "tn": 7884,
+      "tp": 50956
+    },
+    "f1": 0.8801070857981779,
+    "n_frames": 72723,
+    "positive_frames": 64822,
+    "pr_auc": 0.9975052397520997,
+    "precision": 0.9996664901026033,
+    "recall": 0.7860911418962698,
+    "roc_auc": 0.9797861393808578,
+    "threshold": 0.5
+  },
+  "audio_seconds": 2327.119,
+  "chunk_samples": 512,
+  "context_samples": 64,
+  "engine": "silero-vad-onnx",
+  "frame_shift_seconds": 0.032,
+  "inference_seconds": 12.3972,
+  "load_seconds": 0.0859,
+  "model": {
+    "bytes": 2327524,
+    "path": "models/silero-official/model.onnx",
+    "sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3"
+  },
+  "notes": [
+    "32 ms frames; ground truth is the union of AISHELL-4 RTTM speaker segments.",
+    "Threshold 0.5 is the primary operating point; best_f1 is an optimistic threshold sweep.",
+    "GPU was not run for this ONNX model; the CPUExecutionProvider is the deployment target."
+  ],
+  "peak_rss_mb": 476.95,
+  "provider": "CPUExecutionProvider",
+  "rtf": 0.005327273766403866,
+  "sample_rate": 16000,
+  "sessions": {
+    "S_R004S03C01": {
+      "accuracy": 0.8090975344801508,
+      "audio_seconds": 2327.119,
+      "best_f1": {
+        "f1": 0.9726229116393101,
+        "threshold": 0.02
+      },
+      "confusion": {
+        "fn": 13866,
+        "fp": 17,
+        "tn": 7884,
+        "tp": 50956
+      },
+      "f1": 0.8801070857981779,
+      "inference_seconds": 12.3972,
+      "n_frames": 72723,
+      "positive_frames": 64822,
+      "pr_auc": 0.9975052397520997,
+      "precision": 0.9996664901026033,
+      "recall": 0.7860911418962698,
+      "roc_auc": 0.9797861393808578,
+      "rtf": 0.0053272754135092705,
+      "threshold": 0.5
+    }
+  },
+  "threads": 4
+}

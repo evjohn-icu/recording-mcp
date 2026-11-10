@@ -1,0 +1,263 @@
+{
+  "audio_seconds": 200.0,
+  "dataset": {
+    "clip_seconds": 5.0,
+    "license": "CC BY-NC 3.0 (dataset); individual clips vary",
+    "mapped_classes": 21,
+    "n_clips": 40,
+    "name": "ESC-50"
+  },
+  "engine": "PANNs-CNN14",
+  "gpu_peak_mb": 424.7,
+  "inference_seconds": 1.103,
+  "load_seconds": 2.076,
+  "metrics": {
+    "classes": 20,
+    "mAP": 0.881875,
+    "mapping": {
+      "cat": {
+        "index": 81,
+        "label": "Cat"
+      },
+      "chainsaw": {
+        "index": 347,
+        "label": "Chainsaw"
+      },
+      "chirping_birds": {
+        "index": 112,
+        "label": "Bird vocalization, bird call, bird song"
+      },
+      "clapping": {
+        "index": 67,
+        "label": "Applause"
+      },
+      "cow": {
+        "index": 90,
+        "label": "Cattle, bovinae"
+      },
+      "crackling_fire": {
+        "index": 299,
+        "label": "Crackle"
+      },
+      "crickets": {
+        "index": 127,
+        "label": "Cricket"
+      },
+      "crying_baby": {
+        "index": 23,
+        "label": "Baby cry, infant cry"
+      },
+      "dog": {
+        "index": 74,
+        "label": "Dog"
+      },
+      "frog": {
+        "index": 132,
+        "label": "Frog"
+      },
+      "helicopter": {
+        "index": 339,
+        "label": "Helicopter"
+      },
+      "laughing": {
+        "index": 16,
+        "label": "Laughter"
+      },
+      "pig": {
+        "index": 93,
+        "label": "Pig"
+      },
+      "rain": {
+        "index": 289,
+        "label": "Rain"
+      },
+      "rooster": {
+        "index": 99,
+        "label": "Chicken, rooster"
+      },
+      "sea_waves": {
+        "index": 295,
+        "label": "Waves, surf"
+      },
+      "siren": {
+        "index": 396,
+        "label": "Siren"
+      },
+      "snoring": {
+        "index": 43,
+        "label": "Snoring"
+      },
+      "thunder": {
+        "index": 287,
+        "label": "Thunder"
+      },
+      "water_drops": {
+        "index": 448,
+        "label": "Drip"
+      },
+      "wind": {
+        "index": 283,
+        "label": "Wind"
+      }
+    },
+    "missing_labels": [],
+    "n_clips": 40,
+    "per_class": {
+      "cat": {
+        "audioset_index": 81,
+        "audioset_label": "Cat",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "chainsaw": {
+        "audioset_index": 347,
+        "audioset_label": "Chainsaw",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "chirping_birds": {
+        "audioset_index": 112,
+        "audioset_label": "Bird vocalization, bird call, bird song",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "clapping": {
+        "audioset_index": 67,
+        "audioset_label": "Applause",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "cow": {
+        "audioset_index": 90,
+        "audioset_label": "Cattle, bovinae",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "crackling_fire": {
+        "audioset_index": 299,
+        "audioset_label": "Crackle",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "crickets": {
+        "audioset_index": 127,
+        "audioset_label": "Cricket",
+        "average_precision": 0.6666666666666666,
+        "n": 40,
+        "n_positive": 2
+      },
+      "crying_baby": {
+        "audioset_index": 23,
+        "audioset_label": "Baby cry, infant cry",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "dog": {
+        "audioset_index": 74,
+        "audioset_label": "Dog",
+        "average_precision": 0.1875,
+        "n": 40,
+        "n_positive": 2
+      },
+      "frog": {
+        "audioset_index": 132,
+        "audioset_label": "Frog",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "helicopter": {
+        "audioset_index": 339,
+        "audioset_label": "Helicopter",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "laughing": {
+        "audioset_index": 16,
+        "audioset_label": "Laughter",
+        "average_precision": 0.5833333333333333,
+        "n": 40,
+        "n_positive": 2
+      },
+      "pig": {
+        "audioset_index": 93,
+        "audioset_label": "Pig",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "rain": {
+        "audioset_index": 289,
+        "audioset_label": "Rain",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "rooster": {
+        "audioset_index": 99,
+        "audioset_label": "Chicken, rooster",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "sea_waves": {
+        "audioset_index": 295,
+        "audioset_label": "Waves, surf",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "siren": {
+        "audioset_index": 396,
+        "audioset_label": "Siren",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "snoring": {
+        "audioset_index": 43,
+        "audioset_label": "Snoring",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "water_drops": {
+        "audioset_index": 448,
+        "audioset_label": "Drip",
+        "average_precision": 1.0,
+        "n": 40,
+        "n_positive": 2
+      },
+      "wind": {
+        "audioset_index": 283,
+        "audioset_label": "Wind",
+        "average_precision": 0.19999999999999998,
+        "n": 40,
+        "n_positive": 2
+      }
+    },
+    "top1_accuracy": 0.85,
+    "top3_accuracy": 0.925
+  },
+  "model": {
+    "bytes": 327428481,
+    "path": "/home/ev/panns_data/Cnn14_mAP=0.431.pth",
+    "sha256": "0dc499e40e9761ef5ea061ffc77697697f277f6a960894903df3ada000e34b31"
+  },
+  "notes": [
+    "Top-1/top-3 are closed-set over the 21 mapped ESC-50 classes, not over all 527 AudioSet labels.",
+    "PANNs resamples 44.1 kHz ESC-50 clips to 32 kHz; CED consumes 16 kHz directly.",
+    "ESC-50 is non-commercial; this evaluation does not grant redistribution rights."
+  ],
+  "peak_rss_mb": 1508.74,
+  "provider": "cuda",
+  "rtf": 0.005515245170026901
+}

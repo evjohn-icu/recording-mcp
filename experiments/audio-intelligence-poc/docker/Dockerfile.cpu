@@ -1,0 +1,19 @@
+# Standard build path. In the recorded WSL2 environment Docker Hub pulled
+# images were unavailable; the measured build used Dockerfile.cpu.portable.
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    NUMBA_CACHE_DIR=/tmp/numba
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-cpu.txt /tmp/requirements-cpu.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r /tmp/requirements-cpu.txt
+
+WORKDIR /poc
+COPY scripts /poc/scripts
+ENTRYPOINT ["python"]
