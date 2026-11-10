@@ -1,0 +1,2259 @@
+{
+  "dataset": "AISHELL-4 (OpenSLR SLR111, CC BY-SA 4.0), test split",
+  "generated_at": "2026-11-10T20:08:43+0800",
+  "license": "CC BY-SA 4.0",
+  "n_sessions": 20,
+  "n_trials": 4008,
+  "sessions": {
+    "L_R003S01C02": {
+      "duration_seconds": 2362.945,
+      "n_segments": 512,
+      "overlap_seconds": 197.577,
+      "rttm": "aishell4/test/TextGrid/L_R003S01C02.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "002-F": 381.837,
+        "003-F": 90.638,
+        "004-M": 309.523,
+        "005-M": 568.646,
+        "006-M": 876.939,
+        "007-M": 84.386
+      },
+      "speech_union_seconds": 2114.391,
+      "wav": "aishell4/test/wav/L_R003S01C02.wav"
+    },
+    "L_R003S02C02": {
+      "duration_seconds": 2246.708,
+      "n_segments": 376,
+      "overlap_seconds": 62.55,
+      "rttm": "aishell4/test/TextGrid/L_R003S02C02.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "002-F": 212.211,
+        "003-F": 201.004,
+        "004-M": 334.713,
+        "005-M": 421.367,
+        "006-M": 798.824,
+        "007-M": 68.669
+      },
+      "speech_union_seconds": 1974.238,
+      "wav": "aishell4/test/wav/L_R003S02C02.wav"
+    },
+    "L_R003S03C02": {
+      "duration_seconds": 2268.015,
+      "n_segments": 599,
+      "overlap_seconds": 270.946,
+      "rttm": "aishell4/test/TextGrid/L_R003S03C02.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "002-F": 406.747,
+        "003-F": 381.354,
+        "004-M": 426.345,
+        "005-M": 293.506,
+        "006-M": 833.202,
+        "007-M": 35.298
+      },
+      "speech_union_seconds": 2105.506,
+      "wav": "aishell4/test/wav/L_R003S03C02.wav"
+    },
+    "L_R003S04C02": {
+      "duration_seconds": 2324.984,
+      "n_segments": 503,
+      "overlap_seconds": 59.325,
+      "rttm": "aishell4/test/TextGrid/L_R003S04C02.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "002-F": 159.982,
+        "003-F": 75.782,
+        "004-M": 266.71,
+        "005-M": 355.616,
+        "006-M": 1064.903,
+        "007-M": 88.858
+      },
+      "speech_union_seconds": 1952.526,
+      "wav": "aishell4/test/wav/L_R003S04C02.wav"
+    },
+    "L_R004S01C01": {
+      "duration_seconds": 2195.433,
+      "n_segments": 572,
+      "overlap_seconds": 51.508,
+      "rttm": "aishell4/test/TextGrid/L_R004S01C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 959.083,
+        "002-M": 148.338,
+        "003-M": 89.417,
+        "004-M": 67.006,
+        "005-F": 515.533,
+        "006-F": 234.101,
+        "007-M": 28.365
+      },
+      "speech_union_seconds": 1990.335,
+      "wav": "aishell4/test/wav/L_R004S01C01.wav"
+    },
+    "L_R004S02C01": {
+      "duration_seconds": 2226.67,
+      "n_segments": 535,
+      "overlap_seconds": 84.544,
+      "rttm": "aishell4/test/TextGrid/L_R004S02C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 687.984,
+        "002-M": 452.412,
+        "003-M": 22.801,
+        "004-M": 67.501,
+        "005-F": 621.013,
+        "006-F": 312.46,
+        "007-M": 40.722
+      },
+      "speech_union_seconds": 2120.35,
+      "wav": "aishell4/test/wav/L_R004S02C01.wav"
+    },
+    "L_R004S03C01": {
+      "duration_seconds": 2227.768,
+      "n_segments": 660,
+      "overlap_seconds": 142.534,
+      "rttm": "aishell4/test/TextGrid/L_R004S03C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 813.187,
+        "002-M": 435.434,
+        "003-M": 28.456,
+        "004-M": 55.867,
+        "005-F": 567.632,
+        "006-F": 319.075,
+        "007-M": 94.525
+      },
+      "speech_union_seconds": 2171.643,
+      "wav": "aishell4/test/wav/L_R004S03C01.wav"
+    },
+    "L_R004S06C01": {
+      "duration_seconds": 2210.35,
+      "n_segments": 281,
+      "overlap_seconds": 4.885,
+      "rttm": "aishell4/test/TextGrid/L_R004S06C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 122.693,
+        "002-M": 248.336,
+        "003-M": 223.595,
+        "004-M": 418.14,
+        "005-F": 403.703,
+        "006-F": 256.259,
+        "007-M": 357.222
+      },
+      "speech_union_seconds": 2025.062,
+      "wav": "aishell4/test/wav/L_R004S06C01.wav"
+    },
+    "M_R003S01C01": {
+      "duration_seconds": 2282.21,
+      "n_segments": 641,
+      "overlap_seconds": 132.776,
+      "rttm": "aishell4/test/TextGrid/M_R003S01C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 954.598,
+        "002-M": 115.729,
+        "003-F": 69.762,
+        "004-F": 315.915,
+        "005-F": 229.374,
+        "006-F": 506.09
+      },
+      "speech_union_seconds": 2058.692,
+      "wav": "aishell4/test/wav/M_R003S01C01.wav"
+    },
+    "M_R003S02C01": {
+      "duration_seconds": 2321.259,
+      "n_segments": 407,
+      "overlap_seconds": 220.91,
+      "rttm": "aishell4/test/TextGrid/M_R003S02C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 1051.084,
+        "002-M": 96.237,
+        "003-F": 26.564,
+        "004-F": 294.549,
+        "005-F": 475.521,
+        "006-F": 432.834
+      },
+      "speech_union_seconds": 2155.879,
+      "wav": "aishell4/test/wav/M_R003S02C01.wav"
+    },
+    "M_R003S04C01": {
+      "duration_seconds": 2256.727,
+      "n_segments": 716,
+      "overlap_seconds": 168.046,
+      "rttm": "aishell4/test/TextGrid/M_R003S04C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 909.898,
+        "002-M": 64.247,
+        "003-F": 143.149,
+        "004-F": 477.972,
+        "005-F": 168.736,
+        "006-F": 251.631
+      },
+      "speech_union_seconds": 1847.587,
+      "wav": "aishell4/test/wav/M_R003S04C01.wav"
+    },
+    "M_R003S05C01": {
+      "duration_seconds": 2341.215,
+      "n_segments": 553,
+      "overlap_seconds": 154.918,
+      "rttm": "aishell4/test/TextGrid/M_R003S05C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 552.722,
+        "002-M": 241.833,
+        "003-F": 112.153,
+        "004-F": 653.561,
+        "005-F": 240.537,
+        "006-F": 448.877
+      },
+      "speech_union_seconds": 2094.766,
+      "wav": "aishell4/test/wav/M_R003S05C01.wav"
+    },
+    "S_R003S01C01": {
+      "duration_seconds": 2220.529,
+      "n_segments": 716,
+      "overlap_seconds": 85.16,
+      "rttm": "aishell4/test/TextGrid/S_R003S01C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 1002.806,
+        "002-F": 267.094,
+        "003-M": 408.853,
+        "004-F": 184.156,
+        "005-M": 264.953
+      },
+      "speech_union_seconds": 2042.702,
+      "wav": "aishell4/test/wav/S_R003S01C01.wav"
+    },
+    "S_R003S02C01": {
+      "duration_seconds": 2361.298,
+      "n_segments": 685,
+      "overlap_seconds": 57.014,
+      "rttm": "aishell4/test/TextGrid/S_R003S02C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 1150.004,
+        "002-F": 239.859,
+        "003-M": 394.211,
+        "004-F": 140.593,
+        "005-M": 298.205
+      },
+      "speech_union_seconds": 2165.858,
+      "wav": "aishell4/test/wav/S_R003S02C01.wav"
+    },
+    "S_R003S03C01": {
+      "duration_seconds": 2279.261,
+      "n_segments": 712,
+      "overlap_seconds": 63.319,
+      "rttm": "aishell4/test/TextGrid/S_R003S03C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 736.387,
+        "002-F": 265.704,
+        "003-M": 436.957,
+        "004-F": 267.962,
+        "005-M": 364.113
+      },
+      "speech_union_seconds": 2007.805,
+      "wav": "aishell4/test/wav/S_R003S03C01.wav"
+    },
+    "S_R003S04C01": {
+      "duration_seconds": 2393.927,
+      "n_segments": 762,
+      "overlap_seconds": 326.768,
+      "rttm": "aishell4/test/TextGrid/S_R003S04C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 699.093,
+        "002-F": 70.576,
+        "003-M": 984.095,
+        "004-F": 341.883,
+        "005-M": 520.133
+      },
+      "speech_union_seconds": 2289.012,
+      "wav": "aishell4/test/wav/S_R003S04C01.wav"
+    },
+    "S_R004S01C01": {
+      "duration_seconds": 2345.908,
+      "n_segments": 276,
+      "overlap_seconds": 27.694,
+      "rttm": "aishell4/test/TextGrid/S_R004S01C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 903.837,
+        "002-F": 85.628,
+        "003-F": 290.883,
+        "004-F": 477.913,
+        "005-F": 359.648
+      },
+      "speech_union_seconds": 2090.214,
+      "wav": "aishell4/test/wav/S_R004S01C01.wav"
+    },
+    "S_R004S02C01": {
+      "duration_seconds": 2319.371,
+      "n_segments": 362,
+      "overlap_seconds": 13.171,
+      "rttm": "aishell4/test/TextGrid/S_R004S02C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 551.677,
+        "002-F": 134.369,
+        "003-F": 448.08,
+        "004-F": 722.98,
+        "005-F": 237.976
+      },
+      "speech_union_seconds": 2081.911,
+      "wav": "aishell4/test/wav/S_R004S02C01.wav"
+    },
+    "S_R004S03C01": {
+      "duration_seconds": 2327.119,
+      "n_segments": 213,
+      "overlap_seconds": 0.0,
+      "rttm": "aishell4/test/TextGrid/S_R004S03C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 526.425,
+        "002-F": 161.238,
+        "003-F": 475.393,
+        "004-F": 536.808,
+        "005-F": 374.526
+      },
+      "speech_union_seconds": 2074.39,
+      "wav": "aishell4/test/wav/S_R004S03C01.wav"
+    },
+    "S_R004S04C01": {
+      "duration_seconds": 2299.396,
+      "n_segments": 460,
+      "overlap_seconds": 0.791,
+      "rttm": "aishell4/test/TextGrid/S_R004S04C01.rttm",
+      "sample_rate": 16000,
+      "speakers": {
+        "001-M": 614.419,
+        "002-F": 177.2,
+        "003-F": 395.493,
+        "004-F": 588.591,
+        "005-F": 303.145
+      },
+      "speech_union_seconds": 2078.057,
+      "wav": "aishell4/test/wav/S_R004S04C01.wav"
+    }
+  },
+  "trial_positive": 2004,
+  "trial_seed": 20261110,
+  "voiceprint_clean": {
+    "L_R003S01C02": {
+      "clean_seconds": 1624.486,
+      "clean_segments": 217,
+      "clean_speakers": 6
+    },
+    "L_R003S02C02": {
+      "clean_seconds": 1841.736,
+      "clean_segments": 263,
+      "clean_speakers": 6
+    },
+    "L_R003S03C02": {
+      "clean_seconds": 1654.446,
+      "clean_segments": 248,
+      "clean_speakers": 6
+    },
+    "L_R003S04C02": {
+      "clean_seconds": 1636.726,
+      "clean_segments": 308,
+      "clean_speakers": 6
+    },
+    "L_R004S01C01": {
+      "clean_seconds": 1827.955,
+      "clean_segments": 407,
+      "clean_speakers": 7
+    },
+    "L_R004S02C01": {
+      "clean_seconds": 1835.202,
+      "clean_segments": 336,
+      "clean_speakers": 7
+    },
+    "L_R004S03C01": {
+      "clean_seconds": 1648.136,
+      "clean_segments": 366,
+      "clean_speakers": 7
+    },
+    "L_R004S06C01": {
+      "clean_seconds": 1902.721,
+      "clean_segments": 254,
+      "clean_speakers": 7
+    },
+    "M_R003S01C01": {
+      "clean_seconds": 1788.474,
+      "clean_segments": 344,
+      "clean_speakers": 6
+    },
+    "M_R003S02C01": {
+      "clean_seconds": 1549.004,
+      "clean_segments": 184,
+      "clean_speakers": 6
+    },
+    "M_R003S04C01": {
+      "clean_seconds": 1304.453,
+      "clean_segments": 294,
+      "clean_speakers": 6
+    },
+    "M_R003S05C01": {
+      "clean_seconds": 1610.135,
+      "clean_segments": 273,
+      "clean_speakers": 6
+    },
+    "S_R003S01C01": {
+      "clean_seconds": 1732.009,
+      "clean_segments": 359,
+      "clean_speakers": 5
+    },
+    "S_R003S02C01": {
+      "clean_seconds": 1938.781,
+      "clean_segments": 437,
+      "clean_speakers": 5
+    },
+    "S_R003S03C01": {
+      "clean_seconds": 1635.828,
+      "clean_segments": 386,
+      "clean_speakers": 5
+    },
+    "S_R003S04C01": {
+      "clean_seconds": 1834.942,
+      "clean_segments": 317,
+      "clean_speakers": 5
+    },
+    "S_R004S01C01": {
+      "clean_seconds": 1909.922,
+      "clean_segments": 208,
+      "clean_speakers": 5
+    },
+    "S_R004S02C01": {
+      "clean_seconds": 2021.271,
+      "clean_segments": 326,
+      "clean_speakers": 5
+    },
+    "S_R004S03C01": {
+      "clean_seconds": 1959.969,
+      "clean_segments": 205,
+      "clean_speakers": 5
+    },
+    "S_R004S04C01": {
+      "clean_seconds": 1913.146,
+      "clean_segments": 360,
+      "clean_speakers": 5
+    }
+  },
+  "voiceprint_speakers": {
+    "L_R003S01C02:002-F": {
+      "enroll": [
+        {
+          "end": 346.2763,
+          "start": 343.3063
+        },
+        {
+          "end": 357.4454,
+          "start": 346.3626
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 19,
+      "session": "L_R003S01C02",
+      "speaker": "002-F"
+    },
+    "L_R003S01C02:004-M": {
+      "enroll": [
+        {
+          "end": 113.9196,
+          "start": 108.094
+        },
+        {
+          "end": 124.7646,
+          "start": 113.9735
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S01C02",
+      "speaker": "004-M"
+    },
+    "L_R003S01C02:005-M": {
+      "enroll": [
+        {
+          "end": 221.8412,
+          "start": 210.6801
+        },
+        {
+          "end": 231.1927,
+          "start": 222.2368
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S01C02",
+      "speaker": "005-M"
+    },
+    "L_R003S01C02:006-M": {
+      "enroll": [
+        {
+          "end": 28.485,
+          "start": 23.475
+        },
+        {
+          "end": 33.615,
+          "start": 28.505
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S01C02",
+      "speaker": "006-M"
+    },
+    "L_R003S01C02:007-M": {
+      "enroll": [
+        {
+          "end": 1055.6184,
+          "start": 1052.2576
+        },
+        {
+          "end": 1897.98,
+          "start": 1889.33
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 7,
+      "session": "L_R003S01C02",
+      "speaker": "007-M"
+    },
+    "L_R003S02C02:002-F": {
+      "enroll": [
+        {
+          "end": 10.1222,
+          "start": 7.867
+        },
+        {
+          "end": 1364.5938,
+          "start": 1354.5488
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S02C02",
+      "speaker": "002-F"
+    },
+    "L_R003S02C02:003-F": {
+      "enroll": [
+        {
+          "end": 1236.4572,
+          "start": 1227.5372
+        },
+        {
+          "end": 1242.4543,
+          "start": 1236.4645
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S02C02",
+      "speaker": "003-F"
+    },
+    "L_R003S02C02:004-M": {
+      "enroll": [
+        {
+          "end": 1002.9349,
+          "start": 994.0349
+        },
+        {
+          "end": 1008.9583,
+          "start": 1003.1283
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S02C02",
+      "speaker": "004-M"
+    },
+    "L_R003S02C02:005-M": {
+      "enroll": [
+        {
+          "end": 16.8579,
+          "start": 14.6527
+        },
+        {
+          "end": 442.8199,
+          "start": 435.4149
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S02C02",
+      "speaker": "005-M"
+    },
+    "L_R003S02C02:006-M": {
+      "enroll": [
+        {
+          "end": 20.2482,
+          "start": 17.868
+        },
+        {
+          "end": 46.9622,
+          "start": 43.3518
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S02C02",
+      "speaker": "006-M"
+    },
+    "L_R003S02C02:007-M": {
+      "enroll": [
+        {
+          "end": 26.8773,
+          "start": 20.8367
+        },
+        {
+          "end": 31.7473,
+          "start": 27.0918
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 7,
+      "session": "L_R003S02C02",
+      "speaker": "007-M"
+    },
+    "L_R003S03C02:002-F": {
+      "enroll": [
+        {
+          "end": 13.955,
+          "start": 11.78
+        },
+        {
+          "end": 793.1046,
+          "start": 781.8496
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S03C02",
+      "speaker": "002-F"
+    },
+    "L_R003S03C02:003-F": {
+      "enroll": [
+        {
+          "end": 471.6647,
+          "start": 463.1347
+        },
+        {
+          "end": 476.3347,
+          "start": 471.8147
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S03C02",
+      "speaker": "003-F"
+    },
+    "L_R003S03C02:004-M": {
+      "enroll": [
+        {
+          "end": 673.3914,
+          "start": 670.1646
+        },
+        {
+          "end": 1064.2794,
+          "start": 1053.4394
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S03C02",
+      "speaker": "004-M"
+    },
+    "L_R003S03C02:005-M": {
+      "enroll": [
+        {
+          "end": 321.2148,
+          "start": 313.7298
+        },
+        {
+          "end": 328.4548,
+          "start": 321.6398
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S03C02",
+      "speaker": "005-M"
+    },
+    "L_R003S03C02:006-M": {
+      "enroll": [
+        {
+          "end": 50.775,
+          "start": 41.36
+        },
+        {
+          "end": 62.94,
+          "start": 50.94
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S03C02",
+      "speaker": "006-M"
+    },
+    "L_R003S03C02:007-M": {
+      "enroll": [
+        {
+          "end": 33.91,
+          "start": 24.075
+        },
+        {
+          "end": 40.54,
+          "start": 37.025
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 4,
+      "session": "L_R003S03C02",
+      "speaker": "007-M"
+    },
+    "L_R003S04C02:002-F": {
+      "enroll": [
+        {
+          "end": 1260.1386,
+          "start": 1252.0286
+        },
+        {
+          "end": 1264.4336,
+          "start": 1260.1686
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 13,
+      "session": "L_R003S04C02",
+      "speaker": "002-F"
+    },
+    "L_R003S04C02:003-F": {
+      "enroll": [
+        {
+          "end": 1183.4187,
+          "start": 1180.7337
+        },
+        {
+          "end": 1186.9437,
+          "start": 1183.4987
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 9,
+      "session": "L_R003S04C02",
+      "speaker": "003-F"
+    },
+    "L_R003S04C02:004-M": {
+      "enroll": [
+        {
+          "end": 781.1091,
+          "start": 776.8041
+        },
+        {
+          "end": 790.7941,
+          "start": 782.4141
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S04C02",
+      "speaker": "004-M"
+    },
+    "L_R003S04C02:005-M": {
+      "enroll": [
+        {
+          "end": 393.2596,
+          "start": 388.6946
+        },
+        {
+          "end": 399.3346,
+          "start": 393.9496
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S04C02",
+      "speaker": "005-M"
+    },
+    "L_R003S04C02:006-M": {
+      "enroll": [
+        {
+          "end": 46.095,
+          "start": 43.115
+        },
+        {
+          "end": 51.285,
+          "start": 46.12
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R003S04C02",
+      "speaker": "006-M"
+    },
+    "L_R003S04C02:007-M": {
+      "enroll": [
+        {
+          "end": 30.1,
+          "start": 23.4
+        },
+        {
+          "end": 37.835,
+          "start": 30.265
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 13,
+      "session": "L_R003S04C02",
+      "speaker": "007-M"
+    },
+    "L_R004S01C01:001-M": {
+      "enroll": [
+        {
+          "end": 25.0854,
+          "start": 13.0854
+        },
+        {
+          "end": 35.7254,
+          "start": 29.9454
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S01C01",
+      "speaker": "001-M"
+    },
+    "L_R004S01C01:002-M": {
+      "enroll": [
+        {
+          "end": 234.7955,
+          "start": 230.5505
+        },
+        {
+          "end": 240.6355,
+          "start": 234.8755
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S01C01",
+      "speaker": "002-M"
+    },
+    "L_R004S01C01:003-M": {
+      "enroll": [
+        {
+          "end": 840.9134,
+          "start": 835.8134
+        },
+        {
+          "end": 843.1334,
+          "start": 841.0034
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 17,
+      "session": "L_R004S01C01",
+      "speaker": "003-M"
+    },
+    "L_R004S01C01:004-M": {
+      "enroll": [
+        {
+          "end": 449.7581,
+          "start": 447.4581
+        },
+        {
+          "end": 452.2031,
+          "start": 449.8431
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 11,
+      "session": "L_R004S01C01",
+      "speaker": "004-M"
+    },
+    "L_R004S01C01:005-F": {
+      "enroll": [
+        {
+          "end": 64.8354,
+          "start": 57.8904
+        },
+        {
+          "end": 69.4729,
+          "start": 64.8579
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S01C01",
+      "speaker": "005-F"
+    },
+    "L_R004S01C01:006-F": {
+      "enroll": [
+        {
+          "end": 573.0357,
+          "start": 570.7957
+        },
+        {
+          "end": 578.1457,
+          "start": 573.2857
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S01C01",
+      "speaker": "006-F"
+    },
+    "L_R004S01C01:007-M": {
+      "enroll": [
+        {
+          "end": 1022.1835,
+          "start": 1019.7735
+        },
+        {
+          "end": 1034.5884999999998,
+          "start": 1022.5885
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 2,
+      "session": "L_R004S01C01",
+      "speaker": "007-M"
+    },
+    "L_R004S02C01:001-M": {
+      "enroll": [
+        {
+          "end": 16.569,
+          "start": 9.3983
+        },
+        {
+          "end": 23.792,
+          "start": 16.6013
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S02C01",
+      "speaker": "001-M"
+    },
+    "L_R004S02C01:002-M": {
+      "enroll": [
+        {
+          "end": 169.2759,
+          "start": 164.8355
+        },
+        {
+          "end": 179.5736,
+          "start": 169.2826
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S02C01",
+      "speaker": "002-M"
+    },
+    "L_R004S02C01:003-M": {
+      "enroll": [
+        {
+          "end": 1011.8372,
+          "start": 1005.3215
+        },
+        {
+          "end": 1015.2857,
+          "start": 1011.8854
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 2,
+      "session": "L_R004S02C01",
+      "speaker": "003-M"
+    },
+    "L_R004S02C01:004-M": {
+      "enroll": [
+        {
+          "end": 631.5622,
+          "start": 628.9203
+        },
+        {
+          "end": 636.2972,
+          "start": 631.8668
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 7,
+      "session": "L_R004S02C01",
+      "speaker": "004-M"
+    },
+    "L_R004S02C01:005-F": {
+      "enroll": [
+        {
+          "end": 120.2205,
+          "start": 115.51
+        },
+        {
+          "end": 125.701,
+          "start": 120.3555
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S02C01",
+      "speaker": "005-F"
+    },
+    "L_R004S02C01:006-F": {
+      "enroll": [
+        {
+          "end": 540.7881,
+          "start": 538.3129
+        },
+        {
+          "end": 547.6085,
+          "start": 540.8228
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S02C01",
+      "speaker": "006-F"
+    },
+    "L_R004S02C01:007-M": {
+      "enroll": [
+        {
+          "end": 743.4969,
+          "start": 739.6665
+        },
+        {
+          "end": 759.4962,
+          "start": 755.4008
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 6,
+      "session": "L_R004S02C01",
+      "speaker": "007-M"
+    },
+    "L_R004S03C01:001-M": {
+      "enroll": [
+        {
+          "end": 580.1811,
+          "start": 574.8756
+        },
+        {
+          "end": 588.1391,
+          "start": 580.2033
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S03C01",
+      "speaker": "001-M"
+    },
+    "L_R004S03C01:002-M": {
+      "enroll": [
+        {
+          "end": 15.5671,
+          "start": 13.217
+        },
+        {
+          "end": 19.469,
+          "start": 15.719
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S03C01",
+      "speaker": "002-M"
+    },
+    "L_R004S03C01:004-M": {
+      "enroll": [
+        {
+          "end": 931.9345,
+          "start": 929.8093
+        },
+        {
+          "end": 1383.2436,
+          "start": 1379.9633
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 8,
+      "session": "L_R004S03C01",
+      "speaker": "004-M"
+    },
+    "L_R004S03C01:005-F": {
+      "enroll": [
+        {
+          "end": 40.9282,
+          "start": 34.3075
+        },
+        {
+          "end": 44.3941,
+          "start": 40.9437
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S03C01",
+      "speaker": "005-F"
+    },
+    "L_R004S03C01:006-F": {
+      "enroll": [
+        {
+          "end": 198.8614,
+          "start": 193.1108
+        },
+        {
+          "end": 207.2978,
+          "start": 199.0453
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S03C01",
+      "speaker": "006-F"
+    },
+    "L_R004S03C01:007-M": {
+      "enroll": [
+        {
+          "end": 82.0651,
+          "start": 76.1095
+        },
+        {
+          "end": 87.4178,
+          "start": 82.0723
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 16,
+      "session": "L_R004S03C01",
+      "speaker": "007-M"
+    },
+    "L_R004S06C01:001-M": {
+      "enroll": [
+        {
+          "end": 20.7605,
+          "start": 11.4996
+        },
+        {
+          "end": 26.875,
+          "start": 20.7694
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 10,
+      "session": "L_R004S06C01",
+      "speaker": "001-M"
+    },
+    "L_R004S06C01:002-M": {
+      "enroll": [
+        {
+          "end": 1218.5514,
+          "start": 1216.0298
+        },
+        {
+          "end": 1230.6112,
+          "start": 1218.725
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S06C01",
+      "speaker": "002-M"
+    },
+    "L_R004S06C01:003-M": {
+      "enroll": [
+        {
+          "end": 346.5807,
+          "start": 337.0598
+        },
+        {
+          "end": 352.0723,
+          "start": 346.6368
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S06C01",
+      "speaker": "003-M"
+    },
+    "L_R004S06C01:004-M": {
+      "enroll": [
+        {
+          "end": 58.3141,
+          "start": 54.1687
+        },
+        {
+          "end": 61.1328,
+          "start": 58.4825
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S06C01",
+      "speaker": "004-M"
+    },
+    "L_R004S06C01:005-F": {
+      "enroll": [
+        {
+          "end": 984.9843,
+          "start": 982.6541
+        },
+        {
+          "end": 993.2768,
+          "start": 986.5961
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S06C01",
+      "speaker": "005-F"
+    },
+    "L_R004S06C01:006-F": {
+      "enroll": [
+        {
+          "end": 1482.6681,
+          "start": 1470.6681
+        },
+        {
+          "end": 1495.5548,
+          "start": 1483.5548
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S06C01",
+      "speaker": "006-F"
+    },
+    "L_R004S06C01:007-M": {
+      "enroll": [
+        {
+          "end": 597.3131,
+          "start": 585.3131
+        },
+        {
+          "end": 605.0199,
+          "start": 597.6192
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "L_R004S06C01",
+      "speaker": "007-M"
+    },
+    "M_R003S01C01:001-M": {
+      "enroll": [
+        {
+          "end": 6.6547,
+          "start": 4.0844
+        },
+        {
+          "end": 22.0639,
+          "start": 14.5031
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S01C01",
+      "speaker": "001-M"
+    },
+    "M_R003S01C01:002-M": {
+      "enroll": [
+        {
+          "end": 1572.4049,
+          "start": 1568.0949
+        },
+        {
+          "end": 1575.0024,
+          "start": 1572.5924
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S01C01",
+      "speaker": "002-M"
+    },
+    "M_R003S01C01:003-F": {
+      "enroll": [
+        {
+          "end": 1490.3498,
+          "start": 1484.0948
+        },
+        {
+          "end": 1496.1698,
+          "start": 1490.3548
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 12,
+      "session": "M_R003S01C01",
+      "speaker": "003-F"
+    },
+    "M_R003S01C01:004-F": {
+      "enroll": [
+        {
+          "end": 969.519,
+          "start": 957.519
+        },
+        {
+          "end": 979.9165,
+          "start": 969.7015
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S01C01",
+      "speaker": "004-F"
+    },
+    "M_R003S01C01:005-F": {
+      "enroll": [
+        {
+          "end": 682.4186,
+          "start": 677.3186
+        },
+        {
+          "end": 691.6586,
+          "start": 683.4986
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S01C01",
+      "speaker": "005-F"
+    },
+    "M_R003S01C01:006-F": {
+      "enroll": [
+        {
+          "end": 177.5229,
+          "start": 170.1172
+        },
+        {
+          "end": 181.0908,
+          "start": 177.6555
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S01C01",
+      "speaker": "006-F"
+    },
+    "M_R003S02C01:001-M": {
+      "enroll": [
+        {
+          "end": 29.5936,
+          "start": 24.9886
+        },
+        {
+          "end": 37.7653,
+          "start": 29.6053
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S02C01",
+      "speaker": "001-M"
+    },
+    "M_R003S02C01:002-M": {
+      "enroll": [
+        {
+          "end": 1739.5556,
+          "start": 1727.5556
+        },
+        {
+          "end": 1748.3463,
+          "start": 1740.3467
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 5,
+      "session": "M_R003S02C01",
+      "speaker": "002-M"
+    },
+    "M_R003S02C01:004-F": {
+      "enroll": [
+        {
+          "end": 18.5452,
+          "start": 12.2302
+        },
+        {
+          "end": 1038.2264,
+          "start": 1030.5717
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S02C01",
+      "speaker": "004-F"
+    },
+    "M_R003S02C01:005-F": {
+      "enroll": [
+        {
+          "end": 674.1874,
+          "start": 662.1874
+        },
+        {
+          "end": 686.7618,
+          "start": 674.7618
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S02C01",
+      "speaker": "005-F"
+    },
+    "M_R003S02C01:006-F": {
+      "enroll": [
+        {
+          "end": 194.2917,
+          "start": 182.2917
+        },
+        {
+          "end": 208.2204,
+          "start": 197.4259
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S02C01",
+      "speaker": "006-F"
+    },
+    "M_R003S04C01:001-M": {
+      "enroll": [
+        {
+          "end": 20.774,
+          "start": 15.554
+        },
+        {
+          "end": 23.454,
+          "start": 20.779
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S04C01",
+      "speaker": "001-M"
+    },
+    "M_R003S04C01:002-M": {
+      "enroll": [
+        {
+          "end": 1783.4309,
+          "start": 1780.8046
+        },
+        {
+          "end": 1786.1798,
+          "start": 1783.7512
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 10,
+      "session": "M_R003S04C01",
+      "speaker": "002-M"
+    },
+    "M_R003S04C01:003-F": {
+      "enroll": [
+        {
+          "end": 706.876,
+          "start": 702.926
+        },
+        {
+          "end": 856.2387,
+          "start": 852.6993
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S04C01",
+      "speaker": "003-F"
+    },
+    "M_R003S04C01:004-F": {
+      "enroll": [
+        {
+          "end": 112.3002,
+          "start": 100.3002
+        },
+        {
+          "end": 126.4065,
+          "start": 122.7252
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S04C01",
+      "speaker": "004-F"
+    },
+    "M_R003S04C01:005-F": {
+      "enroll": [
+        {
+          "end": 178.0303,
+          "start": 172.9559
+        },
+        {
+          "end": 181.4416,
+          "start": 178.8669
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 16,
+      "session": "M_R003S04C01",
+      "speaker": "005-F"
+    },
+    "M_R003S04C01:006-F": {
+      "enroll": [
+        {
+          "end": 303.7892,
+          "start": 301.5142
+        },
+        {
+          "end": 307.2242,
+          "start": 304.0592
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S04C01",
+      "speaker": "006-F"
+    },
+    "M_R003S05C01:001-M": {
+      "enroll": [
+        {
+          "end": 24.025,
+          "start": 16.47
+        },
+        {
+          "end": 36.04,
+          "start": 24.04
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S05C01",
+      "speaker": "001-M"
+    },
+    "M_R003S05C01:002-M": {
+      "enroll": [
+        {
+          "end": 692.6055,
+          "start": 680.6055
+        },
+        {
+          "end": 708.7705,
+          "start": 696.7705
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S05C01",
+      "speaker": "002-M"
+    },
+    "M_R003S05C01:003-F": {
+      "enroll": [
+        {
+          "end": 587.7954,
+          "start": 580.3554
+        },
+        {
+          "end": 600.2004,
+          "start": 588.4104
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 9,
+      "session": "M_R003S05C01",
+      "speaker": "003-F"
+    },
+    "M_R003S05C01:004-F": {
+      "enroll": [
+        {
+          "end": 417.8403,
+          "start": 411.2803
+        },
+        {
+          "end": 429.7953,
+          "start": 419.4003
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S05C01",
+      "speaker": "004-F"
+    },
+    "M_R003S05C01:005-F": {
+      "enroll": [
+        {
+          "end": 294.7652,
+          "start": 282.7652
+        },
+        {
+          "end": 307.6852,
+          "start": 297.0602
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S05C01",
+      "speaker": "005-F"
+    },
+    "M_R003S05C01:006-F": {
+      "enroll": [
+        {
+          "end": 86.7151,
+          "start": 76.0101
+        },
+        {
+          "end": 98.8701,
+          "start": 86.8701
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "M_R003S05C01",
+      "speaker": "006-F"
+    },
+    "S_R003S01C01:001-M": {
+      "enroll": [
+        {
+          "end": 8.1213,
+          "start": 6.0413
+        },
+        {
+          "end": 25.1276,
+          "start": 19.3376
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S01C01",
+      "speaker": "001-M"
+    },
+    "S_R003S01C01:002-F": {
+      "enroll": [
+        {
+          "end": 10.3838,
+          "start": 8.3388
+        },
+        {
+          "end": 897.867,
+          "start": 894.247
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S01C01",
+      "speaker": "002-F"
+    },
+    "S_R003S01C01:003-M": {
+      "enroll": [
+        {
+          "end": 12.83,
+          "start": 10.705
+        },
+        {
+          "end": 125.6776,
+          "start": 120.9426
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S01C01",
+      "speaker": "003-M"
+    },
+    "S_R003S01C01:004-F": {
+      "enroll": [
+        {
+          "end": 15.1738,
+          "start": 13.1438
+        },
+        {
+          "end": 1310.1328,
+          "start": 1306.4098
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S01C01",
+      "speaker": "004-F"
+    },
+    "S_R003S01C01:005-M": {
+      "enroll": [
+        {
+          "end": 533.9558,
+          "start": 529.5481
+        },
+        {
+          "end": 538.8342,
+          "start": 534.1242
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S01C01",
+      "speaker": "005-M"
+    },
+    "S_R003S02C01:001-M": {
+      "enroll": [
+        {
+          "end": 17.29,
+          "start": 13.225
+        },
+        {
+          "end": 23.96,
+          "start": 17.475
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S02C01",
+      "speaker": "001-M"
+    },
+    "S_R003S02C01:002-F": {
+      "enroll": [
+        {
+          "end": 623.9011,
+          "start": 620.4357
+        },
+        {
+          "end": 631.0784,
+          "start": 626.673
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S02C01",
+      "speaker": "002-F"
+    },
+    "S_R003S02C01:003-M": {
+      "enroll": [
+        {
+          "end": 451.1746,
+          "start": 444.5196
+        },
+        {
+          "end": 453.9797,
+          "start": 451.5096
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S02C01",
+      "speaker": "003-M"
+    },
+    "S_R003S02C01:004-F": {
+      "enroll": [
+        {
+          "end": 371.5485,
+          "start": 367.8146
+        },
+        {
+          "end": 373.5821,
+          "start": 371.5769
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S02C01",
+      "speaker": "004-F"
+    },
+    "S_R003S02C01:005-M": {
+      "enroll": [
+        {
+          "end": 194.0872,
+          "start": 188.3648
+        },
+        {
+          "end": 199.5955,
+          "start": 194.1499
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S02C01",
+      "speaker": "005-M"
+    },
+    "S_R003S03C01:001-M": {
+      "enroll": [
+        {
+          "end": 26.9349,
+          "start": 19.2759
+        },
+        {
+          "end": 31.8477,
+          "start": 26.9633
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S03C01",
+      "speaker": "001-M"
+    },
+    "S_R003S03C01:002-F": {
+      "enroll": [
+        {
+          "end": 354.6575,
+          "start": 344.5038
+        },
+        {
+          "end": 358.9904,
+          "start": 354.7159
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S03C01",
+      "speaker": "002-F"
+    },
+    "S_R003S03C01:003-M": {
+      "enroll": [
+        {
+          "end": 596.9157,
+          "start": 594.4075
+        },
+        {
+          "end": 599.917,
+          "start": 597.5773
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S03C01",
+      "speaker": "003-M"
+    },
+    "S_R003S03C01:004-F": {
+      "enroll": [
+        {
+          "end": 14.2082,
+          "start": 11.9435
+        },
+        {
+          "end": 955.6769,
+          "start": 952.8819
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S03C01",
+      "speaker": "004-F"
+    },
+    "S_R003S03C01:005-M": {
+      "enroll": [
+        {
+          "end": 94.6332,
+          "start": 89.2539
+        },
+        {
+          "end": 99.2226,
+          "start": 94.6532
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S03C01",
+      "speaker": "005-M"
+    },
+    "S_R003S04C01:001-M": {
+      "enroll": [
+        {
+          "end": 6.8,
+          "start": 4.54
+        },
+        {
+          "end": 25.87,
+          "start": 22.0
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S04C01",
+      "speaker": "001-M"
+    },
+    "S_R003S04C01:002-F": {
+      "enroll": [
+        {
+          "end": 10.25,
+          "start": 7.16
+        },
+        {
+          "end": 1110.1038,
+          "start": 1104.7132
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 5,
+      "session": "S_R003S04C01",
+      "speaker": "002-F"
+    },
+    "S_R003S04C01:003-M": {
+      "enroll": [
+        {
+          "end": 13.865,
+          "start": 10.55
+        },
+        {
+          "end": 297.4705,
+          "start": 293.3949
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S04C01",
+      "speaker": "003-M"
+    },
+    "S_R003S04C01:004-F": {
+      "enroll": [
+        {
+          "end": 18.385,
+          "start": 14.575
+        },
+        {
+          "end": 917.7683,
+          "start": 914.433
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S04C01",
+      "speaker": "004-F"
+    },
+    "S_R003S04C01:005-M": {
+      "enroll": [
+        {
+          "end": 21.13,
+          "start": 18.555
+        },
+        {
+          "end": 85.255,
+          "start": 73.255
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R003S04C01",
+      "speaker": "005-M"
+    },
+    "S_R004S01C01:001-M": {
+      "enroll": [
+        {
+          "end": 29.4043,
+          "start": 17.4043
+        },
+        {
+          "end": 42.6276,
+          "start": 30.6276
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S01C01",
+      "speaker": "001-M"
+    },
+    "S_R004S01C01:002-F": {
+      "enroll": [
+        {
+          "end": 445.8047,
+          "start": 434.7306
+        },
+        {
+          "end": 455.332,
+          "start": 445.9577
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 7,
+      "session": "S_R004S01C01",
+      "speaker": "002-F"
+    },
+    "S_R004S01C01:003-F": {
+      "enroll": [
+        {
+          "end": 518.2967,
+          "start": 506.2967
+        },
+        {
+          "end": 531.3264,
+          "start": 519.3264
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S01C01",
+      "speaker": "003-F"
+    },
+    "S_R004S01C01:004-F": {
+      "enroll": [
+        {
+          "end": 130.7072,
+          "start": 118.9481
+        },
+        {
+          "end": 142.7622,
+          "start": 130.7622
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S01C01",
+      "speaker": "004-F"
+    },
+    "S_R004S01C01:005-F": {
+      "enroll": [
+        {
+          "end": 295.5664,
+          "start": 283.7573
+        },
+        {
+          "end": 304.7027,
+          "start": 295.5984
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S01C01",
+      "speaker": "005-F"
+    },
+    "S_R004S02C01:001-M": {
+      "enroll": [
+        {
+          "end": 28.519,
+          "start": 23.024
+        },
+        {
+          "end": 30.648,
+          "start": 28.523
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S02C01",
+      "speaker": "001-M"
+    },
+    "S_R004S02C01:002-F": {
+      "enroll": [
+        {
+          "end": 14.821,
+          "start": 12.756
+        },
+        {
+          "end": 1683.4385,
+          "start": 1677.3985
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 14,
+      "session": "S_R004S02C01",
+      "speaker": "002-F"
+    },
+    "S_R004S02C01:003-F": {
+      "enroll": [
+        {
+          "end": 911.5452,
+          "start": 905.8402
+        },
+        {
+          "end": 916.2821,
+          "start": 911.5721
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S02C01",
+      "speaker": "003-F"
+    },
+    "S_R004S02C01:004-F": {
+      "enroll": [
+        {
+          "end": 181.3958,
+          "start": 175.0158
+        },
+        {
+          "end": 188.2628,
+          "start": 181.4378
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S02C01",
+      "speaker": "004-F"
+    },
+    "S_R004S02C01:005-F": {
+      "enroll": [
+        {
+          "end": 1376.3778,
+          "start": 1372.0128
+        },
+        {
+          "end": 1380.9737,
+          "start": 1376.5137
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S02C01",
+      "speaker": "005-F"
+    },
+    "S_R004S03C01:001-M": {
+      "enroll": [
+        {
+          "end": 8.1088,
+          "start": 6.1039
+        },
+        {
+          "end": 27.2739,
+          "start": 20.9994
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S03C01",
+      "speaker": "001-M"
+    },
+    "S_R004S03C01:002-F": {
+      "enroll": [
+        {
+          "end": 1849.6117,
+          "start": 1839.2775
+        },
+        {
+          "end": 1861.6941,
+          "start": 1849.6941
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 15,
+      "session": "S_R004S03C01",
+      "speaker": "002-F"
+    },
+    "S_R004S03C01:003-F": {
+      "enroll": [
+        {
+          "end": 834.3177,
+          "start": 824.8684
+        },
+        {
+          "end": 846.5717,
+          "start": 834.5717
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S03C01",
+      "speaker": "003-F"
+    },
+    "S_R004S03C01:004-F": {
+      "enroll": [
+        {
+          "end": 291.0058,
+          "start": 281.3965
+        },
+        {
+          "end": 303.0398,
+          "start": 291.0398
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S03C01",
+      "speaker": "004-F"
+    },
+    "S_R004S03C01:005-F": {
+      "enroll": [
+        {
+          "end": 1409.0759,
+          "start": 1404.8962
+        },
+        {
+          "end": 1420.341,
+          "start": 1409.1619
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S03C01",
+      "speaker": "005-F"
+    },
+    "S_R004S04C01:001-M": {
+      "enroll": [
+        {
+          "end": 7.8388,
+          "start": 5.5838
+        },
+        {
+          "end": 24.9363,
+          "start": 18.9913
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S04C01",
+      "speaker": "001-M"
+    },
+    "S_R004S04C01:002-F": {
+      "enroll": [
+        {
+          "end": 1649.0575,
+          "start": 1642.3625
+        },
+        {
+          "end": 1654.7474,
+          "start": 1649.5324
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S04C01",
+      "speaker": "002-F"
+    },
+    "S_R004S04C01:003-F": {
+      "enroll": [
+        {
+          "end": 831.9669,
+          "start": 828.2819
+        },
+        {
+          "end": 834.7206,
+          "start": 831.9856
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S04C01",
+      "speaker": "003-F"
+    },
+    "S_R004S04C01:004-F": {
+      "enroll": [
+        {
+          "end": 191.2799,
+          "start": 189.0999
+        },
+        {
+          "end": 199.1574,
+          "start": 193.1624
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S04C01",
+      "speaker": "004-F"
+    },
+    "S_R004S04C01:005-F": {
+      "enroll": [
+        {
+          "end": 1251.0865,
+          "start": 1246.3215
+        },
+        {
+          "end": 1259.4115,
+          "start": 1253.3265
+        }
+      ],
+      "n_enroll": 2,
+      "n_test": 20,
+      "session": "S_R004S04C01",
+      "speaker": "005-F"
+    }
+  }
+}

@@ -1,0 +1,531 @@
+{
+  "aggregate": {
+    "accuracy": 0.7369920655598918,
+    "best_f1": {
+      "f1": 0.9575260320746549,
+      "threshold": 0.01
+    },
+    "confusion": {
+      "fn": 372695,
+      "fp": 3829,
+      "tn": 132772,
+      "tp": 922311
+    },
+    "f1": 0.8304821024822322,
+    "n_frames": 1431607,
+    "positive_frames": 1295006,
+    "pr_auc": 0.9925330907867468,
+    "precision": 0.995865635864988,
+    "recall": 0.7122059666132821,
+    "roc_auc": 0.9351307229402562,
+    "threshold": 0.5
+  },
+  "audio_seconds": 45811.093,
+  "chunk_samples": 512,
+  "context_samples": 64,
+  "engine": "silero-vad-onnx",
+  "frame_shift_seconds": 0.032,
+  "gpu_peak_mb": null,
+  "inference_seconds": 208.2319,
+  "load_seconds": 0.0913,
+  "model": {
+    "bytes": 2327524,
+    "path": "models/silero-official/model.onnx",
+    "sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3"
+  },
+  "notes": [
+    "32 ms frames; ground truth is the union of AISHELL-4 RTTM speaker segments.",
+    "Threshold 0.5 is the primary operating point; best_f1 is an optimistic threshold sweep.",
+    "gpu_peak_mb is whole-device nvidia-smi memory delta across the measured sessions, not per-process allocation.",
+    "The CPUExecutionProvider remains the deployment target; the GPU row only measures resource headroom."
+  ],
+  "peak_rss_mb": 630.91,
+  "provider": [
+    "CPUExecutionProvider"
+  ],
+  "rtf": 0.004545447103827014,
+  "sample_rate": 16000,
+  "sessions": {
+    "L_R003S01C02": {
+      "accuracy": 0.6291727042509108,
+      "audio_seconds": 2362.945,
+      "best_f1": {
+        "f1": 0.9551905692737472,
+        "threshold": 0.01
+      },
+      "confusion": {
+        "fn": 27200,
+        "fp": 183,
+        "tn": 7579,
+        "tp": 38881
+      },
+      "f1": 0.739569166389272,
+      "inference_seconds": 10.0514,
+      "n_frames": 73843,
+      "positive_frames": 66081,
+      "pr_auc": 0.989825524800316,
+      "precision": 0.9953153798894122,
+      "recall": 0.5883839530273453,
+      "roc_auc": 0.9265972598003167,
+      "rtf": 0.004253772990483622,
+      "threshold": 0.5
+    },
+    "L_R003S02C02": {
+      "accuracy": 0.6582538099985757,
+      "audio_seconds": 2246.708,
+      "best_f1": {
+        "f1": 0.9476158128567301,
+        "threshold": 0.01
+      },
+      "confusion": {
+        "fn": 23854,
+        "fp": 140,
+        "tn": 8375,
+        "tp": 37841
+      },
+      "f1": 0.7592800674184357,
+      "inference_seconds": 10.2253,
+      "n_frames": 70210,
+      "positive_frames": 61695,
+      "pr_auc": 0.9896088222055863,
+      "precision": 0.9963139464469076,
+      "recall": 0.6133560256098549,
+      "roc_auc": 0.9296944466216351,
+      "rtf": 0.004551247750486489,
+      "threshold": 0.5
+    },
+    "L_R003S03C02": {
+      "accuracy": 0.6739799085727185,
+      "audio_seconds": 2268.015,
+      "best_f1": {
+        "f1": 0.9630857763139308,
+        "threshold": 0.01
+      },
+      "confusion": {
+        "fn": 22906,
+        "fp": 201,
+        "tn": 4880,
+        "tp": 42889
+      },
+      "f1": 0.7877852780456445,
+      "inference_seconds": 10.3596,
+      "n_frames": 70876,
+      "positive_frames": 65795,
+      "pr_auc": 0.9926057751112309,
+      "precision": 0.9953353446275238,
+      "recall": 0.6518580439243103,
+      "roc_auc": 0.9157074946621626,
+      "rtf": 0.004567715892970984,
+      "threshold": 0.5
+    },
+    "L_R003S04C02": {
+      "accuracy": 0.7063284518828452,
+      "audio_seconds": 2324.984,
+      "best_f1": {
+        "f1": 0.938167066437,
+        "threshold": 0.02
+      },
+      "confusion": {
+        "fn": 21190,
+        "fp": 147,
+        "tn": 11505,
+        "tp": 39814
+      },
+      "f1": 0.7886693408606943,
+      "inference_seconds": 10.4005,
+      "n_frames": 72656,
+      "positive_frames": 61004,
+      "pr_auc": 0.9877373778151938,
+      "precision": 0.9963214133780436,
+      "recall": 0.6526457281489738,
+      "roc_auc": 0.9379789541187701,
+      "rtf": 0.004473362808088384,
+      "threshold": 0.5
+    },
+    "L_R004S01C01": {
+      "accuracy": 0.7281658115671642,
+      "audio_seconds": 2195.433,
+      "best_f1": {
+        "f1": 0.9619463896852627,
+        "threshold": 0.02
+      },
+      "confusion": {
+        "fn": 18549,
+        "fp": 101,
+        "tn": 6302,
+        "tp": 43656
+      },
+      "f1": 0.8239935071063211,
+      "inference_seconds": 9.9812,
+      "n_frames": 68608,
+      "positive_frames": 62205,
+      "pr_auc": 0.99402676543705,
+      "precision": 0.9976917978837672,
+      "recall": 0.7018085362912949,
+      "roc_auc": 0.9455745006795969,
+      "rtf": 0.004546356734184506,
+      "threshold": 0.5
+    },
+    "L_R004S02C01": {
+      "accuracy": 0.8074844791906185,
+      "audio_seconds": 2226.67,
+      "best_f1": {
+        "f1": 0.9797066595409875,
+        "threshold": 0.02
+      },
+      "confusion": {
+        "fn": 13202,
+        "fp": 194,
+        "tn": 3135,
+        "tp": 53053
+      },
+      "f1": 0.8879014577161889,
+      "inference_seconds": 10.6446,
+      "n_frames": 69584,
+      "positive_frames": 66255,
+      "pr_auc": 0.9951917185513781,
+      "precision": 0.996356602249892,
+      "recall": 0.8007395668251452,
+      "roc_auc": 0.9351637794743308,
+      "rtf": 0.004780503786819172,
+      "threshold": 0.5
+    },
+    "L_R004S03C01": {
+      "accuracy": 0.7935304088023213,
+      "audio_seconds": 2227.768,
+      "best_f1": {
+        "f1": 0.9879323160334047,
+        "threshold": 0.01
+      },
+      "confusion": {
+        "fn": 14196,
+        "fp": 178,
+        "tn": 1592,
+        "tp": 53652
+      },
+      "f1": 0.8818685382731472,
+      "inference_seconds": 9.808,
+      "n_frames": 69618,
+      "positive_frames": 67848,
+      "pr_auc": 0.9973313061793883,
+      "precision": 0.9966932937023965,
+      "recall": 0.7907675981605943,
+      "roc_auc": 0.9173153333106839,
+      "rtf": 0.004402592372725307,
+      "threshold": 0.5
+    },
+    "L_R004S06C01": {
+      "accuracy": 0.723036164113849,
+      "audio_seconds": 2210.35,
+      "best_f1": {
+        "f1": 0.9590441865603975,
+        "threshold": 0.01
+      },
+      "confusion": {
+        "fn": 18910,
+        "fp": 221,
+        "tn": 5569,
+        "tp": 44374
+      },
+      "f1": 0.8226624273491597,
+      "inference_seconds": 10.502,
+      "n_frames": 69074,
+      "positive_frames": 63284,
+      "pr_auc": 0.9923546626748405,
+      "precision": 0.9950442874761745,
+      "recall": 0.7011882940395676,
+      "roc_auc": 0.9229698503082684,
+      "rtf": 0.004751289915623422,
+      "threshold": 0.5
+    },
+    "M_R003S01C01": {
+      "accuracy": 0.555005608524958,
+      "audio_seconds": 2282.21,
+      "best_f1": {
+        "f1": 0.9148516107547514,
+        "threshold": 0.01
+      },
+      "confusion": {
+        "fn": 31700,
+        "fp": 37,
+        "tn": 6946,
+        "tp": 32637
+      },
+      "f1": 0.6728515323004608,
+      "inference_seconds": 10.0482,
+      "n_frames": 71320,
+      "positive_frames": 64337,
+      "pr_auc": 0.9848923603035737,
+      "precision": 0.9988676011507621,
+      "recall": 0.5072819683852215,
+      "roc_auc": 0.8676842083349016,
+      "rtf": 0.004402824368047098,
+      "threshold": 0.5
+    },
+    "M_R003S02C01": {
+      "accuracy": 0.6170113041080783,
+      "audio_seconds": 2321.259,
+      "best_f1": {
+        "f1": 0.9590202474360104,
+        "threshold": 0.01
+      },
+      "confusion": {
+        "fn": 27694,
+        "fp": 88,
+        "tn": 5073,
+        "tp": 39685
+      },
+      "f1": 0.7407234582648947,
+      "inference_seconds": 10.439,
+      "n_frames": 72540,
+      "positive_frames": 67379,
+      "pr_auc": 0.9932917975949076,
+      "precision": 0.9977874437432429,
+      "recall": 0.5889817302126775,
+      "roc_auc": 0.9219599373179652,
+      "rtf": 0.004497138546796492,
+      "threshold": 0.5
+    },
+    "M_R003S04C01": {
+      "accuracy": 0.795414262013811,
+      "audio_seconds": 2256.727,
+      "best_f1": {
+        "f1": 0.9467025338424159,
+        "threshold": 0.04
+      },
+      "confusion": {
+        "fn": 13955,
+        "fp": 473,
+        "tn": 12320,
+        "tp": 43775
+      },
+      "f1": 0.8585185039910569,
+      "inference_seconds": 10.7731,
+      "n_frames": 70523,
+      "positive_frames": 57730,
+      "pr_auc": 0.9867550832059997,
+      "precision": 0.9893102513107938,
+      "recall": 0.758271262774987,
+      "roc_auc": 0.9509471472150272,
+      "rtf": 0.004773770839804689,
+      "threshold": 0.5
+    },
+    "M_R003S05C01": {
+      "accuracy": 0.6741932397523338,
+      "audio_seconds": 2341.215,
+      "best_f1": {
+        "f1": 0.9474401920967599,
+        "threshold": 0.01
+      },
+      "confusion": {
+        "fn": 23072,
+        "fp": 765,
+        "tn": 6931,
+        "tp": 42395
+      },
+      "f1": 0.780561002329071,
+      "inference_seconds": 10.8642,
+      "n_frames": 73163,
+      "positive_frames": 65467,
+      "pr_auc": 0.9816280063901714,
+      "precision": 0.9822752548656163,
+      "recall": 0.6475781691539249,
+      "roc_auc": 0.8719668732103432,
+      "rtf": 0.004640411642672852,
+      "threshold": 0.5
+    },
+    "S_R003S01C01": {
+      "accuracy": 0.8212329951579432,
+      "audio_seconds": 2220.529,
+      "best_f1": {
+        "f1": 0.9628036784554147,
+        "threshold": 0.02
+      },
+      "confusion": {
+        "fn": 12130,
+        "fp": 275,
+        "tn": 5298,
+        "tp": 51689
+      },
+      "f1": 0.8928599189863797,
+      "inference_seconds": 9.9531,
+      "n_frames": 69392,
+      "positive_frames": 63819,
+      "pr_auc": 0.9942852717100841,
+      "precision": 0.9947078746824725,
+      "recall": 0.809931211708112,
+      "roc_auc": 0.9387465482204803,
+      "rtf": 0.0044822926581905434,
+      "threshold": 0.5
+    },
+    "S_R003S02C01": {
+      "accuracy": 0.7630740876258623,
+      "audio_seconds": 2361.298,
+      "best_f1": {
+        "f1": 0.9588506107555695,
+        "threshold": 0.01
+      },
+      "confusion": {
+        "fn": 17304,
+        "fp": 179,
+        "tn": 5921,
+        "tp": 50387
+      },
+      "f1": 0.852160971443551,
+      "inference_seconds": 10.3733,
+      "n_frames": 73791,
+      "positive_frames": 67691,
+      "pr_auc": 0.9924688367523989,
+      "precision": 0.9964600719851283,
+      "recall": 0.7443677889231951,
+      "roc_auc": 0.9202103894965334,
+      "rtf": 0.004393063125026332,
+      "threshold": 0.5
+    },
+    "S_R003S03C01": {
+      "accuracy": 0.7874682353601864,
+      "audio_seconds": 2279.261,
+      "best_f1": {
+        "f1": 0.9426416091114616,
+        "threshold": 0.02
+      },
+      "confusion": {
+        "fn": 14889,
+        "fp": 249,
+        "tn": 8240,
+        "tp": 47849
+      },
+      "f1": 0.8634198274928724,
+      "inference_seconds": 10.6188,
+      "n_frames": 71227,
+      "positive_frames": 62738,
+      "pr_auc": 0.9901087875262816,
+      "precision": 0.9948230695663022,
+      "recall": 0.7626797156428321,
+      "roc_auc": 0.9277354355523578,
+      "rtf": 0.00465886622769444,
+      "threshold": 0.5
+    },
+    "S_R003S04C01": {
+      "accuracy": 0.8087447033190306,
+      "audio_seconds": 2393.927,
+      "best_f1": {
+        "f1": 0.9801527346647254,
+        "threshold": 0.01
+      },
+      "confusion": {
+        "fn": 14176,
+        "fp": 132,
+        "tn": 3150,
+        "tp": 57353
+      },
+      "f1": 0.8890973072689785,
+      "inference_seconds": 10.7169,
+      "n_frames": 74811,
+      "positive_frames": 71529,
+      "pr_auc": 0.9964531472971891,
+      "precision": 0.9977037488040358,
+      "recall": 0.8018146486040627,
+      "roc_auc": 0.9370006483863578,
+      "rtf": 0.004476694178644284,
+      "threshold": 0.5
+    },
+    "S_R004S01C01": {
+      "accuracy": 0.7463920338289456,
+      "audio_seconds": 2345.908,
+      "best_f1": {
+        "f1": 0.961709360928041,
+        "threshold": 0.01
+      },
+      "confusion": {
+        "fn": 18534,
+        "fp": 58,
+        "tn": 7933,
+        "tp": 46785
+      },
+      "f1": 0.8342397603466415,
+      "inference_seconds": 10.2478,
+      "n_frames": 73310,
+      "positive_frames": 65319,
+      "pr_auc": 0.9946157890599604,
+      "precision": 0.9987618214034114,
+      "recall": 0.7162540761493593,
+      "roc_auc": 0.9573090127042044,
+      "rtf": 0.00436838704075411,
+      "threshold": 0.5
+    },
+    "S_R004S02C01": {
+      "accuracy": 0.8227811426442792,
+      "audio_seconds": 2319.371,
+      "best_f1": {
+        "f1": 0.9675450043115619,
+        "threshold": 0.02
+      },
+      "confusion": {
+        "fn": 12743,
+        "fp": 102,
+        "tn": 7313,
+        "tp": 52323
+      },
+      "f1": 0.8906724770407947,
+      "inference_seconds": 11.1475,
+      "n_frames": 72481,
+      "positive_frames": 65066,
+      "pr_auc": 0.9963191811085577,
+      "precision": 0.9980543633762518,
+      "recall": 0.8041527064826484,
+      "roc_auc": 0.9684962407277355,
+      "rtf": 0.004806253811917189,
+      "threshold": 0.5
+    },
+    "S_R004S03C01": {
+      "accuracy": 0.8090975344801508,
+      "audio_seconds": 2327.119,
+      "best_f1": {
+        "f1": 0.9726229116393101,
+        "threshold": 0.02
+      },
+      "confusion": {
+        "fn": 13866,
+        "fp": 17,
+        "tn": 7884,
+        "tp": 50956
+      },
+      "f1": 0.8801070857981779,
+      "inference_seconds": 10.3453,
+      "n_frames": 72723,
+      "positive_frames": 64822,
+      "pr_auc": 0.9975052397520997,
+      "precision": 0.9996664901026033,
+      "recall": 0.7860911418962698,
+      "roc_auc": 0.9797861393808578,
+      "rtf": 0.004445533041067979,
+      "threshold": 0.5
+    },
+    "S_R004S04C01": {
+      "accuracy": 0.8230652546028918,
+      "audio_seconds": 2299.396,
+      "best_f1": {
+        "f1": 0.9678351675933039,
+        "threshold": 0.02
+      },
+      "confusion": {
+        "fn": 12625,
+        "fp": 89,
+        "tn": 6826,
+        "tp": 52317
+      },
+      "f1": 0.8916555885059823,
+      "inference_seconds": 10.7321,
+      "n_frames": 71857,
+      "positive_frames": 64942,
+      "pr_auc": 0.9965503931627365,
+      "precision": 0.9983017211769645,
+      "recall": 0.8055957623725786,
+      "roc_auc": 0.9680032595078499,
+      "rtf": 0.004667349440462097,
+      "threshold": 0.5
+    }
+  },
+  "threads": 4
+}

@@ -9,8 +9,8 @@
   },
   "engine": "PANNs-CNN14",
   "gpu_peak_mb": 424.7,
-  "inference_seconds": 1.103,
-  "load_seconds": 2.076,
+  "inference_seconds": 1.0971,
+  "load_seconds": 1.6853,
   "metrics": {
     "classes": 20,
     "mAP": 0.881875,
@@ -249,7 +249,7 @@
   },
   "model": {
     "bytes": 327428481,
-    "path": "/home/ev/panns_data/Cnn14_mAP=0.431.pth",
+    "path": "/tmp/panns_data/Cnn14_mAP=0.431.pth",
     "sha256": "0dc499e40e9761ef5ea061ffc77697697f277f6a960894903df3ada000e34b31"
   },
   "notes": [
@@ -257,7 +257,7 @@
     "PANNs resamples 44.1 kHz ESC-50 clips to 32 kHz; CED consumes 16 kHz directly.",
     "ESC-50 is non-commercial; this evaluation does not grant redistribution rights."
   ],
-  "peak_rss_mb": 1508.74,
+  "peak_rss_mb": 1240.56,
   "provider": "cuda",
-  "rtf": 0.005515245170026901
+  "rtf": 0.005485518155001046
 }

@@ -11,20 +11,39 @@ from pathlib import Path
 
 from common import DATA, MODELS, RESULTS, clean_voiceprint_segments, now_iso, overlap_duration, read_rttm, read_wav, speaker_groups, union_duration, write_json
 
-SESSIONS = ("L_R004S03C01", "S_R004S03C01")
 TRIAL_SEED = 20261110
+LICENSE = "CC BY-SA 4.0"
+
+
+def discover_sessions(data: Path) -> list[str]:
+    """Test sessions that have both a WAV and a reference RTTM on disk."""
+    wav_dir = data / "test" / "wav"
+    rttm_dir = data / "test" / "TextGrid"
+    return sorted(
+        path.stem for path in wav_dir.glob("*.wav") if (rttm_dir / f"{path.stem}.rttm").exists()
+    )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=Path, default=DATA / "aishell4")
+    parser.add_argument(
+        "--sessions",
+        nargs="*",
+        default=None,
+        help="session ids; default discovers every wav with a matching rttm",
+    )
     parser.add_argument("--out", type=Path, default=RESULTS / "manifest.json")
     parser.add_argument("--trials-out", type=Path, default=RESULTS / "trials.json")
     args = parser.parse_args()
 
+    session_ids = args.sessions if args.sessions else discover_sessions(args.data)
+    if not session_ids:
+        raise SystemExit(f"no sessions with wav+rttm found under {args.data / 'test'}")
+
     sessions: dict[str, dict] = {}
     all_segments: dict[str, list[dict]] = {}
-    for session_id in SESSIONS:
+    for session_id in session_ids:
         wav = args.data / "test" / "wav" / f"{session_id}.wav"
         rttm = args.data / "test" / "TextGrid" / f"{session_id}.rttm"
         if not wav.exists() or not rttm.exists():
@@ -103,6 +122,8 @@ def main() -> int:
     payload = {
         "generated_at": now_iso(),
         "dataset": "AISHELL-4 (OpenSLR SLR111, CC BY-SA 4.0), test split",
+        "license": LICENSE,
+        "n_sessions": len(sessions),
         "sessions": sessions,
         "voiceprint_clean": clean_stats,
         "voiceprint_speakers": speakers_out,

@@ -24,6 +24,26 @@
       "rtf": 0.6659339424533633,
       "scope": "first 300s"
     },
+    "pyannote_cpu_full": {
+      "der": 0.09950322164817284,
+      "peak_rss_mb": 1322.38,
+      "rtf": 1.1357134196006942,
+      "scope": "full"
+    },
+    "pyannote_cuda_all": {
+      "audio_seconds": 45811.093,
+      "components": {
+        "confusion": 1163.9456687500021,
+        "correct": 37448.17037500003,
+        "false alarm": 849.1811812500687,
+        "missed detection": 1151.4469562499617,
+        "total": 39763.56299999999
+      },
+      "der": 0.07958476473172268,
+      "engine": "pyannote-community-1",
+      "n_sessions": 20,
+      "rtf": 0.038225300583856404
+    },
     "pyannote_cuda_full": {
       "engine": "pyannote-community-1",
       "gpu_peak_mb": 436.44,
@@ -47,6 +67,21 @@
       "peak_rss_mb": 2323.45,
       "rtf": 0.03160993003176025,
       "scope": "full"
+    },
+    "sherpa_cpu_all": {
+      "audio_seconds": 45811.093,
+      "components": {
+        "confusion": 6447.761573461144,
+        "correct": 32394.98116891097,
+        "false alarm": 1038.7563511446651,
+        "missed detection": 920.8202576278737,
+        "total": 39763.56299999999
+      },
+      "der": 0.21143322046451632,
+      "engine": "sherpa-onnx",
+      "n_sessions": 20,
+      "num_clusters_mode": "oracle",
+      "rtf": 0.09097109732788955
     },
     "sherpa_cpu_default": {
       "engine": "sherpa-onnx",
@@ -125,7 +160,7 @@
     "panns_cuda_42clips": {
       "engine": "PANNs-CNN14",
       "gpu_peak_mb": 424.7,
-      "load_seconds": 2.076,
+      "load_seconds": 1.6853,
       "metrics": {
         "der": null,
         "eer": null,
@@ -133,14 +168,14 @@
         "mAP": 0.881875,
         "top1_accuracy": 0.85
       },
-      "peak_rss_mb": 1508.74,
-      "rtf": 0.005515245170026901,
+      "peak_rss_mb": 1240.56,
+      "rtf": 0.005485518155001046,
       "scope": null
     },
     "pyannote_cuda_60s": {
       "engine": "pyannote-community-1",
       "gpu_peak_mb": 436.44,
-      "load_seconds": 5.3326,
+      "load_seconds": 2.8243,
       "metrics": {
         "der": 0.06598953330174774,
         "eer": null,
@@ -148,8 +183,8 @@
         "mAP": null,
         "top1_accuracy": null
       },
-      "peak_rss_mb": 2258.63,
-      "rtf": 0.09468750406667822,
+      "peak_rss_mb": 1891.45,
+      "rtf": 0.05484100649997951,
       "scope": "first 60s"
     },
     "vad_cpu": {
@@ -183,17 +218,109 @@
       "scope": null
     }
   },
+  "docker_gpu": {
+    "cuda_matmul": {
+      "device": "NVIDIA GeForce RTX 2070",
+      "note": "torch.matmul on 1024x1024 CUDA tensors inside the container",
+      "peak_allocated_mb": 16.1,
+      "result": "PASS"
+    },
+    "self_contained_gpu_image": {
+      "build_command": "docker/build-portable.sh gpu",
+      "build_seconds": 732.2,
+      "contents": "debian:bookworm-slim + portable CPython 3.12.13 + torch 2.14.1+cu126 + torchaudio + onnxruntime-gpu==1.23.2 + pyannote.audio==4.0.0 + panns_inference==0.1.1 + kaldi-native-fbank",
+      "image": "recording-mcp-audio-poc:gpu",
+      "onnxruntime": {
+        "note": "1.31.1 needs a CUDA 13 runtime and the PyPI nvidia-*-cu13 wheels are 0.0.1 placeholders; 1.23.2 is the last CUDA 12 build and matches torch cu126's bundled cuBLAS 12 / cuDNN 9. Scripts call onnxruntime.preload_dlls() and assert CUDAExecutionProvider in session.get_providers().",
+        "providers": [
+          "CUDAExecutionProvider",
+          "CPUExecutionProvider"
+        ],
+        "version": "1.23.2"
+      },
+      "rows": {
+        "panns_cnn14": {
+          "clips": 40,
+          "gpu_peak_mb": 424.7,
+          "load_seconds": 1.6853,
+          "mAP": 0.881875,
+          "note": "Requires -e HOME=/tmp plus a read-only mount of the host panns_data labels/checkpoint for an offline run.",
+          "result": "PASS",
+          "result_file": "results/audio_tagging_panns_docker_gpu_smoke.json",
+          "rtf": 0.005486,
+          "top1_accuracy": 0.85
+        },
+        "pyannote_community1": {
+          "der": 0.06598953330174774,
+          "gpu_peak_mb": 436.44,
+          "hyp_speakers": 2,
+          "load_seconds": 2.8243,
+          "ref_speakers": 7,
+          "result": "PASS",
+          "result_file": "results/diarization_pyannote_docker_gpu_smoke.json",
+          "rtf": 0.054841,
+          "scope": "first 60s of L_R004S03C01"
+        },
+        "silero_vad": {
+          "f1_l": 0.8819,
+          "f1_s": 0.8801,
+          "gpu_peak_mb": 78.0,
+          "note": "Per-chunk streaming loop dominates; GPU is slower than the CPU provider for this model.",
+          "providers": [
+            "CUDAExecutionProvider",
+            "CPUExecutionProvider"
+          ],
+          "result": "PASS",
+          "result_file": "results/vad_silero_gpu.json",
+          "rtf_l": 0.0543,
+          "rtf_s": 0.05975,
+          "sessions": 2
+        }
+      },
+      "status": "PASS",
+      "torch": {
+        "cuda_available": true,
+        "device": "NVIDIA GeForce RTX 2070",
+        "version": "2.14.1+cu126"
+      },
+      "working_invocation": "docker run --rm --gpus all --network=none --user <uid>:<gid> [-e HOME=/tmp] -v /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro -e LD_LIBRARY_PATH=/usr/lib/wsl/lib -v $PWD/data:/poc/data:ro -v $PWD/models:/poc/models:ro -v $PWD/results:/poc/results recording-mcp-audio-poc:gpu <script>"
+    }
+  },
   "not_run": [
-    "official gated pyannote Community-1 repository (no HF token; public mirror used)",
-    "GPU execution for Silero VAD, sherpa-onnx diarization, CAM++, WeSpeaker",
-    "pyannote CPU full 2227.8 s (only 300 s subset)",
-    "self-contained recording-mcp-audio-poc:gpu image (GPU runs used CPU image + host venv)",
+    "official gated pyannote Community-1 repository (public mirror used; see pyannote_official_status.json)",
+    "GPU execution for sherpa-onnx diarization (CPU is the edge deployment target)",
     "macOS and RK hardware",
-    "AISHELL-4 remaining test sessions",
     "commercial ambient corpus (ESC-50 only)",
-    "speaker-count estimator",
     "recording-mcp end-to-end integration and ASR/Evidence/Worldline/MCP regressions"
   ],
+  "official_pyannote": {
+    "checked_at": "2026-11-10T19:44:07+0800",
+    "model": "pyannote/speaker-diarization-community-1",
+    "note": "The gated repository requires accepting the terms and an access token; the public mirror result stands as the pyannote measurement.",
+    "reason": "no HF token",
+    "status": "NOT_RUN"
+  },
+  "speaker_count": {
+    "engine": "silero-vad + CAM++ agglomerative (cosine, average linkage)",
+    "sessions": {
+      "L_R004S03C01": {
+        "estimated_speakers": 5,
+        "reference_speakers": 7,
+        "reliable": true,
+        "silhouette": 0.25404688715934753,
+        "threshold": 0.8,
+        "window_count": 200
+      },
+      "S_R004S03C01": {
+        "estimated_speakers": 7,
+        "reference_speakers": 5,
+        "reliable": true,
+        "silhouette": 0.3417576551437378,
+        "threshold": 0.7,
+        "window_count": 200
+      }
+    }
+  },
   "tagging": {
     "ced_cpu": {
       "engine": "sherpa-onnx-CED-base",
@@ -267,6 +394,66 @@
       "threshold": 0.5
     },
     "engine": "silero-vad-onnx",
+    "full_cpu": {
+      "aggregate": {
+        "accuracy": 0.7369920655598918,
+        "best_f1": {
+          "f1": 0.9575260320746549,
+          "threshold": 0.01
+        },
+        "confusion": {
+          "fn": 372695,
+          "fp": 3829,
+          "tn": 132772,
+          "tp": 922311
+        },
+        "f1": 0.8304821024822322,
+        "n_frames": 1431607,
+        "positive_frames": 1295006,
+        "pr_auc": 0.9925330907867468,
+        "precision": 0.995865635864988,
+        "recall": 0.7122059666132821,
+        "roc_auc": 0.9351307229402562,
+        "threshold": 0.5
+      },
+      "audio_seconds": 45811.093,
+      "engine": "silero-vad-onnx",
+      "n_sessions": 20,
+      "provider": [
+        "CPUExecutionProvider"
+      ],
+      "rtf": 0.004545447103827014
+    },
+    "gpu": {
+      "aggregate": {
+        "accuracy": 0.8014837608278711,
+        "best_f1": {
+          "f1": 0.9804349620027157,
+          "threshold": 0.02
+        },
+        "confusion": {
+          "fn": 28062,
+          "fp": 195,
+          "tn": 9476,
+          "tp": 104608
+        },
+        "f1": 0.8810096305685278,
+        "n_frames": 142341,
+        "positive_frames": 132670,
+        "pr_auc": 0.997660630701655,
+        "precision": 0.998139366239516,
+        "recall": 0.7884827014396624,
+        "roc_auc": 0.9711772212710047,
+        "threshold": 0.5
+      },
+      "gpu_peak_mb": 78.0,
+      "n_sessions": 2,
+      "provider": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "rtf": 0.05708841953708181
+    },
     "load_seconds": 0.0476,
     "model": {
       "bytes": 2327524,
@@ -293,6 +480,45 @@
       "peak_rss_mb": 1118.88,
       "rtf": 0.017428015577763033
     },
+    "campplus_cpu_all": {
+      "engine": "3D-Speaker CAM++",
+      "gpu_peak_mb": null,
+      "load_seconds": 0.7771,
+      "metrics": {
+        "accuracy_at_eer": 0.967564870259481,
+        "eer": 0.03243512974051897,
+        "eer_threshold": 0.49535611271858215,
+        "min_dcf": 0.0037275449101796406,
+        "min_dcf_normalized": 0.37275449101796404,
+        "n_negative": 2004,
+        "n_positive": 2004,
+        "n_trials": 4008
+      },
+      "peak_rss_mb": 3116.68,
+      "provider": "CPUExecutionProvider",
+      "rtf": 0.02444124170236453
+    },
+    "campplus_cuda_all": {
+      "engine": "3D-Speaker CAM++",
+      "gpu_peak_mb": 228.0,
+      "load_seconds": 0.7585,
+      "metrics": {
+        "accuracy_at_eer": 0.9770459081836327,
+        "eer": 0.02295409181636729,
+        "eer_threshold": 0.45403945446014404,
+        "min_dcf": 0.0035828343313373265,
+        "min_dcf_normalized": 0.3582834331337326,
+        "n_negative": 2004,
+        "n_positive": 2004,
+        "n_trials": 4008
+      },
+      "peak_rss_mb": 3716.35,
+      "provider": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "rtf": 0.023208695201692265
+    },
     "campplus_docker_cpu": {
       "engine": "3D-Speaker CAM++",
       "load_seconds": 0.6493,
@@ -309,6 +535,26 @@
       "peak_rss_mb": 555.62,
       "rtf": 0.012414668477373396
     },
+    "campplus_onnx_cpu_all": {
+      "engine": "3D-Speaker CAM++",
+      "gpu_peak_mb": null,
+      "load_seconds": 0.2,
+      "metrics": {
+        "accuracy_at_eer": 0.9770459081836327,
+        "eer": 0.02295409181636729,
+        "eer_threshold": 0.4540393650531769,
+        "min_dcf": 0.0035828343313373265,
+        "min_dcf_normalized": 0.3582834331337326,
+        "n_negative": 2004,
+        "n_positive": 2004,
+        "n_trials": 4008
+      },
+      "peak_rss_mb": 3120.54,
+      "provider": [
+        "CPUExecutionProvider"
+      ],
+      "rtf": 0.008056972390952747
+    },
     "wespeaker_cpu": {
       "engine": "WeSpeaker CN-Celeb ResNet34-LM",
       "load_seconds": 0.1122,
@@ -324,6 +570,65 @@
       },
       "peak_rss_mb": 1118.88,
       "rtf": 0.030371981392384992
+    },
+    "wespeaker_cpu_all": {
+      "engine": "WeSpeaker CN-Celeb ResNet34-LM",
+      "gpu_peak_mb": null,
+      "load_seconds": 0.2661,
+      "metrics": {
+        "accuracy_at_eer": 0.9650698602794411,
+        "eer": 0.0349301397205589,
+        "eer_threshold": 0.5066907405853271,
+        "min_dcf": 0.003048902195608782,
+        "min_dcf_normalized": 0.3048902195608782,
+        "n_negative": 2004,
+        "n_positive": 2004,
+        "n_trials": 4008
+      },
+      "peak_rss_mb": 3108.56,
+      "provider": "CPUExecutionProvider",
+      "rtf": 0.03054106440859906
+    },
+    "wespeaker_cuda_all": {
+      "engine": "WeSpeaker CN-Celeb ResNet34-LM",
+      "gpu_peak_mb": 362.0,
+      "load_seconds": 0.4105,
+      "metrics": {
+        "accuracy_at_eer": 0.9650698602794411,
+        "eer": 0.0349301397205589,
+        "eer_threshold": 0.5066908001899719,
+        "min_dcf": 0.003048902195608782,
+        "min_dcf_normalized": 0.3048902195608782,
+        "n_negative": 2004,
+        "n_positive": 2004,
+        "n_trials": 4008
+      },
+      "peak_rss_mb": 3597.95,
+      "provider": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "rtf": 0.004579491402921475
+    },
+    "wespeaker_onnx_cpu_all": {
+      "engine": "WeSpeaker CN-Celeb ResNet34-LM",
+      "gpu_peak_mb": null,
+      "load_seconds": 0.0883,
+      "metrics": {
+        "accuracy_at_eer": 0.9650698602794411,
+        "eer": 0.0349301397205589,
+        "eer_threshold": 0.5066907405853271,
+        "min_dcf": 0.003048902195608782,
+        "min_dcf_normalized": 0.3048902195608782,
+        "n_negative": 2004,
+        "n_positive": 2004,
+        "n_trials": 4008
+      },
+      "peak_rss_mb": 3108.57,
+      "provider": [
+        "CPUExecutionProvider"
+      ],
+      "rtf": 0.015479676131249866
     }
   }
 }

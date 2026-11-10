@@ -294,6 +294,19 @@ def gpu_query() -> dict[str, Any]:
     return fields
 
 
+def gpu_memory_used_mb() -> float | None:
+    """Whole-device memory in use, from nvidia-smi; None when unavailable."""
+    out = run_command(
+        ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"]
+    )
+    if out["returncode"] != 0 or not out["stdout"]:
+        return None
+    try:
+        return float(out["stdout"].splitlines()[0].strip())
+    except (TypeError, ValueError):
+        return None
+
+
 def speaker_groups(segments: Iterable[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for seg in segments:

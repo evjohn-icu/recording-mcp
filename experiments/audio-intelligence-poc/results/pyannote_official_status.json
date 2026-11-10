@@ -1,0 +1,7 @@
+{
+  "checked_at": "2026-11-10T19:44:07+0800",
+  "model": "pyannote/speaker-diarization-community-1",
+  "note": "The gated repository requires accepting the terms and an access token; the public mirror result stands as the pyannote measurement.",
+  "reason": "no HF token",
+  "status": "NOT_RUN"
+}

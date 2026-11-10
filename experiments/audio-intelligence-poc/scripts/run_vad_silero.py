@@ -19,29 +19,44 @@ from common import (
     binary_metrics,
     ensure_results,
     file_info,
+    gpu_memory_used_mb,
     merge_intervals,
     peak_rss_mb,
     read_rttm,
     read_wav,
     write_json,
 )
+from prepare_eval import discover_sessions
 
 CHUNK = 512  # 32 ms at 16 kHz for Silero VAD v5
 CONTEXT = 64  # Silero v5 prepends the previous 64 samples
 
 
-def load_session(path: Path, threads: int):
+def load_session(path: Path, threads: int, provider: str = "cpu"):
     import onnxruntime as ort
 
+    if provider == "cuda":
+        if "CUDAExecutionProvider" not in ort.get_available_providers():
+            raise SystemExit("CUDAExecutionProvider unavailable")
+        # onnxruntime-gpu does not search torch's bundled nvidia/*/lib dirs on
+        # its own; preload_dlls() loads them (cuDNN 9, cuBLAS 12) first.
+        if hasattr(ort, "preload_dlls"):
+            ort.preload_dlls()
+        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    else:
+        providers = ["CPUExecutionProvider"]
     options = ort.SessionOptions()
     options.intra_op_num_threads = threads
     options.inter_op_num_threads = 1
     options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-    return ort.InferenceSession(
-        str(path),
-        sess_options=options,
-        providers=["CPUExecutionProvider"],
-    )
+    session = ort.InferenceSession(str(path), sess_options=options, providers=providers)
+    # get_available_providers() only lists compiled-in providers; a missing
+    # CUDA runtime library makes the session fall back to CPU silently.
+    if provider == "cuda" and "CUDAExecutionProvider" not in session.get_providers():
+        raise SystemExit(
+            f"CUDAExecutionProvider requested but session fell back to {session.get_providers()}"
+        )
+    return session
 
 
 def speech_at(centers: np.ndarray, segments: list[dict]) -> np.ndarray:
@@ -82,27 +97,38 @@ def run_vad(session, audio: np.ndarray, threads: int) -> tuple[np.ndarray, np.nd
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=Path, default=MODELS / "silero" / "model.onnx")
+    parser.add_argument("--model", type=Path, default=MODELS / "silero-official" / "model.onnx")
     parser.add_argument("--data", type=Path, default=DATA / "aishell4")
-    parser.add_argument("--sessions", nargs="*", default=["L_R004S03C01", "S_R004S03C01"])
+    parser.add_argument(
+        "--sessions",
+        nargs="*",
+        default=None,
+        help="session ids; default discovers every wav with a matching rttm",
+    )
     parser.add_argument("--threads", type=int, default=4)
+    parser.add_argument("--provider", choices=["cpu", "cuda"], default="cpu")
     parser.add_argument("--out", type=Path, default=RESULTS / "vad_silero.json")
     args = parser.parse_args()
 
     ensure_results()
+    session_ids = args.sessions if args.sessions else discover_sessions(args.data)
+    if not session_ids:
+        raise SystemExit(f"no sessions with wav+rttm found under {args.data / 'test'}")
     load_started = time.perf_counter()
-    session = load_session(args.model, args.threads)
+    session = load_session(args.model, args.threads, args.provider)
     load_seconds = time.perf_counter() - load_started
+    providers = list(session.get_providers())
 
     # Warm up on a short slice so the first measured pass excludes lazy init.
-    warm, _ = read_wav(args.data / "test" / "wav" / f"{args.sessions[0]}.wav", max_seconds=5.0)
+    gpu_start_mb = gpu_memory_used_mb() if args.provider == "cuda" else None
+    warm, _ = read_wav(args.data / "test" / "wav" / f"{session_ids[0]}.wav", max_seconds=5.0)
     run_vad(session, warm, args.threads)
 
     all_true: list[np.ndarray] = []
     all_score: list[np.ndarray] = []
     per_session: dict[str, dict] = {}
     probs_out: dict[str, np.ndarray] = {}
-    for session_id in args.sessions:
+    for session_id in session_ids:
         audio, sr = read_wav(args.data / "test" / "wav" / f"{session_id}.wav")
         if sr != SAMPLE_RATE:
             raise ValueError(f"expected {SAMPLE_RATE} Hz, got {sr}")
@@ -129,6 +155,11 @@ def main() -> int:
     aggregate["best_f1"] = best_f1_threshold(truth, score)
     total_audio = sum(v["audio_seconds"] for v in per_session.values())
     total_inference = sum(v["inference_seconds"] for v in per_session.values())
+    gpu_peak_mb = None
+    if args.provider == "cuda":
+        gpu_end_mb = gpu_memory_used_mb()
+        if gpu_start_mb is not None and gpu_end_mb is not None:
+            gpu_peak_mb = round(max(0.0, gpu_end_mb - gpu_start_mb), 2)
     payload = {
         "engine": "silero-vad-onnx",
         "model": file_info(args.model),
@@ -137,18 +168,20 @@ def main() -> int:
         "context_samples": CONTEXT,
         "frame_shift_seconds": CHUNK / SAMPLE_RATE,
         "threads": args.threads,
-        "provider": "CPUExecutionProvider",
+        "provider": providers,
         "load_seconds": round(load_seconds, 4),
         "audio_seconds": round(total_audio, 3),
         "inference_seconds": round(total_inference, 4),
         "rtf": total_inference / total_audio if total_audio else None,
         "peak_rss_mb": round(peak_rss_mb(), 2),
+        "gpu_peak_mb": gpu_peak_mb,
         "sessions": per_session,
         "aggregate": aggregate,
         "notes": [
             "32 ms frames; ground truth is the union of AISHELL-4 RTTM speaker segments.",
             "Threshold 0.5 is the primary operating point; best_f1 is an optimistic threshold sweep.",
-            "GPU was not run for this ONNX model; the CPUExecutionProvider is the deployment target.",
+            "gpu_peak_mb is whole-device nvidia-smi memory delta across the measured sessions, not per-process allocation.",
+            "The CPUExecutionProvider remains the deployment target; the GPU row only measures resource headroom.",
         ],
     }
     write_json(args.out, payload)

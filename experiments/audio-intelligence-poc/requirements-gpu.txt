@@ -1,3 +1,6 @@
+# onnxruntime-gpu 1.31.x requires a CUDA 13 runtime; the cu13 pip wheels are
+# placeholders, while torch cu126 bundles CUDA 12.6 + cuDNN 9. 1.23.2 is the
+# last CUDA 12 build, so scripts call onnxruntime.preload_dlls() before use.
 numpy>=2.0,<3
 scipy>=1.11,<2
 scikit-learn>=1.3,<2
@@ -10,3 +13,5 @@ huggingface_hub>=0.20,<3
 pyannote.metrics==4.2.0
 kaldi-native-fbank==1.23.0
 panns_inference==0.1.1
+pyannote.audio==4.0.0
+onnxruntime-gpu==1.23.2

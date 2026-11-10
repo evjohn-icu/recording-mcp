@@ -1,6 +1,6 @@
 {
   "environment": {
-    "wsl_kernel": "6.18.54.1-microsoft-standard-WSL2",
+    "wsl_kernel": "6.18.58.1-microsoft-standard-WSL2",
     "gpu": "NVIDIA GeForce RTX 2070 8192 MiB",
     "driver": "610.88",
     "cuda_umd": "13.3",
@@ -21,26 +21,62 @@
     "peak_allocated_mb": 16.1,
     "note": "torch.matmul on 1024x1024 CUDA tensors inside the container"
   },
-  "panns_cnn14_gpu_smoke": {
-    "result": "PASS",
-    "clips": 40,
-    "mAP": 0.881875,
-    "top1": 0.85,
-    "rtf": 0.005515245170026901,
-    "load_seconds": 2.076,
-    "gpu_peak_mb": 424.7
-  },
-  "pyannote_community1_gpu_smoke": {
-    "result": "PASS",
-    "scope": "first 60s",
-    "der": 0.06598953330174774,
-    "rtf": 0.09468750406667822,
-    "load_seconds": 5.3326,
-    "gpu_peak_mb": 436.44,
-    "note": "first 60 s only; 2 dominant speakers"
-  },
   "self_contained_gpu_image": {
-    "status": "NOT_RUN",
-    "detail": "First build failed because panns_inference==0.2.1 does not exist; pin corrected to 0.1.1, rebuild did not complete within the session. GPU model runs used the CPU image with the host .venv-gpu mounted."
+    "status": "PASS",
+    "image": "recording-mcp-audio-poc:gpu",
+    "build_command": "docker/build-portable.sh gpu",
+    "build_seconds": 732.2,
+    "contents": "debian:bookworm-slim + portable CPython 3.12.13 + torch 2.14.1+cu126 + torchaudio + onnxruntime-gpu==1.23.2 + pyannote.audio==4.0.0 + panns_inference==0.1.1 + kaldi-native-fbank",
+    "torch": {
+      "version": "2.14.1+cu126",
+      "cuda_available": true,
+      "device": "NVIDIA GeForce RTX 2070"
+    },
+    "onnxruntime": {
+      "version": "1.23.2",
+      "providers": ["CUDAExecutionProvider", "CPUExecutionProvider"],
+      "note": "1.31.1 needs a CUDA 13 runtime and the PyPI nvidia-*-cu13 wheels are 0.0.1 placeholders; 1.23.2 is the last CUDA 12 build and matches torch cu126's bundled cuBLAS 12 / cuDNN 9. Scripts call onnxruntime.preload_dlls() and assert CUDAExecutionProvider in session.get_providers()."
+    },
+    "working_invocation": "docker run --rm --gpus all --network=none --user <uid>:<gid> [-e HOME=/tmp] -v /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro -e LD_LIBRARY_PATH=/usr/lib/wsl/lib -v $PWD/data:/poc/data:ro -v $PWD/models:/poc/models:ro -v $PWD/results:/poc/results recording-mcp-audio-poc:gpu <script>",
+    "rows": {
+      "silero_vad": {
+        "result_file": "results/vad_silero_gpu.json",
+        "result": "PASS",
+        "sessions": 2,
+        "providers": ["CUDAExecutionProvider", "CPUExecutionProvider"],
+        "f1_s": 0.8801,
+        "f1_l": 0.8819,
+        "rtf_s": 0.05975,
+        "rtf_l": 0.0543,
+        "gpu_peak_mb": 78.0,
+        "note": "Per-chunk streaming loop dominates; GPU is slower than the CPU provider for this model."
+      },
+      "panns_cnn14": {
+        "result_file": "results/audio_tagging_panns_docker_gpu_smoke.json",
+        "result": "PASS",
+        "clips": 40,
+        "mAP": 0.881875,
+        "top1_accuracy": 0.85,
+        "rtf": 0.005486,
+        "load_seconds": 1.6853,
+        "gpu_peak_mb": 424.7,
+        "note": "Requires -e HOME=/tmp plus a read-only mount of the host panns_data labels/checkpoint for an offline run."
+      },
+      "pyannote_community1": {
+        "result_file": "results/diarization_pyannote_docker_gpu_smoke.json",
+        "result": "PASS",
+        "scope": "first 60s of L_R004S03C01",
+        "der": 0.06598953330174774,
+        "ref_speakers": 7,
+        "hyp_speakers": 2,
+        "rtf": 0.054841,
+        "load_seconds": 2.8243,
+        "gpu_peak_mb": 436.44
+      }
+    }
+  },
+  "previous_cpu_image_with_host_venv": {
+    "status": "superseded",
+    "detail": "Earlier GPU rows used recording-mcp-audio-poc:cpu with the host .venv-gpu mounted because the first self-contained build failed on a bad panns_inference pin."
   }
 }

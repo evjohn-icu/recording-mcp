@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -51,16 +53,20 @@ def run_sherpa(args, audio: np.ndarray) -> tuple[list[dict], float, float]:
     import sherpa_onnx
 
     started_load = time.perf_counter()
+    # sherpa-onnx logs a CUDA fallback from C++ to fd 2; capture it so a CPU
+    # build cannot be reported under a CUDA label.
     config = sherpa_onnx.OfflineSpeakerDiarizationConfig(
         segmentation=sherpa_onnx.OfflineSpeakerSegmentationModelConfig(
             pyannote=sherpa_onnx.OfflineSpeakerSegmentationPyannoteModelConfig(
                 model=str(args.segmentation)
             ),
             num_threads=args.threads,
+            provider=args.provider,
         ),
         embedding=sherpa_onnx.SpeakerEmbeddingExtractorConfig(
             model=str(args.embedding),
             num_threads=args.threads,
+            provider=args.provider,
         ),
         clustering=sherpa_onnx.FastClusteringConfig(
             num_clusters=args.num_clusters, threshold=args.threshold
@@ -68,7 +74,24 @@ def run_sherpa(args, audio: np.ndarray) -> tuple[list[dict], float, float]:
         min_duration_on=args.min_duration_on,
         min_duration_off=args.min_duration_off,
     )
-    diarizer = sherpa_onnx.OfflineSpeakerDiarization(config)
+    saved_fd = os.dup(2)
+    log = tempfile.TemporaryFile(mode="w+b")
+    try:
+        os.dup2(log.fileno(), 2)
+        # Creating the diarizer is what requests the provider, so its warning
+        # is the only evidence of a fallback.
+        diarizer = sherpa_onnx.OfflineSpeakerDiarization(config)
+    finally:
+        os.dup2(saved_fd, 2)
+        os.close(saved_fd)
+    log.seek(0)
+    captured = log.read().decode("utf-8", "replace")
+    log.close()
+    if args.provider == "cuda" and "Fallback to cpu" in captured:
+        raise SystemExit(
+            "sherpa-onnx refused CUDAExecutionProvider: "
+            + captured.strip().splitlines()[0]
+        )
     load_seconds = time.perf_counter() - started_load
     started = time.perf_counter()
     result = diarizer.process(audio)
@@ -130,6 +153,7 @@ def main() -> int:
     parser.add_argument("--session", default="L_R004S03C01")
     parser.add_argument("--data", type=Path, default=DATA / "aishell4")
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    parser.add_argument("--provider", choices=["cpu", "cuda"], default="cpu")
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--threshold", type=float, default=0.5)
     parser.add_argument("--num-clusters", type=int, default=-1)
@@ -158,7 +182,7 @@ def main() -> int:
             "segmentation": file_info(args.segmentation),
             "embedding": file_info(args.embedding),
         }
-        provider = "CPUExecutionProvider"
+        provider = args.provider
     else:
         hypothesis, load_seconds, inference_seconds, gpu_peak_mb = run_pyannote(args, audio)
         model_info = {"pipeline": str(args.pipeline.resolve())}
@@ -166,10 +190,11 @@ def main() -> int:
 
     metrics = der_metrics(reference, hypothesis, collar=0.25, skip_overlap=False)
     suffix = f"_{args.device}" if args.engine == "pyannote" else ""
+    stem = f"diarization_{args.engine}{suffix}_{args.session}"
     if args.max_seconds:
-        suffix += f"_first{int(args.max_seconds)}s"
-    out = args.out or RESULTS / f"diarization_{args.engine}{suffix}.json"
-    hyp_rttm = RESULTS / f"diarization_{args.engine}{suffix}.rttm"
+        stem += f"_first{int(args.max_seconds)}s"
+    out = args.out or RESULTS / f"{stem}.json"
+    hyp_rttm = RESULTS / f"{stem}.rttm"
     write_rttm(hyp_rttm, args.session, hypothesis)
     payload = {
         "engine": "sherpa-onnx" if args.engine == "sherpa" else "pyannote-community-1",
@@ -179,6 +204,7 @@ def main() -> int:
         "provider": provider,
         "threads": args.threads if args.engine == "sherpa" else None,
         "threshold": args.threshold if args.engine == "sherpa" else None,
+        "num_clusters": args.num_clusters if args.engine == "sherpa" else None,
         "batch_size": args.batch_size if args.engine == "pyannote" else None,
         "models": model_info,
         "load_seconds": round(load_seconds, 4),
