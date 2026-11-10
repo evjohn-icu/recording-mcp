@@ -50,6 +50,7 @@ scripts/local-gpu-up.sh --profile sprint3 --backend ark --with-embedding
 
 - Go 侧 `--asr-lock` 指向 `data/profiles/<profile>/gpu.lock`，以 `flock(LOCK_EX|LOCK_NB)` 轮询（200 ms），超时（默认 10 分钟）报错。
 - Python embedding 服务在 CUDA 设备上以 `--gpu-lock` 在模型加载与每批推理外加锁，超时返回 HTTP 503 `GPU busy`。
+- `--with-embedding` 同时向 worker/web 传 `--embed-input-type` / `--semantic-input-type`（本地 Qwen 服务的 query 指令开关）；该字段默认关闭，避免严格 OpenAI 兼容端点拒绝未知字段。
 - 启动器总是把同一锁路径传给 worker；`--with-embedding` 在 GPU 设备上自动追加 `--gpu-lock`。
 
 锁的串行性由 `internal/cloudsync/gpu_lock_test.go::TestGPUFileLockSerializesLocalASR` 验证（trace 必须是 start/end/start/end）。

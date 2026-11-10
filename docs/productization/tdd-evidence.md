@@ -57,3 +57,12 @@
 | T3 PASS 不校验覆盖/重复 | 代码分析 | 增加 `status_coverage_ms` 与 `duplicate_turns` 门槛；2 h 重跑 258/258、覆盖=时长、重复 0 |
 | probe/embedding 继承 API key；测试钩子未受 TEST_MODE 限制；`.env` 权限未校验 | 安全评审 | `env -i` 白名单、钩子仅 TEST_MODE、属主/600 校验 |
 | e2e-cloud 本地卡在 `npx wrangler`（解析/网络） | 本地运行 15 分钟无输出；直接调用本地 wrangler 后 `dev` 10 秒就绪 | 脚本改用 `./node_modules/.bin/wrangler`；本地 10/10 场景通过 |
+
+### 第二轮评审修复（2026-11-09，提交 `6d9e386`）
+
+| 缺陷 | 证据 | 回归 |
+|---|---|---|
+| `input_type` 默认发给所有 OpenAI 兼容端点，严格端点可能 400 | 代码评审确认请求体始终携带 `input_type`；未在真实严格端点复现 | 改为 opt-in：`TestOpenAICompatProviderOmitsInputTypeByDefault`、`TestOpenAICompatProviderSendsInputType`；启动器/评测脚本/文档同步。红阶段未观察 |
+| `.env` 权限校验调用尚未定义的 `die`，错误路径退出 127 | 用旧脚本（`50681f0:scripts/local-gpu-up.sh`）对 0644 `.env` 复现：`line 64: die: command not found`，rc=127 | `test_env_file_permissions_fail_with_clean_error`（修复后 rc=1 且输出 chmod 600 提示） |
+| 非测试模式启用 embedding 时 `EMBED_CMD`/`EMBED_HEALTH_CMD` 未初始化，`set -u` 中止 | 代码评审确认赋值仅在 `TEST_MODE=1` 分支 | 默认初始化 + `${VAR:-}` 展开；非测试端到端未复现。红阶段未观察 |
+| 启动器传 `ASR_SCRIPT`，`local-start.sh` 未消费，自定义 runner 被忽略 | 代码评审确认 `local-start.sh` 只转发 `ASR_PYTHON` | `test_local_start.py` 断言 worker/web 收到 `--asr-script`。红阶段未观察 |

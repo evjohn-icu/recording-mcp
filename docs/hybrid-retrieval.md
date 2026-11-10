@@ -119,4 +119,6 @@ bin/context-embed --db data/context-memory.db --provider openai \
 
 `build_context` 新增 `mode` 字段：`""`/`"hybrid"`（默认，字面 + 语义 + 导航 + 已确认链接）与 `"lexical"`（关闭语义分支，导航与已确认链接保留）。
 
-MCP server 新增标志：`--semantic-provider`（`off|hash|openai`，默认 `hash`）、`--semantic-dims`（默认 256）、`--semantic-endpoint`、`--semantic-model`、`--semantic-key-env`。`off` 时语义检索器为 nil，`build_context` 与 `get_current_context` 的查询路径退化为仅字面。
+MCP server 新增标志：`--semantic-provider`（`off|hash|openai`，默认 `hash`）、`--semantic-dims`（默认 256）、`--semantic-endpoint`、`--semantic-model`、`--semantic-key-env`、`--semantic-input-type`。`off` 时语义检索器为 nil，`build_context` 与 `get_current_context` 的查询路径退化为仅字面。
+
+`--semantic-input-type` 默认关闭。开启后 OpenAI 兼容请求会携带 `input_type`（文档/查询角色），内置 Qwen3-Embedding 服务据此给 query 加检索指令；严格 OpenAI 兼容端点可能拒绝未知字段，因此仅在使用本地服务时开启。`local-start.sh` 在 `EMBED_PROVIDER=local` 时自动启用 worker 的 `--embed-input-type` 与 web 的 `--semantic-input-type`。

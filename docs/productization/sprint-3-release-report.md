@@ -1,6 +1,6 @@
 # Sprint 3 发布报告：Local Intelligence Reliability
 
-日期：2026-11-09。分支 `feat/local-intelligence-reliability`（起点 `8090255b034365b8aa91eccac3b04568910becca`）。未推送、未合并。基线见 `sprint-3-baseline.md`，TDD 过程证据见 `tdd-evidence.md`。
+日期：2026-11-09。分支 `feat/local-intelligence-reliability`（起点 `8090255b034365b8aa91eccac3b04568910becca`）。经用户确认后已推送并合并到 `main`；合并后修复见 B 节“评审与合并后修复”。基线见 `sprint-3-baseline.md`，TDD 过程证据见 `tdd-evidence.md`。
 
 ## A. SMART 记分卡
 
@@ -10,9 +10,21 @@
 | SMART-02 | 长录音可靠转写 | 2 h 故障注入中断后只补未完成窗口；覆盖=时长；无重复活跃片段；OOM/超时动作 | T3 2 h：258/258 窗口、覆盖 7 200 000 ms、2 次 SIGKILL、无重复；T4–T10 PASS | PASS（真实 2 h 本机 ASR 未运行） | `long-audio-reliability.md` |
 | SMART-03 | 真实中文 embedding 评估 | 角色化边界；本地服务；冻结门禁；未通过不换默认 | 见 C 节 | 真实 embedding 校准未通过门禁（误报率 0.95、p95 超 1.5×、v2-openai 召回低于 v1）；未创建 holdout lock，默认保持 v1 + hash | `real-embedding-evaluation.md`、`docs/evals/sprint3-real-embedding/` |
 | SMART-04 | 证据充分性可见 | 20 场景（≥5 不可回答）；三种状态；有效引用；UI 可核对 | 21 场景 21/21（11 不可回答）；浏览器 12/12 | PASS | `sufficiency-scenarios.md`、`artifacts/sufficiency/v1/results.json` |
-| SMART-05 | 发布验证 | 12 步演示；命令清单；真实回归 | 12/12 步通过（含重启持久化、非空决策轨迹与 MCP 读取）；`go vet`、`go test`、`go test -race`、`make build`、`make spec-validate`、Web typecheck/build、Python 117 项、浏览器 14/14 与 12/12、Docker 6/6、Android 单测/APK、cloud-ingest 74 项、e2e-cloud 10/10 场景均通过 | PASS | `release-commands.json`、`artifacts/sprint3-demo/result.json` |
+| SMART-05 | 发布验证 | 12 步演示；命令清单；真实回归 | 12/12 步通过（含重启持久化、非空决策轨迹与 MCP 读取）；`go vet`、`go test`、`go test -race`、`make build`、`make spec-validate`、Web typecheck/build、Python 118 项、浏览器 14/14 与 12/12、Docker 6/6、Android 单测/APK、cloud-ingest 74 项、e2e-cloud 10/10 场景均通过 | PASS | `release-commands.json`、`artifacts/sprint3-demo/result.json` |
 
 ## B. 工程交付
+
+### 评审与合并后修复
+
+合并后进行了独立代码评审，修复四类缺陷并以 `6d9e386` 推送：
+
+- `input_type` 改为显式 opt-in（`--embed-input-type`/`--semantic-input-type`），本地 Qwen 服务自动开启，严格 OpenAI 兼容端点默认不发送；评测脚本、启动器与文档同步。
+- `local-gpu-up.sh` 的 `die()` 移到 `.env` 校验之前；非测试模式下补全 `EMBED_CMD`/`EMBED_HEALTH_CMD` 默认值。
+- `local-start.sh` 转发 `ASR_SCRIPT`，自定义本地 ASR runner 不再被忽略。
+- 新增/更新回归测试：provider 默认关闭断言、`.env` 权限错误路径、启动器标志与 runner 转发。
+
+验证：`go vet ./...`、目标包 Go 测试、Web typecheck/build、Python 118 项、`make spec-validate` 通过；GitHub Actions `42695277388` 9/9 jobs 成功。最终 `main` 为 `6d9e386`。
+
 
 ### 变更文件
 

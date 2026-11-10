@@ -30,7 +30,8 @@ flowchart TD
 
 - ✅ 已实现：转写摄入与修订取代（stale 追踪）、extract/publish 候选记忆链路、话题关联提议与人工复核、说话人绑定与修订级身份投影、环境音分离、混合检索（字面 + 语义 + 已确认链接分支 + 融合打分与逐条来源 `retrieval_sources`）、上下文投影 v0（`get_current_context`）、确定性离线评估、任务队列 worker、跨设备采集链路（Android 分块录音 → Cloudflare ingest-v1 → `context-sync` 拉取入库）。
 - ✅ 转写配套工具：lite 兜底转写流水线、ASR 修复提案与服务健康判别（`scripts/`，见下文「转写工具链」）。
-- 🧪 实验：`build_context` 返回的包结构（items/evidence/coverage/gaps/trace/ranking）、语义后端默认使用离线哈希嵌入器（真实端点可选开启）、投影 v0 的规则集（笔记类型映射与否定线索）。
+- ✅ 本地智能：`scripts/local-gpu-up.sh` 一条命令完成 GPU 预检、模型探针、启动/健康检查/可重复启停与降级诊断；长录音按窗口断点续跑（已提交窗口不重复计费）；搜索结果展示证据充分性（充分/不足/无法判定）与可点击证据引用。
+- 🧪 实验：`build_context` 返回的包结构（items/evidence/coverage/gaps/trace/ranking）、语义后端默认使用离线哈希嵌入器（真实端点可选开启；内置 Qwen3-Embedding 服务需显式启用，校准门禁未通过，默认仍为 v1 + hash）、投影 v0 的规则集（笔记类型映射与否定线索）。
 - 🚧 计划：FTS5 字面索引与字面分支的 n-gram 覆盖率打分、真值引擎（`conflicting` 状态）、模型辅助的投影增强、`project` 记忆类型。
 
 ## 快速开始
@@ -124,6 +125,30 @@ scripts/local-start.sh home
 
 录音详情页可标记重点并添加备注；导航“上下文简报”可按人物、主题、会话或显式项目来源生成确定性简报。来源修订会使重点需要重新关联，关注标签不代表事实确认。操作、应用契约及 v19 升级见 [记忆重点与上下文简报](docs/memory-highlights-context-brief.md)。
 
+## 本机 GPU 一键启动（WSL2 + 本地 ASR）
+
+Windows 11 + WSL2 的受支持路径是宿主原生 web/worker + `.venv-asr`。先构建、拉取钉住模型，再预检：
+
+```sh
+make build && make web                        # 启动器默认检查 bin/ 与 web/dist
+scripts/fetch-local-models.sh                 # 显式下载 ARK/Qwen3-ASR/Qwen3-Embedding/Jev 快照并校验 SHA-256
+scripts/local-gpu-up.sh --profile home --check # GPU/ffmpeg/.venv-asr/模型快照预检 + 真实加载探针
+scripts/local-gpu-up.sh --profile home         # 启动 web/worker（默认 127.0.0.1:8788）
+scripts/local-gpu-up.sh --profile home --cycles 5 --no-build  # 五轮启停验收
+```
+
+默认 `--backend qwen`；也可 `--backend ark`。启动器校验 `.env` 属主与 `600` 权限，ASR 与可选 embedding 共用 profile 内 `gpu.lock`，SIGTERM 后写 `artifacts/local-gpu/startup.json`。ASR 不可用时服务降级启动，`/api/capabilities` 与详情页显示原因，其他功能保持可用。详见 [GPU 部署](docs/productization/gpu-deployment.md) 与 [长音频可靠性](docs/productization/long-audio-reliability.md)。
+
+可选本地 embedding 依赖同一 `.venv-asr`：
+
+```sh
+.venv-asr/bin/python -m pip install -r requirements-local-embed.txt
+scripts/local-gpu-up.sh --profile home --with-embedding
+```
+
+`--with-embedding` 启动 `scripts/local-embed.py` 并自动向 worker/web 传 `--embed-input-type` / `--semantic-input-type`；该字段是本地 Qwen 服务的 query 指令开关，默认**不发送**，以免严格 OpenAI 兼容端点因未知字段拒绝请求。直接配置 `--embed-provider openai`/`--semantic-provider openai` 指向本地服务时需显式加这两个标志。
+
+
 ## MCP 客户端与 Web 运行限制
 
 MCP 客户端里 `tools/list` 可见 30 个工具（22 个记忆工具 + 8 个事件原型工具）。调用 `get_current_context`：
@@ -176,6 +201,16 @@ Android 端构建与真机说明见 [docs/android.md](docs/android.md)；云端�
 
 典型补录流程：`asr-health.sh` 确认配额状态 → 可用则 `asr-ingest` 正常入库；不可用则
 `lite-transcribe.py` 出逐字稿，恢复后再 `asr-ingest` 补库、`asr-repair.py` 做质量对齐。
+
+本地模型与 GPU 工具：
+
+| 工具 | 用途 |
+| --- | --- |
+| `scripts/local-gpu-up.sh` | 预检、探针、启动/健康检查/多轮启停、降级与显存诊断；支持 `--with-embedding` |
+| `scripts/local-asr.py` | 离线 ASR runner：`--probe`、`--stream`、`--skip`、加载/窗口超时；环境白名单不继承 API key |
+| `scripts/local-embed.py` | OpenAI 兼容本地 embedding 服务（Qwen3-Embedding，query 指令、健康检查、模型 SHA-256 校验、GPU 锁） |
+| `scripts/fetch-local-models.sh` | 按 `scripts/model-revisions.json` 下载并校验钉住模型快照 |
+| `scripts/long-audio-reliability.py` | 长录音 T1–T10 验证：合成故障注入、真实录音指标、覆盖/重复/断点续跑 |
 
 ## 核心概念
 
