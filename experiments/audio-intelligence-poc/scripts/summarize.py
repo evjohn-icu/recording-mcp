@@ -70,6 +70,23 @@ def main() -> int:
     vad_gpu = optional("vad_silero_gpu.json")
     diar_pyannote_all = optional("diarization_pyannote_cuda_all.json")
     diar_pyannote_official_all = optional("diarization_pyannote_official_cuda_all.json")
+    sherpa_cuda = {
+        key: optional(name)
+        for key, name in {
+            "S": "diarization_sherpa_cuda_S.json",
+            "L": "diarization_sherpa_cuda_L.json",
+        }.items()
+    }
+    sherpa_cuda = {k: v for k, v in sherpa_cuda.items() if v}
+    rk = {
+        key: optional(name)
+        for key, name in {
+            "vad": "rk_vad_silero_S.json",
+            "voiceprint": "rk_voiceprint_campplus.json",
+            "diarization": "rk_diarization_sherpa_S.json",
+        }.items()
+    }
+    rk = {k: v for k, v in rk.items() if v}
     diar_sherpa_all = optional("diarization_sherpa_cpu_all.json")
     diar_pyannote_cpu_full = optional("diarization_pyannote_cpu_L.json")
     speaker_count = optional("speaker_count_estimator.json")
@@ -148,6 +165,17 @@ def main() -> int:
             "pyannote_cuda_all": aggregate_block(diar_pyannote_all),
             "pyannote_official_cuda_all": aggregate_block(diar_pyannote_official_all),
             "sherpa_cpu_all": aggregate_block(diar_sherpa_all, with_mode=True),
+            "sherpa_cuda": {
+                key: {
+                    "der": value["metrics"]["der"],
+                    "rtf": value["rtf"],
+                    "provider": value.get("provider"),
+                    "num_clusters": value.get("num_clusters"),
+                    "peak_rss_mb": value["peak_rss_mb"],
+                }
+                for key, value in sherpa_cuda.items()
+            }
+            or None,
             "pyannote_cpu_full": None
             if not diar_pyannote_cpu_full
             else {
@@ -181,6 +209,27 @@ def main() -> int:
                 for key, value in voiceprint_full.items()
             },
         },
+        "rk_device": {
+            "vad": None if "vad" not in rk else {
+                "f1": rk["vad"]["aggregate"]["f1"],
+                "rtf": rk["vad"]["rtf"],
+                "audio_seconds": rk["vad"]["audio_seconds"],
+                "peak_rss_mb": rk["vad"]["peak_rss_mb"],
+            },
+            "voiceprint": None if "voiceprint" not in rk else {
+                "eer": rk["voiceprint"]["metrics"]["eer"],
+                "rtf": rk["voiceprint"]["rtf"],
+                "n_trials": rk["voiceprint"]["metrics"]["n_trials"],
+                "peak_rss_mb": rk["voiceprint"]["peak_rss_mb"],
+            },
+            "diarization": None if "diarization" not in rk else {
+                "der": rk["diarization"]["metrics"]["der"],
+                "rtf": rk["diarization"]["rtf"],
+                "peak_rss_mb": rk["diarization"]["peak_rss_mb"],
+                "hyp_speakers": rk["diarization"]["metrics"]["hyp_speakers"],
+            },
+        }
+        or None,
         "speaker_count": None
         if not speaker_count
         else {
@@ -239,9 +288,8 @@ def main() -> int:
         and has_cuda_provider(voiceprint_full.get("wespeaker_cuda"))
     ):
         not_run.append("GPU execution for CAM++ / WeSpeaker ONNX")
-    not_run.append(
-        "GPU execution for sherpa-onnx diarization (CPU is the edge deployment target)"
-    )
+    if len(sherpa_cuda) < 2:
+        not_run.append("GPU execution for sherpa-onnx diarization")
     if not diar_pyannote_cpu_full:
         not_run.append("pyannote CPU full session (only a 300 s subset)")
     image = (docker_validation or {}).get("self_contained_gpu_image") or {}
@@ -253,7 +301,8 @@ def main() -> int:
         not_run.append("speaker-count estimator")
     not_run.extend(
         [
-            "macOS and RK hardware",
+            "RK NPU acceleration (only the CPU EP was exercised)",
+            "macOS hardware",
             "commercial ambient corpus (ESC-50 only)",
             "recording-mcp end-to-end integration and ASR/Evidence/Worldline/MCP regressions",
         ]

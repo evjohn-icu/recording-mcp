@@ -168,6 +168,22 @@
       "peak_rss_mb": 2892.37,
       "rtf": 0.07058559287367293,
       "scope": "full"
+    },
+    "sherpa_cuda": {
+      "L": {
+        "der": 0.14579613143761844,
+        "num_clusters": 7,
+        "peak_rss_mb": 1193.41,
+        "provider": "cuda",
+        "rtf": 0.1929051425525456
+      },
+      "S": {
+        "der": 0.3195847532777563,
+        "num_clusters": 5,
+        "peak_rss_mb": 1192.35,
+        "provider": "cuda",
+        "rtf": 0.12054811014907112
+      }
     }
   },
   "docker": {
@@ -301,8 +317,8 @@
     }
   },
   "not_run": [
-    "GPU execution for sherpa-onnx diarization (CPU is the edge deployment target)",
-    "macOS and RK hardware",
+    "RK NPU acceleration (only the CPU EP was exercised)",
+    "macOS hardware",
     "commercial ambient corpus (ESC-50 only)",
     "recording-mcp end-to-end integration and ASR/Evidence/Worldline/MCP regressions"
   ],
@@ -314,6 +330,26 @@
     "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
     "session": "L_R004S03C01",
     "status": "PASS"
+  },
+  "rk_device": {
+    "diarization": {
+      "der": 0.24086506626641815,
+      "hyp_speakers": 4,
+      "peak_rss_mb": 536.74,
+      "rtf": 1.4057006428038272
+    },
+    "vad": {
+      "audio_seconds": 2327.119,
+      "f1": 0.8801070857981779,
+      "peak_rss_mb": 472.58,
+      "rtf": 0.07661722498935379
+    },
+    "voiceprint": {
+      "eer": 0.015075376884422132,
+      "n_trials": 398,
+      "peak_rss_mb": 548.48,
+      "rtf": 0.13489400283650346
+    }
   },
   "speaker_count": {
     "engine": "silero-vad + CAM++ agglomerative (cosine, average linkage)",

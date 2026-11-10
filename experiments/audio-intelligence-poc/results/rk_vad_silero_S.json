@@ -1,0 +1,75 @@
+{
+  "aggregate": {
+    "accuracy": 0.8090975344801508,
+    "best_f1": {
+      "f1": 0.9726229116393101,
+      "threshold": 0.02
+    },
+    "confusion": {
+      "fn": 13866,
+      "fp": 17,
+      "tn": 7884,
+      "tp": 50956
+    },
+    "f1": 0.8801070857981779,
+    "n_frames": 72723,
+    "positive_frames": 64822,
+    "pr_auc": 0.9975052406943565,
+    "precision": 0.9996664901026033,
+    "recall": 0.7860911418962698,
+    "roc_auc": 0.9797861413333777,
+    "threshold": 0.5
+  },
+  "audio_seconds": 2327.119,
+  "chunk_samples": 512,
+  "context_samples": 64,
+  "engine": "silero-vad-onnx",
+  "frame_shift_seconds": 0.032,
+  "gpu_peak_mb": null,
+  "inference_seconds": 178.2974,
+  "load_seconds": 0.4356,
+  "model": {
+    "bytes": 2327524,
+    "path": "models/silero-official/model.onnx",
+    "sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3"
+  },
+  "notes": [
+    "32 ms frames; ground truth is the union of AISHELL-4 RTTM speaker segments.",
+    "Threshold 0.5 is the primary operating point; best_f1 is an optimistic threshold sweep.",
+    "gpu_peak_mb is whole-device nvidia-smi memory delta across the measured sessions, not per-process allocation.",
+    "The CPUExecutionProvider remains the deployment target; the GPU row only measures resource headroom."
+  ],
+  "peak_rss_mb": 472.58,
+  "provider": [
+    "CPUExecutionProvider"
+  ],
+  "rtf": 0.07661722498935379,
+  "sample_rate": 16000,
+  "sessions": {
+    "S_R004S03C01": {
+      "accuracy": 0.8090975344801508,
+      "audio_seconds": 2327.119,
+      "best_f1": {
+        "f1": 0.9726229116393101,
+        "threshold": 0.02
+      },
+      "confusion": {
+        "fn": 13866,
+        "fp": 17,
+        "tn": 7884,
+        "tp": 50956
+      },
+      "f1": 0.8801070857981779,
+      "inference_seconds": 178.2974,
+      "n_frames": 72723,
+      "positive_frames": 64822,
+      "pr_auc": 0.9975052406943565,
+      "precision": 0.9996664901026033,
+      "recall": 0.7860911418962698,
+      "roc_auc": 0.9797861413333777,
+      "rtf": 0.07661721884054916,
+      "threshold": 0.5
+    }
+  },
+  "threads": 4
+}

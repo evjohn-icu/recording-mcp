@@ -24,6 +24,7 @@
 | 内存 | 23 GB |
 | GPU | NVIDIA GeForce RTX 2070，8192 MiB，驱动 610.88，CUDA UMD 13.3 |
 | Docker | 29.9.2（Docker Desktop 4.98.0，WSL2 engine） |
+| 边缘设备 | OEC BOX WXY4（RK35xx，4×Cortex-A，3.8 GB RAM，eMMC 6.5 GB + HDD 916 GB），Armbian 26.11 / Debian 13 trixie，kernel 6.12.69-rk35xx，Python 3.13.5；有 NPU devfreq 节点，本次只用 CPU EP |
 | Python | 3.12.13（PoC venv） |
 | 数据 | AISHELL-4 test split 全部 20 个 session；ESC-50 2000 clips |
 
@@ -133,6 +134,7 @@ sherpa 的人数在 20 个 session 里有 19 个与参考完全一致（逐 sess
 - pyannote CPU 子集（S session 前 300 s）：DER 0.0276，参考 5 / 输出 2，RTF 0.666，加载 0.734 s，RSS 1474 MB。该子集只有 2 个主要说话人，DER 不能与完整 L 直接比较，仅用于 CPU 资源。
 - sherpa 在 L 前 300 s（7 人）上阈值扫描：0.45→DER 0.316/21 人，0.5→0.266/18 人，0.55→0.266/17 人，0.6→0.263/16 人，0.7→0.168/11 人；oracle 7 人才到 0.140。说明 **未知人数时 threshold 聚类不可靠**。
 - pyannote 在 L 上只输出 5 个 speaker，漏掉 2 个；混淆 108 s。sherpa oracle 7 人时人数正确，但混淆 191 s。
+- **sherpa-onnx GPU（预编译 CUDA 12 bundle）**：S 与 L 各跑一次，`provider` 字段为 `cuda`（否则脚本会 SystemExit，不会贴错标签），但**没有收益**：S DER 0.3196 vs CPU 0.2409、L 0.1458 vs 0.1404（S 退化 0.079，L 差 0.005），RTF 0.1205 / 0.1929 vs CPU 0.0910 / 0.0914（慢 1.3–2.1×），全卡显存 1586 → 1985 MiB（峰值增量约 400 MB）。差异来自 bundle 自带的 onnxruntime 1.28.2 与 CPU wheel 的推理数值/聚类边界，不是标签错位。结论：sherpa 保持 CPU 部署。
 - 人数估计器（Silero 1.5 s 窗 + CAM++ 余弦层次聚类，`results/speaker_count_estimator.json`）：L 估计 5（参考 7，silhouette 0.254，threshold 0.8），S 估计 7（参考 5，silhouette 0.342，threshold 0.7），两次都被判 `reliable`。用估计值驱动 sherpa：L 参考 7 / 输出 5，DER **0.2612**，同 session oracle 7 人是 0.1404，明显退化；S 参考 5 / 输出 4，DER **0.2409**，与同 session oracle 结果**完全相同**（`num_clusters=7` 与 5 在该 session 收敛到同一分割），因此 S 只能算持平，不能作为估计值有害的证据。**silhouette ≥ 0.05 不足以证明人数正确**：估计器"自信地"在两个方向上都报错，`reliable` 只能当作"聚类结构清晰"，不能当作人数正确性的证据。
 
 结论：精度优先选 pyannote Community-1（20 session DER 0.0796，GPU RTF 0.038）；边缘/CPU 可选 sherpa-onnx，但必须有人数估计或人工指定 `num_clusters`，不能直接用默认 threshold；当前人数估计器还不足以自动供给该参数。
@@ -222,20 +224,33 @@ sherpa 的人数在 20 个 session 里有 19 个与参考完全一致（逐 sess
 
 ## 7. 可迁移性（Mac / RK）
 
-- 全部 ONNX/CPU 组件（Silero、Zipformer、CAM++、sherpa diarization）可直接走 ONNX Runtime；macOS 可用 CoreML/CPU EP，RK 可用 ARM CPU EP。模型总大小约 2.3 MB + 259 MB + 28 MB + 6 MB + 28 MB，边缘存储可接受。
-- pyannote Community-1 和 PANNs 是 PyTorch 路线；Mac 可用 MPS/CPU，但 RK 不现实，建议放服务端/GPU。
-- Zipformer 259 MB 对资源极紧的 RK 仍偏大；后续应测试 int8/更小模型（`NOT_RUN`）。
-- 会议远场 VAD 阈值、sherpa 聚类人数是迁移时最先需要重新校准的两个参数。
+RK 侧已实测（OEC BOX WXY4 / RK35xx，4 核，3.8 GB RAM，Armbian 26.11，Python 3.13.5，全 CPU EP；工作目录 `/hdd/audio-poc`）：
+
+| 任务 | RK 实测 | x86 对照 | 倍数 | 峰值 RSS | 结果是否一致 |
+|---|---:|---:|---:|---:|---|
+| Silero VAD（S session，2327 s） | RTF **0.0766**，F1 0.8801 | RTF 0.00445，F1 0.8801 | 17.2× 慢 | 473 MB | 完全一致 |
+| CAM++ 声纹（398 trials） | RTF **0.1349**，EER 1.5075% | RTF 0.0174，EER 1.5075% | 7.8× 慢 | 548 MB | 完全一致 |
+| sherpa diarization（S，oracle 5） | RTF **1.4057**（54.7 min 跑 38.8 min 音频），DER 0.2409 | RTF 0.0910，DER 0.2409 | 15.4× 慢 | 537 MB | DER 完全一致 |
+
+结论：
+
+- **VAD 与声纹可以上 RK**：VAD 约实时 13×、声纹约实时 7.4×，3.8 GB 内存够用（实测峰值 473/548 MB）。
+- **sherpa diarization 在 4 核上 RTF > 1**，单个 39 分钟会议要跑 55 分钟，只能做离线批处理，不能实时/准实时；这也解释了为什么边缘方案应把 diarization 放服务端（或等 NPU/更快的核）。
+- 数值与 x86 完全一致（同权重同前端，CPU EP 的浮点路径一致），说明 ARM 迁移不引入精度漂移，只是变慢。
+- 连续满载时温度到 75.6 ℃、load average 4.0，未见降频导致的错误；但没有做长时间（>1 h）稳定性测试。
+- 板上存在 NPU（`/sys/class/devfreq/fde40000.npu`），但 ONNX Runtime 没有 RK NPU EP，本次**没有**用 NPU；要利用需 rknn-toolkit2 重新转换模型（`NOT_RUN`）。
+- macOS 仍未验证（无硬件）；其 ONNX 路径预期与 RK 同类，但 CoreML EP 需要单独验证。
 
 ## 8. NOT_RUN
 
 以下项目没有真实执行，未用推测数字填充：
 
 - pyannote Community-1 **官方 gated 仓库**：已用 HF token 接受条款并下载官方权重（`pyannote/speaker-diarization-community-1`，revision `3533c8cf8e36`），20 个 session 全量重跑，聚合 DER 与公开镜像**逐位相同**（`results/diarization_pyannote_official_cuda_all.json`，状态见 `results/pyannote_official_status.json`）。镜像 checksum 风险已消除。
-- sherpa-onnx diarization 的 **GPU 执行**：`NOT_RUN`。PoC 用的 `sherpa-onnx 2.0.1` 是 CPU wheel，`--provider cuda` 会被库自己回退并打印：
-  `Please compile with -DSHERPA_ONNX_ENABLE_GPU=ON. Available providers: CPUExecutionProvider, . Fallback to cpu!`
-  `run_diarization.py` 捕获 fd 2 上的这条日志并在 `--provider cuda` 时 `SystemExit`，因此不会把 CPU 结果标成 CUDA。Silero、CAM++、WeSpeaker 的 GPU 行已真实执行（见 §4.1、§4.4）。
-- macOS / RK 系列真机：`NOT_RUN`（无硬件）。
+- sherpa-onnx diarization 的 **GPU 执行**：已实测（S 与 L），但**不建议使用**：PyPI 的 `sherpa-onnx 2.0.1` 是 CPU wheel，`--provider cuda` 会被库静默回退并打印
+  `Please compile with -DSHERPA_ONNX_ENABLE_GPU=ON. Available providers: CPUExecutionProvider, . Fallback to cpu!`；
+  改用官方预编译 bundle `sherpa-onnx-v2.0.1-cuda-12.x-cudnn-9.x-onnxruntime1.28.2-linux-x64-gpu` 后 CUDA provider 生效，但 DER 反而变差、RTF 慢 1.3–2.1×（见 §4.3），因此保持 CPU 部署。`run_diarization.py` 仍保留 fd 2 守卫：回退即 `SystemExit`，不会把 CPU 结果标成 CUDA。
+  复现要点：bundle 只有 C++ 产物，需要把 `libsherpa-onnx-c-api.so` 与 `libonnxruntime*.so` 覆盖进 `sherpa_onnx/lib/`（原文件备份），并让 `LD_LIBRARY_PATH` 先用**新版 `nvidia-cuda-runtime-cu12`**——torch 自带的 12.6.77 里 `libcudart.so.12` 不导出 `cudaLibraryGetKernel`，会报 `undefined symbol`。
+- macOS 真机：`NOT_RUN`（无硬件）。RK 已实测（见 §7），但只在 CPU EP 上跑过 VAD/声纹/diarization 的单 session/398-trial 规模，没有跑全量矩阵，也没有用 NPU。
 - 商业授权的 ambient 语料：`NOT_RUN`；只测 ESC-50（非商业）。
 - 端到端接入 recording-mcp 的 ASR/Evidence/Worldline/MCP：`NOT_RUN`；本次只做隔离 PoC，未改契约。
 - ASR/Evidence/Worldline/MCP 回归测试：`NOT_RUN`；因为没有改这些代码路径。
@@ -323,7 +338,7 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/run_diarization_all.py --engine pyanno
 6. **VAD 阈值**：不同麦克风/房间需重新校准；20 session 上 0.5 的 F1 只有 0.831，0.01 才到 0.958。
 7. **前端数值一致性**：CAM++ 同权重下 sherpa-onnx 提取器 3.24%、显式 Kaldi fbank+CMN 2.30%，差 0.94 个百分点；同脚本的 CPU/CUDA 四位有效数字完全相同，说明差异来自前端而不是 provider。接入前必须固定前端与归一化，并用金标 trial 复核。
 8. **样本量与结论稳定性**：扩展后（20 session / 4008 trials / 800 ambient clips）多个 2-session 结论被推翻——CAM++ 优势缩小、sherpa 人数估计不可靠；报告中的数字都以全量为准，单 session 数字仅作对照。
-9. **sherpa CUDA 不可用**：`sherpa-onnx 2.0.1` 是 CPU wheel，GPU 行保持 `NOT_RUN`；边缘方案按 CPU 资源规划。
+9. **sherpa GPU 无收益**：预编译 CUDA bundle 可用，但 S/L 上 DER 变差（0.3196/0.1458 vs CPU 0.2409/0.1404）且 RTF 慢 1.3–2.1×；边缘方案按 CPU 规划。
 
 ## 12. 验收索引（结论 → 证据 → 范围）
 
@@ -340,9 +355,11 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/run_diarization_all.py --engine pyanno
 | 官方 pyannote 权重 | `results/diarization_pyannote_official_cuda_all.json`、`results/diarization_pyannote_official_cuda_L.json`、`results/pyannote_official_status.json` | 官方 gated 仓库、revision `3533c8cf8e36`、20 session | 状态文件记录 revision/returncode；聚合 DER 与镜像逐位相同 |
 | pyannote CPU 资源 | `results/diarization_pyannote_cpu_L.json`、`diarization_pyannote_cpu_S_first300s.json` | 完整 L；S 前 300 s 子集 | 脚本直接输出 |
 | sherpa oracle 人数 | `results/diarization_sherpa_cpu_all.json` + 20 个 `diarization_sherpa_cpu_<session>.json` | CPU、`num_clusters`=RTTM 人数 | 同上；逐 session `num_clusters` 与 `expected_speakers` 相等 |
+| sherpa GPU | `results/diarization_sherpa_cuda_S.json`、`results/diarization_sherpa_cuda_L.json`、`results/diarization_sherpa_cuda_*_<session>.rttm` | S/L 两个 session、官方 CUDA bundle、`provider: cuda` | `provider` 字段 + `metrics.der`/`rtf`；CPU 对照见 `diarization_sherpa_cpu_all.json` |
 | 人数估计器 | `results/speaker_count_estimator.json` + `results/diarization_sherpa_est_{L,S}_*.json` | 仅 L/S 两个 session | silhouette 选阈值；估计值驱动 sherpa 的 DER 对照 oracle |
 | 声纹 sherpa 路径 | `voiceprint_campplus_all_cpu.json`、`voiceprint_wespeaker_all_cpu.json` | 4008 trials，CPU | `compute_eer` |
 | 声纹显式前端 | `voiceprint_{campplus,wespeaker}_onnx_cpu_all.json`、`voiceprint_{campplus,wespeaker}_cuda_all.json` | 同 4008 trials，Kaldi fbank + CMN，CPU/CUDA | 同上；`provider` 字段为硬证据 |
+| RK 设备 | `results/rk_vad_silero_S.json`、`results/rk_voiceprint_campplus.json`、`results/rk_diarization_sherpa_S.json` | RK35xx 4 核；S session VAD、398-trial 声纹、S 单 session diarization | 与 x86 同脚本同权重；数值一致、RTF 见 §7 |
 | Docker / 环境 | `results/docker_gpu_validation.json`、`docker_settings_restore.json`、`environment.json` | 构建、容器内 CUDA 自检、设置还原 | 文件内命令与返回值 |
 | 汇合 | `results/summary.json` | 上述文件的子集视图 | `scripts/summarize.py` |
 
@@ -362,9 +379,10 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/run_diarization_all.py --engine pyanno
 | 能力 | 推荐执行路径 | 本次实际测量 | 采用前置条件 | 不得据此放行 |
 |---|---|---|---|---|
 | 说话人分离 | pyannote Community-1，服务端 GPU | 20 session、官方权重、DER 7.96%、峰值 436 MB | 固定官方 revision/hash（本次 `3533c8cf8e36`）；GPU 显存预算 ≥1 GB | Mac/RK 未验证；未测长会议（>1 h）与真机并发 |
-| 说话人分离（边缘） | sherpa-onnx CPU，**人数由外部给定** | 20 session、oracle 人数、DER 21.14% | 先有可靠人数来源（人工/会议先验） | 默认 threshold 聚类；估计器自动给人数 |
+| 说话人分离（边缘） | sherpa-onnx CPU，**人数由外部给定** | 20 session、oracle 人数、DER 21.14%；GPU 实测无收益（见 §4.3） | 先有可靠人数来源（人工/会议先验） | 默认 threshold 聚类；估计器自动给人数；GPU 部署 |
 | VAD | Silero ONNX，CPU | 20 session、F1 0.831@0.5、RTF 0.0046 | 按设备/房间校准阈值（0.01–0.05） | 沿用 0.5 默认值上远场新设备；GPU 部署 |
 | 声纹 | CAM++ 或 WeSpeaker + **固定显式 fbank+CMN 前端** | 4008 trials、同 session、EER 3.24%/3.49%（sherpa）与 2.30%/3.49%（显式前端） | 前端与归一化固定并经金标 trial 复核；权重来源校验 | 跨数据集 EER 横比；把 sherpa 与 ORT 的数字互换 |
+| 边缘设备（RK） | ONNX/CPU EP：VAD + 声纹；diarization 留服务端 | RK35xx 4 核实测：VAD RTF 0.077、声纹 0.135、diarization 1.406 | 连续负载散热与长时稳定性需复测 | 在 RK 上做实时 diarization；声称 NPU 可用 |
 | 环境声标签 | sherpa-onnx Zipformer | ESC-50 800 clips（CC BY-NC） | 换商用授权语料复测 | 用作商用结论 |
 | 人数估计 | 不作为能力 | 仅 L/S 两个 session，两例都判 reliable 但人数都错 | — | 作为 `num_clusters` 或产品输出 |
 
@@ -381,6 +399,6 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/run_diarization_all.py --engine pyanno
 仍然缺失、会直接阻塞对应结论的资源：
 
 - ~~HF token + 官方条款接受~~：已具备，20 session 已用官方权重重跑（约 29 分钟 GPU），与镜像逐位一致；换环境复跑时仍需 token 与 revision 固定的权重。
-- **macOS / RK 真机**（迁移结论未验证）。
+- **macOS 真机**（RK 已实测，macOS 未验证）。
 - **商用授权 ambient 语料**（ESC-50 为 CC BY-NC）。
 - **产品侧 adapter/worker 设计与回归套件**（ASR/Evidence/Worldline/MCP 未改动，也未验证）。
