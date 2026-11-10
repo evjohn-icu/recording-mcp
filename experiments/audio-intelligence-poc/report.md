@@ -24,7 +24,7 @@
 | 内存 | 23 GB |
 | GPU | NVIDIA GeForce RTX 2070，8192 MiB，驱动 610.88，CUDA UMD 13.3 |
 | Docker | 29.9.2（Docker Desktop 4.98.0，WSL2 engine） |
-| 边缘设备 | OEC BOX WXY4（RK35xx，4×Cortex-A，3.8 GB RAM，eMMC 6.5 GB + HDD 916 GB），Armbian 26.11 / Debian 13 trixie，kernel 6.12.69-rk35xx，Python 3.13.5；有 NPU devfreq 节点，本次只用 CPU EP |
+| 边缘设备 | OEC BOX WXY4（RK35xx，4×Cortex-A，3.8 GB RAM，eMMC 6.5 GB + HDD 916 GB），Armbian 26.11 / Debian 13 trixie，kernel 6.12.69-rk35xx，Python 3.13.5；有 NPU（rknpu 0.9.8），实测任务超时不可用，见 §7 |
 | Python | 3.12.13（PoC venv） |
 | 数据 | AISHELL-4 test split 全部 20 个 session；ESC-50 2000 clips |
 
@@ -238,7 +238,13 @@ RK 侧已实测（OEC BOX WXY4 / RK35xx，4 核，3.8 GB RAM，Armbian 26.11，P
 - **sherpa diarization 在 4 核上 RTF > 1**，单个 39 分钟会议要跑 55 分钟，只能做离线批处理，不能实时/准实时；这也解释了为什么边缘方案应把 diarization 放服务端（或等 NPU/更快的核）。
 - 数值与 x86 完全一致（同权重同前端，CPU EP 的浮点路径一致），说明 ARM 迁移不引入精度漂移，只是变慢。
 - 连续满载时温度到 75.6 ℃、load average 4.0，未见降频导致的错误；但没有做长时间（>1 h）稳定性测试。
-- 板上存在 NPU（`/sys/class/devfreq/fde40000.npu`），但 ONNX Runtime 没有 RK NPU EP，本次**没有**用 NPU；要利用需 rknn-toolkit2 重新转换模型（`NOT_RUN`）。
+- **NPU 实测不可用**（RK3566，`results/rk_npu_rk3566.json`）：
+  - 驱动在：`/sys/kernel/debug/rknpu/version` = `RKNPU driver: v0.9.8`，DRM 节点 `platform-fde40000.npu-card` 存在。
+  - 用户态齐了：设备上装 `rknn-toolkit-lite2==2.5.0`（PyPI 只有 cp37–cp312 轮子，所以用 `uv` 装了 Python 3.12.16 到 `/hdd/audio-poc/.venv312`），并把 `librknnrt` 从系统自带 1.5.2 换成 2.5.0（`rknnlite` 只从 `/usr/lib` 找该库，`LD_LIBRARY_PATH` 不生效）。
+  - 模型能初始化：x86 上用 `rknn-toolkit2==2.5.0` 把合成 conv 模型转成 `rk3566` 的 `.rknn`，设备上 `load_rknn`/`init_runtime` 返回 0、输出 shape 正确。
+  - **但每次推理 6.4 s，`/sys/kernel/debug/rknpu/load` 恒为 0%**，dmesg 原文：`RKNPU: job: ..., commit elapse time: 6190526us, wait time: 6190531us, timeout: 6000000us` → `RKNPU: job timeout` → `RKNPU: soft reset`，probe 阶段还有 `error -ENXIO: IRQ npu_irq not found`。
+  - 结论：NPU 中断没接上，任务等不到 IRQ、6 s 后被复位；**装依赖解决不了**，要换带可用 NPU 中断的 kernel/dtb（厂商 BSP 或修好的 Armbian）。
+- 转换成本记录：CAM++ ONNX 能 `load_onnx`（`inputs=["x"]`, `input_size_list=[[1,400,80]]`），但 `build()` 在 617 节点模型上极慢（fp16 >15 min、w8a8 >30 min 未完成，均主动停止）；Silero VAD 是多输入 + 递归状态，尚未尝试。
 - macOS 仍未验证（无硬件）；其 ONNX 路径预期与 RK 同类，但 CoreML EP 需要单独验证。
 
 ## 8. NOT_RUN
@@ -250,7 +256,8 @@ RK 侧已实测（OEC BOX WXY4 / RK35xx，4 核，3.8 GB RAM，Armbian 26.11，P
   `Please compile with -DSHERPA_ONNX_ENABLE_GPU=ON. Available providers: CPUExecutionProvider, . Fallback to cpu!`；
   改用官方预编译 bundle `sherpa-onnx-v2.0.1-cuda-12.x-cudnn-9.x-onnxruntime1.28.2-linux-x64-gpu` 后 CUDA provider 生效，但 DER 反而变差、RTF 慢 1.3–2.1×（见 §4.3），因此保持 CPU 部署。`run_diarization.py` 仍保留 fd 2 守卫：回退即 `SystemExit`，不会把 CPU 结果标成 CUDA。
   复现要点：bundle 只有 C++ 产物，需要把 `libsherpa-onnx-c-api.so` 与 `libonnxruntime*.so` 覆盖进 `sherpa_onnx/lib/`（原文件备份），并让 `LD_LIBRARY_PATH` 先用**新版 `nvidia-cuda-runtime-cu12`**——torch 自带的 12.6.77 里 `libcudart.so.12` 不导出 `cudaLibraryGetKernel`，会报 `undefined symbol`。
-- macOS 真机：`NOT_RUN`（无硬件）。RK 已实测（见 §7），但只在 CPU EP 上跑过 VAD/声纹/diarization 的单 session/398-trial 规模，没有跑全量矩阵，也没有用 NPU。
+- macOS 真机：`NOT_RUN`（无硬件）。RK 已实测（见 §7），但只在 CPU EP 上跑过 VAD/声纹/diarization 的单 session/398-trial 规模，没有跑全量矩阵。
+- RK NPU：驱动与用户态都已就位、模型能初始化，但每个 job 都等不到中断、6 s 超时复位（dmesg 有原文），属内核/设备树问题，`NOT_RUN` 到换 BSP 为止。
 - 商业授权的 ambient 语料：`NOT_RUN`；只测 ESC-50（非商业）。
 - 端到端接入 recording-mcp 的 ASR/Evidence/Worldline/MCP：`NOT_RUN`；本次只做隔离 PoC，未改契约。
 - ASR/Evidence/Worldline/MCP 回归测试：`NOT_RUN`；因为没有改这些代码路径。
@@ -359,6 +366,7 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/run_diarization_all.py --engine pyanno
 | 人数估计器 | `results/speaker_count_estimator.json` + `results/diarization_sherpa_est_{L,S}_*.json` | 仅 L/S 两个 session | silhouette 选阈值；估计值驱动 sherpa 的 DER 对照 oracle |
 | 声纹 sherpa 路径 | `voiceprint_campplus_all_cpu.json`、`voiceprint_wespeaker_all_cpu.json` | 4008 trials，CPU | `compute_eer` |
 | 声纹显式前端 | `voiceprint_{campplus,wespeaker}_onnx_cpu_all.json`、`voiceprint_{campplus,wespeaker}_cuda_all.json` | 同 4008 trials，Kaldi fbank + CMN，CPU/CUDA | 同上；`provider` 字段为硬证据 |
+| RK NPU | `results/rk_npu_rk3566.json` | RK3566 + rknpu 0.9.8 + librknnrt 2.5.0 + lite2 2.5.0 | dmesg job timeout 原文；npu load 0% |
 | RK 设备 | `results/rk_vad_silero_S.json`、`results/rk_voiceprint_campplus.json`、`results/rk_diarization_sherpa_S.json` | RK35xx 4 核；S session VAD、398-trial 声纹、S 单 session diarization | 与 x86 同脚本同权重；数值一致、RTF 见 §7 |
 | Docker / 环境 | `results/docker_gpu_validation.json`、`docker_settings_restore.json`、`environment.json` | 构建、容器内 CUDA 自检、设置还原 | 文件内命令与返回值 |
 | 汇合 | `results/summary.json` | 上述文件的子集视图 | `scripts/summarize.py` |
@@ -382,7 +390,7 @@ HF_TOKEN=... .venv-gpu/bin/python scripts/run_diarization_all.py --engine pyanno
 | 说话人分离（边缘） | sherpa-onnx CPU，**人数由外部给定** | 20 session、oracle 人数、DER 21.14%；GPU 实测无收益（见 §4.3） | 先有可靠人数来源（人工/会议先验） | 默认 threshold 聚类；估计器自动给人数；GPU 部署 |
 | VAD | Silero ONNX，CPU | 20 session、F1 0.831@0.5、RTF 0.0046 | 按设备/房间校准阈值（0.01–0.05） | 沿用 0.5 默认值上远场新设备；GPU 部署 |
 | 声纹 | CAM++ 或 WeSpeaker + **固定显式 fbank+CMN 前端** | 4008 trials、同 session、EER 3.24%/3.49%（sherpa）与 2.30%/3.49%（显式前端） | 前端与归一化固定并经金标 trial 复核；权重来源校验 | 跨数据集 EER 横比；把 sherpa 与 ORT 的数字互换 |
-| 边缘设备（RK） | ONNX/CPU EP：VAD + 声纹；diarization 留服务端 | RK35xx 4 核实测：VAD RTF 0.077、声纹 0.135、diarization 1.406 | 连续负载散热与长时稳定性需复测 | 在 RK 上做实时 diarization；声称 NPU 可用 |
+| 边缘设备（RK） | ONNX/CPU EP：VAD + 声纹；diarization 留服务端 | RK3566 4 核实测：VAD RTF 0.077、声纹 0.135、diarization 1.406；NPU 任务全部 6 s 超时 | 连续负载散热与长时稳定性需复测；NPU 需换带可用中断的 kernel/dtb | 在 RK 上做实时 diarization；声称 NPU 可用 |
 | 环境声标签 | sherpa-onnx Zipformer | ESC-50 800 clips（CC BY-NC） | 换商用授权语料复测 | 用作商用结论 |
 | 人数估计 | 不作为能力 | 仅 L/S 两个 session，两例都判 reliable 但人数都错 | — | 作为 `num_clusters` 或产品输出 |
 

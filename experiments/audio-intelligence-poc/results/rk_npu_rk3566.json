@@ -1,0 +1,41 @@
+{
+  "board": "OEC BOX WXY4 (RK3566)",
+  "kernel": "6.12.69-rk35xx-ophub (Armbian 26.11 / Debian 13 trixie)",
+  "npu_driver": "rknpu 0.9.8 (debugfs /sys/kernel/debug/rknpu/version)",
+  "runtime": {
+    "system_before": "/usr/local/lib/librknnrt.so 1.5.2 (2023-08-23)",
+    "installed": "/usr/lib/librknnrt.so + /usr/local/lib/librknnrt.so 2.5.0 (74ea630ce8@2026-09-30), backup at /usr/local/lib/librknnrt.so.bak-1.5.2",
+    "python": "rknn-toolkit-lite2==2.5.0 in /hdd/audio-poc/.venv312 (Python 3.12.16 installed with uv 0.13.7; system Python stays 3.13.5)",
+    "note": "PyPI rknn-toolkit-lite2 has wheels only up to cp312, and rknnlite resolves librknnrt.so from /usr/lib itself, so LD_LIBRARY_PATH alone is not enough"
+  },
+  "model": {
+    "path": "models/tiny_rk3566.rknn",
+    "source": "synthetic 3x3 conv + relu ONNX (1x3x32x32 -> 1x8x32x32)",
+    "converted_with": "rknn-toolkit2==2.5.0 on x86_64, target_platform=rk3566, do_quantization=False",
+    "init_ok": true,
+    "inference_output_shape": [1, 8, 32, 32],
+    "latency_ms_median": 6400.0,
+    "latency_ms_p95": 6400.1,
+    "n_runs": 20,
+    "execution_device": "npu job submitted but never completes (timeout), result is not a usable NPU inference"
+  },
+  "dmesg_evidence": [
+    "RKNPU fde40000.npu: error -ENXIO: IRQ npu_irq not found",
+    "RKNPU: job: ..., commit elapse time: 6190526us, wait time: 6190531us, timeout: 6000000us",
+    "RKNPU: failed to wait job, task counter: 0, flags: 0x5, ret = 0, elapsed time: 6190577us",
+    "RKNPU: job timeout, flags: 0x0:",
+    "RKNPU: core 0 irq status: 0x0, raw status: 0x0, require mask: 0x300, task counter: 0x0, elapsed time: 6293892us",
+    "RKNPU: soft reset, num: 2"
+  ],
+  "npu_load_percent": 0,
+  "conclusion": "The RK3566 NPU cannot be used on this image: every job waits for an IRQ that never arrives and is reset after the 6 s timeout. Needs a kernel/dtb with a working NPU interrupt (vendor BSP or a fixed Armbian build); no amount of user-space packaging fixes it.",
+  "dependencies_installed": {
+    "host_x86": ["rknn-toolkit2==2.5.0 (in /tmp/rknn-venv, Python 3.12)", "setuptools<81 (rknn-toolkit2 still imports pkg_resources)", "onnx==1.18.0"],
+    "board": ["uv==0.13.7", "Python 3.12.16", "rknn-toolkit-lite2==2.5.0", "numpy==2.5.4", "psutil==7.2.2", "ruamel.yaml==0.19.1", "librknnrt 2.5.0"]
+  },
+  "conversion_attempts": {
+    "campplus_fp16": "load_onnx rc=0 with inputs=[x], input_size_list=[[1,400,80]]; build(do_quantization=False) stuck in OpFusing for >15 min at optimization_level=3 and was stopped",
+    "campplus_w8a8": "build(do_quantization=True, 40 calibration samples) also exceeded 30 min in OpFusing and was stopped",
+    "silero_vad": "not attempted: multi-input (x, state, sr) with recurrent state, no calibration path defined yet"
+  }
+}

@@ -301,7 +301,7 @@ def main() -> int:
         not_run.append("speaker-count estimator")
     not_run.extend(
         [
-            "RK NPU acceleration (only the CPU EP was exercised)",
+            "RK NPU execution (driver 0.9.8 present but every job times out on a missing IRQ)",
             "macOS hardware",
             "commercial ambient corpus (ESC-50 only)",
             "recording-mcp end-to-end integration and ASR/Evidence/Worldline/MCP regressions",
