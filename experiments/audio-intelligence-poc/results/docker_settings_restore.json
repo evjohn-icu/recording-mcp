@@ -1,0 +1,40 @@
+{
+  "backup_path": "/mnt/c/Users/EV/AppData/Roaming/Docker/settings-store.json.bak-audio-poc",
+  "during_builds": {
+    "OverrideProxyExclude": null,
+    "OverrideProxyHTTP": null,
+    "OverrideProxyHTTPS": null,
+    "ProxyHTTPMode": "system",
+    "ProxyHTTPSMode": null
+  },
+  "note": "The restored manual proxy 172.22.23.142:7890 is the user's original configuration and is currently unreachable; docker build/pull via proxy therefore fails again, which is the pre-existing state. The `system` mode was only used to build the two PoC images, which remain on disk.",
+  "procedure": [
+    "docker desktop stop",
+    "force-stop remaining Docker Desktop/com.docker.backend/com.docker.build processes (docker info confirmed the daemon was down)",
+    "copy settings-store.json.bak-audio-poc over settings-store.json",
+    "start Docker Desktop and poll docker info"
+  ],
+  "restored": {
+    "OverrideProxyExclude": "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12",
+    "OverrideProxyHTTP": "http://172.22.23.142:7890",
+    "OverrideProxyHTTPS": "http://172.22.23.142:7890",
+    "ProxyHTTPMode": "manual",
+    "ProxyHTTPSMode": null
+  },
+  "settings_path": "/mnt/c/Users/EV/AppData/Roaming/Docker/settings-store.json",
+  "verification": {
+    "docker_info_driver": "overlayfs",
+    "docker_info_server": "29.9.2",
+    "images": [
+      "recording-mcp-audio-poc:cpu",
+      "recording-mcp-audio-poc:gpu"
+    ],
+    "on_disk_values_after_restart": {
+      "OverrideProxyExclude": "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12",
+      "OverrideProxyHTTP": "http://172.22.23.142:7890",
+      "OverrideProxyHTTPS": "http://172.22.23.142:7890",
+      "ProxyHTTPMode": "manual",
+      "ProxyHTTPSMode": null
+    }
+  }
+}

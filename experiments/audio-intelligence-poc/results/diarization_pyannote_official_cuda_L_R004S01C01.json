@@ -1,0 +1,40 @@
+{
+  "audio_seconds": 2195.433,
+  "batch_size": 8,
+  "engine": "pyannote-community-1",
+  "gpu_peak_mb": 436.44,
+  "inference_seconds": 75.5724,
+  "load_seconds": 1.5905,
+  "metrics": {
+    "collar": 0.25,
+    "components": {
+      "confusion": 22.947075000000435,
+      "correct": 1812.181718749998,
+      "false alarm": 22.489581250002427,
+      "missed detection": 21.64600624999909,
+      "total": 1856.7747999999976
+    },
+    "der": 0.03612859378531098,
+    "hyp_speakers": 7,
+    "hyp_speech_seconds": 2024.780625000002,
+    "ref_speakers": 7,
+    "ref_speech_seconds": 1990.3346999999978,
+    "skip_overlap": false
+  },
+  "models": {
+    "pipeline": "/home/ev/code/recording-mcp/experiments/audio-intelligence-poc/models/pyannote-official"
+  },
+  "n_hypothesis_segments": 288,
+  "notes": [
+    "DER uses pyannote.metrics 4.2.0 with a 0.25 s collar; overlap is scored (skip_overlap=False).",
+    "sherpa-onnx clustering is threshold-based with an unknown speaker count; pyannote Community-1 is end-to-end."
+  ],
+  "num_clusters": null,
+  "peak_rss_mb": 1974.61,
+  "provider": "cuda",
+  "rtf": 0.03442254929073295,
+  "scope": "full",
+  "session": "L_R004S01C01",
+  "threads": null,
+  "threshold": null
+}

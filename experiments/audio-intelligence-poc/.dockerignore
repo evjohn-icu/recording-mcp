@@ -1,0 +1,8 @@
+.venv-cpu
+.venv-gpu
+data
+models
+results
+__pycache__
+*.pyc
+.pytest_cache

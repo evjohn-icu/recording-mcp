@@ -1,0 +1,149 @@
+{
+  "embedding_model": {
+    "bytes": 28281164,
+    "path": "models/campplus/campplus_zh_en_fp32.onnx",
+    "sha256": "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"
+  },
+  "engine": "silero-vad + CAM++ agglomerative (cosine, average linkage)",
+  "hop_seconds": 0.75,
+  "load_seconds": 0.6381,
+  "max_speakers": 12,
+  "max_windows": 200,
+  "min_silhouette": 0.05,
+  "min_window_speech_probability": 0.1,
+  "n_sessions": 2,
+  "notes": [
+    "Windows are 1.5 s with a 0.75 s hop, kept when the mean Silero probability is at least 0.1.",
+    "The threshold with the highest cosine silhouette wins; a single-cluster split is never eligible.",
+    "reliable requires silhouette >= 0.05 and 1 <= estimated_speakers <= 12; unreliable estimates must not drive sherpa num_clusters."
+  ],
+  "peak_rss_mb": 543.33,
+  "sessions": {
+    "L_R004S03C01": {
+      "audio_seconds": 2227.768,
+      "embedding_dim": 192,
+      "embedding_seconds": 5.2486,
+      "estimated_speakers": 5,
+      "raw_clusters": 5,
+      "reference_speakers": 7,
+      "reliable": true,
+      "silhouette": 0.25404688715934753,
+      "sweep": [
+        {
+          "clusters": 180,
+          "silhouette": 0.02235846221446991,
+          "threshold": 0.3
+        },
+        {
+          "clusters": 114,
+          "silhouette": 0.062406983226537704,
+          "threshold": 0.4
+        },
+        {
+          "clusters": 58,
+          "silhouette": 0.07991476356983185,
+          "threshold": 0.5
+        },
+        {
+          "clusters": 30,
+          "silhouette": 0.1472887247800827,
+          "threshold": 0.6
+        },
+        {
+          "clusters": 12,
+          "silhouette": 0.24634785950183868,
+          "threshold": 0.7
+        },
+        {
+          "clusters": 5,
+          "silhouette": 0.25404688715934753,
+          "threshold": 0.8
+        },
+        {
+          "clusters": 2,
+          "silhouette": 0.1824086308479309,
+          "threshold": 0.9
+        },
+        {
+          "clusters": 1,
+          "silhouette": null,
+          "threshold": 1.0
+        }
+      ],
+      "threshold": 0.8,
+      "vad_seconds": 15.4366,
+      "window_count": 200
+    },
+    "S_R004S03C01": {
+      "audio_seconds": 2327.119,
+      "embedding_dim": 192,
+      "embedding_seconds": 4.4986,
+      "estimated_speakers": 7,
+      "raw_clusters": 7,
+      "reference_speakers": 5,
+      "reliable": true,
+      "silhouette": 0.3417576551437378,
+      "sweep": [
+        {
+          "clusters": 178,
+          "silhouette": 0.022472167387604713,
+          "threshold": 0.3
+        },
+        {
+          "clusters": 98,
+          "silhouette": 0.06227847933769226,
+          "threshold": 0.4
+        },
+        {
+          "clusters": 37,
+          "silhouette": 0.06976830214262009,
+          "threshold": 0.5
+        },
+        {
+          "clusters": 13,
+          "silhouette": 0.2462974190711975,
+          "threshold": 0.6
+        },
+        {
+          "clusters": 7,
+          "silhouette": 0.3417576551437378,
+          "threshold": 0.7
+        },
+        {
+          "clusters": 5,
+          "silhouette": 0.29261666536331177,
+          "threshold": 0.8
+        },
+        {
+          "clusters": 1,
+          "silhouette": null,
+          "threshold": 0.9
+        },
+        {
+          "clusters": 1,
+          "silhouette": null,
+          "threshold": 1.0
+        }
+      ],
+      "threshold": 0.7,
+      "vad_seconds": 13.4759,
+      "window_count": 200
+    }
+  },
+  "thresholds": [
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0
+  ],
+  "vad_model": {
+    "bytes": 2327524,
+    "path": "models/silero-official/model.onnx",
+    "sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3"
+  },
+  "window_seconds": 1.5
+}

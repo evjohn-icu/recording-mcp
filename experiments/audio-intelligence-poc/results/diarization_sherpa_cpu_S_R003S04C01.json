@@ -1,0 +1,49 @@
+{
+  "audio_seconds": 2393.927,
+  "batch_size": null,
+  "engine": "sherpa-onnx",
+  "gpu_peak_mb": null,
+  "inference_seconds": 164.6326,
+  "load_seconds": 0.2652,
+  "metrics": {
+    "collar": 0.25,
+    "components": {
+      "confusion": 644.296809454345,
+      "correct": 1491.3977403442402,
+      "false alarm": 41.58082647047925,
+      "missed detection": 120.14005020141829,
+      "total": 2255.834600000004
+    },
+    "der": 0.35730353906542667,
+    "hyp_speakers": 5,
+    "hyp_speech_seconds": 2272.2866254206747,
+    "ref_speakers": 5,
+    "ref_speech_seconds": 2289.011900000001,
+    "skip_overlap": false
+  },
+  "models": {
+    "embedding": {
+      "bytes": 28281164,
+      "path": "models/campplus/campplus_zh_en_fp32.onnx",
+      "sha256": "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"
+    },
+    "segmentation": {
+      "bytes": 5992913,
+      "path": "models/sherpa-seg/model.onnx",
+      "sha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
+    }
+  },
+  "n_hypothesis_segments": 306,
+  "notes": [
+    "DER uses pyannote.metrics 4.2.0 with a 0.25 s collar; overlap is scored (skip_overlap=False).",
+    "sherpa-onnx clustering is threshold-based with an unknown speaker count; pyannote Community-1 is end-to-end."
+  ],
+  "num_clusters": 5,
+  "peak_rss_mb": 567.41,
+  "provider": "cpu",
+  "rtf": 0.0687709532688345,
+  "scope": "full",
+  "session": "S_R003S04C01",
+  "threads": 4,
+  "threshold": 0.5
+}

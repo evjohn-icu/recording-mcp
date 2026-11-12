@@ -1,0 +1,7 @@
+.venv-cpu/
+.venv-gpu/
+data/
+models/
+results/*
+!results/*.json
+!results/*.rttm
