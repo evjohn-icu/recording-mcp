@@ -2,7 +2,9 @@
 
 上下文投影是一个**读取时**的确定性推导层：给定记忆库的当前状态，直接推导出消费方应该看到的上下文对象——person（人物）、topic（话题）、commitment（承诺）、preference（偏好）、event（事件），每个对象都带证据轮次、来源与状态。投影不落库、不新增表：每次调用都从当前行重建，因此天然可重复构建，永远不会与记忆库产生漂移。
 
-实现：`internal/projection`（`Build`），由 MCP 工具 `get_current_context` 暴露。无 LLM 参与，无真值引擎。
+实现：`internal/projection`（`Build`），由 MCP 工具 `get_current_context` 暴露。投影规则本身无 LLM 参与，无真值引擎。
+
+提供 `query` 时，MCP 先用 `build_context` 执行一次小规模检索（`v1`、12 条、16000 字节），在显式的 `conversation_id` 和 `topic_id` 范围内按命中的会话与话题收窄投影。如果语义后端未配置或出现可降级故障，检索保留其余分支，投影继续执行。字面与语义均零召回时，投影沿用原有过滤条件，在 `unresolved` 中报告 `no_retrieval_hits`。影响整个检索的错误会返回给 MCP 调用方。 [上下文包与降级说明](context-layer-runtime.md#mcp-工具)
 
 ## 对象与状态模型
 
@@ -74,8 +76,8 @@
 ## 确定性保证
 
 - 输出中不出现任何 map 迭代顺序：所有集合在输出前排序；
-- 融合、排序、限额全部确定；同一数据库快照 + 同一请求 = 逐字节相同的 JSON；
-- 无时钟输入：没有字段依赖 wall-clock；
+- 给定同一数据库快照、过滤条件和检索范围，投影输出逐字节相同。带 `query` 的请求中，配置的 embedding 或 Decision 服务可影响收窄后的范围。
+- 无时钟输入：投影字段没有依赖 wall-clock；
 - `trace.rules` 是固定字面列表：`note_kind_mapping`、`commitment_conflict_cues`、`topic_from_membership`、`person_from_confirmed_bindings`。
 
 ## 明确不投影的内容
@@ -84,5 +86,5 @@
 - 无时间锚的 `observation`（拒绝编造事件时间）；
 - `project` 类型：保留，v0 不做任何虚构分类；
 - 没有真值引擎：冲突只报告，不裁决；
-- 投影路径上没有 LLM：一切规则都是代码里的字面规则；
+- 投影规则没有 LLM：一切规则都是代码里的字面规则（可选 `query` 的收窄检索属于 `build_context`，不属于投影规则）；
 - ambient 内容：主证据轮次为 ambient 的笔记从不进入投影。

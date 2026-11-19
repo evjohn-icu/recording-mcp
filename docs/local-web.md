@@ -8,6 +8,10 @@
 - `--web-dir`：已构建的前端目录，默认 `web/dist`；
 - `--semantic-provider`：`off`、离线确定性的 `hash`，或需要凭据的 `openai`。
 
+另有 profile 模式：`--profile <name>`（可配 `--profiles-root`，缺省 `data/profiles`）启用受密码保护的
+本地 profile，数据库、音频与事件平面都放在 profile 目录内；它与 `--db`/`--audio-dir` 互斥。Docker 部署
+即使用该模式，备份与恢复也按 profile 布局走，见下文。
+
 ## 合成演示（推荐的首次检查）
 
 ```sh
@@ -84,7 +88,11 @@ Web 的转写 tab 是 ASR 原文只读视图；不能在浏览器中直接改字
 `turns`。纠错必须通过新的转录 revision 走既有 ingestion 路径，使旧 revision 能够
 审计并按 stale 规则处理。Web 支持的是带证据的 note summary 修订，不等于 ASR 编辑。
 
-### 备份：使用 SQLite backup API
+### 备份：单库 SQLite backup 的适用范围
+
+本节适用于上面的 legacy 单库模式（`--db data/context-memory.db`）。这套数据除了 memory 数据库，还有事件
+平面 `data/context-memory.db.events.db`（`--db` 路径加 `.events.db` 后缀）和 `--audio-dir` 下的 PCM；
+下面的 Python 备份只覆盖 memory 数据库本身。
 
 不要用 `cp` 在数据库仍有 WAL 写入时复制单个 `.db` 文件。可以先停写入进程，或使用
 SQLite online backup API 创建一致副本：
@@ -107,14 +115,30 @@ finally:
 PY
 ```
 
-备份文件应有严格的本地权限，并在恢复演练中验证副本能被程序打开；`context-web` 当前没有只读启动模式，
-启动时可能运行迁移，不要将此操作当作只读检查。备份不包含云端 R2/D1 的远端生命周期操作；那些部分按
-[docs/cloud-deploy.md](cloud-deploy.md) 的流程另行备份。
+单库副本只用于崩溃安全副本与文件级检查，**不是**可恢复部署的完整备份：
+
+- 不含事件平面与音频 PCM。只恢复 `.db` 后，`sync_recordings.stitched_path` 指向的音频文件不会随之恢复，
+  播放会报音频缺失；事件平面也不随库回滚，两边可能不一致。
+- 恢复一个旧的 `.db` 副本没有任何遗忘屏障校验：永久遗忘之前拍的副本会把已遗忘的录音与内容原样带回来。
+  需要考虑遗忘屏障的恢复必须走 profile 布局的 `context-backup restore`（见下）。
+- `context-web` 当前没有只读启动模式，`memory.Open` 启动时运行内置 migration runner；打开副本做“检查”
+  也可能触发迁移，不要把这一步当作只读校验。
+
+若数据库属于 profile 布局（`--profile`/`--profiles-root` 运行，或 Docker 部署），数据位于
+`<profiles-root>/<profile>/db/context-memory.db`，音频在 `<profile>/audio/`，事件平面在
+`<profile>/plane/events.db`。这种布局的完整备份/恢复/校验走 `context-backup`（备份要求停写并显式传
+`--confirm-writers-stopped`，恢复以停写的受信 live root 校验遗忘屏障），命令、恢复前置条件与错误码见
+[docs/productization/deployment.md](productization/deployment.md)。`context-backup verify` 适用于 profile
+布局（未完成遗忘或损坏音频引用会被拒绝），对 legacy 单库布局会因找不到 profile 数据库而失败。
+
+备份文件应有严格的本地权限，并在恢复演练中验证副本能被程序打开。备份不包含云端 R2/D1 的远端生命周期操作；
+那些部分按 [docs/cloud-deploy.md](cloud-deploy.md) 的流程另行备份。
 
 ## 发布、回滚与证据口径
 
-1. 发布前用 SQLite backup API 做带时间戳备份，记录将使用的 binary、`web/dist` 和
-   loopback 端口。
+1. 发布前做带时间戳备份：legacy 单库用上面的 SQLite backup API；profile 布局用
+   [deployment.md](productization/deployment.md) 的停写 `context-backup` 归档。记录将使用的 binary、
+   `web/dist` 和 loopback 端口。
 2. 先停止旧的 Web 进程，再替换 binary/前端并启动；用 `/healthz` 和随机 bootstrap
    token 做本机检查。不要让新版本覆盖数据库文件。
 3. 回滚时停止新进程，恢复旧 binary/前端并重新启动；只有在明确的灾难恢复操作中才

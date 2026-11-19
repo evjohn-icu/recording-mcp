@@ -21,6 +21,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"recordingmcp/internal/audioanalysis"
 	"recordingmcp/internal/cloudsync"
 	"recordingmcp/internal/decision"
 	"recordingmcp/internal/generate"
@@ -98,6 +99,7 @@ func run() error {
 	ffmpegPath := flag.String("ffmpeg", "ffmpeg", "ffmpeg binary used by the ingest stage")
 	ffprobePath := flag.String("ffprobe", "ffprobe", "ffprobe binary used by the ingest stage")
 	audioDir := flag.String("audio-dir", "", "audio directory (legacy mode; profile mode uses the profile audio directory)")
+	audioAnalysisConfig := flag.String("audio-analysis-config", "", "path to an audio-analysis-config-v1 JSON (empty disables audio analysis)")
 	healthAddr := flag.String("health-addr", "", "address for the worker health endpoint; empty disables it")
 	flag.Parse()
 
@@ -210,8 +212,12 @@ func run() error {
 			transcriber = nil
 		}
 	}
+	audioCfg, audioCfgPath, audioStages, audioUnavailable, audioStore, err := buildAudioStages(*audioAnalysisConfig, db, store, *audioDir, logger)
+	if err != nil {
+		return err
+	}
 	importer, err := ingest.New(ingest.Config{
-		Store: store, DB: db, AudioDir: *audioDir,
+		Store: store, DB: db, AudioDir: *audioDir, Audio: audioCfg,
 		Decoder:       &ingest.FFmpegDecoder{FFmpeg: *ffmpegPath, FFprobe: *ffprobePath},
 		Transcription: transcriber,
 		ASRProvider:   *asrProvider, ASRModel: *asrModel, ASRResourceID: *asrResourceID,
@@ -224,7 +230,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	inner, err := buildExecutor(*executor, db, store, *decisionURL, *decisionModel, gen, *syntheticDelay, absDBPath, *curatorCommand, *curatorModel, *curatorTimeout, embedProviderImpl, importer)
+	inner, err := buildExecutor(*executor, db, store, *decisionURL, *decisionModel, gen, *syntheticDelay, absDBPath, *curatorCommand, *curatorModel, *curatorTimeout, embedProviderImpl, importer, audioCfg, audioCfgPath, audioStages, audioStore)
 	if err != nil {
 		return err
 	}
@@ -236,6 +242,19 @@ func run() error {
 		}
 	})
 	jobStages := workerStages(*stages, profileSelected, explicitStages)
+	if !explicitStages {
+		for capability := range audioStages {
+			stage := "audio_" + capability
+			if !containsStage(jobStages, stage) {
+				jobStages = append(jobStages, stage)
+			}
+		}
+	}
+	if audioStore != nil {
+		if err := recoverAudioStages(context.Background(), audioStore, jobStages, audioUnavailable, time.Now()); err != nil {
+			logger.Printf("context-worker: audio stage recovery: %v", err)
+		}
+	}
 	if containsStage(jobStages, "worldline") {
 		scope, eventsPath, e := profileCLI.WorldlinePlane(*dbPath, *worldlineEventsDB)
 		if e != nil {
@@ -354,7 +373,7 @@ func workerDSN(path string) string {
 // pipeline executor routes extract, publish, curate and embed jobs to their
 // stage handlers; the curate handler runs the configured curator command and
 // stores the proposals it produces.
-func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, decisionModel string, gen generate.Generator, syntheticDelay time.Duration, dbPath, curatorCommand, curatorModel string, curatorTimeout time.Duration, embedProvider semantic.Provider, importer *ingest.Service) (worker.Executor, error) {
+func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, decisionModel string, gen generate.Generator, syntheticDelay time.Duration, dbPath, curatorCommand, curatorModel string, curatorTimeout time.Duration, embedProvider semantic.Provider, importer *ingest.Service, audioCfg *audioanalysis.Config, audioCfgPath string, audioStages map[string]*audioStage, audioStore *audioanalysis.Store) (worker.Executor, error) {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "synthetic":
 		return worker.Synthetic{Delay: syntheticDelay}, nil
@@ -369,7 +388,7 @@ func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, de
 				HTTPClient: &http.Client{Timeout: 30 * time.Second},
 			}
 		}
-		return &stageExecutor{stages: map[string]worker.Executor{
+		stageMap := map[string]worker.Executor{
 			"ingest": &ingestStage{svc: importer, stage: "ingest"},
 			"asr":    &ingestStage{svc: importer, stage: "asr"},
 			"extract": &pipeline.ExtractHandler{
@@ -396,7 +415,14 @@ func buildExecutor(name string, db *sql.DB, store *memory.Store, decisionURL, de
 				Model:            curatorModel,
 				ProcessorVersion: "curate-v1",
 			},
-		}}, nil
+		}
+		for capability, stage := range audioStages {
+			stageMap["audio_"+capability] = stage
+		}
+		_ = audioCfg
+		_ = audioCfgPath
+		_ = audioStore
+		return &stageExecutor{stages: stageMap}, nil
 	default:
 		return nil, fmt.Errorf("unknown executor %q (want synthetic or pipeline)", name)
 	}

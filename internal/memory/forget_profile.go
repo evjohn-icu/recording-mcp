@@ -63,6 +63,7 @@ func (s *Store) PurgeRetiredProfile(ctx context.Context) error {
 		return errors.New("profile retirement fence is not active")
 	}
 	tables := []string{
+		"audio_speaker_embeddings", "audio_analysis_events", "audio_analysis_heads", "processing_job_dependencies", "audio_analysis_runs",
 		"decision_answers", "processing_attempts", "memory_highlight_requests", "memory_highlights", "annotation_history", "note_evidence", "turn_topics", "turn_classes", "analysis_coverage", "attachment_turns", "derived_artifact_sources", "speaker_binding_events",
 		"worker_heartbeats", "processing_retry_requests", "memory_embeddings", "memory_links", "derived_artifacts", "decision_runs", "publication_runs", "memory_candidates", "notes", "speaker_bindings", "turns", "source_attachments", "processing_jobs", "recordings", "topic_conversations", "topics", "conversations", "sync_chunks", "sync_events", "sync_recordings", "sync_state", "ai_note_suppressions", "suppression_cleanup_operations", "forget_files", "forget_provider_fences", "forget_tombstones",
 	}

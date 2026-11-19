@@ -157,7 +157,7 @@ export interface Capabilities {
   version: string
   asr: ASRCapability
   generator: { enabled: boolean }
-  retrieval: { default_version: string; v2_available: boolean }
+  retrieval: { default_version: string; v2_available: boolean; v3_available: boolean }
   worker: { alive: boolean; count: number }
   limits: { upload_bytes: number }
 }
@@ -336,6 +336,29 @@ export interface PackageItemRanking {
   retrieval_link_ids?: string[]
 }
 
+export interface AdmissionRejection {
+  item_id: string
+  reason: string
+}
+
+export interface AdmissionDecision {
+  item_id: string
+  relation: string
+  probability: number
+}
+
+export interface AdmissionTrace {
+  schema?: string
+  threshold?: number
+  latency_ms?: number
+  assessor_model?: string
+  candidates: number
+  admitted: number
+  pool_limited_ids?: string[]
+  rejected?: AdmissionRejection[]
+  decisions?: AdmissionDecision[]
+}
+
 export interface ContextPackage {
   items: Item[]
   evidence: {
@@ -345,6 +368,13 @@ export interface ContextPackage {
     global_start_ms: number | null
     global_end_ms: number | null
     used_by_item_ids: string[]
+    recording_id?: string
+    conversation_id?: string
+    transcript_revision?: string
+    source_status?: 'raw_current' | 'derived_proposed' | 'navigation_only' | string
+    speaker_confirmed?: boolean
+    speaker_person_id?: string | null
+    recording_started_at?: string
   }[]
   coverage: {
     conversations: string[]
@@ -384,6 +414,7 @@ export interface ContextPackage {
     stale_filtered: string[]
     decision_rerank: boolean
     budget: { bytes_used: number; items_used: number; evidence_used: number }
+    admission?: AdmissionTrace
   }
   ranking: PackageItemRanking[]
 }
@@ -409,10 +440,12 @@ export interface SearchParams {
   include_ambient?: boolean
 }
 
+export type RetrievalVersion = 'v1' | 'v2' | 'v3'
+
 export interface HybridParams {
   q: string
   mode: 'hybrid' | 'lexical'
-  retrieval_version?: 'v1' | 'v2'
+  retrieval_version?: RetrievalVersion
   topic_id?: string
   conversation_id?: string
   started_after?: string

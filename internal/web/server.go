@@ -144,6 +144,7 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /api/items/{id}", s.handleItem)
 	mux.HandleFunc("GET /api/turns/{id}/evidence", s.handleEvidence)
 	mux.HandleFunc("GET /api/turns/{id}/audio", s.handleAudio)
+	mux.HandleFunc("GET /api/audio-analysis/events/{id}/audio", s.handleAudioAnalysisEvent)
 	mux.HandleFunc("GET /api/search", s.handleSearch)
 	mux.HandleFunc("GET /api/search/hybrid", s.handleHybrid)
 	mux.HandleFunc("GET /api/topics", s.handleTopics)

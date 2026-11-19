@@ -834,6 +834,47 @@ func TestHybridRetrievalVersionSelection(t *testing.T) {
 	}
 }
 
+func TestHybridIncludeRawEvidence(t *testing.T) {
+	env := newTestEnv(t, "")
+	var without struct {
+		Evidence []struct {
+			TurnID string `json:"turn_id"`
+			Text   string `json:"text"`
+		} `json:"evidence"`
+	}
+	status, data := env.do(t, http.MethodGet, "/api/search/hybrid?q=预算&mode=lexical&retrieval_version=v1", "", nil)
+	if status != http.StatusOK {
+		t.Fatalf("hybrid failed: %d %s", status, data)
+	}
+	if err := json.Unmarshal(data, &without); err != nil {
+		t.Fatal(err)
+	}
+	if len(without.Evidence) != 0 {
+		t.Fatalf("evidence was returned without the flag: %s", data)
+	}
+	status, data = env.do(t, http.MethodGet,
+		"/api/search/hybrid?q=预算&mode=lexical&retrieval_version=v1&max_bytes=65536&include_raw_evidence=true", "", nil)
+	if status != http.StatusOK {
+		t.Fatalf("hybrid with evidence failed: %d %s", status, data)
+	}
+	if err := json.Unmarshal(data, &without); err != nil {
+		t.Fatal(err)
+	}
+	if len(without.Evidence) == 0 || without.Evidence[0].Text == "" {
+		t.Fatalf("include_raw_evidence returned no budgeted evidence: %s", data)
+	}
+	if len(data) > 65536+4096 {
+		t.Fatalf("evidence exceeded the byte budget: %d bytes", len(data))
+	}
+	status, data = env.do(t, http.MethodGet, "/api/search/hybrid?q=预算&include_raw_evidence=maybe", "", nil)
+	if status != http.StatusBadRequest {
+		t.Fatalf("invalid boolean: got %d want 400 (%s)", status, data)
+	}
+	if e := decodeError(t, data); e.Code != app.CodeValidationFailed {
+		t.Fatalf("unexpected code: %q", e.Code)
+	}
+}
+
 func TestHealthReflectsDatabaseFailure(t *testing.T) {
 	env := newTestEnv(t, "")
 	if err := env.store.DB().Close(); err != nil {

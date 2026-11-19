@@ -41,7 +41,11 @@ type SearchOptions struct {
 // caller's retrieval.
 type SemanticRetriever interface {
 	Search(ctx context.Context, query string, opts SearchOptions) ([]SemanticHit, error)
-	Ready() bool
+	// Ready probes whether the backend can serve. A false result with a nil
+	// error means the index is genuinely empty (degrade to lexical); any
+	// database or index failure must be returned as an error so callers never
+	// mistake a broken store for an empty one.
+	Ready(ctx context.Context) (bool, error)
 	Describe() string // provider/model summary for traces
 }
 
@@ -68,19 +72,23 @@ func (r *SQLiteRetriever) Describe() string {
 
 // Ready reports whether at least one embedding row exists for the configured
 // provider/model/dims. An empty index is not an error; it means the semantic
-// branch must degrade.
-func (r *SQLiteRetriever) Ready() bool {
+// branch must degrade. A SQL failure is an error: a broken database must not
+// look like an empty index.
+func (r *SQLiteRetriever) Ready(ctx context.Context) (bool, error) {
 	if r == nil || r.DB == nil || r.Provider == nil {
-		return false
+		return false, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return false, err
 	}
 	var n int
-	if err := r.DB.QueryRowContext(context.Background(),
+	if err := r.DB.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM memory_embeddings WHERE provider_id=? AND model_id=? AND dims=?`,
 		r.Provider.ID(), r.Provider.Model(), r.Provider.Dims(),
 	).Scan(&n); err != nil {
-		return false
+		return false, fmt.Errorf("semantic: readiness probe: %w", err)
 	}
-	return n > 0
+	return n > 0, nil
 }
 
 // Search embeds the query and returns the closest current, non-ambient

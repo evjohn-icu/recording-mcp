@@ -1,0 +1,37 @@
+# Audio analysis adapter dependencies (audio-analysis-v1, C2).
+#
+# Install into a dedicated Python 3.12 environment for the adapter; never mix
+# it with the ASR environment (.venv-asr) and never co-install the CPU and GPU
+# onnxruntime builds (they collide on import). Versions are the PoC-verified
+# pins from experiments/audio-intelligence-poc/results/environment.json.
+#
+#   numpy             2.5.4
+#   onnxruntime       1.31.1   (CPU)
+#   sherpa-onnx       2.0.1
+#   kaldi-native-fbank 1.23.0
+#   pyannote.metrics  4.2.0    (offline DER scoring only)
+
+numpy==2.5.4
+onnxruntime==1.31.1
+sherpa-onnx==2.0.1
+kaldi-native-fbank==1.23.0
+pyannote.metrics==4.2.0
+
+# ---------------------------------------------------------------------------
+# GPU group — Community-1 diarization only. Separate environment; replaces the
+# CPU onnxruntime above (do NOT install both ORT builds together).
+# PoC-verified GPU stack (docker_gpu_validation.json): portable CPython 3.12.13
+# on debian bookworm with CUDA 12.6.
+#
+#   torch==2.14.1+cu126 --index-url https://download.pytorch.org/whl/cu126
+#   torchaudio==2.14.1+cu126 --index-url https://download.pytorch.org/whl/cu126
+#   onnxruntime-gpu==1.23.2
+#   pyannote.audio==4.0.0
+#
+# onnxruntime-gpu 1.23.2 is the last CUDA 12 build and matches torch cu126's
+# bundled cuBLAS 12 / cuDNN 9; scripts call onnxruntime.preload_dlls() when the
+# helper exists. pyannote Community-1 weights are CC-BY-4.0 and gated: they are
+# fetched once by an operator account into a trusted local directory that the
+# config pins by hash, then everything runs offline (HF_HUB_OFFLINE=1). The
+# adapter never downloads or accepts gated terms at runtime.
+# ---------------------------------------------------------------------------

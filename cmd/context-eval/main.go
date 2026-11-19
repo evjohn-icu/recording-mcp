@@ -49,12 +49,18 @@ func run() error {
 		embedModel            = flag.String("embed-model", "", "embedding model")
 		embedKeyEnv           = flag.String("embed-key-env", "", "environment variable containing the embedding API key")
 		embedInputType        = flag.Bool("embed-input-type", false, "send the non-standard input_type field (needed by the bundled Qwen embedding server)")
-		retrievalVersion      = flag.String("retrieval-version", "v1", "retrieval implementation: v1|v2")
+		retrievalVersion      = flag.String("retrieval-version", "v1", "retrieval implementation: v1|v2|v3")
 		rerankCandidateLimit  = flag.Int("rerank-candidate-limit", 64, "v2 candidate pool size before final budget (1..128)")
 		rerankDecisionURL     = flag.String("rerank-decision-url", "", "optional Decision service endpoint for explicitly enabled reranking")
 		rerankDecisionModel   = flag.String("rerank-decision-model", "", "Decision model name for reranking")
 		assessorDecisionURL   = flag.String("assessor-decision-url", "", "optional Decision service endpoint for evidence sufficiency assessment")
 		assessorDecisionModel = flag.String("assessor-decision-model", "", "Decision model name for evidence assessment")
+		admissionPolicyPath   = flag.String("admission-policy", "", "path to an evidence-admission-policy-v1 JSON (required for v3)")
+		calibrationMode       = flag.Bool("calibration-mode", false, "accept a calibration admission policy (offline calibration only)")
+		admissionBatch        = flag.Int("admission-batch-questions", 0, "candidates per assessor request; 0 uses the client default (1), max 32")
+		lifecyclePath         = flag.String("lifecycle", "", "lifecycle fixture listing sources forgotten before retrieval (v3)")
+		admissionCachePath    = flag.String("admission-probability-cache", "", "calibration-only cache of frozen assessor decisions")
+		profileAdmission      = flag.Bool("profile-admission", false, "profile-only: record assessor engine latency and request accounting")
 		minSimilarity         = flag.Float64("min-similarity", -1, "optional semantic admission threshold; omit for default behavior")
 		lexicalOnly           = flag.Bool("lexical-only", false, "run only the lexical retrieval pass")
 		timeout               = flag.Duration("timeout", 5*time.Minute, "total evaluation timeout")
@@ -91,8 +97,33 @@ func run() error {
 	if *minSimilarity > 1 {
 		return fmt.Errorf("min-similarity must be in [0,1]")
 	}
-	if *retrievalVersion != "v1" && *retrievalVersion != "v2" {
-		return fmt.Errorf("retrieval-version must be v1 or v2")
+	if *retrievalVersion != "v1" && *retrievalVersion != "v2" && *retrievalVersion != "v3" {
+		return fmt.Errorf("retrieval-version must be v1, v2 or v3")
+	}
+	var admissionPolicy *contextbuild.AdmissionPolicy
+	if raw := strings.TrimSpace(*admissionPolicyPath); raw != "" {
+		loaded, err := contextbuild.LoadAdmissionPolicy(raw)
+		if err != nil {
+			return err
+		}
+		if err := loaded.Validate(*calibrationMode); err != nil {
+			return err
+		}
+		admissionPolicy = loaded
+	} else if *retrievalVersion == "v3" {
+		return fmt.Errorf("retrieval-version v3 requires --admission-policy")
+	}
+	if *retrievalVersion == "v3" && *assessorDecisionURL == "" {
+		return fmt.Errorf("retrieval-version v3 requires --assessor-decision-url and --assessor-decision-model")
+	}
+	if *admissionCachePath != "" && (!*calibrationMode || *retrievalVersion != "v3") {
+		return fmt.Errorf("--admission-probability-cache is only valid for v3 calibration")
+	}
+	if *profileAdmission && (*retrievalVersion != "v3" || *assessorDecisionURL == "") {
+		return fmt.Errorf("--profile-admission requires retrieval v3 with an assessor endpoint")
+	}
+	if *admissionBatch < 0 || *admissionBatch > 32 {
+		return fmt.Errorf("admission-batch-questions must be within [0,32]")
 	}
 	if *rerankCandidateLimit < 1 || *rerankCandidateLimit > 128 {
 		return fmt.Errorf("rerank-candidate-limit must be in [1,128]")
@@ -109,9 +140,28 @@ func run() error {
 		reranker = &contextbuild.DecisionReranker{Engine: engine}
 	}
 	var assessor contextbuild.EvidenceAssessor
+	var candidateAssessor contextbuild.CandidateAssessor
+	var engineTiming *eval.EngineTiming
+	var admissionStats *contextbuild.AdmissionRequestStats
 	if *assessorDecisionURL != "" {
-		engine := &decision.SystemOneClient{Endpoint: strings.TrimSpace(*assessorDecisionURL), Model: strings.TrimSpace(*assessorDecisionModel)}
+		engine := decision.Engine(&decision.SystemOneClient{Endpoint: strings.TrimSpace(*assessorDecisionURL), Model: strings.TrimSpace(*assessorDecisionModel)})
+		if *profileAdmission {
+			// Offline profile only: measure the engine's own work and the
+			// request accounting the 64 KiB cap produces.
+			engineTiming = eval.NewEngineTiming(engine)
+			engine = engineTiming
+			admissionStats = &contextbuild.AdmissionRequestStats{}
+		}
 		assessor = contextbuild.DecisionEvidenceAssessor{Engine: engine}
+		candidateAssessor = contextbuild.DecisionCandidateAssessor{Engine: engine, MaxQuestionsPerBatch: *admissionBatch,
+			Stats: admissionStats}
+		if *admissionCachePath != "" {
+			cached, cacheErr := eval.NewCachedCandidateAssessor(candidateAssessor, *admissionCachePath, strings.TrimSpace(*assessorDecisionModel))
+			if cacheErr != nil {
+				return cacheErr
+			}
+			candidateAssessor = cached
+		}
 	}
 	threshold := (*float64)(nil)
 	if *minSimilarity >= 0 {
@@ -138,6 +188,12 @@ func run() error {
 		RerankCandidateLimit:       *rerankCandidateLimit,
 		Reranker:                   reranker,
 		Assessor:                   assessor,
+		CandidateAssessor:          candidateAssessor,
+		EngineTiming:               engineTiming,
+		AdmissionStats:             admissionStats,
+		AdmissionPolicy:            admissionPolicy,
+		AllowCalibrationPolicy:     *calibrationMode,
+		LifecyclePath:              *lifecyclePath,
 		LexicalOnly:                *lexicalOnly,
 	})
 	if err != nil {

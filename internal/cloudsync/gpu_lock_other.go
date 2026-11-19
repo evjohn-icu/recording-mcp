@@ -4,12 +4,13 @@ package cloudsync
 
 import (
 	"context"
-	"errors"
 	"time"
+
+	"recordingmcp/internal/gpulock"
 )
 
-// acquireGPULock refuses to pretend it serialized inference on platforms without
-// flock. Callers only configure a lock path on hosts that support it.
+// acquireGPULock refuses to pretend it serialized inference on platforms
+// without file locks.
 func acquireGPULock(ctx context.Context, path string, timeout time.Duration) (func(), error) {
-	return nil, errors.New("cloudsync: GPU file locking is unsupported on this platform")
+	return gpulock.Acquire(ctx, path, timeout)
 }

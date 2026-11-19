@@ -1,0 +1,159 @@
+{
+  "schema": "context-engine-acceptance-score-v1",
+  "manifest": "/tmp/recording-v04-followup.VcrM9p/final-synth/manifest.json",
+  "run_id": "synthetic-cli-smoke",
+  "prediction_digest": "bf33d0a15a4e4d75b24e2ef2887e12fd8e7be7cdd0969e0ac04a498a7b76bdbb",
+  "model": {
+    "provider": "synthetic-fixture",
+    "revision": "synthetic-test"
+  },
+  "samples": [
+    {
+      "sample_id": "synth-2",
+      "category": "quiet_two_person",
+      "transcript": {
+        "status": "OK",
+        "cer": {
+          "value": 0.0,
+          "numerator": 0,
+          "denominator": 6,
+          "status": "OK"
+        },
+        "wer": {
+          "value": 0.0,
+          "numerator": 0,
+          "denominator": 6,
+          "status": "OK",
+          "tokenization": "cjk-latin-v1"
+        },
+        "scored_regions": 1,
+        "scored_ms": 500,
+        "excluded_gold_turns": 0,
+        "excluded_predicted_turns": 0,
+        "lost_gold_ms": 0
+      },
+      "acoustic_events": {
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "per_label": {},
+        "status": "NOT_EVALUABLE"
+      },
+      "der": {
+        "value": 0.0,
+        "false_alarm_ms": 0.0,
+        "missed_ms": 0.0,
+        "confusion_ms": 0.0,
+        "reference_speech_ms": 500.0,
+        "status": "OK",
+        "label_mapping": {
+          "x": "A"
+        },
+        "pyannote": {
+          "status": "BLOCKED",
+          "reason": "no --audio-python; pyannote.metrics was not consulted"
+        }
+      }
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "q1",
+      "expected_sufficiency": "sufficient",
+      "evidence_completeness": "complete",
+      "web": {
+        "accuracy": 1.0,
+        "accuracy_status": "OK",
+        "supported_refs": 1,
+        "returned_refs": 1,
+        "legal_refs": 1,
+        "legal_ref_rate": 1.0,
+        "error_counts": {},
+        "semantic_accuracy": null,
+        "semantic_status": "NOT_RUN",
+        "semantic_accepted": 0,
+        "semantic_adjudicated": 0,
+        "coverage": 1.0,
+        "required_total": 1,
+        "required_covered": 1,
+        "status": "OK",
+        "sufficiency": "sufficient",
+        "sufficiency_matches": true
+      },
+      "mcp": {
+        "accuracy": null,
+        "accuracy_status": "NOT_EVALUABLE",
+        "supported_refs": 0,
+        "returned_refs": 0,
+        "legal_refs": 0,
+        "legal_ref_rate": null,
+        "error_counts": {},
+        "semantic_accuracy": null,
+        "semantic_status": "NOT_RUN",
+        "semantic_accepted": 0,
+        "semantic_adjudicated": 0,
+        "coverage": 0.0,
+        "required_total": 1,
+        "required_covered": 0,
+        "status": "NOT_EVALUABLE",
+        "sufficiency": "insufficient",
+        "sufficiency_matches": false
+      }
+    }
+  ],
+  "claims": {
+    "precision": null,
+    "total": 1,
+    "accepted": 0,
+    "adjudicated": 0,
+    "unadjudicated": 1,
+    "status": "NOT_RUN",
+    "by_kind": {
+      "decision": {
+        "precision": null,
+        "total": 1,
+        "accepted": 0,
+        "adjudicated": 0,
+        "unadjudicated": 1,
+        "status": "NOT_RUN"
+      }
+    }
+  },
+  "transcript_pooled": {
+    "cer": {
+      "value": 0.0,
+      "numerator": 0,
+      "denominator": 6,
+      "status": "OK"
+    },
+    "wer": {
+      "value": 0.0,
+      "numerator": 0,
+      "denominator": 6,
+      "status": "OK"
+    }
+  },
+  "speaker": {
+    "coverage": {
+      "speakers": [],
+      "evaluation_trials": 0,
+      "calibration_trials": 0,
+      "deficiencies": [
+        "fewer than two speakers with same-speaker trials"
+      ],
+      "status": "NOT_EVALUABLE"
+    },
+    "scores": {
+      "status": "BLOCKED",
+      "reason": "no --audio-analysis-config; voiceprint scoring not requested"
+    }
+  },
+  "adjudication": null,
+  "sample_problems": {},
+  "excluded_samples": [],
+  "cross_recording_eer": false,
+  "note": "offline re-scoring only: no service, model or Go test was called"
+}

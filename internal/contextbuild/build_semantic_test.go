@@ -15,16 +15,22 @@ import (
 // fakeSemantic is an in-test SemanticRetriever: no embeddings, just a fixed
 // hit list, so a test can inject hits the retrieval SQL would never return.
 type fakeSemantic struct {
-	hits  []semantic.SemanticHit
-	ready bool
-	err   error
+	hits     []semantic.SemanticHit
+	ready    bool
+	err      error
+	readyErr error
 }
 
 func (f *fakeSemantic) Search(ctx context.Context, query string, opts semantic.SearchOptions) ([]semantic.SemanticHit, error) {
 	return f.hits, f.err
 }
 
-func (f *fakeSemantic) Ready() bool { return f.ready || len(f.hits) > 0 }
+func (f *fakeSemantic) Ready(ctx context.Context) (bool, error) {
+	if f.readyErr != nil {
+		return false, f.readyErr
+	}
+	return f.ready || len(f.hits) > 0, nil
+}
 
 func (f *fakeSemantic) Describe() string { return "fake/test" }
 
@@ -217,8 +223,8 @@ func TestSupersededRevisionEmbeddingDoesNotLeak(t *testing.T) {
 	f.ingest("seg-rev", "rev-2", "rev-1", "utt-1", "搬迁计划修订版说明")
 
 	retriever := &semantic.SQLiteRetriever{DB: f.db, Provider: semantic.NewHashProvider(64)}
-	if !retriever.Ready() {
-		t.Fatal("retriever not ready after indexing")
+	if ok, err := retriever.Ready(context.Background()); err != nil || !ok {
+		t.Fatalf("retriever not ready after indexing: ok=%v err=%v", ok, err)
 	}
 	pkg := f.buildSemantic(retriever, Request{Query: "搬迁计划初稿说明"})
 

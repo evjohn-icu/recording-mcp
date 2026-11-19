@@ -45,6 +45,9 @@ type RecordingView struct {
 	StartedAt         *time.Time `json:"started_at"`
 	AbsoluteTimeKnown bool       `json:"absolute_time_known"`
 	LocalAudio        string     `json:"local_audio"` // available|deleted|missing|unavailable
+	// AudioAnalysis is present only for a recording with any audio-analysis
+	// state or configuration; it never contains speaker vectors.
+	AudioAnalysis *AudioAnalysisView `json:"audio_analysis,omitempty"`
 	// SourceFile, SourceBytes and DurationMS describe the imported file. They
 	// stay zero for recordings that were not imported through the web path.
 	SourceFile  string `json:"source_file,omitempty"`
@@ -499,6 +502,13 @@ func (s *Service) recordingViews(ctx context.Context, conversationID string) ([]
 			return nil, err
 		}
 		out[i].LocalAudio = src.state
+		if s.AudioRuns != nil || s.AudioConfig != nil {
+			analysis, err := s.AudioAnalysis(ctx, out[i].RecordingID)
+			if err != nil {
+				return nil, err
+			}
+			out[i].AudioAnalysis = &analysis
+		}
 	}
 	// The conversation's own recording is the one its start time belongs to;
 	// it stays first while the rest keep the stable id order.

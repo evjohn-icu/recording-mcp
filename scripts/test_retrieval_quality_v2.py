@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import tempfile
 import unittest
 from argparse import Namespace
 from pathlib import Path
@@ -378,3 +379,428 @@ class FrozenQualityV2Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RetrievalQualityV3ProtocolTests(unittest.TestCase):
+    """Protocol-level tests for the v3 runner; no model or holdout I/O."""
+
+    def metrics(self, **overrides):
+        base = {
+            "recall_at_5": 0.9, "mrr_at_10": 0.8, "p95_ms": 100.0,
+            "false_positive_rate": 0.0, "none_false_positive_rate": 0.0,
+            "false_positive_queries": 0, "no_evidence_denominator": 40,
+            "stale_leaks": 0, "ambient_leaks": 0, "scope_leaks": 0, "invalid_refs": 0,
+            "fixture_cross_split_leaks": 0, "answerable_denominator": 180,
+            "recall_denominator": 180, "mrr_denominator": 180, "p95_denominator": 220,
+            "failure_counts": {"embedding": 0, "rerank": 0, "assessment": 0},
+            "assessor_configured": True, "false_sufficient_rate": 0.0,
+            "false_sufficient_denominator": 40, "forgotten_leakage": 0, "admission_failures": 0,
+            "blocked_note": "v3",
+        }
+        base.update(overrides)
+        return base
+
+    def baseline(self):
+        return self.metrics(recall_at_5=0.5, mrr_at_10=0.4, p95_ms=100.0)
+
+    def test_v3_gate_requires_recall_fp_lifecycle_and_admission(self):
+        gate = runner.quality_gate_v3(self.metrics(), self.baseline())
+        self.assertTrue(gate["passed"], gate["checks"])
+        for override in ({"recall_at_5": 0.84}, {"false_positive_rate": 0.06},
+                         {"forgotten_leakage": 1}, {"admission_failures": 2},
+                         {"false_sufficient_rate": 0.2}, {"stale_leaks": 1}):
+            failed = runner.quality_gate_v3(self.metrics(**override), self.baseline())
+            self.assertFalse(failed["passed"], override)
+
+    def test_v3_selection_orders_recall_mrr_p95_then_stricter_threshold(self):
+        def candidate(recall, mrr, p95, threshold):
+            return {"backend": "hash", "threshold_hundredths": threshold,
+                    "metrics": self.metrics(recall_at_5=recall, mrr_at_10=mrr, p95_ms=p95),
+                    "gate": {"passed": True}}
+
+        selected = runner.select_v3_candidate([
+            candidate(0.9, 0.8, 90, 30), candidate(0.9, 0.8, 90, 70),
+            candidate(0.9, 0.8, 110, 50), candidate(0.91, 0.7, 200, 90),
+            candidate(0.95, 0.9, 10, 40),
+        ])
+        self.assertEqual(selected["threshold_hundredths"], 40, "highest recall must win")
+        tie = runner.select_v3_candidate([candidate(0.9, 0.8, 90, 30), candidate(0.9, 0.8, 90, 70)])
+        self.assertEqual(tie["threshold_hundredths"], 70)
+        self.assertIsNone(runner.select_v3_candidate([{"backend": "hash", "threshold_hundredths": 1,
+                                                        "metrics": self.metrics(), "gate": {"passed": False}}]))
+
+    def lock_document(self):
+        hashes = {"corpus.json": "a", "retrieval.json": "b", "lifecycle.json": "c"}
+        configuration = {"protocol": "v3", "embedding_endpoint": "http://127.0.0.1:1/v1/embeddings",
+                         "embedding_model": "embed-model", "embedding_dims": 1024,
+                         "embedding_input_type": True, "embedding_key_env": "",
+                         "embedding_revision": "rev-7", "rerank_endpoint": "", "rerank_model": "",
+                         "assessor_endpoint": "http://127.0.0.1:2/v1/systemone",
+                         "assessor_model": "decision-model", "admission_batch_questions": 32,
+                         "max_items": 10, "max_bytes": 65536}
+        selected = {"version": "v3", "backend": "hash", "threshold_hundredths": 42,
+                    "threshold": 0.42, "rerank": False}
+        lock = {"schema": runner.V3_LOCK_SCHEMA, "fixture_sha256": hashes,
+                "configuration": configuration,
+                "configuration_sha256": runner.config_signature(configuration),
+                "policy_template_sha256": "tmpl", "binary_sha256": "bin",
+                "identity": {"embedding_revision": "rev-7", "assessor_model": "decision-model",
+                             "assessor_actual_model": "decision-model-1.2", "binary_sha256": "bin"},
+                "budget": {"max_items": 10, "max_bytes": 65536},
+                "warmup": {"questions": 1, "source": "train", "cache_flush": True},
+                "selected": selected, "calibration_gate": {"passed": True}, "holdout_started": False}
+        return hashes, configuration, lock
+
+    def test_v3_lock_rejects_unpinned_or_started_locks(self):
+        hashes, configuration, lock = self.lock_document()
+        config_hash = runner.config_signature(configuration)
+        self.assertEqual(runner.validate_v3_lock(lock, hashes, config_hash, "tmpl", "bin")["threshold_hundredths"], 42)
+        for broken in ({**lock, "holdout_started": True},
+                       {**lock, "binary_sha256": "other"},
+                       {**lock, "selected": {**lock["selected"], "threshold_hundredths": 101}},
+                       {**lock, "calibration_gate": {"passed": False}},
+                       {**lock, "schema": "retrieval-v3-selection-lock-v1"},
+                       {**lock, "identity": {**lock["identity"], "binary_sha256": "other"}},
+                       {**lock, "budget": {"max_items": 20, "max_bytes": 65536}},
+                       {**lock, "warmup": {"questions": 8}}):
+            with self.assertRaises(ValueError):
+                runner.validate_v3_lock(broken, hashes, config_hash, "tmpl", "bin")
+        with self.assertRaises(ValueError):
+            runner.validate_v3_lock(lock, hashes, config_hash, "other-template", "bin")
+        with self.assertRaises(ValueError):
+            runner.validate_v3_lock(lock, {"corpus.json": "z"}, config_hash, "tmpl", "bin")
+
+    def test_v3_lock_configuration_hash_must_match_its_content(self):
+        hashes, configuration, lock = self.lock_document()
+        config_hash = runner.config_signature(configuration)
+        tampered = {**lock, "configuration": {**configuration, "embedding_input_type": False}}
+        with self.assertRaisesRegex(ValueError, "does not match its own hash"):
+            runner.validate_v3_lock(tampered, hashes, config_hash, "tmpl", "bin")
+        # embedding_input_type is part of the hash: dropping it changes the data.
+        without_flag = {key: value for key, value in configuration.items() if key != "embedding_input_type"}
+        self.assertNotEqual(runner.config_signature(without_flag), config_hash)
+
+    def test_v3_holdout_claim_is_single_use(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lock_path = Path(tmp) / "selection-lock.json"
+            runner.claim_holdout(lock_path)
+            self.assertTrue(Path(str(lock_path) + ".consumed").exists())
+            with self.assertRaises(FileExistsError):
+                runner.claim_holdout(lock_path)
+
+    def test_v3_fixture_is_frozen_and_valid(self):
+        root = Path(__file__).resolve().parents[1] / "fixtures" / "eval" / "quality-v3-r1"
+        hashes = runner.verify_frozen_hashes_v3(root)
+        summary = runner.validate_fixture_v3(root / "retrieval.json", root / "corpus.json", root / "lifecycle.json")
+        self.assertEqual(sorted(hashes), ["corpus.json", "lifecycle.json", "retrieval.json"])
+        self.assertEqual(summary["questions"], 780)
+        self.assertEqual(summary["groups"], 330)
+        self.assertEqual(summary["splits"], {"train": 110, "calibration": 110, "test": 110})
+        self.assertEqual(summary["split_questions"], {"train": 260, "calibration": 260, "test": 260})
+        self.assertEqual(summary["lifecycle_sources"], 30)
+        self.assertEqual(summary["fixture_cross_split_leaks"], 0)
+
+    def test_v3_policy_document_pins_integer_threshold(self):
+        args = Namespace(embed_model="Qwen/Qwen3-Embedding-0.6B", embed_revision="rev-7",
+                                  assessor_model="decision-v3-0.8b")
+        policy = runner.admission_policy_document(args, "openai", 7, "f" * 64, "calibration")
+        self.assertEqual(policy["threshold"], 0.07)
+        self.assertEqual(policy["phase"], "calibration")
+        self.assertEqual(policy["provider_id"], "openai-compat")
+        self.assertEqual(policy["model_revision"], "rev-7")
+        self.assertEqual(policy["fixture_sha256"], "f" * 64)
+
+
+class RetrievalQualityV3BehaviourTests(unittest.TestCase):
+    """End-to-end runner behaviour with the binary and services mocked."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.fixtures = self.root / "fixtures"
+        self.fixtures.mkdir()
+        (self.fixtures / "retrieval.json").write_text(json.dumps(
+            {"questions": [{"id": "warm-1", "split": "train", "query": "热身"}]}))
+        (self.fixtures / "corpus.json").write_text("{}")
+        self.binary = self.root / "context-eval"
+        self.binary.write_text("synthetic binary pin")
+        self.out = self.root / "out"
+        self.hashes = {"corpus.json": "a" * 64, "retrieval.json": "b" * 64, "lifecycle.json": "c" * 64}
+        real_digest = runner.digest
+
+        def fake_digest(path):
+            name = Path(path).name
+            if name in self.hashes:
+                return self.hashes[name]
+            return real_digest(Path(path))
+
+        self.patches = [
+            mock.patch.object(runner, "verify_frozen_hashes_v3", return_value=self.hashes),
+            mock.patch.object(runner, "digest", side_effect=fake_digest),
+            mock.patch.object(runner, "validate_fixture_v3",
+                              return_value={"lifecycle_sources": 3, "questions": 1}),
+            mock.patch.object(runner, "flush_embed_cache"),
+            mock.patch.object(runner, "_split_file", side_effect=self.fake_split),
+        ]
+        for patch in self.patches:
+            patch.start()
+        self.addCleanup(self.temp.cleanup)
+        self.addCleanup(lambda: [patch.stop() for patch in self.patches])
+
+    @staticmethod
+    def fake_split(_source, split, out):
+        path = Path(out) / f"retrieval-{split}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"questions": [], "split": split}))
+        return path
+
+    def args(self, **overrides):
+        values = {
+            "binary": str(self.binary), "fixture_dir": str(self.fixtures), "lifecycle": "",
+            "out": str(self.out), "phase": "calibrate", "selection_lock": "", "max_items": 10,
+            "max_bytes": 65536, "timeout": 5, "embed_endpoint": "http://127.0.0.1:9/v1/embeddings",
+            "embed_model": "embed-model", "embed_key_env": "", "embed_dims": 1024,
+            "embed_input_type": True, "embed_revision": "rev-7",
+            "rerank_url": "", "rerank_model": "", "assessor_url": "http://127.0.0.1:8/v1/systemone",
+            "assessor_model": "decision-model", "admission_batch_questions": 32,
+            "protocol": "v3", "backends": "hash", "flush_embed_cache_url": "",
+            "admission_probability_cache": "", "warmup": True,
+            "assessor_actual_model": "decision-model-1.2", "fixture_cross_split_leaks": 0,
+        }
+        values.update(overrides)
+        return Namespace(**values)
+
+    def passing_run(self, *, recall=0.9, p95=100.0, engine_p95=50.0, status="PASS"):
+        return {"status": status,
+                "metrics": {"recall_at_5": recall, "mrr_at_10": 0.8, "p95_ms": p95,
+                            "false_positive_rate": 0.0, "none_false_positive_rate": 0.0,
+                            "false_positive_queries": 0, "no_evidence_denominator": 40,
+                            "stale_leaks": 0, "ambient_leaks": 0, "scope_leaks": 0, "invalid_refs": 0,
+                            "fixture_cross_split_leaks": 0, "answerable_denominator": 180,
+                            "recall_denominator": 180, "mrr_denominator": 180, "p95_denominator": 220,
+                            "failure_counts": {"embedding": 0, "rerank": 0, "assessment": 0},
+                            "assessor_configured": True, "false_sufficient_rate": 0.0,
+                            "false_sufficient_denominator": 40, "forgotten_leakage": 0,
+                            "admission_failures": 0},
+                "raw_metrics": {"retrieval_hybrid_latency_ms_p50": p95 / 2,
+                                "retrieval_hybrid_latency_ms_p95": p95,
+                                "admission_engine_latency_ms_p50": engine_p95 / 2,
+                                "admission_engine_latency_ms_p95": engine_p95,
+                                "admission_engine_calls": 220, "admission_requests": 220,
+                                "admission_request_candidates": 8800,
+                                "admission_request_bytes": 8800 * 900,
+                                "retrieval_requests": 220,
+                                "stage_latencies": {"admission": {"p50": 10, "p95": 20, "n": 220},
+                                                    "assessor": {"p50": 5, "p95": 9, "n": 220},
+                                                    "rerank": {"p50": 0, "p95": 0, "n": 0}}}}
+
+    def test_v3_flush_url_must_match_the_embedding_service(self):
+        with self.assertRaisesRegex(ValueError, "own host and port"):
+            runner.run(self.args(flush_embed_cache_url="http://127.0.0.1:8790/admin/flush"))
+        runner.validate_flush_target("http://127.0.0.1:8792/v1/embeddings",
+                                     "http://127.0.0.1:8792/admin/flush")
+        with self.assertRaisesRegex(ValueError, "requires --embed-endpoint"):
+            runner.validate_flush_target("", "http://127.0.0.1:8792/admin/flush")
+
+    def test_v3_output_directory_must_be_new_or_empty(self):
+        self.out.mkdir()
+        (self.out / "manifest.json").write_text("{}")
+        with self.assertRaisesRegex(ValueError, "must be new or empty"):
+            runner.run(self.args())
+
+    def test_v3_profile_writes_no_lock_and_never_touches_test(self):
+        calls = []
+
+        def fake_run(_binary, _args, split_path, version, provider, _rerank, split, out, extra=None, corpus=None):
+            calls.append((split, version, tuple(extra or ())))
+            return self.passing_run()
+
+        with mock.patch.object(runner, "_run", side_effect=fake_run):
+            self.assertEqual(runner.run(self.args(phase="profile")), 0)
+        manifest = json.loads((self.out / "manifest.json").read_text())
+        self.assertFalse(manifest["protocol_config"]["test_touched"])
+        self.assertIsNone(manifest["selection_lock"])
+        self.assertFalse((self.out / "selection-lock.json").exists())
+        self.assertTrue(all(split == "train" for split, _version, _extra in calls))
+        self.assertEqual({version for _split, version, _extra in calls}, {"v1", "v3"})
+        self.assertTrue(any("--profile-admission" in extra for _split, _version, extra in calls))
+        self.assertNotIn("result", {entry["status"] for entry in manifest["runs"].values()})
+        self.assertEqual(manifest["profile"]["conclusion"], "construction-bound")
+
+    def test_v3_profile_reports_a_model_bound_configuration(self):
+        def fake_run(_binary, _args, _split, version, _provider, _rerank, _split_name, _out, extra=None, corpus=None):
+            if version == "v1":
+                return self.passing_run(p95=120.0)
+            return self.passing_run(engine_p95=900.0, p95=1200.0)
+
+        with mock.patch.object(runner, "_run", side_effect=fake_run):
+            runner.run(self.args(phase="profile"))
+        manifest = json.loads((self.out / "manifest.json").read_text())
+        self.assertEqual(manifest["profile"]["conclusion"], "model-bound")
+        self.assertIn("cannot bring this configuration under budget", manifest["profile"]["reason"])
+        self.assertFalse((self.out / "selection-lock.json").exists())
+
+    def test_v3_calibration_executes_every_threshold_and_one_uncached_rerun(self):
+        thresholds = []
+        uncached = 0
+
+        def fake_run(_binary, _args, _split, version, provider, _rerank, _split_name, out, extra=None, corpus=None):
+            nonlocal uncached
+            path = Path(out)
+            if "--admission-probability-cache" in (extra or ()):
+                thresholds.append(path.name)
+            elif "uncached" in path.name:
+                uncached += 1
+            return self.passing_run(recall=0.5 if version == "v1" else 0.9)
+
+        with mock.patch.object(runner, "_run", side_effect=fake_run):
+            self.assertEqual(runner.run(self.args()), 0)
+        self.assertEqual(len(thresholds), 101)
+        self.assertEqual(uncached, 1)
+        manifest = json.loads((self.out / "manifest.json").read_text())
+        self.assertEqual(manifest["thresholds_executed"], 101)
+        lock = json.loads((self.out / "selection-lock.json").read_text())
+        self.assertEqual(lock["schema"], runner.V3_LOCK_SCHEMA)
+        self.assertEqual(lock["selected"]["threshold_hundredths"], 100)
+        self.assertIn("embedding_input_type", lock["configuration"])
+        self.assertFalse(lock["holdout_started"])
+
+    def test_v3_final_uncached_failure_writes_no_lock(self):
+        def fake_run(_binary, _args, _split, version, provider, _rerank, _split_name, out, extra=None, corpus=None):
+            if "uncached" in Path(out).name:
+                return self.passing_run(status="FAIL", recall=0.1)
+            return self.passing_run(recall=0.5 if version == "v1" else 0.9)
+
+        with mock.patch.object(runner, "_run", side_effect=fake_run):
+            self.assertEqual(runner.run(self.args()), 1)
+        manifest = json.loads((self.out / "manifest.json").read_text())
+        self.assertNotIn("selection_lock", manifest)
+        self.assertFalse((self.out / "selection-lock.json").exists())
+        self.assertIn("uncached final rerun", manifest["calibration_selection"])
+
+    def test_v3_gate_failure_writes_no_lock(self):
+        def fake_run(_binary, _args, _split, version, provider, _rerank, _split_name, out, extra=None, corpus=None):
+            return self.passing_run(recall=0.5 if version == "v1" else 0.9,
+                                    p95=100.0 if version == "v1" else 1000.0)
+
+        with mock.patch.object(runner, "_run", side_effect=fake_run):
+            self.assertEqual(runner.run(self.args()), 0)
+        manifest = json.loads((self.out / "manifest.json").read_text())
+        self.assertNotIn("selection_lock", manifest)
+        self.assertFalse((self.out / "selection-lock.json").exists())
+        self.assertIn("No v3 candidate passed every calibration gate", manifest["calibration_selection"])
+
+    def write_lock(self, configuration=None, **overrides):
+        configuration = configuration or {
+            "protocol": "v3", "embedding_endpoint": "http://127.0.0.1:9/v1/embeddings",
+            "embedding_model": "embed-model", "embedding_dims": 1024,
+            "embedding_input_type": True, "embedding_key_env": "", "embedding_revision": "rev-7",
+            "rerank_endpoint": "", "rerank_model": "",
+            "assessor_endpoint": "http://127.0.0.1:8/v1/systemone",
+            "assessor_model": "decision-model", "admission_batch_questions": 32,
+            "max_items": 10, "max_bytes": 65536,
+        }
+        lock = {"schema": runner.V3_LOCK_SCHEMA, "fixture_sha256": self.hashes,
+                "configuration": configuration,
+                "configuration_sha256": runner.config_signature(configuration),
+                "policy_template_sha256": "",
+                "binary_sha256": runner.digest(self.binary),
+                "identity": {"embedding_revision": "rev-7", "assessor_model": "decision-model",
+                             "assessor_actual_model": "decision-model-1.2",
+                             "binary_sha256": runner.digest(self.binary)},
+                "budget": {"max_items": 10, "max_bytes": 65536},
+                "warmup": dict(runner.WARMUP),
+                "selected": {"version": "v3", "backend": "hash", "threshold_hundredths": 42,
+                             "threshold": 0.42, "rerank": False},
+                "calibration_gate": {"passed": True}, "holdout_started": False}
+        lock.update(overrides)
+        lock["policy_template_sha256"] = runner.config_signature(
+            runner.admission_policy_document(self.args(backends="hash"), "hash", 0,
+                                             self.hashes["retrieval.json"], "selected")).replace("x", "x")
+        template = runner.admission_policy_document(self.args(backends="hash"), "hash", 0,
+                                                    self.hashes["retrieval.json"], "selected")
+        template.pop("threshold", None)
+        template.pop("phase", None)
+        lock["policy_template_sha256"] = runner.config_signature(template)
+        path = self.root / "selection-lock.json"
+        path.write_text(json.dumps(lock))
+        return path
+
+    def test_v3_holdout_restores_the_locked_configuration(self):
+        lock_path = self.write_lock()
+        seen = []
+
+        def fake_run(_binary, args, _split, version, _provider, _rerank, split, out, extra=None, corpus=None):
+            seen.append((version, args.embed_endpoint, args.embed_model, args.admission_batch_questions,
+                         args.max_items, split))
+            return self.passing_run()
+
+        with mock.patch.object(runner, "_run", side_effect=fake_run):
+            runner.run(self.args(phase="holdout", selection_lock=str(lock_path),
+                                 embed_endpoint=None, embed_model=None, embed_dims=None,
+                                 embed_input_type=None, embed_revision=None, assessor_url=None,
+                                 assessor_model=None, admission_batch_questions=None,
+                                 max_items=None, max_bytes=None))
+        official = [entry for entry in seen if entry[5] == "test"]
+        self.assertEqual(len(official), 2)
+        self.assertEqual({entry[1] for entry in official}, {"http://127.0.0.1:9/v1/embeddings"})
+        self.assertEqual({entry[2] for entry in official}, {"embed-model"})
+        self.assertEqual({entry[3] for entry in official}, {32})
+        self.assertEqual({entry[4] for entry in official}, {10})
+        self.assertEqual({entry[0] for entry in official}, {"v1", "v3"})
+        self.assertTrue(any(entry[5] == "train" for entry in seen), "the warmup must precede the official runs")
+        consumed = json.loads(lock_path.read_text())
+        self.assertTrue(consumed["holdout_started"])
+        self.assertTrue(Path(str(lock_path) + ".consumed").exists())
+
+    def test_v3_holdout_rejects_a_conflicting_explicit_flag_before_any_test_query(self):
+        lock_path = self.write_lock()
+        runs = []
+        for overrides in ({"embed_endpoint": "http://127.0.0.1:7/other"},
+                          {"embed_model": "other-model"},
+                          {"admission_batch_questions": 1},
+                          {"embed_input_type": False}):
+            with self.subTest(overrides=overrides):
+                self.out = self.root / f"out-{sorted(overrides)[0]}"
+                args = self.args(phase="holdout", selection_lock=str(lock_path), **overrides)
+                with mock.patch.object(runner, "_run", side_effect=lambda *a, **k: runs.append(a)):
+                    with self.assertRaisesRegex(ValueError, "conflicts with the selection lock"):
+                        runner.run(args)
+                self.assertEqual(runs, [])
+                self.assertFalse(json.loads(lock_path.read_text())["holdout_started"])
+
+    def test_v3_holdout_rejects_the_calibration_cache(self):
+        lock_path = self.write_lock()
+        with mock.patch.object(runner, "_run") as run_mock:
+            with self.assertRaisesRegex(ValueError, "must not use the calibration probability cache"):
+                runner.run(self.args(phase="holdout", selection_lock=str(lock_path),
+                                     admission_probability_cache=str(self.root / "cache.json")))
+            run_mock.assert_not_called()
+
+    def test_v3_holdout_cannot_be_replayed_after_a_crash(self):
+        lock_path = self.write_lock()
+        runner.claim_holdout(lock_path)
+        with mock.patch.object(runner, "_run") as run_mock:
+            with self.assertRaises((ValueError, FileExistsError)):
+                runner.run(self.args(phase="holdout", selection_lock=str(lock_path)))
+            run_mock.assert_not_called()
+        # The consumed claim is never removed, so the lock cannot be reopened.
+        self.assertTrue(Path(str(lock_path) + ".consumed").exists())
+
+    def test_v3_holdout_rejects_an_older_lock_schema(self):
+        lock_path = self.write_lock(schema="retrieval-v3-selection-lock-v1")
+        with mock.patch.object(runner, "_run") as run_mock:
+            with self.assertRaisesRegex(ValueError, "older protocol"):
+                runner.run(self.args(phase="holdout", selection_lock=str(lock_path)))
+            run_mock.assert_not_called()
+
+    def test_unverifiable_assessor_identity_blocks_the_lock(self):
+        identity = runner.v3_identity(self.args(assessor_model="typesafe/jev-latest",
+                                                assessor_actual_model=""), "b" * 64, "CONFIGURED")
+        ready, reason = runner.identity_is_verifiable(identity)
+        self.assertFalse(ready)
+        self.assertIn("latest", reason)
+        ready, _reason = runner.identity_is_verifiable(
+            runner.v3_identity(self.args(assessor_model="typesafe/jev-latest",
+                                         assessor_actual_model="jev-1.14.0"), "b" * 64, "CONFIGURED"))
+        self.assertTrue(ready)

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"recordingmcp/internal/asrinput"
+	"recordingmcp/internal/audioanalysis"
 	"recordingmcp/internal/cloudsync"
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/process"
@@ -41,6 +42,8 @@ type Service struct {
 	revision  string
 	now       func() time.Time
 	importJID string
+	audio     *audioanalysis.Store
+	audioCfg  *audioanalysis.Config
 }
 
 // New builds the importer. The audio directory is resolved once so a later
@@ -68,6 +71,7 @@ func New(cfg Config) (*Service, error) {
 		store: cfg.Store, db: cfg.DB, audioDir: audioDir, decoder: cfg.Decoder,
 		trans: cfg.Transcription, provider: strings.ToLower(strings.TrimSpace(cfg.ASRProvider)),
 		model: cfg.ASRModel, resource: cfg.ASRResourceID, revision: revision, now: now,
+		audio: audioanalysis.NewStore(cfg.DB), audioCfg: cfg.Audio,
 	}, nil
 }
 
@@ -306,14 +310,39 @@ func (s *Service) RunIngestJob(ctx context.Context, job process.Job) (string, er
 		p.ProviderRecordingID, ImportOwner, p.DeviceID, durationMS*16, pcmAbs, s.revision, now.UnixMilli()); err != nil {
 		return "", err
 	}
-	if _, _, err := process.EnqueueTx(ctx, tx, process.Spec{
+	plans, err := s.audioPlans(ctx, p.RecordingID, p.SourceSHA256, pcmAbs, durationMS)
+	if err != nil {
+		return "", err
+	}
+	audioJobs := map[string]string{}
+	for _, plan := range plans {
+		if plan.capability == audioanalysis.CapabilityDiarization {
+			continue // needs the ASR job id
+		}
+		jobID, err := s.enqueueAudioTx(ctx, tx, p.RecordingID, plan, nonEmptyDependencies())
+		if err != nil {
+			return "", err
+		}
+		audioJobs[plan.capability] = jobID
+	}
+	asrJobID, _, err := process.EnqueueTx(ctx, tx, process.Spec{
 		Stage:           "asr",
 		InputSnapshotID: p.ConversationID,
 		IdempotencyKey:  "asr|" + p.ProviderRecordingID + "|" + p.SourceSHA256,
 		PayloadJSON:     string(payload),
 		MaxAttempts:     3,
-	}, now); err != nil {
+		Dependencies:    nonEmptyDependencies(audioJobs[audioanalysis.CapabilityVAD]),
+	}, now)
+	if err != nil {
 		return "", err
+	}
+	for _, plan := range plans {
+		if plan.capability != audioanalysis.CapabilityDiarization {
+			continue
+		}
+		if _, err := s.enqueueAudioTx(ctx, tx, p.RecordingID, plan, nonEmptyDependencies(asrJobID)); err != nil {
+			return "", err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return "", err

@@ -466,8 +466,20 @@ func TestBuildContextByteBudgetEnforced(t *testing.T) {
 	if pkg.Trace.Budget.BytesUsed > maxBytes {
 		t.Fatalf("bytes_used = %d exceeds budget %d", pkg.Trace.Budget.BytesUsed, maxBytes)
 	}
-	if len(pkg.Items) != 1 {
-		t.Fatalf("items = %v, want a single item inside the budget", itemIDs(pkg.Items))
+	// Budgeting skips an item that cannot fit and keeps looking: the first
+	// note fits, the next identical note does not and is named in the trace
+	// instead of ending the loop.
+	notes := []string{}
+	for _, item := range pkg.Items {
+		if isNoteKind(item.Kind) {
+			notes = append(notes, item.ID)
+		}
+	}
+	if len(notes) != 1 || notes[0] != "n:1" {
+		t.Fatalf("note items = %v, want [n:1]", notes)
+	}
+	if !containsString(pkg.Trace.Budget.SkippedItemIDs, "n:2") {
+		t.Fatalf("skipped item ids = %v, want n:2", pkg.Trace.Budget.SkippedItemIDs)
 	}
 	if pkg.Trace.Budget.ItemsUsed != len(pkg.Items) {
 		t.Fatalf("budget items_used = %d, items = %d", pkg.Trace.Budget.ItemsUsed, len(pkg.Items))

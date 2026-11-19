@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -26,6 +27,10 @@ var (
 	ErrLeaseLost = errors.New("process: lease lost")
 	// ErrNotFound reports that a job id does not exist.
 	ErrNotFound = errors.New("process: job not found")
+	// ErrConflict reports that an idempotency key was reused with a different
+	// dependency set. Callers that also pin a payload (for example audio
+	// analysis) report their own conflict code before reaching the queue.
+	ErrConflict = errors.New("process: idempotency key conflict")
 )
 
 // Spec describes a job to enqueue. IdempotencyKey is mandatory and determines
@@ -37,6 +42,10 @@ type Spec struct {
 	PayloadJSON     string
 	Priority        int
 	MaxAttempts     int
+	// Dependencies names parent jobs that must reach a terminal state before
+	// this job can be claimed. A dependency is satisfied when the parent is
+	// succeeded, failed or cancelled; waiting never consumes an attempt.
+	Dependencies []string
 }
 
 // Job is a snapshot of a processing job row.
@@ -133,6 +142,10 @@ func EnqueueTx(ctx context.Context, tx *sql.Tx, spec Spec, now time.Time) (jobID
 	if strings.TrimSpace(payload) == "" {
 		payload = "{}"
 	}
+	dependencies, err := normalizeDependencies(spec.Dependencies)
+	if err != nil {
+		return "", false, err
+	}
 	maxAttempts := spec.MaxAttempts
 	if maxAttempts <= 0 {
 		maxAttempts = defaultMaxAttempts
@@ -155,16 +168,118 @@ func EnqueueTx(ctx context.Context, tx *sql.Tx, spec Spec, now time.Time) (jobID
 		return "", false, err
 	}
 	if affected > 0 {
+		for _, dependency := range dependencies {
+			if dependency == id {
+				return "", false, errors.New("process: a job cannot depend on itself")
+			}
+			var exists int
+			if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM processing_jobs WHERE id=?`, dependency).Scan(&exists); err != nil {
+				return "", false, err
+			}
+			if exists == 0 {
+				return "", false, fmt.Errorf("process: dependency %s does not exist", dependency)
+			}
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO processing_job_dependencies(job_id,dependency_id) VALUES(?,?)`, id, dependency); err != nil {
+				return "", false, err
+			}
+		}
+		if err := rejectDependencyCycle(ctx, tx, id); err != nil {
+			return "", false, err
+		}
 		return id, true, nil
 	}
 
-	// The row already existed; return the persisted id for this key.
+	// The row already existed; return the persisted id for this key. A second
+	// enqueue with a different dependency set is a conflict: silently adding a
+	// dependency to a running job would let it wait on a parent nobody
+	// scheduled for it.
 	var existing string
 	if err := tx.QueryRowContext(ctx,
 		`SELECT id FROM processing_jobs WHERE idempotency_key = ?`, spec.IdempotencyKey).Scan(&existing); err != nil {
 		return "", false, err
 	}
+	rows, err := tx.QueryContext(ctx,
+		`SELECT dependency_id FROM processing_job_dependencies WHERE job_id=? ORDER BY dependency_id`, existing)
+	if err != nil {
+		return "", false, err
+	}
+	stored := []string{}
+	for rows.Next() {
+		var dependency string
+		if err := rows.Scan(&dependency); err != nil {
+			rows.Close()
+			return "", false, err
+		}
+		stored = append(stored, dependency)
+	}
+	if err := rows.Close(); err != nil {
+		return "", false, err
+	}
+	if strings.Join(stored, "\x00") != strings.Join(dependencies, "\x00") {
+		return "", false, fmt.Errorf("%w: dependency set differs from the stored job", ErrConflict)
+	}
 	return existing, false, nil
+}
+
+// normalizeDependencies sorts and deduplicates parent ids, rejecting empty ids.
+func normalizeDependencies(dependencies []string) ([]string, error) {
+	if len(dependencies) == 0 {
+		return nil, nil
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(dependencies))
+	for _, dependency := range dependencies {
+		dependency = strings.TrimSpace(dependency)
+		if dependency == "" {
+			return nil, errors.New("process: dependency id is empty")
+		}
+		if seen[dependency] {
+			continue
+		}
+		seen[dependency] = true
+		out = append(out, dependency)
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// rejectDependencyCycle walks the new job's parents defensively. Structural
+// inserts cannot create a cycle because a new job has no children yet, but the
+// check keeps the invariant explicit if edges are ever added elsewhere.
+func rejectDependencyCycle(ctx context.Context, tx *sql.Tx, jobID string) error {
+	visited := map[string]bool{}
+	queue := []string{jobID}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		rows, err := tx.QueryContext(ctx,
+			`SELECT dependency_id FROM processing_job_dependencies WHERE job_id=? ORDER BY dependency_id`, current)
+		if err != nil {
+			return err
+		}
+		next := []string{}
+		for rows.Next() {
+			var dependency string
+			if err := rows.Scan(&dependency); err != nil {
+				rows.Close()
+				return err
+			}
+			if dependency == jobID {
+				rows.Close()
+				return errors.New("process: job dependency cycle")
+			}
+			if !visited[dependency] {
+				visited[dependency] = true
+				next = append(next, dependency)
+			}
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		queue = append(queue, next...)
+	}
+	return nil
 }
 
 // Enqueue inserts a queued job in its own transaction, mirroring EnqueueTx. It
@@ -255,6 +370,11 @@ func Claim(ctx context.Context, db *sql.DB, opts ClaimOptions) (*Job, error) {
 		        worker_id, lease_token, lease_expires_at
 		 FROM processing_jobs
 		 WHERE status IN ('queued', 'retry_wait') AND available_at <= ?`+stageClause+`
+		   AND NOT EXISTS (
+		     SELECT 1 FROM processing_job_dependencies dep
+		     JOIN processing_jobs parent ON parent.id = dep.dependency_id
+		     WHERE dep.job_id = processing_jobs.id
+		       AND parent.status NOT IN ('succeeded','failed','cancelled'))
 		 ORDER BY priority DESC, available_at ASC, created_at ASC
 		 LIMIT 1`, args...)
 	if err := row.Scan(&id, &stage, &inputSnapshotID, &status, &payload, &attemptCount, &maxAttempts,
@@ -348,13 +468,22 @@ func Renew(ctx context.Context, db *sql.DB, jobID, token string, lease time.Dura
 
 // Complete marks a running job succeeded and records the result reference.
 func Complete(ctx context.Context, db *sql.DB, jobID, token, resultRef string, now time.Time) error {
-	nowMS := ms(now)
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := CompleteTx(ctx, tx, jobID, token, resultRef, now); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
 
+// CompleteTx finishes a running job inside the caller's transaction. It is the
+// atomic-completion half of a result commit: a worker that publishes a result
+// and the job state in one transaction must not call Complete again.
+func CompleteTx(ctx context.Context, tx *sql.Tx, jobID, token, resultRef string, now time.Time) error {
+	nowMS := ms(now)
 	res, err := tx.ExecContext(ctx,
 		`UPDATE processing_jobs
 		 SET status = 'succeeded', lease_token = NULL, lease_expires_at = NULL, worker_id = NULL, updated_at = ?
@@ -376,21 +505,28 @@ func Complete(ctx context.Context, db *sql.DB, jobID, token, resultRef string, n
 		resultRef, nowMS, jobID); err != nil {
 		return err
 	}
-	return tx.Commit()
+	return nil
 }
 
 // Fail terminates a running attempt. Retryable failures within the attempt
 // budget return the job to retry_wait; otherwise the job becomes failed.
 func Fail(ctx context.Context, db *sql.DB, jobID, token, errorJSON string, retryable bool, now time.Time) error {
-	nowMS := ms(now)
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := FailTx(ctx, tx, jobID, token, errorJSON, retryable, now); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
 
+// FailTx terminates a running attempt inside the caller's transaction.
+func FailTx(ctx context.Context, tx *sql.Tx, jobID, token, errorJSON string, retryable bool, now time.Time) error {
+	nowMS := ms(now)
 	var attemptCount, maxAttempts int
-	err = tx.QueryRowContext(ctx,
+	err := tx.QueryRowContext(ctx,
 		`SELECT attempt_count, max_attempts FROM processing_jobs
 		 WHERE id = ? AND lease_token = ? AND status = 'running'`,
 		jobID, token).Scan(&attemptCount, &maxAttempts)
@@ -430,7 +566,7 @@ func Fail(ctx context.Context, db *sql.DB, jobID, token, errorJSON string, retry
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 func scanJob(row interface{ Scan(...any) error }) (*Job, error) {

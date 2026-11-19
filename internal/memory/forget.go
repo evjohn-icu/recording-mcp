@@ -869,6 +869,31 @@ func (s *Store) IsAINoteSuppressed(ctx context.Context, recordingID, sourceSegme
 
 // ---- resumable DB redaction implementation ----
 
+// purgeAudioAnalysis deletes every audio-analysis row of the affected
+// recordings. It runs inside the forget transaction, before job scrubbing.
+func purgeAudioAnalysis(ctx context.Context, tx *sql.Tx, t forgetTarget, conversationID string) error {
+	recordingIDs := []string{}
+	if t.recordingID != "" {
+		recordingIDs = append(recordingIDs, t.recordingID)
+	}
+	more, err := idsFromQuery(ctx, tx, `SELECT id FROM recordings WHERE conversation_id=?`, conversationID)
+	if err != nil {
+		return err
+	}
+	recordingIDs = append(recordingIDs, more...)
+	seen := map[string]bool{}
+	for _, recordingID := range recordingIDs {
+		if recordingID == "" || seen[recordingID] {
+			continue
+		}
+		seen[recordingID] = true
+		if err := purgeAudioAnalysisTx(ctx, tx, recordingID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Store) redactForgetDatabase(ctx context.Context, tombstoneID string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -993,6 +1018,13 @@ func (s *Store) redactForgetDatabase(ctx context.Context, tombstoneID string) er
 		return err
 	}
 	if err := deleteIDs(ctx, tx, "memory_candidates", "id", candidateIDs); err != nil {
+		return err
+	}
+	// Audio-analysis rows reference processing_jobs, so they must be removed
+	// before the job rows are scrubbed. A turn-level forget is deliberately
+	// conservative: the whole recording's acoustic analysis is invalidated and
+	// its vectors are deleted.
+	if err := purgeAudioAnalysis(ctx, tx, t, conv); err != nil {
 		return err
 	}
 	if err := scrubJobs(ctx, tx, jobIDs); err != nil {
@@ -1805,4 +1837,28 @@ func (s *Store) suppressNote(ctx context.Context, conversationID, noteID, expect
 		return err
 	}
 	return tx.Commit()
+}
+
+// purgeAudioAnalysisTx removes every audio-analysis row of one recording,
+// dependencies first. Speaker vectors live in their own table and are deleted
+// with the events.
+func purgeAudioAnalysisTx(ctx context.Context, tx *sql.Tx, recordingID string) error {
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM audio_speaker_embeddings WHERE event_id IN (
+		   SELECT e.id FROM audio_analysis_events e JOIN audio_analysis_runs r ON r.id=e.run_id WHERE r.recording_id=?)`,
+		recordingID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM audio_analysis_events WHERE run_id IN (SELECT id FROM audio_analysis_runs WHERE recording_id=?)`,
+		recordingID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM audio_analysis_heads WHERE recording_id=?`, recordingID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM audio_analysis_runs WHERE recording_id=?`, recordingID); err != nil {
+		return err
+	}
+	return nil
 }

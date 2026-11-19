@@ -1,6 +1,6 @@
 # 处理链路现状
 
-本文描述当前已实现的处理链路：接收统一 ASR 结果、原子入队处理任务、Worker 领取并在租约保护下执行、决策判断的持久记录、候选记忆的生成校验与会话级发布，以及分析覆盖记录。对应[开发执行计划](development-plan.md)中的 A（存储与任务）、B（决策服务与执行器）与 C（候选记忆与会话级发布）切片；D 切片的基础检索工具（`list_conversations` / `get_evidence_context` / `search_memory`）已落地，文末有对照表。事实以代码为准，主要入口是 `internal/memory/ingestion.go`、`internal/memory/retrieval.go`、`internal/process`、`internal/worker`、`internal/pipeline`、`internal/generate`、`internal/decision` 与 `cmd/context-worker`。
+本文描述当前已实现的处理链路：接收统一 ASR 结果、原子入队处理任务、Worker 领取并在租约保护下执行、决策判断的持久记录、候选记忆的生成校验与会话级发布，以及分析覆盖记录。对应[开发执行计划](development-plan.md)中的 A（存储与任务）、B（决策服务与执行器）与 C（候选记忆与会话级发布）切片；D 切片的基础检索工具（`list_conversations` / `get_evidence_context` / `search_memory`）已落地，文末有对照表。事实以代码为准，主要入口是 `internal/memory/ingestion.go`、`internal/memory/retrieval.go`、`internal/process`、`internal/worker`、`internal/pipeline`、`internal/generate`、`internal/decision` 与 `cmd/context-worker`；可选音频分析（见下文独立小节）的主要入口是 `internal/audioanalysis`、`internal/ingest/audio.go` 与 `cmd/context-audio`。
 
 决策判断仍处于 **shadow 模式**：Worker 对每个分析窗口调用 Decision 引擎并把问题和回答完整写入 `decision_runs` / `decision_answers`，但不依据判断结果修改注释，也不跳过任何基线提炼。C 切片在此基础上新增了一条独立于判断结果的自动链路：每个窗口在决策记录之后由生成器产出候选记忆，经证据校验后写入 `memory_candidates`，再由独立的 publish 任务合并进会话注释（标注为未经人工复核）。既有的 `apply_annotations` 显式提交路径不受影响。
 
@@ -87,7 +87,7 @@
 
 ## 表结构摘要
 
-迁移集中在 `internal/migrations`（当前版本 9：v1–v5 为处理链路，v6 `memory_links`，v7 `annotation_history`，v8 `derived_artifacts` / `derived_artifact_sources`，v9 `speaker_bindings` / `speaker_binding_events`），时间列为 unix 毫秒 INTEGER。
+迁移集中在 `internal/migrations`（当前版本 23：v1–v5 为处理链路，v6 `memory_links`，v7 `annotation_history`，v8 `derived_artifacts` / `derived_artifact_sources`，v9 `speaker_bindings` / `speaker_binding_events`，v10–v22 依次覆盖活动头不变式、环境音分类 `turn_classes`、语义索引 `memory_embeddings`、云同步状态、遗忘与 profile 退休、抑制清理、轮次反查索引、处理运行时、记忆高亮、worker 心跳、录音源字节与 ASR 进度，v23 为音频分析新表），时间列为 unix 毫秒 INTEGER。
 
 ### processing_jobs（迁移 v2 processing-queue）
 
@@ -198,6 +198,22 @@ MCP 面已暴露（`context-memory`）：写入 `propose_speaker_binding` / `rev
 
 混合检索的语义分支由离线索引支撑：`bin/context-embed --db ... --provider hash`（默认）或 `--provider openai` 接入 OpenAI 兼容嵌入端点，把当前非 stale 的笔记与轮次嵌入到 `memory_embeddings`（主键 `(kind, artifact_id, provider_id, model_id)`，`content_sha256` 使重复索引幂等）。当前环境音工件也会被索引——隔离不变量由查询路径执行（见 `internal/semantic` 的候选 SQL：轮次过 `CurrentTurnPredicate` + ambient 排除，笔记过 `NoteStalePredicate` + 主证据 ambient 排除），这样"语义检索绝不复活 stale/ambient"是可测试的性质。工件被删除后用 `--prune` 清理孤儿行。提供方边界在 `internal/semantic.Provider`，检索边界在 `SemanticRetriever`（空索引或未配置时优雅降级，绝不让检索失败）。
 
+### 可选音频分析（migration v23：`audio_analysis_runs` / `audio_analysis_events` / `audio_speaker_embeddings` / `audio_analysis_heads`）
+
+音频分析是独立于 ASR 的可选阶段，支持 `vad`（语音活动）、`tagging`（声学事件标签）、`diarization`（说话人分段）和 `speaker`（声纹分析）。分析事件保存在独立表中，声纹向量只写入 `audio_speaker_embeddings`。 [音频分析内部契约](engineering/audio-analysis-v1.md)
+
+**配置**：`audio-analysis-config-v1` JSON，worker / web / context-memory 用 `--audio-analysis-config`、context-audio 用 `--config` 指向同一份文件，**缺省 = 音频分析整体关闭**。每能力 `enabled` / `model_id` / `model_revision` / `files[]`（本地路径 + 64 hex SHA-256，相对路径相对配置文件目录解析）/ `device`（空默认 `cpu`）/ `frontend_id`；顶层 `python`（默认 `python3`）、`runner`（默认 `scripts/audio-analysis.py`，相对配置目录解析）、`gpu_lock`（空 = 用户级默认锁路径，见 [GPU 部署](productization/gpu-deployment.md)）、`lock/load/run_timeout_seconds`（默认 600 / 300 / 7200 秒）。校验按能力隔离：缺模型或哈希不符只把该能力标 `audio_model_unavailable`，其余能力照常。
+
+**排队**：worker / web / context-memory 加载配置后，ingest 事务在导入时自动为已启用的 vad / tagging / diarization 入队（generation 为 `ingest-<hash>`，派生自源音频、能力、模型 revision 与 config 哈希；能力不可解析时跳过，不阻塞 ASR）。依赖边由 `processing_job_dependencies` 表达：ASR 任务依赖 VAD 终态，diarization 依赖 ASR 终态（失败也算终止，ASR 失败后 diarization 仍可独立分析），等待不消耗 attempt（`TestJobDependenciesWaitWithoutAttempts`）。`speaker` 是显式操作：`bin/context-audio enqueue --recording-id ID --capabilities speaker --request-id <generation> --config <文件>`——它要求 diarization 已有期望任务并依赖其终态，失败/缺失返回 `audio_dependency_unavailable`；vad/tagging/diarization 也可用它显式重跑。同一 generation 重复入队幂等返回；同 generation 但请求体不同 → `audio_request_conflict`。入队原子写 `processing_jobs`（stage `audio_<capability>`，max_attempts 3）+ `audio_analysis_runs`（status=running）+ `audio_analysis_heads.desired_job_id`（`current_run_id` 置 NULL，旧 run 立即 invalidated）。
+
+**执行与状态**：worker 领取 `audio_vad` / `audio_tagging` / `audio_diarization` / `audio_speaker` stage；Runner 在同一事务校验 desired head、租约令牌、forget 屏障与当前附件后写 events / active / head 并终结 job（worker 跳过通用 Complete/Fail，`TestAudioAnalysisEndToEnd`）。可重试错误保留 running 等待重试，非可重试置 run failed + active=0。未配置或模型不可用的能力，其可领取任务在 worker 启动时被 `FailUnclaimed` 以 `audio_disabled` / 对应 code 终结为 failed（`TestAudioFailUnclaimedReleasesDependents`），ASR 依赖不被挂住。推理是受管子进程：临时目录内生成 16k 单声道 PCM 窗口（`input_sha256` 校验）与请求文件，环境变量白名单（不带 API key，`HF_HUB_OFFLINE=1`），stderr 上限 4 KiB 且只允许安全错误码，结果校验 run 身份与窗口边界后才落库。device 为 cuda 的能力在整个子进程生命周期内持有 GPU 锁，空闲显存 < 1024 MiB 报 `audio_gpu_busy`。
+
+**读投影**：`AudioAnalysisView` 挂在 `get_context_item` 的可选 `audio_analysis` 字段与 Web 会话详情 `recordings[].audio_analysis`：每能力状态 `disabled|unavailable|not_requested|queued|running|succeeded|failed|invalidated` 加原因/动作（如 disabled 提示"configure --audio-analysis-config"），另附 current run 与事件元数据（不含向量）；`succeeded` 且 events 为空是合法结果（真实无检出），与 unavailable 可区分。`GET /api/audio-analysis/events/{id}/audio` 按服务端起止输出有界 WAV，仅 current / active / 未遗忘的 run 可读；事件时间是窗口内时钟，读侧加 `run_start_ms` 换算回录音时钟。状态语义见 [音频分析内部契约](engineering/audio-analysis-v1.md#7-状态投影)。
+
+**失效与遗忘**：新 generation 入队即把旧 run 置 invalidated；转写修订替换把 pin 到被替换附件的 speaker 映射 run 置 invalidated 并清 head（纯声学 run——`source_attachment_ids` 为空——保持有效），重跑需显式新 generation，不复制旧确认；turn 级遗忘保守地使该 recording 的全部声学分析失效并清向量；profile 退休 / purge 先删依赖再删行。
+
+**证据边界**：v0.4 轮内真实模型推理（Silero / Zipformer / Community-1 / CAM++）为 NOT_RUN/BLOCKED（见 [v0.4 发布报告](engineering/context-engine-v04-release-report.md) Sprint C）；已验证的是契约、存储迁移、生命周期/遗忘/revision 失效、队列依赖与 Python 适配器协议（`go test ./internal/audioanalysis`、`scripts/test_audio_analysis.py` 68 项、`go test ./internal/gpulock`）。speaker 身份质量保持 EXPERIMENTAL，本实现只产生 `speaker_identity_proposal` 提案，不自动写确认。
+
 ### 读取时上下文投影（internal/projection）
 
 `get_current_context` 在读取时从当前证据推导 person / topic / commitment / preference / event 对象（状态 current / superseded / unresolved，`conflicting` 保留），带证据轮次、来源与冲突对；无投影表、无 LLM、确定性输出。规则、否定线索清单与"明确不投影的内容"见 [context-projection.md](context-projection.md)。评估用 `fixtures/eval/projection.json` 与 `internal/eval` 的投影指标（`evidence_valid`、`stale_not_current`、`superseded_not_current`、`conflicting_honest`、`deterministic`）守护。
@@ -256,6 +272,26 @@ make build
   --curator-model volces-agent-01/glm-5.3-flash
 ```
 
+### 可选音频分析（启用与显式入队）
+
+```sh
+# 1) worker / web / context-memory 指向同一份 audio-analysis-config-v1
+#    （模型路径相对配置文件目录解析；未传 --stages 时已启用的 audio_* stage 自动领取）
+./bin/context-worker --profile sprint3 --profiles-root data/profiles \
+  --audio-analysis-config ./audio-analysis.json
+./bin/context-web --profile sprint3 --profiles-root data/profiles \
+  --audio-analysis-config ./audio-analysis.json
+
+# 2) ingest 自动排队 vad/tagging/diarization；speaker 由 context-audio 显式入队
+#    （--request-id 即 generation：换新值强制新 run；模型升级/重跑必须换 generation）
+./bin/context-audio enqueue --profile sprint3 --profiles-root data/profiles \
+  --recording-id "$RECORDING_ID" --capabilities speaker \
+  --request-id "$AUDIO_ANALYSIS_REQUEST_ID" --config ./audio-analysis.json
+
+# 3) 观察状态：get_context_item / 会话详情的 audio_analysis 投影，或
+#    GET /api/audio-analysis/events/{id}/audio 播放事件片段
+```
+
 ### embed stage（发布后自动增量索引；M1 起）
 
 两个入队点：**摄入事务内**（`Store.IngestTranscript` 与 extract 任务同一事务，幂等键 `embed|<attachmentID>`，保证 generator=off / publish noop 时原话也被索引）与 **publish 提交后**（`publish:committed` 之后入队，幂等键 `embed|<conversationID>|<version>`；`publish:noop` 不入队）。处理复用 `internal/semantic.Indexer`（内容哈希幂等、stale 排除、`PruneConversation` 清孤儿行），结果引用形如 `embed:hash-ngram-v1/hash-ngram-v1+notes:N+turns:N+skipped:N+pruned:N`。
@@ -264,7 +300,7 @@ make build
 
 worker 嵌入端与查询端默认一致（`hash`/256，开箱匹配）；`openai` 需两侧 flags 对齐（`--embed-provider openai --embed-endpoint ... --embed-model ... --embed-dims ... --embed-key-env EMBED_API_KEY` 与 `context-memory --semantic-provider openai ...`），不一致时查询侧降级到字面分支并在 `gaps` 说明，不报错。新增 flags：`--embed-provider`（默认 `hash`）、`--embed-dims`（默认 256）、`--embed-endpoint`、`--embed-model`、`--embed-key-env`（默认 `EMBED_API_KEY`）、`--allow-synthetic`（放行占位候选生成器）、`--generator-temperature`（默认 -1 = 请求体省略 temperature）。
 
-`context-worker` 的完整参数：`--db`（必填）、`--worker-id`（默认 主机名+随机后缀）、`--stages`（默认 `extract,publish,curate,embed`）、`--lease`（默认 30s）、`--poll`（默认 1s）、`--once`、`--executor`（`synthetic|pipeline`，默认 `pipeline`；`synthetic` 仅演示/测试，运行时打 stderr 警告）、`--decision-url`（默认空 = 不做 Decision 评估，extract 照常提炼；配置时 HTTP 超时 30s）、`--decision-model`（默认 `jev-style-2b-v2`）、`--generator`（`off|synthetic|openai`，默认 `off`；`synthetic` 需 `--allow-synthetic`）、`--generator-url`、`--generator-model`（默认 `glm-5.3-flash`）、`--generator-key-env`（默认 `GENERATOR_API_KEY`）、`--curator-command`（默认空，空则 curate 任务以 skipped 结束）、`--curator-timeout`（默认 15m）、`--curator-model`（默认 `curator`）、`--synthetic-delay`。启动时会先执行 `migrations.Apply`。`--executor synthetic` 运行时打 stderr 警告 `synthetic executor acknowledges jobs without real processing (demo/test only)`，并注明 embed 任务被空转确认、`get_processing_status.indexing_status` 停留 `pending`；`--generator openai` 未提供 `--generator-url` 时启动即报错。
+`context-worker` 的完整参数：`--db`（必填）、`--worker-id`（默认 主机名+随机后缀）、`--stages`（默认 `ingest,asr,extract,publish,curate,embed`；配置音频分析后自动追加已启用的 `audio_<capability>` stage，显式传 `--stages` 则以显式值为准）、`--lease`（默认 30s）、`--poll`（默认 1s）、`--once`、`--executor`（`synthetic|pipeline`，默认 `pipeline`；`synthetic` 仅演示/测试，运行时打 stderr 警告）、`--decision-url`（默认空 = 不做 Decision 评估，extract 照常提炼；配置时 HTTP 超时 30s）、`--decision-model`（默认 `jev-style-2b-v2`）、`--generator`（`off|synthetic|openai`，默认 `off`；`synthetic` 需 `--allow-synthetic`）、`--generator-url`、`--generator-model`（默认 `glm-5.3-flash`）、`--generator-key-env`（默认 `GENERATOR_API_KEY`）、`--generator-timeout`（默认 180s）、`--curator-command`（默认空，空则 curate 任务以 skipped 结束）、`--curator-timeout`（默认 15m）、`--curator-model`（默认 `curator`）、`--audio-analysis-config`（默认空 = 音频分析整体关闭；与 web / context-memory / context-audio 指向同一份 `audio-analysis-config-v1`）、`--embed-input-type`（向 Qwen 嵌入服务发送 `input_type` 字段）、`--health-addr`（worker 健康端点）、`--synthetic-delay`。启动时会先执行 `migrations.Apply`。`--executor synthetic` 运行时打 stderr 警告 `synthetic executor acknowledges jobs without real processing (demo/test only)`，并注明 embed 任务被空转确认、`get_processing_status.indexing_status` 停留 `pending`；`--generator openai` 未提供 `--generator-url` 时启动即报错。
 
 ## 与开发计划的对应
 

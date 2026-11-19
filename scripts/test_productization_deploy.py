@@ -17,6 +17,8 @@ import tempfile
 import time
 import wave
 import unittest
+import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -192,7 +194,13 @@ class DeploymentTest(unittest.TestCase):
                 wav.setnchannels(1)
                 wav.setsampwidth(2)
                 wav.setframerate(16000)
-                wav.writeframes(b"\x00\x00" * 16000)
+                # The suite shares one profile/volume across tests, so an
+                # identical WAV would be an idempotent re-import of the prior
+                # test's conversation and would never enqueue new work.
+                frames = bytearray(b"\x00\x00" * 16000)
+                frames[0] = os.getpid() & 0xFF
+                frames[1] = time.time_ns() & 0xFF
+                wav.writeframes(bytes(frames))
             path = Path(handle.name)
         boundary = "----deploy-test"
         prefix = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"deploy.wav\"\r\n"
@@ -227,43 +235,219 @@ class DeploymentTest(unittest.TestCase):
         finally:
             subprocess.run(compose + ["down", "-v"], capture_output=True)
 
-    def test_backup_restore_preserves_sources(self) -> None:
-        self.run_compose("up", "-d", "--build")
-        wait_http(self.health_url())
-        self.import_wav()
-        # Stop writers so the backup and the original are hashed in the same
-        # quiescent state.
-        self.run_compose("stop", timeout=300)
-        backup = Path(self.tmp) / "backup.tar"
-        dump = subprocess.run(
-            ["docker", "run", "--rm", "-v", f"{self.data_volume}:/data:ro", "-v", f"{self.tmp}:/out",
-             "debian:bookworm-slim", "tar", "cf", "/out/backup.tar", "-C", "/data", "."],
-            capture_output=True, text=True, timeout=300,
+    def backup_script(self, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "backup-profile-volume.py"), *args],
+            cwd=ROOT, capture_output=True, text=True, timeout=3600,
         )
-        self.assertEqual(dump.returncode, 0, dump.stderr)
-        self.assertTrue(backup.exists())
+
+    def find_turn(self, conversation_id: str) -> dict:
+        cookie, csrf = self.login()
+        view = self.api_json(f"/api/conversations/{conversation_id}", cookie, csrf)
+        for recording in view.get("recordings", []):
+            recording_id = recording.get("recording_id")
+            if not recording_id:
+                continue
+            query = urllib.parse.urlencode({"recording_id": recording_id})
+            page = self.api_json(f"/api/conversations/{conversation_id}/turns?{query}", cookie, csrf)
+            for item in page.get("items", []):
+                if item.get("kind") == "turn" and item.get("global_start_ms") is not None:
+                    return item
+        raise AssertionError(f"no turn with known offsets: {view}")
+
+    def fetch(self, base: str, path: str, cookie: str) -> tuple[int, bytes]:
+        request = urllib.request.Request(base + path)
+        request.add_header("Cookie", cookie)
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        try:
+            with opener.open(request, timeout=60) as response:
+                return int(response.status), response.read()
+        except urllib.error.HTTPError as exc:  # noqa: PERF203 - reported to caller
+            return int(exc.code), exc.read()
+
+    def login_at(self, base: str) -> tuple[str, str]:
+        body = json.dumps({"password": PASSWORD}).encode()
+        request = urllib.request.Request(base + "/api/login", data=body, method="POST")
+        request.add_header("Origin", base)
+        request.add_header("Content-Type", "application/json")
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(request, timeout=30) as response:
+            payload = json.loads(response.read())
+            cookie = (response.getheader("Set-Cookie") or "").split(";", 1)[0]
+        return cookie, payload["csrf_token"]
+
+    def api_at(self, base: str, path: str, cookie: str, csrf: str, body: bytes | None = None,
+               content_type: str = "application/json") -> dict:
+        request = urllib.request.Request(base + path, data=body, method="POST" if body is not None else "GET")
+        request.add_header("Origin", base)
+        request.add_header("Cookie", cookie)
+        request.add_header("X-CSRF-Token", csrf)
+        if body is not None:
+            request.add_header("Content-Type", content_type)
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(request, timeout=60) as response:
+            return json.loads(response.read())
+
+    def start_restored_stack(self, data_volume: str, suffix: str) -> tuple[list[str], str, int]:
+        """Start a separate compose project on the restored volume.
+
+        It uses a new project name, a new env file, a new host port and the
+        restored DATA_VOLUME: never the original stack.
+        """
+        port = free_port()
+        env_file = Path(self.tmp) / f"restored-{suffix}.env"
+        env_file.write_text(
+            "MEMORY_PROFILE_PASSWORD=" + PASSWORD + "\n"
+            "RECORDING_PROFILE=verify\n"
+            "ASR_PROVIDER=fixture\n"
+            "GENERATOR_PROVIDER=off\n"
+            "EMBED_PROVIDER=hash\n"
+            f"WEB_PORT={port}\n"
+            f"DATA_VOLUME={data_volume}\n",
+            encoding="utf-8",
+        )
+        compose = ["docker", "compose", "-p", f"{self.project}-{suffix}", "--env-file", str(env_file)]
+        config = subprocess.run(compose + ["config"], cwd=ROOT, capture_output=True, text=True, timeout=120)
+        self.assertEqual(config.returncode, 0, config.stderr)
+        self.assertIn(data_volume, config.stdout)
+        self.assertIn(f"published: {port}", config.stdout.replace('"', "").replace("'", ""))
+        up = subprocess.run(compose + ["up", "-d"], cwd=ROOT, capture_output=True, text=True, timeout=900)
+        self.assertEqual(up.returncode, 0, up.stderr)
+        wait_http(f"http://127.0.0.1:{port}/healthz")
+        return compose, f"http://127.0.0.1:{port}", port
+
+    def test_backup_restore_preserves_sources(self) -> None:
+        up = self.run_compose("up", "-d", "--build")
+        self.assertEqual(up.returncode, 0, up.stderr)
+        wait_http(self.health_url())
+        conversation_id = self.import_wav()
+        turn = self.find_turn(conversation_id)
+        cookie, _ = self.login()
+        status, audio_before = self.fetch(self.base_url(), f"/api/turns/{turn['id']}/audio", cookie)
+        self.assertEqual(status, 200)
+        expected_pcm = 32 * (turn["global_end_ms"] - turn["global_start_ms"])
+        self.assertEqual(len(audio_before), 44 + expected_pcm, "turn WAV does not match the 32 bytes/ms contract")
+
+        backups = Path(self.tmp) / "backups"
+        archive = backups / f"{self.project}.tgz"
+        backup = self.backup_script(
+            "backup", "--data-volume", self.data_volume, "--out", str(backups),
+            "--compose-project", self.project, "--name", archive.name,
+        )
+        self.assertEqual(backup.returncode, 0, backup.stderr)
+        self.assertTrue(archive.exists())
+        manifest = json.loads(backup.stdout)
+        self.assertEqual(manifest["schema"], "backup-archive-manifest-v1")
+
+        # Refuse to overwrite an existing archive.
+        again = self.backup_script(
+            "backup", "--data-volume", self.data_volume, "--out", str(backups),
+            "--compose-project", self.project, "--name", archive.name,
+        )
+        self.assertNotEqual(again.returncode, 0)
+        self.assertIn("archive_exists", again.stderr)
+
+        # A live writer makes the backup refuse instead of copying a hot volume.
+        self.run_compose("up", "-d")
+        wait_http(self.health_url())
+        hot = self.backup_script(
+            "backup", "--data-volume", self.data_volume, "--out", str(backups),
+            "--name", "hot.tgz",
+        )
+        self.assertNotEqual(hot.returncode, 0)
+        self.assertIn("writers_active", hot.stderr)
+        self.assertFalse((backups / "hot.tgz").exists())
+        self.run_compose("stop", timeout=300)
 
         restore_volume = f"{self.project}-restore"
-        subprocess.run(["docker", "volume", "create", restore_volume], check=True, capture_output=True)
+        restored = self.backup_script(
+            "restore", "--archive", str(archive), "--data-volume", restore_volume,
+            "--barrier-source-volume", self.data_volume, "--compose-project", self.project,
+        )
+        self.assertEqual(restored.returncode, 0, restored.stderr)
+        verify = self.backup_script("verify", "--data-volume", restore_volume)
+        self.assertEqual(verify.returncode, 0, verify.stderr)
+        report = json.loads(verify.stdout)
+        self.assertEqual(report["profiles"][0]["id"], "verify")
+
+        compose, base, _ = self.start_restored_stack(restore_volume, "restored")
         try:
-            restore = subprocess.run(
-                ["docker", "run", "--rm", "-v", f"{restore_volume}:/data", "-v", f"{self.tmp}:/in",
-                 "debian:bookworm-slim", "tar", "xf", "/in/backup.tar", "-C", "/data"],
-                capture_output=True, text=True, timeout=300,
-            )
-            self.assertEqual(restore.returncode, 0, restore.stderr)
-            listing = subprocess.run(
-                ["docker", "run", "--rm", "-v", f"{restore_volume}:/data:ro", "debian:bookworm-slim",
-                 "sh", "-c", "find /data -type f | sort | xargs sha256sum | sha256sum"],
-                capture_output=True, text=True, timeout=300,
-            )
-            original = subprocess.run(
-                ["docker", "run", "--rm", "-v", f"{self.data_volume}:/data:ro", "debian:bookworm-slim",
-                 "sh", "-c", "find /data -type f | sort | xargs sha256sum | sha256sum"],
-                capture_output=True, text=True, timeout=300,
-            )
-            self.assertEqual(original.stdout.split()[0], listing.stdout.split()[0])
+            restored_cookie, restored_csrf = self.login_at(base)
+            page = self.api_at(base, "/api/search?q=fixture%20transcript", restored_cookie, restored_csrf)
+            texts = [hit.get("text", "") for hit in page.get("hits", [])]
+            self.assertTrue(any("fixture transcript" in text for text in texts),
+                            f"restored search lost the synthetic transcript: {page}")
+            status, audio_after = self.fetch(base, f"/api/turns/{turn['id']}/audio", restored_cookie)
+            self.assertEqual(status, 200)
+            self.assertEqual(audio_after, audio_before, "restored turn audio differs from the source")
         finally:
+            subprocess.run(compose + ["down", "-v", "--remove-orphans"], capture_output=True)
+            subprocess.run(["docker", "volume", "rm", "-f", restore_volume], capture_output=True)
+
+    def test_backup_rejects_pre_forget_archive(self) -> None:
+        up = self.run_compose("up", "-d", "--build")
+        self.assertEqual(up.returncode, 0, up.stderr)
+        wait_http(self.health_url())
+        conversation_id = self.import_wav()
+        turn = self.find_turn(conversation_id)
+
+        backups = Path(self.tmp) / "forget-backups"
+        pre = backups / "pre-forget.tgz"
+        backup = self.backup_script(
+            "backup", "--data-volume", self.data_volume, "--out", str(backups),
+            "--compose-project", self.project, "--name", pre.name,
+        )
+        self.assertEqual(backup.returncode, 0, backup.stderr)
+        self.run_compose("up", "-d")
+        wait_http(self.health_url())
+
+        cookie, csrf = self.login()
+        forget_request = {"scope": "turn", "turn_id": turn["id"]}
+        preview = self.api_json("/api/forget/preview", cookie, csrf,
+                                json.dumps(forget_request).encode())
+        forget_request["expected_state"] = preview["expected_state"]
+        forgotten = self.api_json("/api/forget", cookie, csrf,
+                                  json.dumps(forget_request).encode())
+        tombstone = forgotten.get("tombstone_id")
+        self.assertTrue(tombstone, forgotten)
+        deadline = time.time() + 120
+        while time.time() < deadline:
+            status = self.api_json(f"/api/forget/{tombstone}", cookie, csrf)
+            if status.get("status") == "complete" and status.get("redaction_done"):
+                break
+            time.sleep(0.5)
+        else:
+            raise AssertionError(f"forget did not complete: {status}")
+        self.run_compose("stop", timeout=300)
+
+        restore_volume = f"{self.project}-pre-restore"
+        rejected = self.backup_script(
+            "restore", "--archive", str(pre), "--data-volume", restore_volume,
+            "--barrier-source-volume", self.data_volume, "--compose-project", self.project,
+        )
+        self.assertNotEqual(rejected.returncode, 0, rejected.stdout)
+        self.assertIn("backup_predates_forget", rejected.stderr)
+
+        post = backups / "post-forget.tgz"
+        after = self.backup_script(
+            "backup", "--data-volume", self.data_volume, "--out", str(backups),
+            "--compose-project", self.project, "--name", post.name,
+        )
+        self.assertEqual(after.returncode, 0, after.stderr)
+        restored = self.backup_script(
+            "restore", "--archive", str(post), "--data-volume", restore_volume,
+            "--barrier-source-volume", self.data_volume, "--compose-project", self.project,
+        )
+        self.assertEqual(restored.returncode, 0, restored.stderr)
+        compose, base, _ = self.start_restored_stack(restore_volume, "post-forget")
+        try:
+            restored_cookie, restored_csrf = self.login_at(base)
+            page = self.api_at(base, "/api/search?q=fixture%20transcript", restored_cookie, restored_csrf)
+            self.assertEqual(page.get("hits", []), [], f"forgotten source reappeared: {page}")
+            status, _ = self.fetch(base, f"/api/turns/{turn['id']}/audio", restored_cookie)
+            self.assertIn(status, (404, 410), f"forgotten audio still readable: {status}")
+        finally:
+            subprocess.run(compose + ["down", "-v", "--remove-orphans"], capture_output=True)
             subprocess.run(["docker", "volume", "rm", "-f", restore_volume], capture_output=True)
 
 

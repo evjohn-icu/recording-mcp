@@ -242,6 +242,12 @@ func (s *Store) IngestTranscript(ctx context.Context, result asrinput.Result) (I
 		if _, err = tx.ExecContext(ctx, `UPDATE source_attachments SET active=0 WHERE id=? AND active=1`, supersededID); err != nil {
 			return IngestReport{}, err
 		}
+		// A revision replacement invalidates every speaker-mapping run pinned
+		// to the replaced attachment. Pure acoustic runs stay valid, and the
+		// new attachment id is not part of the snapshot yet.
+		if err := invalidateAudioMappingRunsTx(ctx, tx, supersededID); err != nil {
+			return IngestReport{}, err
+		}
 	}
 	var supersedes any
 	if src.SupersedesRevision != "" {
@@ -545,4 +551,41 @@ func deriveIndexingStatus(ctx context.Context, db *sql.DB, conversationID string
 		// later embed job lands.
 		return "pending", nil
 	}
+}
+
+// invalidateAudioMappingRunsTx invalidates every speaker-mapping run pinned to
+// the superseded attachment and clears its head. Pure acoustic runs are not
+// pinned to attachments and stay valid. The SQL lives here (not in
+// audioanalysis) so the memory package keeps no dependency on the analysis
+// package.
+func invalidateAudioMappingRunsTx(ctx context.Context, tx *sql.Tx, attachmentID string) error {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT id FROM audio_analysis_runs WHERE capability='speaker' AND EXISTS (SELECT 1 FROM json_each(source_attachment_ids_json) e WHERE e.value=?)`,
+		attachmentID)
+	if err != nil {
+		return err
+	}
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE audio_analysis_runs SET status='invalidated',active=0,updated_at=? WHERE id=?`,
+			time.Now().UnixMilli(), id); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE audio_analysis_heads SET current_run_id=NULL WHERE current_run_id=?`, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }

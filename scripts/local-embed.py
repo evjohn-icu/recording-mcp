@@ -164,6 +164,12 @@ class Service:
         self.lock = None
         self._compat_lock = threading.Lock()
         self._infer_lock = threading.Lock()
+        # Grid calibration re-embeds the same corpus for every threshold. Keep
+        # a bounded process-local memo so identical inputs reuse the exact
+        # vectors; nothing is persisted and model identity is fixed per server.
+        self._cache_lock = threading.Lock()
+        self._embedding_cache: dict[str, list[float]] = {}
+        self._embedding_cache_limit = 200_000
         self.last_request = time.monotonic()
         self.encoder = None
 
@@ -229,14 +235,36 @@ class Service:
                 prepared.append(QUERY_PREFIX + text)
             else:
                 prepared.append(text)
-        encoder = self.ensure_encoder()
-        out: list[list[float]] = []
-        # One model instance is shared by the threaded HTTP server; serialize
-        # inference so concurrent requests cannot interleave CUDA calls.
-        with self._infer_lock:
-            for start in range(0, len(prepared), self.args.batch_size):
-                out.extend(encoder.encode(prepared[start:start + self.args.batch_size]))
-        return out
+        hits: dict[str, list[float]] = {}
+        misses: list[str] = []
+        seen: set[str] = set()
+        with self._cache_lock:
+            for text in prepared:
+                if text in seen:
+                    continue
+                seen.add(text)
+                cached = self._embedding_cache.get(text)
+                if cached is not None:
+                    hits[text] = cached
+                else:
+                    misses.append(text)
+        if misses:
+            encoder = self.ensure_encoder()
+            encoded: dict[str, list[float]] = {}
+            # One model instance is shared by the threaded HTTP server; serialize
+            # inference so concurrent requests cannot interleave CUDA calls.
+            with self._infer_lock:
+                for start in range(0, len(misses), self.args.batch_size):
+                    batch = misses[start:start + self.args.batch_size]
+                    for text, vector in zip(batch, encoder.encode(batch)):
+                        encoded[text] = vector
+            with self._cache_lock:
+                for text, vector in encoded.items():
+                    if len(self._embedding_cache) >= self._embedding_cache_limit:
+                        self._embedding_cache.pop(next(iter(self._embedding_cache)))
+                    self._embedding_cache[text] = vector
+                hits.update(encoded)
+        return [hits[text] for text in prepared]
 
     def health(self) -> dict:
         return {
@@ -285,6 +313,12 @@ def make_handler(service: Service):
         def do_POST(self):  # noqa: N802 - http.server API
             service.touch()
             if self._reject_browser():
+                return
+            if self.path.split("?", 1)[0] == "/admin/flush":
+                with service._cache_lock:
+                    cleared = len(service._embedding_cache)
+                    service._embedding_cache.clear()
+                self._send(200, {"status": "ok", "cleared": cleared})
                 return
             if self.path.split("?", 1)[0] != "/v1/embeddings":
                 self._send(404, {"error": {"message": "not found"}})

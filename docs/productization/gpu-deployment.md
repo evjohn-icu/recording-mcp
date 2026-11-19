@@ -1,6 +1,6 @@
 # 本机 GPU 部署（SMART-01）
 
-主部署形态是 **Mode B**：WSL2 原生 web + worker + `.venv-asr` 本机 ASR。Docker Compose 仍是非 GPU 部署；本轮不发布 GPU Compose profile。
+主部署形态是 **Mode B**：WSL2 原生 web + worker + `.venv-asr` 本机 ASR。Docker Compose 仍是非 GPU 部署；本轮不发布 GPU Compose profile。v0.4 新增可选音频分析（VAD/tagging/speaker 走 CPU ONNX、diarization 走 GPU，详见下文小节）；本轮只验证部署机制与锁，真实模型推理未执行。
 
 ## 前置条件
 
@@ -46,14 +46,15 @@ scripts/local-gpu-up.sh --profile sprint3 --backend ark --with-embedding
 
 ## 并发与锁
 
-本机 ASR 与可选 embedding 共用 8 GB 显存：
+ASR、embedding 与音频分析可以通过同一锁文件串行使用 GPU。Go 在未配置锁路径时使用用户级默认值 `${XDG_RUNTIME_DIR:-$HOME/.local/state}/recording-mcp/recording-mcp-gpu.lock`，使用 `flock(LOCK_EX|LOCK_NB)` 每 200 ms 重试。多个 profile 使用该默认路径时会相互等待。
 
-- Go 侧 `--asr-lock` 指向 `data/profiles/<profile>/gpu.lock`，以 `flock(LOCK_EX|LOCK_NB)` 轮询（200 ms），超时（默认 10 分钟）报错。
+- `local-gpu-up.sh` 选择 profile 内的 `gpu.lock`，传给 worker 的 `--asr-lock`，以及 `--with-embedding` 启动的 CUDA embedding 服务。ASR 默认等锁 10 分钟。
 - Python embedding 服务在 CUDA 设备上以 `--gpu-lock` 在模型加载与每批推理外加锁，超时返回 HTTP 503 `GPU busy`。
+- CUDA 音频分析在整个适配器子进程生命周期内持锁。与启动器并用时，在音频分析配置的 `gpu_lock` 中填写启动器所用锁文件的绝对路径。持锁后发现空闲显存小于 1024 MiB 时返回可重试的 `audio_gpu_busy`。
 - `--with-embedding` 同时向 worker/web 传 `--embed-input-type` / `--semantic-input-type`（本地 Qwen 服务的 query 指令开关）；该字段默认关闭，避免严格 OpenAI 兼容端点拒绝未知字段。
-- 启动器总是把同一锁路径传给 worker；`--with-embedding` 在 GPU 设备上自动追加 `--gpu-lock`。
+- 启动器默认关闭音频分析。手动配置时，worker 和读取状态的 Web / MCP 进程需使用同一份配置。 [启用与显式入队](../processing.md#可选音频分析启用与显式入队)
 
-锁的串行性由 `internal/cloudsync/gpu_lock_test.go::TestGPUFileLockSerializesLocalASR` 验证（trace 必须是 start/end/start/end）。
+锁的串行性由 `internal/gpulock` 测试（跨进程争用、同一锁路径跨 profile、取消）与 `internal/cloudsync/gpu_lock_test.go::TestGPUFileLockSerializesLocalASR` 验证（trace 必须是 start/end/start/end）。
 
 ## 降级
 
@@ -66,6 +67,23 @@ scripts/local-gpu-up.sh --profile sprint3 --backend ark --with-embedding
 ## 关闭行为
 
 `SIGTERM`/`SIGINT` 发送给启动器后：向 `local-start.sh` 子进程发 `TERM`，最多等待 30 秒，超时 `KILL`；停止 embedding 服务；写 `artifacts/local-gpu/startup.json`（每轮冷启动毫秒、模型加载毫秒、峰值显存、关闭毫秒）。
+
+## 可选音频分析（v0.4）
+
+音频分析按能力逐个声明设备：**vad** = Silero VAD（ONNX，CPU）、**tagging** = Zipformer（sherpa-onnx，CPU）、**diarization** = pyannote Community-1（GPU）、**speaker** = CAM++（ONNX，CPU）。每能力在 `audio-analysis-config-v1` 里钉住 `enabled` / `model_id` / `model_revision` / `files[]`（本地路径 + 64 hex SHA-256）/ `device` / `frontend_id`；模型文件必须本地存在且哈希匹配，缺失只把该能力降级为 unavailable，不影响其它能力与 ASR。
+
+```sh
+# worker 执行 + web/context-memory 读投影指向同一份配置；模型路径相对配置文件目录解析
+./bin/context-worker --profile sprint3 --profiles-root data/profiles \
+  --audio-analysis-config ./audio-analysis.json
+./bin/context-web --profile sprint3 --profiles-root data/profiles \
+  --audio-analysis-config ./audio-analysis.json
+```
+
+- **适配器环境**：`requirements-audio-analysis.txt`（numpy / onnxruntime(CPU) / sherpa-onnx / kaldi-native-fbank / pyannote.metrics）。必须是独立 Python 环境：不与 `.venv-asr` 混装，CPU 与 GPU onnxruntime 不可共存；diarization 需要 GPU 组（torch cu126 + onnxruntime-gpu + pyannote.audio）。
+- **gated 权重**：Community-1 权重为 CC-BY-4.0 且 gated——由操作者账号一次性取到本地目录并在 config 里钉哈希，运行期 `HF_HUB_OFFLINE=1`，适配器绝不下载或接受条款。
+- Worker 启动时会终结未配置或不可用能力的可领取任务，使依赖这些任务的处理继续推进。
+- **证据边界**：本轮只验证配置、锁、存储与适配器协议（`go test ./internal/audioanalysis`、`go test ./internal/gpulock`、`scripts/test_audio_analysis.py`）；真实模型推理与 gated 权重部署为 NOT_RUN/BLOCKED（见 [v0.4 发布报告](../engineering/context-engine-v04-release-report.md) Sprint C）。本节描述的是部署机制，不是已验证的模型性能。
 
 ## Docker GPU 探针（事实记录）
 

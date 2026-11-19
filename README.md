@@ -2,7 +2,7 @@
 
 A local-first Context Layer that turns long-form recordings into revision-aware, evidence-backed memory consumable through MCP.
 
-把随身录音变成可检索、可审计的会话记忆：转写修订与失效追踪、候选记忆抽取与发布、人工复核的关联与说话人身份、环境音隔离、混合检索（字面 + 语义 + 已确认关联）以及读取时的上下文投影，全部通过 MCP 工具暴露给 agent。所有数据保存在本地 SQLite，不依赖云服务。
+把随身录音变成可检索、可审计的会话记忆。系统支持转写修订与失效追踪、候选记忆抽取与发布、说话人和话题关联的人工复核、环境音隔离、混合检索与上下文投影。记忆与嵌入向量保存在本地 SQLite，托管录音保存在文件系统，可通过本地 Web 和 MCP 查询。云端采集与外部模型服务均为可选配置。
 
 ## 架构
 
@@ -24,15 +24,17 @@ flowchart TD
 ```
 
 - 索引与评估旁路：`bin/context-embed` 构建 `memory_embeddings`（迁移 v12），`bin/context-eval` 离线评估检索与投影。
-- Worker：`bin/context-worker` 以任务队列租约执行 extract / publish / curate。
+- Worker 通过任务队列租约处理转写、提炼、发布、关联和索引，可配置独立的音频分析阶段。 [处理链路](docs/processing.md)
 
 ## 已实现 / 实验 / 计划
 
 - ✅ 已实现：转写摄入与修订取代（stale 追踪）、extract/publish 候选记忆链路、话题关联提议与人工复核、说话人绑定与修订级身份投影、环境音分离、混合检索（字面 + 语义 + 已确认链接分支 + 融合打分与逐条来源 `retrieval_sources`）、上下文投影 v0（`get_current_context`）、确定性离线评估、任务队列 worker、跨设备采集链路（Android 分块录音 → Cloudflare ingest-v1 → `context-sync` 拉取入库）。
 - ✅ 转写配套工具：lite 兜底转写流水线、ASR 修复提案与服务健康判别（`scripts/`，见下文「转写工具链」）。
 - ✅ 本地智能：`scripts/local-gpu-up.sh` 一条命令完成 GPU 预检、模型探针、启动/健康检查/可重复启停与降级诊断；长录音按窗口断点续跑（已提交窗口不重复计费）；搜索结果展示证据充分性（充分/不足/无法判定）与可点击证据引用。
-- 🧪 实验：`build_context` 返回的包结构（items/evidence/coverage/gaps/trace/ranking）、语义后端默认使用离线哈希嵌入器（真实端点可选开启；内置 Qwen3-Embedding 服务需显式启用，校准门禁未通过，默认仍为 v1 + hash）、投影 v0 的规则集（笔记类型映射与否定线索）。
+- 🧪 实验：`build_context` 的上下文包与投影 v0 规则集。检索默认 `v1` + 离线 `hash` 嵌入器，`v2` 可显式选择。`v3` 证据准入仍关闭，真实校准未通过时延门禁，尚无选定策略。 [检索配置](docs/retrieval-quality-v2.md#使用) · [检索 v3 报告](docs/engineering/retrieval-v3-report.md)
 - 🚧 计划：FTS5 字面索引与字面分支的 n-gram 覆盖率打分、真值引擎（`conflicting` 状态）、模型辅助的投影增强、`project` 记忆类型。
+
+Context Engine v0.4 发布记录将 `v1` + `hash` 候选标为合并就绪，生产发布仍受阻。真实音频质量评分等待人工金标和裁决。 [发布证据](docs/engineering/context-engine-v04-release-report.md#7-后续跟进第二轮2026-11-13)
 
 ## 快速开始
 
@@ -67,7 +69,7 @@ docker compose up -d --build
 - `ASR_PROVIDER=off` 时服务可用但不能上传：`/api/capabilities` 返回 `asr_not_configured`，上传返回 409 并给出下一步。配置 `ASR_PROVIDER=doubao` + `VOLC_API_KEY`（或使用明确的 `fixture` 演示模式）后，Web 与 worker 必须使用同一个值。离线场景可用 `ASR_PROVIDER=ark|qwen` 在宿主机以 float16 运行本地模型（[docs/productization/local-asr.md](docs/productization/local-asr.md)）。
 - 上传上限 2 GiB；服务端先按扩展名过滤，再用 `ffprobe` 真实探测；失败返回 `invalid_audio`。
 - 阶段进度：音频接收 → 语音转写 → 信息提炼 → 发布 → 索引；失败阶段带 `error_code`/`error_action` 与重试。
-- 部署、备份、升级与排障：[docs/productization/deployment.md](docs/productization/deployment.md)。
+- Profile 整体备份和恢复使用 `context-backup`，操作前停止所有写入者，恢复时用可信 profile 根目录校验遗忘屏障。 [部署、备份、升级与排障](docs/productization/deployment.md)
 - 发布清单与验证记录：[docs/productization/beta-release-checklist.md](docs/productization/beta-release-checklist.md)。
 
 ### 本地 Web 浏览器（安全合成演示）
@@ -151,7 +153,7 @@ scripts/local-gpu-up.sh --profile home --with-embedding
 
 ## MCP 客户端与 Web 运行限制
 
-MCP 客户端里 `tools/list` 可见 30 个工具（22 个记忆工具 + 8 个事件原型工具）。调用 `get_current_context`：
+默认启动时，MCP `tools/list` 可见 30 个工具（22 个记忆工具和 8 个事件原型工具）。下面的请求读取当前上下文中的承诺条目。
 
 ```json
 {"jsonrpc":"2.0","id":1,"method":"tools/call",
@@ -210,6 +212,7 @@ Android 端构建与真机说明见 [docs/android.md](docs/android.md)；云端�
 | `scripts/local-asr.py` | 离线 ASR runner：`--probe`、`--stream`、`--skip`、加载/窗口超时；环境白名单不继承 API key |
 | `scripts/local-embed.py` | OpenAI 兼容本地 embedding 服务（Qwen3-Embedding，query 指令、健康检查、模型 SHA-256 校验、GPU 锁） |
 | `scripts/fetch-local-models.sh` | 按 `scripts/model-revisions.json` 下载并校验钉住模型快照 |
+| `bin/context-audio enqueue` | 显式排队已配置的 VAD、声音标签、说话人分段或声纹分析，由 worker 执行。 [处理链路](docs/processing.md) |
 | `scripts/long-audio-reliability.py` | 长录音 T1–T10 验证：合成故障注入、真实录音指标、覆盖/重复/断点续跑 |
 
 ## 核心概念
@@ -230,7 +233,7 @@ Android 端构建与真机说明见 [docs/android.md](docs/android.md)；云端�
 | --- | --- | --- |
 | 记忆写入（5） | `ingest_transcript`、`apply_annotations`、`review_memory_link`、`propose_speaker_binding`、`review_speaker_binding` | 摄入转写、应用注释修订、复核关联与说话人绑定 |
 | 检索与读取（17） | `search_memory`、`query_context`、`get_conversation_context`、`get_context_item`、`list_conversations`、`list_topics`、`get_evidence_context`、`get_processing_status`、`get_annotation_history`、`build_context`、`get_current_context`、`list_memory_links`、`get_speaker_projection`、`list_speaker_bindings`、`list_highlights`、`build_context_brief`、`get_decision_trail` | 字面/混合检索、上下文包、当前上下文投影、历史、状态与决策轨迹 |
-| 事件原型（8） | `search_events`、`get_timeline`、`get_commitments`、`get_conversation_events`、`get_person_context`、`get_current_state`、`ingest_events`、`record_feedback` | 独立的事件原型，与记忆家族共用同一数据库与服务 |
+| 事件原型（8） | `search_events`、`get_timeline`、`get_commitments`、`get_conversation_events`、`get_person_context`、`get_current_state`、`ingest_events`、`record_feedback` | 由同一 MCP 服务注册。Profile 模式使用独立的 `plane/events.db` |
 
 记忆家族共 22 个工具（17 只读 + 5 写入）；事件原型工具由同一二进制提供。`get_decision_trail` 只读，返回 `schema_version: "decision-trail-v1"`：确认只来自人工 review，`confidence` 不代表真实性，`valid_from` 未知时不推断，来源失效或已遗忘的内容不返回。精确字段以 [docs/contract.md](docs/contract.md) 与 [docs/context-layer-runtime.md](docs/context-layer-runtime.md) 为准。
 

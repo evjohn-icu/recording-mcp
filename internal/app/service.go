@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"recordingmcp/internal/audioanalysis"
 	"recordingmcp/internal/contextbrief"
 	"recordingmcp/internal/contextbuild"
 	"recordingmcp/internal/memory"
@@ -21,6 +22,16 @@ type Service struct {
 	Semantic      semantic.SemanticRetriever
 	Reranker      contextbuild.Reranker
 	Assessor      contextbuild.EvidenceAssessor
+	// CandidateAssessor gates explicit retrieval v3. Nil keeps v3 unavailable
+	// and never falls back to v1/v2 silently.
+	CandidateAssessor contextbuild.CandidateAssessor
+	// AdmissionPolicy pins the v3 provider, assessor and threshold.
+	AdmissionPolicy *contextbuild.AdmissionPolicy
+	// AudioRuns is the vector-free projection source for audio-analysis runs.
+	// Nil disables the projection.
+	AudioRuns *audioanalysis.Store
+	// AudioConfig decides whether a capability is configured and verified.
+	AudioConfig *audioanalysis.Config
 	// ASRProvider names the configured transcription provider ("off" or empty
 	// when uploads cannot be transcribed). It is reported by Capabilities.
 	ASRProvider string
@@ -161,7 +172,15 @@ func (s *Service) EvidenceContext(ctx context.Context, turnID string, radius, ma
 // BuildContext assembles a hybrid context package with the service's fixed
 // dependency set.
 func (s *Service) BuildContext(ctx context.Context, req contextbuild.Request) (contextbuild.Package, error) {
-	return contextbuild.Build(ctx, contextbuild.Deps{Store: s.Store, DB: s.Store.DB(), Reranker: s.Reranker, Assessor: s.Assessor, Semantic: s.Semantic}, req)
+	return contextbuild.Build(ctx, contextbuild.Deps{
+		Store:             s.Store,
+		DB:                s.Store.DB(),
+		Reranker:          s.Reranker,
+		Assessor:          s.Assessor,
+		Semantic:          s.Semantic,
+		CandidateAssessor: s.CandidateAssessor,
+		AdmissionPolicy:   s.AdmissionPolicy,
+	}, req)
 }
 
 // ApplyAnnotations applies one full annotation revision. It is a passthrough:

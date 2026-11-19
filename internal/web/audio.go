@@ -22,6 +22,19 @@ func (s *Server) handleAudio(w http.ResponseWriter, r *http.Request) {
 	writeAudioClip(w, r, clip)
 }
 
+// handleAudioAnalysisEvent streams one audio-analysis event's slice as WAV. The
+// event must belong to a current, active run; forgotten or stale runs return a
+// JSON error instead of bytes.
+func (s *Server) handleAudioAnalysisEvent(w http.ResponseWriter, r *http.Request) {
+	clip, err := s.svc.EventAudioClip(r.Context(), r.PathValue("id"))
+	if err != nil {
+		s.writeError(w, r, err, nil)
+		return
+	}
+	defer clip.Close()
+	writeAudioClip(w, r, clip)
+}
+
 func writeAudioClip(w http.ResponseWriter, r *http.Request, clip *app.AudioClip) {
 	var header bytes.Buffer
 	if err := app.WriteWAVHeader(&header, clip.Size); err != nil {

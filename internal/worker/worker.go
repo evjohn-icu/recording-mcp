@@ -22,6 +22,10 @@ const (
 	defaultStage            = "extract"
 )
 
+// ErrFinalized reports that the executor already committed the job state in
+// its own transaction. The worker treats it as success and skips Complete.
+var ErrFinalized = errors.New("worker: job already finalized by the executor")
+
 // Executor runs a single claimed job. It must honor ctx cancellation and
 // return a result reference on success.
 type Executor interface {
@@ -166,6 +170,9 @@ func runJob(parent context.Context, cfg Config, job process.Job) {
 	lost := leaseLost
 	mu.Unlock()
 	if lost {
+		return
+	}
+	if errors.Is(execErr, ErrFinalized) {
 		return
 	}
 

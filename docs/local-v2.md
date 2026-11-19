@@ -59,7 +59,7 @@ export MEMORY_PROFILE_PASSWORD='迁移后 profile 的本地强密码'
 - 说话人按录音内标签提议并由用户确认、拒绝或撤销；确认身份是人工审阅，不是自动识别。
 - 时间线中如出现事实时间，区分事实适用时间（valid time）与系统记录时间（recorded time）。未知的旧时间不应推造；“某人报告了某事”不等于已验证该事实。录音时间不确定时应选宽泛音频范围，不要把缺失时间静默扩展为更大删除范围；系统当前时间也不等于事实发生时间。
 - GUI 的逐条遗忘操作先显示预览和将清理的托管备份数量，再确认提交；预览版本变化时必须重看预览。遗忘会写入 tombstone / replay fence，清理托管的音频、索引及备份副本；清理未完成会显示 pending，需重试/等待完成，不能当作已完成。待处理遗忘与归纳抑制任务保存在服务端；重新登录后可在页面提示中继续重试。AI-note suppression（抑制）只阻止同一来源、同类 note 再出现，保留来源；它不是删除或遗忘事实。
-- 托管目录之外的云端副本、手工导出及操作系统/用户自管备份不在本地清理范围。发生遗忘后不可用旧二进制或旧备份绕过 tombstone；任何恢复都必须重新施加删除 fence。不能承诺外部副本已删除。
+- 托管目录之外的云端副本、手工导出和用户自管备份需另行清理。恢复 profile 时，`context-backup restore` 要求以停写且包含最新永久遗忘状态的可信 profile 根目录校验归档，拒绝早于遗忘屏障的备份。 [备份与恢复](productization/deployment.md#恢复)
 - Web profile 选择器支持整体永久删除：在当前 profile 的登录界面调用 `POST /api/profiles/retire`，提交 profile 名称、同名确认和当前密码。删除先持久化 fence 并撤销会话，再清理本地 SQLite、事件库及托管目录；响应 `pending` 表示仍被 fence 阻止访问，可用同名和密码重试，只有 `complete` 表示托管清理已完成。已退休名称不能重新创建。不要通过重建旧 profile 或还原备份规避。
 
 ## 检索及验证边界
@@ -70,7 +70,7 @@ export MEMORY_PROFILE_PASSWORD='迁移后 profile 的本地强密码'
 
 ## 数据库迁移状态
 
-代码中注册了迁移 14（permanent forget）、15（profile retirement）和 16（suppression cleanup operations），但这不等于任何既有本地数据库已迁移，也不代表本轮所有迁移/恢复场景已验收。启动/worker 会应用其代码路径上的迁移；部署前须对数据库副本备份并核实实际 `schema_migrations` 状态及迁移成功日志。**不要在未核实前宣称迁移完成**，也不要拿生产/私人数据库做演示或验证。细节与范围参见 [`local-v2-plan.md`](local-v2-plan.md)。
+本地 v2 的遗忘、profile 退休和归纳抑制清理分别由迁移 14、15、16 管理。Context Engine v0.4 的音频分析表使用迁移 23。升级前停写并备份 profile 根目录，启动后检查迁移日志和实际 `schema_migrations`。 [本地 v2 迁移计划](local-v2-plan.md) · [部署与升级](productization/deployment.md#升级)
 
 ## 合成演示
 

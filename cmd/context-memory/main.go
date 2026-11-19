@@ -17,6 +17,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"recordingmcp/internal/app"
 	"recordingmcp/internal/asrinput"
+	"recordingmcp/internal/audioanalysis"
 	"recordingmcp/internal/contextbrief"
 	"recordingmcp/internal/contextbuild"
 	"recordingmcp/internal/decision"
@@ -315,8 +316,8 @@ func newServer(store *memory.Store, svc *app.Service, trail decisionTrailBuilder
 		}
 		return nil, ConversationResult{Experimental: true, ConversationID: cc.ConversationID, Title: cc.Title, Topics: cc.Topics, Context: cc.Context, Processing: cc.Processing}, nil
 	})
-	mcp.AddTool(s, read("get_context_item", "Read one annotated note, a complete stored transcript turn, or the conversation summary by stable ID. Note results include their source turns."), func(ctx context.Context, _ *mcp.CallToolRequest, in ItemInput) (*mcp.CallToolResult, memory.ItemDetail, error) {
-		r, e := svc.GetItem(ctx, in.ID, in.IncludeStale)
+	mcp.AddTool(s, read("get_context_item", "Read one annotated note, a complete stored transcript turn, or the conversation summary by stable ID. Note results include their source turns. When audio analysis is configured, an optional audio_analysis projection is attached."), func(ctx context.Context, _ *mcp.CallToolRequest, in ItemInput) (*mcp.CallToolResult, app.ItemDetail, error) {
+		r, e := svc.ItemWithAudio(ctx, in.ID, in.IncludeStale)
 		return nil, r, e
 	})
 	mcp.AddTool(s, read("list_topics", "List the topics available in the local memory database, optionally scoped to one conversation."), func(ctx context.Context, _ *mcp.CallToolRequest, in TopicsInput) (*mcp.CallToolResult, memory.TopicList, error) {
@@ -587,9 +588,11 @@ func main() {
 	db := flag.String("db", "data/context-memory.db", "experimental SQLite memory database")
 	profileCLI := profile.RegisterCLI(flag.CommandLine)
 	readOnly := flag.Bool("read-only", false, "register only the read tools; ingest_transcript, apply_annotations, review_memory_link, propose_speaker_binding and review_speaker_binding are not exposed")
+	audioAnalysisConfig := flag.String("audio-analysis-config", "", "path to an audio-analysis-config-v1 JSON (empty disables audio analysis)")
 	decisionURL := flag.String("decision-url", "", "optional Decision engine endpoint used to rerank build_context items (empty disables reranking)")
 	sufficiencyURL := flag.String("sufficiency-url", "", "optional Decision endpoint for v2 evidence sufficiency (empty disables assessment)")
-	sufficiencyModel := flag.String("sufficiency-model", "", "model identity for v2 evidence sufficiency")
+	sufficiencyModel := flag.String("sufficiency-model", "", "model identity for v2/v3 evidence assessment")
+	admissionPolicyPath := flag.String("admission-policy", "", "path to an evidence-admission-policy-v1 JSON; enables the experimental retrieval v3 gate")
 	decisionModel := flag.String("decision-model", "jev-style-2b-v2", "model name sent to the Decision engine for build_context reranking")
 	useSemanticIndex := flag.Bool("semantic-index", false, "opt in to the experimental profile-owned HNSW sidecar; exact search remains default")
 	semanticProvider := flag.String("semantic-provider", "hash", "semantic recall backend: off, hash (offline deterministic embedder) or openai")
@@ -601,6 +604,28 @@ func main() {
 	flag.Parse()
 	if flag.NArg() != 0 {
 		log.Fatalf("unexpected arguments: %v", flag.Args())
+	}
+	var audioCfg *audioanalysis.Config
+	if raw := strings.TrimSpace(*audioAnalysisConfig); raw != "" {
+		loaded, err := audioanalysis.LoadConfig(raw)
+		if err != nil {
+			log.Fatal(err)
+		}
+		audioCfg = loaded
+	}
+	var admissionPolicy *contextbuild.AdmissionPolicy
+	if raw := strings.TrimSpace(*admissionPolicyPath); raw != "" {
+		policy, err := contextbuild.LoadAdmissionPolicy(raw)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := policy.Validate(false); err != nil {
+			log.Fatal(err)
+		}
+		if strings.TrimSpace(*sufficiencyURL) == "" || *sufficiencyModel != policy.AssessorModel {
+			log.Fatal("--admission-policy requires --sufficiency-url and --sufficiency-model matching the policy assessor_model")
+		}
+		admissionPolicy = policy
 	}
 	resolvedDB, _, profileErr := profileCLI.Resolve(*db, "")
 	if profileErr != nil {
@@ -667,6 +692,14 @@ func main() {
 		log.Fatal(e)
 	}
 	svc := app.New(store, retriever, rerank, "")
+	svc.AdmissionPolicy = admissionPolicy
+	if audioCfg != nil {
+		svc.AudioConfig = audioCfg
+		svc.AudioRuns = audioanalysis.NewStore(store.DB())
+	}
+	if admissionPolicy != nil {
+		svc.CandidateAssessor = contextbuild.DecisionCandidateAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
+	}
 	if strings.TrimSpace(*sufficiencyURL) != "" {
 		svc.Assessor = &contextbuild.DecisionEvidenceAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
 	}

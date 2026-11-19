@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -371,6 +372,18 @@ func (s *Store) GetCurrentEvidenceContext(ctx context.Context, turnID string, ra
 	return s.evidenceContext(ctx, turnID, radius, maxBytes, true)
 }
 
+// GetCurrentEvidenceWindow returns the complete current-revision window around
+// turnID with no byte budget. Callers that budget evidence themselves (for
+// example contextbuild) must use this: the budgeted variants can cut the
+// window before the caller decides which turns to keep, which would silently
+// drop the centre turn or a neighbour.
+func (s *Store) GetCurrentEvidenceWindow(ctx context.Context, turnID string, radius int) (EvidenceContext, error) {
+	return s.evidenceContext(ctx, turnID, radius, noEvidenceByteLimit, true)
+}
+
+// noEvidenceByteLimit marks an unbudgeted evidence lookup.
+const noEvidenceByteLimit = -1
+
 func (s *Store) evidenceContext(ctx context.Context, turnID string, radius, maxBytes int, currentOnly bool) (EvidenceContext, error) {
 	if err := ctx.Err(); err != nil {
 		return EvidenceContext{}, err
@@ -383,7 +396,9 @@ func (s *Store) evidenceContext(ctx context.Context, turnID string, radius, maxB
 	} else if radius == 0 {
 		radius = defaultEvidenceRadius
 	}
-	if maxBytes <= 0 {
+	if maxBytes < 0 {
+		maxBytes = math.MaxInt
+	} else if maxBytes == 0 {
 		maxBytes = defaultEvidenceMaxByte
 	}
 
@@ -788,4 +803,96 @@ func (s *Store) turnAmbient(ctx context.Context, turnID string) (bool, error) {
 		return false, err
 	}
 	return n > 0, nil
+}
+
+// CurrentTurnRow is one current, non-ambient turn fetched for evidence
+// hydration. TranscriptRevision is filled from the active source attachment
+// when one exists; it is empty for legacy turns without attachment rows.
+type CurrentTurnRow struct {
+	ID                 string
+	ConversationID     string
+	RecordingID        string
+	Text               string
+	SpeakerScopedID    *string
+	GlobalStartMS      *int64
+	GlobalEndMS        *int64
+	TranscriptRevision string
+}
+
+// GetCurrentTurns returns the requested turns that are still current and not
+// ambient, in the order of turnIDs. Ids that are missing, superseded or
+// ambient are returned in missing, in input order, so a caller can decide
+// whether the gap is fatal for its evidence set.
+func (s *Store) GetCurrentTurns(ctx context.Context, turnIDs []string) ([]CurrentTurnRow, []string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	ordered := make([]string, 0, len(turnIDs))
+	seen := map[string]bool{}
+	for _, id := range turnIDs {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		ordered = append(ordered, id)
+	}
+	if len(ordered) == 0 {
+		return nil, nil, nil
+	}
+	byID := map[string]CurrentTurnRow{}
+	const chunk = 200
+	for start := 0; start < len(ordered); start += chunk {
+		end := start + chunk
+		if end > len(ordered) {
+			end = len(ordered)
+		}
+		part := ordered[start:end]
+		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(part)), ",")
+		args := make([]any, len(part))
+		for i, id := range part {
+			args[i] = id
+		}
+		rows, err := s.db.QueryContext(ctx, `SELECT t.id,t.conversation_id,t.recording_id,t.content,t.speaker_scoped_id,t.global_start_ms,t.global_end_ms,
+ COALESCE((SELECT a.transcript_revision FROM attachment_turns at JOIN source_attachments a ON a.id=at.attachment_id WHERE at.turn_id=t.id AND a.active=1 ORDER BY a.segment_index LIMIT 1),'')
+ FROM turns t WHERE t.id IN (`+placeholders+`) AND `+CurrentSpeechTurnPredicate("t"), args...)
+		if err != nil {
+			return nil, nil, err
+		}
+		for rows.Next() {
+			var row CurrentTurnRow
+			var speaker sql.NullString
+			var startMS, endMS sql.NullInt64
+			if err := rows.Scan(&row.ID, &row.ConversationID, &row.RecordingID, &row.Text, &speaker, &startMS, &endMS, &row.TranscriptRevision); err != nil {
+				rows.Close()
+				return nil, nil, err
+			}
+			if speaker.Valid {
+				value := speaker.String
+				row.SpeakerScopedID = &value
+			}
+			if startMS.Valid {
+				value := startMS.Int64
+				row.GlobalStartMS = &value
+			}
+			if endMS.Valid {
+				value := endMS.Int64
+				row.GlobalEndMS = &value
+			}
+			byID[row.ID] = row
+		}
+		if err := rows.Close(); err != nil {
+			return nil, nil, err
+		}
+	}
+	out := make([]CurrentTurnRow, 0, len(ordered))
+	missing := []string{}
+	for _, id := range ordered {
+		if row, ok := byID[id]; ok {
+			out = append(out, row)
+			continue
+		}
+		missing = append(missing, id)
+	}
+	return out, missing, nil
 }

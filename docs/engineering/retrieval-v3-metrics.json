@@ -1,0 +1,121 @@
+{
+  "schema": "retrieval-v3-metrics-v1",
+  "protocol": "v3",
+  "fixture_sha256": {
+    "corpus.json": "a831e66aaf024732cd62ce1211299fda49c2e5a430f53e658073fb56a192089d",
+    "lifecycle.json": "ae25f9c50c8f2758ba928fda7a192427606eb57c283136e468bafac72db03123",
+    "retrieval.json": "5d9b0884527103be00a3f0297d01d2a6ae4b2223f2bf99ee5910de815cd9d3e4"
+  },
+  "fixture_summary": {
+    "questions": 780,
+    "groups": 330,
+    "splits": {
+      "train": 110,
+      "calibration": 110,
+      "test": 110
+    },
+    "split_questions": {
+      "train": 260,
+      "calibration": 260,
+      "test": 260
+    },
+    "bucket_counts": {
+      "direct_fact": 10,
+      "synonym": 10,
+      "negation": 10,
+      "time_change": 10,
+      "cross_session": 10,
+      "multi_source": 10,
+      "revocation": 10,
+      "missing_evidence": 10,
+      "wrong_identity_proposal": 10,
+      "numeric_constraint": 10,
+      "decision_commitment": 10
+    },
+    "lifecycle_sources": 30,
+    "partial_buckets": [
+      "missing_evidence",
+      "revocation",
+      "time_change",
+      "wrong_identity_proposal"
+    ],
+    "fixture_cross_split_leaks": 0
+  },
+  "binary_sha256": "fc4853541d1337bf571751353d0c8d5d6fa94ac9d8929796f73904bdcd9d45dc",
+  "real_model_status": "BLOCKED",
+  "calibration": {
+    "status": "NOT_RUN",
+    "reason": "no trusted local embedding/assessor endpoint",
+    "runs": {
+      "calibration/v1-hash": "PASS",
+      "calibration/v3-grid": "NOT_RUN"
+    }
+  },
+  "holdout": {
+    "status": "NOT_RUN",
+    "reason": "no selection lock"
+  },
+  "default_changed": false,
+  "notes": "The v1 baseline in this no-model run is a protocol check only; it is not a quality gate result.",
+  "real_attempt": {
+    "status": "FAIL",
+    "stage": "threshold 0 calibration",
+    "embedding": {
+      "model": "Qwen/Qwen3-Embedding-0.6B",
+      "revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+      "device": "cpu",
+      "dims": 1024
+    },
+    "assessor": {
+      "requested": "typesafe/jev-latest",
+      "resolved": "jev-1.14.0",
+      "endpoint": "magpie /v1/systemone",
+      "admission_batch_questions": 32
+    },
+    "metrics": {
+      "recall_at_5": 0.875,
+      "mrr_at_10": 0.8786,
+      "p95_ms": 2444.702279,
+      "false_positive_rate": 0.0,
+      "false_sufficient_rate": 0.0,
+      "admission_failures": 0,
+      "forgotten_leakage": 0
+    },
+    "baseline_v1": {
+      "recall_at_5": 0.7933333333333333,
+      "mrr_at_10": 0.2539,
+      "p95_ms": 308.460824
+    },
+    "failed_checks": [
+      "p95_at_most_1_5x_same_provider_v1"
+    ],
+    "p95_limit_ms": 462.691236,
+    "selection_lock": false,
+    "holdout_started": false,
+    "default_changed": false,
+    "note": "Every correctness/leakage gate passed. Admission adds a threshold-independent ~2.1s to p95, so no other threshold can satisfy the 1.5x latency budget; the grid was stopped after threshold 0."
+  },
+  "local_runtime_spike": {
+    "status": "FAIL",
+    "latency_per_question_ms": "25-36",
+    "pool4_admission_warm_ms": 93,
+    "pool4_eval": {
+      "admission_p95_ms": 711,
+      "assessor_p95_ms": 373,
+      "overall_p95_ms": 1882,
+      "admission_failures": 0,
+      "false_positive_queries": 1
+    },
+    "pool4_quality": {
+      "split": "train",
+      "recall_at_5": 0.386,
+      "mrr_at_10": 0.155,
+      "required_recall": 0.85
+    },
+    "models": {
+      "0.8b": "Jev-Style 0.8B Decision v3 Q4_K_M GGUF (uniform letter probabilities)",
+      "2b": "Jev-Style-v2-Q8_0.gguf (letter-logprob works)"
+    },
+    "conclusion": "pool reduction destroys recall; full pool exceeds latency budget; no locally viable configuration found"
+  }
+}

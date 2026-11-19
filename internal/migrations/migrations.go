@@ -180,6 +180,7 @@ var migrations = []migration{
 	{version: 20, name: "worker-capabilities", run: applyWorkerCapabilities},
 	{version: 21, name: "recording-source-bytes", run: applyRecordingSourceBytes},
 	{version: 22, name: "asr-progress", run: applyASRProgress},
+	audioAnalysisMigration,
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`

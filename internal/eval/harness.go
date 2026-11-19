@@ -3,8 +3,10 @@ package eval
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -45,8 +47,21 @@ type Options struct {
 	RetrievalVersion string
 	// RerankCandidateLimit bounds the v2 pre-budget reranker pool.
 	RerankCandidateLimit int
-	Reranker             contextbuild.Reranker
-	Assessor             contextbuild.EvidenceAssessor
+	// LifecyclePath lists sources to forget before retrieval (v3 leakage).
+	LifecyclePath string
+	Reranker      contextbuild.Reranker
+	Assessor      contextbuild.EvidenceAssessor
+	// CandidateAssessor and AdmissionPolicy enable the explicit v3 gate.
+	CandidateAssessor contextbuild.CandidateAssessor
+	AdmissionPolicy   *contextbuild.AdmissionPolicy
+	// AllowCalibrationPolicy lets the runner exercise a calibration policy.
+	AllowCalibrationPolicy bool
+	// EngineTiming measures the assessor engine's own wall time per query. It
+	// is set only by the offline profile and never by a served surface.
+	EngineTiming *EngineTiming
+	// AdmissionStats receives the assessor's request accounting when the
+	// profile sets it. Nil leaves the assessor silent.
+	AdmissionStats *contextbuild.AdmissionRequestStats
 }
 
 // Report is the machine-readable evaluation report.
@@ -112,6 +127,7 @@ type Metrics struct {
 	SemanticProviderEmbedItems            int                               `json:"semantic_provider_embed_items"`
 	SemanticProviderEmbedErrors           int                               `json:"semantic_provider_embed_errors"`
 	RetrievalRerankFailures               int                               `json:"retrieval_rerank_failures"`
+	AdmissionFailures                     int                               `json:"admission_failures"`
 	EvidenceAssessmentFailures            int                               `json:"evidence_assessment_failures"`
 	EvidenceAssessmentSufficient          int                               `json:"evidence_assessment_sufficient"`
 	EvidenceAssessmentInsufficient        int                               `json:"evidence_assessment_insufficient"`
@@ -157,8 +173,39 @@ type Metrics struct {
 	// ScopeEscapeCount counts returned items and evidence refs that violate
 	// their question's explicit scope. It must stay 0.
 	ScopeEscapeCount int `json:"scope_escape_count"`
+	// ForgottenLeakage counts returned items or evidence refs that a lifecycle
+	// forget removed. It must stay 0.
+	ForgottenLeakage int `json:"forgotten_leakage"`
+	// StageLatencies reports admission, rerank and assessor latency over the
+	// questions that actually invoked each stage.
+	StageLatencies StageLatencies `json:"stage_latencies"`
+	// AdmissionRequests and AdmissionRequestBytes are the assessor's own
+	// request accounting; they are collected only by the offline profile.
+	AdmissionRequests          int `json:"admission_requests"`
+	AdmissionRequestCandidates int `json:"admission_request_candidates"`
+	AdmissionRequestBytes      int `json:"admission_request_bytes"`
+	// AdmissionEngineCalls and AdmissionEngineLatencyMSP50/P95 measure the time
+	// spent inside decision.Engine.Evaluate, per query, including admission and
+	// the final evidence assessment. They are zero without EngineTiming.
+	AdmissionEngineCalls        int     `json:"admission_engine_calls"`
+	AdmissionEngineLatencyMSP50 float64 `json:"admission_engine_latency_ms_p50"`
+	AdmissionEngineLatencyMSP95 float64 `json:"admission_engine_latency_ms_p95"`
 	// Projection carries the projection-pass metrics.
 	Projection ProjectionMetrics `json:"projection"`
+}
+
+// StageLatency is one latency distribution. N is the denominator.
+type StageLatency struct {
+	P50 float64 `json:"p50"`
+	P95 float64 `json:"p95"`
+	N   int     `json:"n"`
+}
+
+// StageLatencies reports the per-stage latency distributions of one run.
+type StageLatencies struct {
+	Admission StageLatency `json:"admission"`
+	Rerank    StageLatency `json:"rerank"`
+	Assessor  StageLatency `json:"assessor"`
 }
 
 // RetrievalBucketMetrics reports independently auditable per-split, per-mode,
@@ -198,40 +245,63 @@ type ProjectionMetrics struct {
 
 // QuestionResult is one question's evaluation.
 type QuestionResult struct {
-	ID                   string   `json:"id"`
-	GroupID              string   `json:"group_id,omitempty"`
-	Split                string   `json:"split,omitempty"`
-	Bucket               string   `json:"bucket,omitempty"`
-	Purpose              string   `json:"purpose"`
-	Query                string   `json:"query"`
-	Mode                 string   `json:"mode,omitempty"`
-	Hits                 int      `json:"hits"`
-	Unanswerable         bool     `json:"unanswerable"`
-	ReturnedItems        int      `json:"returned_items"`
-	TurnTop1Hit          *bool    `json:"turn_top1_hit,omitempty"`
-	GoldEvidenceCount    int      `json:"gold_evidence_count"`
-	GoldEvidenceFound    int      `json:"gold_evidence_found"`
-	FinalGoldEvidenceFound int    `json:"final_gold_evidence_found"`
-	RecallAt5            float64  `json:"recall_at_5"`
-	StaleLeakage         float64  `json:"stale_leakage"`
-	StaleItems           int      `json:"stale_items"`
-	RelationAssisted     int      `json:"relation_assisted"`
-	AmbientItems         int      `json:"ambient_items"`
-	ScopeEscapes         int      `json:"scope_escapes"`
-	ContextCoverage      *float64 `json:"context_coverage,omitempty"`
-	LatencyMS            float64  `json:"latency_ms"`
-	ReciprocalRank       float64  `json:"reciprocal_rank_at_10"`
-	PrecisionAt5         float64  `json:"precision_at_5"`
-	Rank                 int      `json:"rank_at_10,omitempty"`
-	ExpectStaleExcluded  bool     `json:"expect_stale_excluded"`
-	SufficiencyStatus    string   `json:"sufficiency_status,omitempty"`
-	ExpectedSufficiency  string   `json:"expected_sufficiency,omitempty"`
-	EvidenceCompleteness string   `json:"evidence_completeness,omitempty"`
-	RerankCalls          int      `json:"rerank_calls"`
-	AssessorCalls        int      `json:"assessor_calls"`
-	AssessmentFailed     bool     `json:"assessment_failed"`
-	RerankFailed         bool     `json:"rerank_failed"`
-	ModelCalls           int      `json:"model_calls"`
+	ID                     string   `json:"id"`
+	GroupID                string   `json:"group_id,omitempty"`
+	Split                  string   `json:"split,omitempty"`
+	Bucket                 string   `json:"bucket,omitempty"`
+	Purpose                string   `json:"purpose"`
+	Query                  string   `json:"query"`
+	Mode                   string   `json:"mode,omitempty"`
+	Hits                   int      `json:"hits"`
+	Unanswerable           bool     `json:"unanswerable"`
+	ReturnedItems          int      `json:"returned_items"`
+	TurnTop1Hit            *bool    `json:"turn_top1_hit,omitempty"`
+	GoldEvidenceCount      int      `json:"gold_evidence_count"`
+	GoldEvidenceFound      int      `json:"gold_evidence_found"`
+	FinalGoldEvidenceFound int      `json:"final_gold_evidence_found"`
+	RecallAt5              float64  `json:"recall_at_5"`
+	StaleLeakage           float64  `json:"stale_leakage"`
+	StaleItems             int      `json:"stale_items"`
+	RelationAssisted       int      `json:"relation_assisted"`
+	AmbientItems           int      `json:"ambient_items"`
+	ScopeEscapes           int      `json:"scope_escapes"`
+	ContextCoverage        *float64 `json:"context_coverage,omitempty"`
+	LatencyMS              float64  `json:"latency_ms"`
+	ReciprocalRank         float64  `json:"reciprocal_rank_at_10"`
+	PrecisionAt5           float64  `json:"precision_at_5"`
+	Rank                   int      `json:"rank_at_10,omitempty"`
+	ExpectStaleExcluded    bool     `json:"expect_stale_excluded"`
+	SufficiencyStatus      string   `json:"sufficiency_status,omitempty"`
+	ExpectedSufficiency    string   `json:"expected_sufficiency,omitempty"`
+	EvidenceCompleteness   string   `json:"evidence_completeness,omitempty"`
+	RerankCalls            int      `json:"rerank_calls"`
+	AssessorCalls          int      `json:"assessor_calls"`
+	AssessmentFailed       bool     `json:"assessment_failed"`
+	RerankFailed           bool     `json:"rerank_failed"`
+	ModelCalls             int      `json:"model_calls"`
+	// ForgottenLeakage counts returned items/refs removed by the lifecycle
+	// forget. It must stay 0.
+	ForgottenLeakage int `json:"forgotten_leakage"`
+	// AdmissionFailed reports a v3 gate failure for this question.
+	AdmissionFailed bool `json:"admission_failed,omitempty"`
+	// ExpectForgottenExcluded marks a question whose authored gold refs may
+	// point at lifecycle-forgotten turns.
+	ExpectForgottenExcluded bool `json:"expect_forgotten_excluded,omitempty"`
+	// RecallEligible reports whether at least one gold ref survives the
+	// lifecycle forget, so recall/MRR denominators stay measurable.
+	RecallEligible bool `json:"recall_eligible"`
+	// DegradeReason and Gaps expose why a package degraded so calibration
+	// failures are diagnosable from the report alone.
+	DegradeReason string             `json:"degrade_reason,omitempty"`
+	Gaps          []contextbuild.Gap `json:"gaps,omitempty"`
+	// Stage latencies measured for this question; 0 when the stage did not run.
+	AdmissionLatencyMS float64 `json:"admission_latency_ms,omitempty"`
+	RerankLatencyMS    float64 `json:"rerank_latency_ms,omitempty"`
+	AssessorLatencyMS  float64 `json:"assessor_latency_ms,omitempty"`
+	// AdmissionEngineCalls and AdmissionEngineLatencyMS are the assessor
+	// engine's own work for this query. Both are reported only by a profile run.
+	AdmissionEngineCalls     int     `json:"admission_engine_calls,omitempty"`
+	AdmissionEngineLatencyMS float64 `json:"admission_engine_latency_ms,omitempty"`
 }
 
 // Run ingests the corpus, drives the pipeline to completion, applies curated
@@ -268,6 +338,35 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
+	forbidden := map[string]bool{}
+	forgottenTurnRefs := map[string]string{}
+	if opts.LifecyclePath != "" {
+		lifecycle, err := loadLifecycle(opts.LifecyclePath)
+		if err != nil {
+			return Report{}, err
+		}
+		for _, ref := range lifecycle.Sources {
+			turnID, err := resolveTurnRef(ctx, db, ref.TurnRef)
+			if err != nil {
+				return Report{}, fmt.Errorf("lifecycle source %s: %w", ref.TurnRef, err)
+			}
+			// CommitForget requires the state hash from a fresh preview; the
+			// frozen lifecycle fixture cannot carry one because it is bound to
+			// the temporary evaluation database.
+			preview, err := store.PreviewForget(ctx, memory.ForgetRequest{Scope: "turn", TurnID: turnID})
+			if err != nil {
+				return Report{}, fmt.Errorf("lifecycle preview %s: %w", ref.TurnRef, err)
+			}
+			forgetReq := preview.Request
+			forgetReq.ExpectedState = preview.ExpectedState
+			if _, err := store.CommitForget(ctx, forgetReq); err != nil {
+				return Report{}, fmt.Errorf("lifecycle forget %s: %w", ref.TurnRef, err)
+			}
+			forbidden[turnID] = true
+			forgottenTurnRefs[turnRefKey(ref.TurnRef)] = turnID
+		}
+	}
+
 	questions, err := LoadQuestions(ctx, db, opts.QuestionsPath)
 	if err != nil {
 		return Report{}, err
@@ -339,7 +438,7 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 		}
 		retriever = &semantic.SQLiteRetriever{DB: db, Provider: provider, MinimumSimilarity: opts.MinimumSimilarity}
 	}
-	retrievalQuestions, err := LoadRetrievalQuestions(ctx, db, opts.RetrievalPath)
+	retrievalQuestions, err := LoadRetrievalQuestions(ctx, db, opts.RetrievalPath, forgottenTurnRefs)
 	if err != nil {
 		return Report{}, err
 	}
@@ -514,34 +613,49 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 		for _, m := range modes {
 			report.Metrics.RetrievalRequests++
 			beforeRerankCalls, beforeAssessorCalls := 0, 0
+			rerankBeforeLatency, assessorBeforeLatency := time.Duration(0), time.Duration(0)
 			if reranker != nil {
 				beforeRerankCalls = reranker.calls
+				rerankBeforeLatency = reranker.latency
 			}
 			if assessor != nil {
 				beforeAssessorCalls = assessor.calls
+				assessorBeforeLatency = assessor.latency
+			}
+			if opts.EngineTiming != nil {
+				opts.EngineTiming.Reset()
 			}
 			started := time.Now()
 			deps := contextbuild.Deps{Store: store, DB: db, Semantic: m.semantic}
 			if reranker != nil {
 				deps.Reranker = reranker
 			}
-			if retrievalVersion == "v2" && assessor != nil {
+			if (retrievalVersion == "v2" || retrievalVersion == "v3") && assessor != nil {
 				deps.Assessor = assessor
 			}
+			if retrievalVersion == "v3" {
+				deps.CandidateAssessor = opts.CandidateAssessor
+				deps.AdmissionPolicy = opts.AdmissionPolicy
+				deps.AllowCalibrationPolicy = opts.AllowCalibrationPolicy
+			}
 			pkg, err := contextbuild.Build(ctx, deps, contextbuild.Request{
-				Purpose:        q.Purpose,
-				Query:          q.Query,
-				ConversationID: q.ScopeConversationID,
-				TopicIDs:       topicScope(q.ScopeTopicID),
-				StartedAfter:   q.ScopeStartedAfter,
-				StartedBefore:  q.ScopeStartedBefore,
-				MaxItems:       maxItems,
-				MaxBytes:       maxBytes,
-				Mode:           m.mode,
+				Purpose:              q.Purpose,
+				Query:                q.Query,
+				ConversationID:       q.ScopeConversationID,
+				TopicIDs:             topicScope(q.ScopeTopicID),
+				StartedAfter:         q.ScopeStartedAfter,
+				StartedBefore:        q.ScopeStartedBefore,
+				MaxItems:             maxItems,
+				MaxBytes:             maxBytes,
+				Mode:                 m.mode,
 				RetrievalVersion:     retrievalVersion,
 				RerankCandidateLimit: opts.RerankCandidateLimit,
 			})
 			latency := float64(time.Since(started)) / float64(time.Millisecond)
+			engineCalls, engineTotal := 0, time.Duration(0)
+			if opts.EngineTiming != nil {
+				engineCalls, engineTotal = opts.EngineTiming.Snapshot()
+			}
 			if err != nil {
 				return Report{}, fmt.Errorf("retrieval question %q (%s): build: %w", q.ID, m.mode, err)
 			}
@@ -568,6 +682,10 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 			if rerankFailed {
 				report.Metrics.RetrievalRerankFailures++
 			}
+			admissionFailed := retrievalVersion == "v3" && (hasGap(pkg.Gaps, "admission_failed") || hasGap(pkg.Gaps, "admission_unavailable"))
+			if admissionFailed {
+				report.Metrics.AdmissionFailures++
+			}
 			rerankCalls := 0
 			assessorCalls := 0
 			if reranker != nil {
@@ -584,6 +702,33 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 			expectedSufficiency := "insufficient"
 			if !q.Unanswerable && finalGoldEvidenceFound == len(q.GoldEvidenceTurnIDs) {
 				expectedSufficiency = "sufficient"
+			}
+			if q.ExpectedSufficiency != "" {
+				expectedSufficiency = q.ExpectedSufficiency
+			}
+			forgottenLeak := 0
+			for _, item := range pkg.Items {
+				if forbidden[item.ID] {
+					forgottenLeak++
+				}
+			}
+			for _, ref := range pkg.Evidence {
+				if forbidden[ref.TurnID] {
+					forgottenLeak++
+				}
+			}
+			report.Metrics.ForgottenLeakage += forgottenLeak
+			admissionLatency := 0.0
+			if pkg.Trace.Admission != nil {
+				admissionLatency = pkg.Trace.Admission.LatencyMS
+			}
+			rerankLatency := 0.0
+			if reranker != nil {
+				rerankLatency = float64(reranker.latency-time.Duration(rerankBeforeLatency)) / float64(time.Millisecond)
+			}
+			assessorLatency := 0.0
+			if assessor != nil {
+				assessorLatency = float64(assessor.latency-time.Duration(assessorBeforeLatency)) / float64(time.Millisecond)
 			}
 			if pkg.Sufficiency != nil && assessorCalls > 0 {
 				report.Metrics.EvidenceAssessmentScored++
@@ -619,50 +764,61 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 				top1Hit = firstTurnTop1Hit(q.GoldTop1TurnID, pkg, noteEvidence)
 			}
 			report.PerQuestion = append(report.PerQuestion, QuestionResult{
-				ID:                   q.ID,
-				GroupID:              q.GroupID,
-				Split:                q.Split,
-				Bucket:               q.Bucket,
-				Purpose:              q.Purpose,
-				Query:                q.Query,
-				Mode:                 m.mode,
-				Hits:                 evaluated.hits,
-				Unanswerable:         q.Unanswerable,
-				ReturnedItems:        evaluated.hits,
-				TurnTop1Hit:          top1Hit,
-				GoldEvidenceCount:    len(q.GoldEvidenceTurnIDs),
-				GoldEvidenceFound:    evaluated.goldFound,
-					FinalGoldEvidenceFound: finalGoldEvidenceFound,
-				RecallAt5:            evaluated.recall,
-				StaleLeakage:         evaluated.staleLeakage,
-				StaleItems:           evaluated.staleItems,
-				RelationAssisted:     evaluated.relationAssisted,
-				AmbientItems:         ambient,
-				ScopeEscapes:         escapes,
-				LatencyMS:            latency,
-				ReciprocalRank:       rank.Value,
-				PrecisionAt5:         evaluated.precisionAt5,
-				Rank:                 rank.Rank,
-				ExpectStaleExcluded:  q.ExpectStaleExcluded,
-				SufficiencyStatus:    assessmentStatus,
-				ExpectedSufficiency:  expectedSufficiency,
-				EvidenceCompleteness: q.EvidenceCompleteness,
-					RerankCalls:          rerankCalls,
-					AssessorCalls:        assessorCalls,
-					AssessmentFailed:     hasGap(pkg.Gaps, "evidence_assessment_failed"),
-					RerankFailed:         rerankFailed,
-					ModelCalls:           rerankCalls + assessorCalls,
+				ID:                       q.ID,
+				GroupID:                  q.GroupID,
+				Split:                    q.Split,
+				Bucket:                   q.Bucket,
+				Purpose:                  q.Purpose,
+				Query:                    q.Query,
+				Mode:                     m.mode,
+				Hits:                     evaluated.hits,
+				Unanswerable:             q.Unanswerable,
+				ReturnedItems:            evaluated.hits,
+				TurnTop1Hit:              top1Hit,
+				GoldEvidenceCount:        len(q.GoldEvidenceTurnIDs),
+				GoldEvidenceFound:        evaluated.goldFound,
+				FinalGoldEvidenceFound:   finalGoldEvidenceFound,
+				RecallAt5:                evaluated.recall,
+				StaleLeakage:             evaluated.staleLeakage,
+				StaleItems:               evaluated.staleItems,
+				RelationAssisted:         evaluated.relationAssisted,
+				AmbientItems:             ambient,
+				ScopeEscapes:             escapes,
+				LatencyMS:                latency,
+				ReciprocalRank:           rank.Value,
+				PrecisionAt5:             evaluated.precisionAt5,
+				Rank:                     rank.Rank,
+				ExpectStaleExcluded:      q.ExpectStaleExcluded,
+				SufficiencyStatus:        assessmentStatus,
+				ExpectedSufficiency:      expectedSufficiency,
+				EvidenceCompleteness:     q.EvidenceCompleteness,
+				RerankCalls:              rerankCalls,
+				AssessorCalls:            assessorCalls,
+				AssessmentFailed:         hasGap(pkg.Gaps, "evidence_assessment_failed"),
+				RerankFailed:             rerankFailed,
+				ModelCalls:               rerankCalls + assessorCalls,
+				ForgottenLeakage:         forgottenLeak,
+				AdmissionFailed:          admissionFailed,
+				ExpectForgottenExcluded:  q.ExpectForgottenExcluded,
+				RecallEligible:           retrievalPositive(q, forbidden),
+				DegradeReason:            pkg.DegradeReason,
+				Gaps:                     pkg.Gaps,
+				AdmissionLatencyMS:       admissionLatency,
+				RerankLatencyMS:          rerankLatency,
+				AssessorLatencyMS:        assessorLatency,
+				AdmissionEngineCalls:     engineCalls,
+				AdmissionEngineLatencyMS: float64(engineTotal) / float64(time.Millisecond),
 			})
 			found := foundGoldSet(asQuestion, pkg, noteEvidence)
 			switch m.mode {
 			case contextbuild.ModeLexical:
-				if !q.Unanswerable {
+				if retrievalPositive(q, forbidden) {
 					lexicalRecallSum += evaluated.recall
 					lexicalRecallQuestions++
 				}
 				lexicalLatencyTotal += latency
 				lexicalLatencies = append(lexicalLatencies, latency)
-				if !q.Unanswerable {
+				if retrievalPositive(q, forbidden) {
 					lexicalMrrTotal += rank.Value
 					lexicalMrrCount++
 					lexicalPrecisionTotal += evaluated.precisionAt5
@@ -674,13 +830,13 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 				}
 				lexicalFound = found
 			default:
-				if !q.Unanswerable {
+				if retrievalPositive(q, forbidden) {
 					hybridRecallSum += evaluated.recall
 					hybridRecallQuestions++
 				}
 				hybridLatencyTotal += latency
 				hybridLatencies = append(hybridLatencies, latency)
-				if !q.Unanswerable {
+				if retrievalPositive(q, forbidden) {
 					hybridMrrTotal += rank.Value
 					hybridMrrCount++
 					hybridPrecisionTotal += evaluated.precisionAt5
@@ -692,14 +848,14 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 				}
 				hybridFound = found
 			}
-			if !q.Unanswerable && q.GoldTop1TurnID != "" && ((opts.LexicalOnly && m.mode == contextbuild.ModeLexical) || (!opts.LexicalOnly && (m.mode == contextbuild.ModeHybrid || m.mode == "hybrid"))) {
+			if retrievalPositive(q, forbidden) && q.GoldTop1TurnID != "" && ((opts.LexicalOnly && m.mode == contextbuild.ModeLexical) || (!opts.LexicalOnly && (m.mode == contextbuild.ModeHybrid || m.mode == "hybrid"))) {
 				top1Questions++
 				if top1Hit != nil && *top1Hit {
 					top1Hits++
 				}
 			}
 		}
-		if !q.Unanswerable {
+		if retrievalPositive(q, forbidden) {
 			if n := len(q.GoldEvidenceTurnIDs); n > 0 && hybridFound != nil {
 				assisted := 0
 				for _, gold := range q.GoldEvidenceTurnIDs {
@@ -751,6 +907,21 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 		report.Metrics.RetrievalHybridPrecisionAt5 = hybridPrecisionTotal / float64(hybridPrecisionCount)
 	}
 	calcRetrievalBuckets(&report)
+	report.Metrics.StageLatencies = stageLatencies(report.PerQuestion)
+	engineValues := []float64{}
+	for _, row := range report.PerQuestion {
+		if row.AdmissionEngineCalls > 0 {
+			engineValues = append(engineValues, row.AdmissionEngineLatencyMS)
+			report.Metrics.AdmissionEngineCalls += row.AdmissionEngineCalls
+		}
+	}
+	report.Metrics.AdmissionEngineLatencyMSP50 = percentile(engineValues, .50)
+	report.Metrics.AdmissionEngineLatencyMSP95 = percentile(engineValues, .95)
+	if opts.AdmissionStats != nil {
+		report.Metrics.AdmissionRequests = opts.AdmissionStats.Requests
+		report.Metrics.AdmissionRequestCandidates = opts.AdmissionStats.Candidates
+		report.Metrics.AdmissionRequestBytes = opts.AdmissionStats.Bytes
+	}
 	if ambientReturnedTotal > 0 {
 		report.Metrics.AmbientLeakage = float64(ambientHitsTotal) / float64(ambientReturnedTotal)
 	}
@@ -973,30 +1144,38 @@ func finalGoldEvidenceFoundCount(q Question, pkg contextbuild.Package) int {
 }
 
 type countingReranker struct {
-	inner contextbuild.Reranker
-	calls int
+	inner   contextbuild.Reranker
+	calls   int
+	latency time.Duration
 }
 
 func (c *countingReranker) Rerank(ctx context.Context, query string, items []memory.Item) ([]memory.Item, error) {
 	c.calls++
-	return c.inner.Rerank(ctx, query, items)
+	started := time.Now()
+	out, err := c.inner.Rerank(ctx, query, items)
+	c.latency += time.Since(started)
+	return out, err
 }
 
 type countingAssessor struct {
-	inner contextbuild.EvidenceAssessor
-	calls int
+	inner   contextbuild.EvidenceAssessor
+	calls   int
+	latency time.Duration
 }
 
 func (c *countingAssessor) Assess(ctx context.Context, query string, evidence []contextbuild.EvidenceRef) (contextbuild.EvidenceAssessment, error) {
 	c.calls++
-	return c.inner.Assess(ctx, query, evidence)
+	started := time.Now()
+	out, err := c.inner.Assess(ctx, query, evidence)
+	c.latency += time.Since(started)
+	return out, err
 }
 
 // decisionRerankerForVersion preserves the V1 adapter's historical behavior
 // while selecting V2's bounded-input and permutation validation before the
 // counter wrapper hides the adapter's concrete type from contextbuild.Build.
 func decisionRerankerForVersion(r contextbuild.Reranker, version string) contextbuild.Reranker {
-	if version != "v2" {
+	if version != "v2" && version != "v3" {
 		return r
 	}
 	switch typed := r.(type) {
@@ -1008,6 +1187,81 @@ func decisionRerankerForVersion(r contextbuild.Reranker, version string) context
 		}
 	}
 	return r
+}
+
+// stageLatencies summarises each stage over the questions that ran it.
+func stageLatencies(rows []QuestionResult) StageLatencies {
+	admissionValues, rerankValues, assessorValues := []float64{}, []float64{}, []float64{}
+	for _, row := range rows {
+		if row.AdmissionLatencyMS > 0 {
+			admissionValues = append(admissionValues, row.AdmissionLatencyMS)
+		}
+		if row.RerankCalls > 0 {
+			rerankValues = append(rerankValues, row.RerankLatencyMS)
+		}
+		if row.AssessorCalls > 0 {
+			assessorValues = append(assessorValues, row.AssessorLatencyMS)
+		}
+	}
+	summarize := func(values []float64) StageLatency {
+		if len(values) == 0 {
+			return StageLatency{}
+		}
+		return StageLatency{P50: percentile(values, .50), P95: percentile(values, .95), N: len(values)}
+	}
+	return StageLatencies{Admission: summarize(admissionValues), Rerank: summarize(rerankValues), Assessor: summarize(assessorValues)}
+}
+
+// lifecycleFile is the frozen v3 lifecycle fixture: sources that are
+// permanently forgotten before retrieval.
+type lifecycleFile struct {
+	Schema  string `json:"schema"`
+	Sources []struct {
+		TurnRef
+		Reason string `json:"reason,omitempty"`
+	} `json:"sources"`
+}
+
+// loadLifecycle reads the lifecycle fixture.
+func loadLifecycle(path string) (lifecycleFile, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return lifecycleFile{}, fmt.Errorf("read lifecycle fixture: %w", err)
+	}
+	var file lifecycleFile
+	if err := json.Unmarshal(data, &file); err != nil {
+		return lifecycleFile{}, fmt.Errorf("decode lifecycle fixture: %w", err)
+	}
+	if file.Schema != "" && file.Schema != "retrieval-lifecycle-v1" {
+		return lifecycleFile{}, fmt.Errorf("lifecycle fixture schema must be retrieval-lifecycle-v1")
+	}
+	if len(file.Sources) == 0 {
+		return lifecycleFile{}, errors.New("lifecycle fixture has no sources")
+	}
+	for i := range file.Sources {
+		ref := file.Sources[i].TurnRef
+		if ref.SegmentID == "" || ref.TranscriptRevision == "" || ref.TurnID == "" {
+			return lifecycleFile{}, fmt.Errorf("lifecycle source %d is incomplete", i)
+		}
+	}
+	return file, nil
+}
+
+// retrievalPositive reports whether a question contributes to recall/MRR
+// denominators. A question whose every gold ref was removed by the lifecycle
+// cannot be retrieved; it is still reported for leakage and sufficiency. The
+// fixture flag alone is not enough: revocation questions keep the flag to
+// suppress leakage while some of them point at live current turns.
+func retrievalPositive(q RetrievalQuestion, forbidden map[string]bool) bool {
+	if q.Unanswerable || len(q.GoldEvidenceTurnIDs) == 0 {
+		return false
+	}
+	for _, id := range q.GoldEvidenceTurnIDs {
+		if !forbidden[id] {
+			return true
+		}
+	}
+	return false
 }
 
 func hasGap(gaps []contextbuild.Gap, kind string) bool {
