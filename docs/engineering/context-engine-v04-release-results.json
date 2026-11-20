@@ -1,16 +1,16 @@
 {
   "schema": "context-engine-v04-release-results-v2",
-  "generated_at": "2026-11-13",
+  "generated_at": "2026-11-20",
   "branch": "engineering/context-engine-v04",
-  "base_head": "6fc48d1cb42883c4c90466823c0d54bc88217649",
+  "base_head": "4293cb0b8ad50e66046e7eb545d011fbf51a5a13",
   "default_changed": false,
   "production_ready_recommendation": false,
   "environment": {
     "go": "go1.27.3 linux/amd64",
-    "node": "v26.13.0 (CI expects Node 22)",
-    "python": "3.15.2 (CI expects Python 3.12)",
-    "docker_daemon": "available (Docker 29.9.2, compose v5.6.1)",
-    "android_sdk": "installed at /home/ev/android-sdk: platform 37.0, build-tools 36.0.0, platform-tools; JDK 17"
+    "node": "v22.23.5",
+    "python": "3.12.13",
+    "docker_daemon": "Docker 29.9.2, Compose 5.6.1",
+    "android_sdk": "JDK 17, Android platform 37.0, build-tools 36.0.0"
   },
   "results": [
     {
@@ -318,7 +318,7 @@
     },
     {
       "id": "followup.spec_validate",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "OpenSpec 结构与场景映射（follow-up change 含 34 个新场景）",
       "command": "npx openspec validate --all && python3 scripts/check_spec_test_map.py",
       "exit_code": 0,
@@ -327,7 +327,7 @@
     },
     {
       "id": "followup.python",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "人工金标/指标口径/运行器/发布判定 Python 回归",
       "command": "python3 -m unittest scripts.test_audio_acceptance_metrics scripts.test_review_audio_acceptance scripts.test_long_audio_reliability scripts.test_retrieval_quality_v2 scripts.test_context_engine_release",
       "exit_code": 0,
@@ -336,7 +336,7 @@
     },
     {
       "id": "followup.go",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "准入批次构造、Engine 计时与评测回归",
       "command": "go test -count=1 ./internal/contextbuild ./internal/eval ./cmd/context-eval",
       "exit_code": 0,
@@ -345,7 +345,7 @@
     },
     {
       "id": "followup.mcp",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "MCP stdio 往返与 build_context 工具 smoke",
       "command": "go test -count=1 ./cmd/context-memory -run 'TestExecutableStdioRoundTrip|TestBuildContextToolSmoke'",
       "exit_code": 0,
@@ -354,7 +354,7 @@
     },
     {
       "id": "followup.v04_synthetic",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "v04 synthetic 闭环（fixture provider，协议/故障注入）",
       "command": "python3 scripts/long-audio-reliability.py --protocol context-engine-v04 --mode synthetic --out $FOLLOWUP_TMP/synthetic",
       "exit_code": 0,
@@ -365,7 +365,7 @@
     },
     {
       "id": "followup.acceptance_cli",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "prepare→finalize→score 合成闭环（无真实录音）",
       "command": "python3 scripts/review-audio-acceptance.py prepare --audio <synthetic wav> ... ; finalize --draft <reviewed> --authorization-reference operator-synthetic-fixture ; score --manifest <manifest> --predictions <bundle>",
       "exit_code": 0,
@@ -376,7 +376,7 @@
     },
     {
       "id": "followup.annotation_page",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "标注页：离线、区间标注、导出 JSON、未签名导出保持 draft",
       "command": "headless Chromium on http://127.0.0.1:8971/annotate.html (synthetic sample)",
       "verification": "interactive",
@@ -388,7 +388,7 @@
     },
     {
       "id": "followup.v3_profile",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "v3 profile 协议（无受信模型 → NOT_RUN，不写 lock、不碰 test）",
       "command": "python3 scripts/run-retrieval-quality-v2.py --protocol v3 --phase profile --fixture-dir fixtures/eval/quality-v3-r1 --binary $FOLLOWUP_TMP/context-eval --out $FOLLOWUP_TMP/profile-notrun --embed-revision not-configured --backends hash",
       "exit_code": 0,
@@ -399,7 +399,7 @@
     },
     {
       "id": "followup.web_build",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "Web 构建（v3 UI 未改动，仅确认未回归）",
       "command": "npm run build --prefix web",
       "exit_code": 0,
@@ -408,7 +408,7 @@
     },
     {
       "id": "followup.product_browser",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "产品浏览器流程（合成数据）",
       "command": "python3 scripts/run-product-browser.py --skip-build --artifacts $FOLLOWUP_TMP/product-browser",
       "exit_code": 0,
@@ -417,7 +417,7 @@
     },
     {
       "id": "followup.ci",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "CI 等价检查",
       "command": "make ci",
       "exit_code": 0,
@@ -426,7 +426,7 @@
     },
     {
       "id": "followup.v3_profile_measured",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "受信本地 embedding/assessor 下的 v3 profile 实测",
       "command": "runner --phase profile with trusted local endpoints",
       "exit_code": null,
@@ -435,7 +435,7 @@
     },
     {
       "id": "followup.v3_calibration",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "v3 完整 0..100 网格校准与 selection lock",
       "command": "runner --protocol v3 --phase calibrate (trusted endpoints)",
       "exit_code": null,
@@ -444,7 +444,7 @@
     },
     {
       "id": "followup.v3_holdout",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "一次性 holdout",
       "command": "runner --protocol v3 --phase holdout --selection-lock <new lock>",
       "exit_code": null,
@@ -453,7 +453,7 @@
     },
     {
       "id": "followup.real_gold",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "真实人工 gold 与人工裁决下的音频质量评分",
       "command": "review-audio-acceptance.py prepare/finalize/score on the authorized 120 s sample",
       "exit_code": null,
@@ -462,26 +462,164 @@
     },
     {
       "id": "followup.pyannote_der",
-      "evidence_kind": "current",
+      "evidence_kind": "historical",
       "requirement": "pyannote.metrics 交叉校验 DER",
       "command": "review-audio-acceptance.py score --audio-python <audio interpreter>",
       "exit_code": null,
       "status": "BLOCKED",
       "reason": "pyannote.metrics is not installed in any configured interpreter; the pure der() implementation is tested instead"
+    },
+    {
+      "id": "ci.make",
+      "evidence_kind": "current",
+      "requirement": "OpenSpec、Python、Go vet、全量 Go race 与二进制构建",
+      "command": "npm ci && make ci",
+      "exit_code": 0,
+      "status": "PASS",
+      "evidence": "OpenSpec 17/17，场景映射 297 条。Python 546 项中 536 项通过、10 项跳过。Go vet、全量 Go race 和构建通过。"
+    },
+    {
+      "id": "ci.e2e_cloud",
+      "evidence_kind": "current",
+      "requirement": "Cloud E2E 及 Wrangler 状态目录隔离",
+      "command": "PORT=<free-port> sh scripts/e2e-cloud.sh; PORT=<free-port> RECORDING_E2E_ROOT=<absolute-empty-directory> sh scripts/e2e-cloud.sh",
+      "exit_code": 0,
+      "status": "PASS",
+      "evidence": "临时检出中，默认根与外部绝对根分别通过 10/10，Wrangler 状态均在选定根下。集成后的 worker 在外部绝对根再次通过 10/10。"
+    },
+    {
+      "id": "ci.release_checker_regressions",
+      "evidence_kind": "current",
+      "requirement": "发布证据、Git 指纹与一次性 holdout 回归",
+      "command": "python3.12 scripts/test_context_engine_release.py -q && python3.12 -m unittest discover -s scripts -p 'test_context_engine_release_git.py' -q; python3.12 -m unittest discover -s scripts -p 'test_retrieval_quality_v2.py' -k HoldoutEvidence -q",
+      "exit_code": 0,
+      "status": "PASS",
+      "evidence": "发布判定 63 项、Git 20 项、holdout 23 项通过。额外将合成 runner 写出的已消费锁及 manifest 交给 checker，匹配时通过，Recall 降至门槛以下且重算文件哈希后被拒绝。"
+    },
+    {
+      "id": "ci.go_race_subset",
+      "evidence_kind": "current",
+      "requirement": "Go race 子集覆盖备份、遗忘、音频任务、检索和评测",
+      "command": "go test -race -count=1 ./internal/backup ./internal/audioanalysis ./internal/ingest ./internal/app ./internal/memory ./internal/process ./internal/retention ./internal/contextbuild ./internal/eval ./cmd/context-worker ./cmd/context-audio",
+      "exit_code": 0,
+      "status": "PASS",
+      "evidence": "11 个包，604 个测试通过"
+    },
+    {
+      "id": "ci.synthetic_browser",
+      "evidence_kind": "current",
+      "requirement": "本地 Chromium 合成资料库浏览器套件",
+      "command": "make build; PYTHON=<playwright-venv>/bin/python python scripts/run-local-browser-tests.py --skip-build --artifacts <temporary-artifacts>",
+      "exit_code": 0,
+      "status": "PASS",
+      "evidence": "使用一次性资料库完成套件。浏览器产物保存在仓库外临时目录。"
+    },
+    {
+      "id": "ci.product_browser",
+      "evidence_kind": "current",
+      "requirement": "本地 Chromium 产品流程与 profile 隔离",
+      "command": "PYTHON=<playwright-venv>/bin/python python scripts/run-product-browser.py --skip-build --artifacts <temporary-artifacts>",
+      "exit_code": 0,
+      "status": "PASS",
+      "evidence": "首次运行在登录竞态中跳过表单。改为等待指定 profile 登录后复跑，14/14 全部通过。"
+    },
+    {
+      "id": "ci.docker_deployment",
+      "evidence_kind": "current",
+      "requirement": "Compose 配置、一次性卷上的备份恢复与容器重启",
+      "command": "docker compose --env-file <synthetic-env> config; RUN_DOCKER_DEPLOYMENT_TEST=1 python3.12 -m unittest discover -s scripts -p 'test_productization_deploy.py' -v; RUN_DOCKER_DEPLOYMENT_TEST=1 PYTHONPATH=scripts python3.12 -m unittest test_productization_deploy.DeploymentTest.test_three_restarts_keep_imported_data -v",
+      "exit_code": 0,
+      "status": "PASS",
+      "evidence": "Compose 配置通过。共享测试栈 7/7，独立三次重启 1/1，重启后仍可读取已导入的合成录音。"
+    },
+    {
+      "id": "ci.web",
+      "evidence_kind": "current",
+      "requirement": "Web 安装、类型检查、构建与 Node 测试",
+      "command": "npm ci --prefix web && npm run typecheck --prefix web && npm run build --prefix web && node --experimental-strip-types --test web/src/api/*.test.mjs",
+      "exit_code": 0,
+      "status": "PASS",
+      "evidence": "Node 22，9/9 测试通过"
+    },
+    {
+      "id": "ci.search_and_decision_browser",
+      "evidence_kind": "current",
+      "requirement": "合成 Chromium 检查显式 v3 请求、旧能力响应及决策线索",
+      "command": "npm exec vite -- preview --host 127.0.0.1 --port 4173 --strictPort; python scripts/sufficiency-browser.py; python scripts/decision-trail-browser.py",
+      "exit_code": 0,
+      "status": "PASS",
+      "evidence": "Playwright 1.60.0，检索证据 32/32，决策线索 14/14。浏览器产物保存在仓库外临时目录。"
+    },
+    {
+      "id": "ci.cloud_ingest",
+      "evidence_kind": "current",
+      "requirement": "Cloud ingest-v1 安装、类型检查与测试",
+      "command": "npm ci --prefix apps/cloud-ingest && npm run typecheck --prefix apps/cloud-ingest && npm test --prefix apps/cloud-ingest",
+      "exit_code": 0,
+      "status": "PASS",
+      "evidence": "7 个测试文件，75/75 测试通过"
+    },
+    {
+      "id": "ci.android",
+      "evidence_kind": "current",
+      "requirement": "Android 单元测试与 debug APK",
+      "command": "cd apps/android && ./gradlew :app:testDebugUnitTest :app:assembleDebug",
+      "exit_code": 0,
+      "status": "PASS",
+      "evidence": "57/57 单元测试通过，debug APK 构建成功"
+    },
+    {
+      "id": "ci.remote",
+      "evidence_kind": "current",
+      "requirement": "含本轮修复的提交通过 GitHub CI 九项检查",
+      "exit_code": null,
+      "status": "NOT_RUN",
+      "evidence": "通过 gh run view 44704436729 核对基础提交 4293cb0：8 项通过，product-browser 失败。https://github.com/evjohn-icu/recording-mcp/actions/runs/44704436729",
+      "reason": "GitHub CI 工作流已手动禁用，本轮候选提交没有远端运行结果。"
+    },
+    {
+      "id": "v3.calibration",
+      "evidence_kind": "current",
+      "requirement": "受信模型校准及生产选型锁",
+      "exit_code": null,
+      "status": "BLOCKED",
+      "reason": "本轮未配置获授权、可核验身份的真实 embedding 和 assessor。仅以合成夹具验证协议与门禁。"
+    },
+    {
+      "id": "v3.holdout",
+      "evidence_kind": "current",
+      "requirement": "消耗真实生产选型锁的一次性 holdout",
+      "exit_code": null,
+      "status": "NOT_RUN",
+      "reason": "本轮没有真实生产校准生成的选型锁。合成校准及 holdout 用于验证产物校验。"
+    },
+    {
+      "id": "audio.production-gate",
+      "evidence_kind": "current",
+      "requirement": "使用人工金标、人工裁决和预先批准阈值的真实音频质量门禁",
+      "exit_code": null,
+      "status": "BLOCKED",
+      "reason": "本轮没有已审定的人工作业金标、逐条裁决和事先批准的生产阈值。"
     }
   ],
   "decision": {
     "schema": "context-engine-v04-decision-v1",
-    "merge_readiness": "READY",
+    "merge_readiness": "BLOCKED",
     "release_readiness": "BLOCKED",
     "production_ready_recommendation": false,
     "scope": {
       "candidate": "retrieval v1 + hash provider (unchanged default)",
       "v3": "closed; opt-in only, no selection lock",
       "audio_analysis": "opt-in, EXPERIMENTAL (speaker identity not bound to diarization clusters)",
-      "followup": "gold loop, release checker, admission batch construction and the v3 lock/holdout protocol are implemented and verified; real-model calibration, holdout and human gold remain open"
+      "followup": "合成验收覆盖录音上传、遗忘、备份、音频 worker、检索准入及发布门禁。远端 CI、真实模型和人工金标的状态记录于当轮证据。"
     },
     "blockers": [
+      {
+        "id": "remote-ci",
+        "detail": "GitHub CI 工作流已手动禁用，候选提交没有九项远端检查的结果。本轮按维护者指示依据本地验收执行合并，远端验收状态仍为 BLOCKED。",
+        "blocks_merge": true,
+        "blocks_release": true
+      },
       {
         "id": "human-gold",
         "detail": "the operator must review the authorized recording and return gold plus claim/ref adjudications before any real audio quality number exists",
@@ -502,44 +640,50 @@
       }
     ],
     "required_for_merge": [
-      "followup.spec_validate",
-      "followup.python",
-      "followup.go",
-      "followup.mcp",
-      "followup.v04_synthetic",
-      "followup.ci"
+      "ci.make",
+      "ci.go_race_subset",
+      "ci.web",
+      "ci.synthetic_browser",
+      "ci.search_and_decision_browser",
+      "ci.product_browser",
+      "ci.android",
+      "ci.cloud_ingest",
+      "ci.e2e_cloud",
+      "ci.docker_deployment",
+      "ci.release_checker_regressions",
+      "ci.remote"
     ],
     "required_for_release": [
-      "followup.python",
-      "followup.go",
-      "followup.real_gold",
-      "followup.v3_calibration",
-      "followup.v3_holdout"
+      "audio.production-gate",
+      "v3.calibration",
+      "v3.holdout"
     ],
     "evidence_snapshot": {
-      "generated_at": "2026-11-13T12:03:25Z",
-      "candidate_head": "6fc48d1cb42883c4c90466823c0d54bc88217649",
-      "uncommitted_diff_sha256": "4bde3897374c157e42db88c6f02ed12dd705a9f9cf42db641497a753655eb1da",
+      "generated_at": "2026-11-20T10:25:12Z",
+      "candidate_head": "e69ab8929dca91480c603fe20f94b919908af214",
+      "uncommitted_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": {
         "scripts/audio_acceptance.py": "1a6903e4f6c378e368daf1be2f97c4c080082485b9875c411b7c617cbc71a521",
         "scripts/audio_acceptance_metrics.py": "231b6872b36a19d4c697d9bd7375824d23dca0861a9ad3281d3d090caa2dbf9c",
-        "scripts/audio_analysis_models.py": "3bc3332732dced093102d2f7437960de5e04b670bfb395d4bdf988966e6477b8",
-        "scripts/long-audio-reliability.py": "c9825d5be5bb6b9e2582288c85fe0f782c0d4cb7a15473333408b4b1a2674b42",
-        "scripts/review-audio-acceptance.py": "3e8153fce23af737fe87c221c857cc237e3f25c2fb88c6884edfb9d6c47b6275",
-        "scripts/check_context_engine_release.py": "56ed8b097124ff741bb35e6ae66df9e33929a4873704cca08fe4a63fdc3ae1d7",
-        "scripts/run-retrieval-quality-v2.py": "b4b89fb22b4880727d1ce2586eb9ab39c07e99e94b4fbb1ac5cd9dae06d5802f",
-        "internal/contextbuild/admission.go": "64ee1e7a9b8a2d2532891b6c7b298203a361b3b053d45ba46b3bfa9bcf14f994",
+        "scripts/audio_analysis_models.py": "05ae6f09c85193ff29adc9214a54e03dfaeaef6bfeb2f1551b794b403a457361",
+        "scripts/long-audio-reliability.py": "7c23399dbac7c3c8cb32c35e2aaabc9d249908f07da2290dd4cdad54d43c1c43",
+        "scripts/review-audio-acceptance.py": "3e0f8050dbb64151efb919420a75bb97d0cff027db44ad7bf0f5074401a3e48f",
+        "scripts/check_context_engine_release.py": "4107c2e128b3de87d88c97f7de7207389ffa1e93f3b258bca60fe29f39138dbe",
+        "scripts/run-retrieval-quality-v2.py": "501025b735f9ee9ae2cc81569daa6c8f38c32d273efeed67e8713dd289eda669",
+        "scripts/retrieval_quality_gates.py": "e2f5d4a606dd559dfe118a41a53326476ccb2d759affbea159b468176a1cebc2",
+        "internal/contextbuild/admission.go": "ac89c16b572e0b1d63066de2f2f0d02efd4e8f37e4ac2aaba2ab6bc4324bb810",
         "internal/eval/engine_timing.go": "ea23d72d244fd920b84aea06e2ec7d51dcd25356680dea9fb7f29e50b9f6e0c2",
-        "internal/eval/harness.go": "c3e67a2e46153023c44d1291448f57bbded06872c83cbf0dcfa13db57172c58d",
+        "internal/eval/harness.go": "e7d3cf83807f939241e22bebbc327e0d55b8faf77f4a73e31f6a0a1425576414",
         "cmd/context-eval/main.go": "75534c48fab0ed9e9e1dc215d9e1b52136c6c2bdd4ecbf7756c62331c700c026"
       },
       "config_sha256": {
-        "openspec/test-map.json": "1600d306d2a2d735c00fb5e982fcce90bc77918d247520af5b7ec3edbb9f3da8",
+        ".github/workflows/ci.yml": "d2c65266d2201b0e6acae0794574cf3ae9db3969163a7cdab7985f9a1720907e",
+        "openspec/test-map.json": "43452f362b9033fff6f65a8ca676df3c8aedd9620aedf4a936826718e2fac0d7",
         "fixtures/eval/quality-v3-r1/SHA256SUMS.json": "d228eb06a896928be0d2f3c7faeee8ab00e5ae33dab60152e8a62aac063ba1be"
       },
-      "hash_definition": "uncommitted_diff_sha256 = sha256('git status --porcelain' + 'git diff HEAD'); source/config digests cover the working tree"
+      "hash_definition": "SHA-256(status_bytes + diff_bytes + untracked_bytes), excluding this evidence JSON. status_bytes uses git status --porcelain=v1 -z --untracked-files=all. diff_bytes uses git diff HEAD --binary --no-ext-diff --no-color. untracked_bytes concatenates raw-path-sorted path + NUL + hex SHA-256 of contents or symlink target bytes + NUL. Source and configuration digests cover the working tree."
     },
-    "v3": "closed: no selection lock; real calibration remains FAIL/BLOCKED until a trusted model identity exists",
-    "next": "operator returns reviewed gold + adjudications → real acceptance run and score; then a trusted local embedding/assessor configuration for profile → calibrate → one holdout"
+    "v3": "真实校准 BLOCKED，真实 holdout NOT_RUN。",
+    "next": "远端 CI 保持关闭期间以本地验收记录核对变更。生产放行还需要人工金标和逐条裁决、预先批准的生产阈值，以及受信模型的校准和一次性 holdout。"
   }
 }
