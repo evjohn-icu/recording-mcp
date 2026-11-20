@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"recordingmcp/internal/asrinput"
 	"recordingmcp/internal/memory"
 	"recordingmcp/internal/pipeline"
+	"recordingmcp/internal/semantic"
 )
 
 // fixture seeds a real SQLite database through memory.Open and exposes the
@@ -187,6 +189,112 @@ func countKind(pkg Package, kind string) int {
 		}
 	}
 	return count
+}
+
+func TestTextQueryDirectHitSurvivesNavigation(t *testing.T) {
+	f := newFixture(t)
+	f.conversation("conv:pump", "Pump meeting", "rec:pump")
+	f.recording("rec:pump", "conv:pump", nil)
+	f.turn("t:pump", "conv:pump", "rec:pump", 0, 1000, nil, "冷却泵的成本是三千元。")
+	f.topic("topic:pump", "Pump meeting")
+	f.turnTopic("t:pump", "topic:pump")
+	for i := 1; i <= 12; i++ {
+		turnID := fmt.Sprintf("t:log:%02d", i)
+		f.turn(turnID, "conv:pump", "rec:pump", i, int64(i)*120000, nil, "现场登记完成。")
+		f.note(fmt.Sprintf("n:log:%02d", i), "conv:pump", "observation", "现场登记", []string{"topic:pump"}, []string{turnID})
+	}
+	assertTarget := func(t *testing.T, pkg Package) {
+		t.Helper()
+		if got := itemIDs(pkg.Items); !reflect.DeepEqual(got, []string{"t:pump"}) {
+			t.Errorf("items = %v, want [t:pump]", got)
+		}
+		for _, ref := range pkg.Evidence {
+			if ref.TurnID == "t:pump" {
+				return
+			}
+		}
+		t.Errorf("t:pump missing from explicit evidence: %+v", pkg.Evidence)
+	}
+	for _, tc := range []struct {
+		name, version, mode string
+		poolLimit           int
+	}{
+		{name: "default-v1-lexical", mode: ModeLexical},
+		{name: "default-v1-hybrid", mode: ModeHybrid},
+		{name: "v2-lexical", version: "v2", mode: ModeLexical},
+		{name: "v2-hybrid", version: "v2", mode: ModeHybrid},
+		{name: "v2-single-candidate-pool", version: "v2", mode: ModeLexical, poolLimit: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assertTarget(t, f.build(nil, Request{
+				Query: "  冷却泵的成本  ", RetrievalVersion: tc.version, Mode: tc.mode,
+				MaxItems: 1, MaxBytes: 65536, IncludeRawEvidence: true, RerankCandidateLimit: tc.poolLimit,
+			}))
+		})
+	}
+	t.Run("semantic-only", func(t *testing.T) {
+		pkg := f.buildSemantic(&fakeSemantic{hits: []semantic.SemanticHit{
+			{Kind: "turn", ArtifactID: "t:pump", ConversationID: "conv:pump", Score: 0.9},
+		}}, Request{
+			Query: "设备报价", RetrievalVersion: "v2", Mode: ModeHybrid,
+			MaxItems: 1, MaxBytes: 65536, IncludeRawEvidence: true,
+		})
+		if len(pkg.Trace.Lexical.HitIDs) != 0 {
+			t.Fatalf("expected no lexical hits, got %v", pkg.Trace.Lexical.HitIDs)
+		}
+		assertTarget(t, pkg)
+	})
+}
+
+func TestTextQueryDirectNoteAndDeterministicTies(t *testing.T) {
+	f := newFixture(t)
+	f.conversation("conv:parts", "Parts meeting", "rec:parts")
+	f.recording("rec:parts", "conv:parts", nil)
+	f.turn("t:nav", "conv:parts", "rec:parts", 0, 1000, nil, "The parcel is at reception.")
+	f.turn("t:b", "conv:parts", "rec:parts", 1, 4000, nil, "The previous delivery arrived Tuesday.")
+	f.turn("t:a", "conv:parts", "rec:parts", 2, 7000, nil, "The carrier gave an updated estimate.")
+	f.note("n:b", "conv:parts", "observation", "Valve delivery is this week", nil, []string{"t:b"})
+	f.note("n:a", "conv:parts", "observation", "Valve delivery is this week", nil, []string{"t:a"})
+	for _, version := range []string{"v1", "v2"} {
+		t.Run(version, func(t *testing.T) {
+			pkg := f.build(nil, Request{
+				Query: "VALVE DELIVERY", ConversationID: "conv:parts", RetrievalVersion: version,
+				Mode: ModeLexical, MaxItems: 4, MaxBytes: 65536, IncludeRawEvidence: true,
+			})
+			if got := itemIDs(pkg.Items); !reflect.DeepEqual(got, []string{"n:a", "n:b", "t:nav", "conv:parts"}) {
+				t.Fatalf("items = %v, want lexical notes in ID order followed by navigation items", got)
+			}
+			if rank, ok := rankingOf(pkg, "t:nav"); !ok || !reflect.DeepEqual(rank.Sources, []string{SourceNav}) {
+				t.Fatalf("navigation turn sources = %v, want nav only", rank.Sources)
+			}
+			if first, _ := rankingOf(pkg, "n:a"); !hasSource(first, SourceLexical) {
+				t.Fatalf("direct note sources = %v, want lexical", first.Sources)
+			}
+			for _, ref := range pkg.Evidence {
+				if ref.TurnID == "t:a" {
+					return
+				}
+			}
+			t.Fatalf("first note's source t:a missing from explicit evidence: %+v", pkg.Evidence)
+		})
+	}
+}
+
+func TestBrowseRetainsKindOrder(t *testing.T) {
+	f := newFixture(t)
+	f.conversation("conv:browse", "Browse meeting", "rec:browse")
+	f.recording("rec:browse", "conv:browse", nil)
+	f.turn("t:browse", "conv:browse", "rec:browse", 0, 1000, nil, "Unrelated turn.")
+	f.turn("t:source", "conv:browse", "rec:browse", 1, 10000, nil, "Source of the note.")
+	f.note("n:browse", "conv:browse", "observation", "A browsing note", nil, []string{"t:source"})
+	for _, version := range []string{"v1", "v2"} {
+		t.Run(version, func(t *testing.T) {
+			pkg := f.build(nil, Request{ConversationID: "conv:browse", RetrievalVersion: version, Mode: ModeLexical, MaxItems: 3})
+			if got := itemIDs(pkg.Items); !reflect.DeepEqual(got, []string{"n:browse", "t:browse", "conv:browse"}) {
+				t.Fatalf("browse items = %v, want note, turn, then conversation", got)
+			}
+		})
+	}
 }
 
 func TestBuildContextLiteralLexicalHit(t *testing.T) {

@@ -453,11 +453,14 @@ def extract_run_metrics(report: dict, split_path: Path, split: str, version: str
             _required_number(row, key)
         if not isinstance(row["assessment_failed"], bool) or not isinstance(row["rerank_failed"], bool):
             raise ReportProtocolError(f"question {row['id']} has invalid model failure flags")
-        if row["expected_sufficiency"] not in ("sufficient", "insufficient"):
+        authored_expected = authored.get("expected_sufficiency")
+        expected_status = row["expected_sufficiency"]
+        legacy_unknown = (getattr(args, "protocol", "v2") == "v2" and row["unanswerable"]
+                          and authored_expected == expected_status == "unknown")
+        if expected_status not in ("sufficient", "insufficient") and not legacy_unknown:
             raise ReportProtocolError(f"question {row['id']} has invalid expected sufficiency")
         complete_final_evidence = (not row["unanswerable"] and row["gold_evidence_count"] > 0 and
                                    row["final_gold_evidence_found"] == row["gold_evidence_count"])
-        authored_expected = authored.get("expected_sufficiency")
         if authored_expected:
             if row["expected_sufficiency"] != authored_expected:
                 raise ReportProtocolError(f"question {row['id']} expected sufficiency disagrees with the fixture label")
@@ -527,7 +530,8 @@ def extract_run_metrics(report: dict, split_path: Path, split: str, version: str
             "sufficiency": {"status_counts": {status: sum(q.get("sufficiency_status") == status for q in assessed)
                                                 for status in ("sufficient", "insufficient", "unknown")},
                             "scored": len(assessed),
-                            "matches": sum(q["expected_sufficiency"] == q.get("sufficiency_status") for q in assessed)},
+                            "matches": sum(q["expected_sufficiency"] != "unknown"
+                                           and q["expected_sufficiency"] == q.get("sufficiency_status") for q in assessed)},
             "embedding_invocations": _required_number(m, "semantic_provider_embed_requests", integer=True),
             "model_calls": sum(q["model_calls"] for q in rows),
             "rerank_calls": sum(q["rerank_calls"] for q in rows),

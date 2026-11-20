@@ -503,9 +503,10 @@ func validRerankAnswer(answer decision.Answer) bool {
 
 // candidate is one recalled item plus the retrieval branches that produced it.
 type candidate struct {
-	item     memory.Item
-	score    float64
-	evidence []string
+	item           memory.Item
+	score          float64
+	evidence       []string
+	queryMatchTier uint8
 	// sources maps branch -> raw branch score (max per branch).
 	sources map[string]float64
 	// linkIDs lists the confirmed links whose expansion contributed this item.
@@ -996,7 +997,11 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	// applied only when an item is actually accepted (step 6), never here: a
 	// candidate the budget skips must not reserve its sources, or an oversized
 	// note would silently hide a smaller turn citing the same turn.
-	ordered := candidates.sorted()
+	rankingQuery := query
+	if req.RetrievalVersion == "v3" {
+		rankingQuery = ""
+	}
+	ordered := candidates.sorted(rankingQuery)
 	poolLimitedIDs := []string{}
 	if (req.RetrievalVersion == "v2" || req.RetrievalVersion == "v3") && len(ordered) > 0 {
 		limit := req.RerankCandidateLimit
@@ -1722,22 +1727,55 @@ func (c *candidateSet) scanned() Scanned {
 	return s
 }
 
-// sorted ranks candidates deterministically: notes before turns before
-// conversations, then higher score, then id ascending.
-func (c *candidateSet) sorted() []candidate {
+// sorted puts direct matches ahead of expansions for text queries. Without a
+// ranking query, it orders by kind, score, then ID for browsing and v3.
+func (c *candidateSet) sorted(query string) []candidate {
+	const (
+		fullQueryMatch uint8 = iota
+		directMatch
+		expandedMatch
+	)
+	query = strings.ToLower(query)
 	out := make([]candidate, 0, len(c.order))
 	for _, cand := range c.order {
-		out = append(out, *cand)
+		ranked := *cand
+		if query != "" {
+			_, lexical := cand.sources[SourceLexical]
+			_, semantic := cand.sources[SourceSemantic]
+			ranked.queryMatchTier = expandedMatch
+			if lexical || semantic {
+				ranked.queryMatchTier = directMatch
+			}
+			if lexical {
+				text := cand.item.Summary
+				if cand.item.Kind == "turn" {
+					text = cand.item.Content
+				}
+				if strings.Contains(strings.ToLower(text), query) {
+					ranked.queryMatchTier = fullQueryMatch
+				}
+			}
+		}
+		out = append(out, ranked)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
-		ri, rj := kindRank(out[i].item.Kind), kindRank(out[j].item.Kind)
+		a, b := &out[i], &out[j]
+		if query != "" {
+			if a.queryMatchTier != b.queryMatchTier {
+				return a.queryMatchTier < b.queryMatchTier
+			}
+			if a.score != b.score {
+				return a.score > b.score
+			}
+		}
+		ri, rj := kindRank(a.item.Kind), kindRank(b.item.Kind)
 		if ri != rj {
 			return ri < rj
 		}
-		if out[i].score != out[j].score {
-			return out[i].score > out[j].score
+		if a.score != b.score {
+			return a.score > b.score
 		}
-		return out[i].item.ID < out[j].item.ID
+		return a.item.ID < b.item.ID
 	})
 	return out
 }

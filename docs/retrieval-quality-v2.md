@@ -33,6 +33,8 @@ v2 返回 `sufficiency.status`（`sufficient`、`insufficient`、`unknown`）和
 
 训练集用于开发，校准集用于选择；锁定配置后才运行test，不根据test重新调参。正式对比固定 `max_items=10`、`max_bytes=65536`，报告 Recall@5、MRR@10、负例查询误召回率、p95、各桶分母、调用数量及故障。p95包含检索、组装及启用的模型阶段，索引开销单独列出。
 
+冻结 v2 负例中的 `expected_sufficiency: unknown` 表示缺少可评分的充分性金标。该标签仍计入检索负例与原始误召回率。报告保留真实判断状态和调用数，`unknown` 不计为充分性匹配，也不纳入以 `insufficient` 为金标的误判充分率分母。
+
 对比v1/v2 lexical、hash hybrid，以及显式配置时的真实embedding和对应重排。真实模型未配置必须记NOT_RUN，mock只能证明功能协议。
 
 门槛为同配置v1基线上的Recall@5严格提升、MRR@10不退步、负例误召回率≤5%、零隔离/引用泄漏、p95≤1.5倍；缺指标或请求失败不能通过。充分性误判充分率另需≤5%。实际执行命令和结果见本变更验证记录；功能测试通过不等于质量门槛通过。

@@ -254,6 +254,44 @@ class FrozenQualityV2Tests(unittest.TestCase):
         self.assertEqual(metrics["false_sufficient_denominator"], 0)
         self.assertIsNone(metrics["false_sufficient_rate"])
 
+    def test_v2_authored_unknown_negative_counts_for_retrieval_but_not_assessment_accuracy(self):
+        report = synthetic_hybrid_report()
+        questions = [
+            {"id": "q-positive", "bucket": "synonym", "unanswerable": False},
+            {"id": "q-negative", "bucket": "no_evidence", "unanswerable": True,
+             "expected_sufficiency": "unknown"},
+        ]
+        for row in report["per_question"]:
+            if row["id"] == "q-negative":
+                row.update(expected_sufficiency="unknown", returned_items=1,
+                           assessor_calls=1, model_calls=1, sufficiency_status="unknown")
+        report["metrics"]["model_calls"] = 4
+        args = Namespace(protocol="v2", rerank_url="", rerank_model="", fixture_cross_split_leaks=0)
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "split.json"
+            path.write_text(json.dumps({"questions": questions}))
+            metrics = runner.extract_run_metrics(report, path, "calibration", "v2", "hash", args)
+            self.assertEqual(metrics["false_positive_queries"], 1)
+            self.assertEqual(metrics["no_evidence_denominator"], 1)
+            self.assertEqual(metrics["sufficiency"]["status_counts"]["unknown"], 2)
+            self.assertEqual(metrics["sufficiency"]["matches"], 0)
+            self.assertEqual(metrics["false_sufficient_denominator"], 0)
+            args.protocol = "v3"
+            with self.assertRaisesRegex(runner.ReportProtocolError, "invalid expected sufficiency"):
+                runner.extract_run_metrics(report, path, "calibration", "v2", "hash", args)
+            args.protocol = "v2"
+            del questions[1]["expected_sufficiency"]
+            path.write_text(json.dumps({"questions": questions}))
+            with self.assertRaisesRegex(runner.ReportProtocolError, "invalid expected sufficiency"):
+                runner.extract_run_metrics(report, path, "calibration", "v2", "hash", args)
+            questions[0]["expected_sufficiency"] = "unknown"
+            questions[1]["expected_sufficiency"] = "unknown"
+            path.write_text(json.dumps({"questions": questions}))
+            for row in report["per_question"]:
+                row["expected_sufficiency"] = "unknown"
+            with self.assertRaisesRegex(runner.ReportProtocolError, "q-positive has invalid expected sufficiency"):
+                runner.extract_run_metrics(report, path, "calibration", "v2", "hash", args)
+
     def test_expected_sufficiency_must_match_final_visible_required_evidence(self):
         import tempfile
         report = synthetic_hybrid_report()

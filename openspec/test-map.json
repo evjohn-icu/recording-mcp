@@ -86,6 +86,27 @@
       "test_anchor": "TestRunAuthoredQualityFixtureReportsAccountingBucketsAndMRR"
     },
     {
+      "id": "retrieval.direct-note-ranking",
+      "status": "covered",
+      "spec": "openspec/specs/retrieval/spec.md",
+      "test_file": "internal/contextbuild/build_test.go",
+      "test_anchor": "TestTextQueryDirectNoteAndDeterministicTies"
+    },
+    {
+      "id": "retrieval.direct-query-before-navigation",
+      "status": "covered",
+      "spec": "openspec/specs/retrieval/spec.md",
+      "test_file": "internal/contextbuild/build_test.go",
+      "test_anchor": "TestTextQueryDirectHitSurvivesNavigation"
+    },
+    {
+      "id": "retrieval.queryless-kind-order",
+      "status": "covered",
+      "spec": "openspec/specs/retrieval/spec.md",
+      "test_file": "internal/contextbuild/build_test.go",
+      "test_anchor": "TestBrowseRetainsKindOrder"
+    },
+    {
       "id": "retrieval.topic-evidence-scope",
       "status": "covered",
       "spec": "openspec/specs/retrieval/spec.md",
