@@ -44,6 +44,7 @@ import json
 import math
 import os
 import re
+import struct
 
 # Network access is a contract violation: models arrive only as hash-pinned
 # local files. Set these before any heavy dependency is imported.
@@ -177,6 +178,9 @@ def write_json_atomic(path: str, payload) -> None:
         json_safe_dump(payload, handle)
         handle.flush()
         os.fsync(handle.fileno())
+    # The staged workspace is under the managed audio root; every adapter
+    # output must stay owner-only like the input and request copies.
+    os.chmod(tmp, 0o600)
     os.replace(tmp, path)
 
 
@@ -806,8 +810,13 @@ def validate_config(config):
             )
 
 
-def resolve_capability(config, capability):
-    """Verify one capability's pins; ``audio_disabled`` / ``audio_model_unavailable``."""
+def resolve_capability(config, capability, *, base_dir=None):
+    """Verify one capability's pins; ``audio_disabled`` / ``audio_model_unavailable``.
+
+    ``base_dir`` resolves relative model paths against the config file's parent
+    directory; without it (the historical default) relative paths resolve
+    against the current working directory.
+    """
     validate_config(config)
     if capability not in CAPABILITIES:
         raise AdapterError("audio_input_invalid", False, "unknown capability")
@@ -829,6 +838,7 @@ def resolve_capability(config, capability):
             "capability " + capability + " pins no model files",
         )
     verified = []
+    verified_digests = {}
     for entry in files:
         if not isinstance(entry, dict):
             raise AdapterError(
@@ -846,6 +856,8 @@ def resolve_capability(config, capability):
                 False,
                 "a pinned model file sha256 is not 64 hex characters",
             )
+        if not os.path.isabs(path) and base_dir is not None:
+            path = os.path.abspath(os.path.join(str(base_dir), path))
         if not os.path.isfile(path):
             raise AdapterError(
                 "audio_model_unavailable", False, "a pinned model file is missing"
@@ -863,6 +875,7 @@ def resolve_capability(config, capability):
                 "a pinned model file hash does not match",
             )
         verified.append(path)
+        verified_digests[path] = actual
     device = cap.get("device") or "cpu"
     if not isinstance(device, str) or device.lower() not in ("cpu", "cuda"):
         raise AdapterError(
@@ -878,6 +891,7 @@ def resolve_capability(config, capability):
         "model_id": cap.get("model_id") or "",
         "model_revision": cap.get("model_revision") or "",
         "files": verified,
+        "file_sha256": verified_digests,
     }
     threshold = cap.get("threshold")
     if threshold is not None:
@@ -907,6 +921,93 @@ def resolve_capability(config, capability):
             )
         resolved["fbank_backend"] = fbank_backend
     return resolved
+
+
+def _resolved_file_digests(resolved):
+    """Actual per-file digests of one resolved capability, keyed by path."""
+    digests = resolved.get("file_sha256")
+    if isinstance(digests, dict) and digests:
+        return digests
+    return {path: sha256_file(path) for path in resolved["files"]}
+
+
+def capability_config_sha256(resolved):
+    """The Go ``Config.Resolve`` config digest for one resolved capability.
+
+    Legacy digest parts (capability, model id, model revision, device,
+    frontend id and the ordered ``basename=sha256`` file list joined with
+    commas) are NUL-joined; three more NUL-joined segments — ``threshold`` and
+    ``span_seconds`` as IEEE-754 64-bit big-endian hex, ``fbank_backend``
+    verbatim — are appended only when at least one tuning is present, so
+    tunings-free capabilities keep the legacy digest.
+    """
+    digests = _resolved_file_digests(resolved)
+    parts = [
+        resolved["capability"],
+        resolved["model_id"],
+        resolved["model_revision"],
+        resolved["device"],
+        resolved["frontend_id"] or "",
+        ",".join(
+            os.path.basename(path) + "=" + digests[path]
+            for path in resolved["files"]
+        ),
+    ]
+    if any(
+        key in resolved for key in ("threshold", "span_seconds", "fbank_backend")
+    ):
+        parts.append(
+            struct.pack(">d", float(resolved["threshold"])).hex()
+            if "threshold" in resolved
+            else ""
+        )
+        parts.append(
+            struct.pack(">d", float(resolved["span_seconds"])).hex()
+            if "span_seconds" in resolved
+            else ""
+        )
+        parts.append(
+            str(resolved["fbank_backend"]) if "fbank_backend" in resolved else ""
+        )
+    return hashlib.sha256("\x00".join(parts).encode("utf-8")).hexdigest()
+
+
+def verify_request_identity(request, resolved):
+    """Refuse runs whose pinned identity is not exactly the resolved one.
+
+    The request's model id/revision, its model file pins (absolute resolved
+    paths to lowercase SHA-256 digests) and its config digest must match the
+    actually resolved model files; anything else raises
+    ``audio_model_unavailable`` so a stale run can never execute against a
+    different model.
+    """
+    if request.get("model_id") != resolved.get("model_id"):
+        raise AdapterError(
+            "audio_model_unavailable",
+            False,
+            "the run model does not match the configured model",
+        )
+    if request.get("model_revision") != resolved.get("model_revision"):
+        raise AdapterError(
+            "audio_model_unavailable",
+            False,
+            "the run model revision does not match the configured model",
+        )
+    expected = _resolved_file_digests(resolved)
+    pinned = request.get("model_files_sha256")
+    pinned = dict(pinned) if isinstance(pinned, dict) else {}
+    if pinned != expected:
+        raise AdapterError(
+            "audio_model_unavailable",
+            False,
+            "the run model files do not match the configured model files",
+        )
+    if request.get("config_sha256") != capability_config_sha256(resolved):
+        raise AdapterError(
+            "audio_model_unavailable",
+            False,
+            "the run configuration digest does not match the configured model",
+        )
 
 
 # ---------------------------------------------------------------------------

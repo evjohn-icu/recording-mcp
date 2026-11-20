@@ -11,6 +11,12 @@ import { SufficiencyPanel } from '../components/SufficiencyPanel'
 
 type Scope = 'raw' | 'derived' | 'both'
 
+const VERSION_LABELS = {
+  v1: 'v1（默认）',
+  v2: 'v2（实验；质量因查询而异）',
+  v3: 'v3（实验；证据准入）',
+}
+
 function itemToHit(item: Item, titles: Record<string, string>, isHybrid: boolean): SearchHit {
   const isTurn = item.kind === 'turn'
   return {
@@ -86,10 +92,9 @@ function SearchPageContent() {
   const hybridEnabled = params.get('hybrid') === '1'
   const mode = hybridEnabled ? 'hybrid' : 'lexical'
   const capabilities = useApi((signal) => getCapabilities(signal), [])
-  const v3Available = capabilities.data?.retrieval.v3_available === true
-  const availableVersions = availableRetrievalVersions(v3Available)
-  const requestedVersion = params.get('retrieval_version')
-  const retrievalVersion = resolveRetrievalVersion(requestedVersion, v3Available)
+  const v3Available = capabilities.data?.retrieval?.v3_available === true
+  const retrievalVersion = resolveRetrievalVersion(params.get('retrieval_version'))
+  const pickerVersions = availableRetrievalVersions(v3Available || retrievalVersion === 'v3')
   const filters: FilterValues = {
     startedAfter: params.get('started_after') || undefined,
     startedBefore: params.get('started_before') || undefined,
@@ -243,9 +248,9 @@ function SearchPageContent() {
           <label>
             检索版本
             <select aria-label="检索版本" value={retrievalVersion} onChange={(event) => updateParams({ retrieval_version: event.target.value })}>
-              <option value="v1">v1（默认）</option>
-              <option value="v2">v2（实验；质量因查询而异）</option>
-              {v3Available && <option value="v3">v3（实验；证据准入）</option>}
+              {pickerVersions.map((version) => (
+                <option key={version} value={version}>{VERSION_LABELS[version]}</option>
+              ))}
             </select>
           </label>
         )}

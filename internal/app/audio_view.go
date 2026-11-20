@@ -48,16 +48,28 @@ func (s *Service) AudioAnalysis(ctx context.Context, recordingID string) (AudioA
 	if err != nil {
 		return view, err
 	}
-	view.Runs = runs
 	current := map[string]audioanalysis.RunView{}
 	for _, run := range runs {
 		current[run.Capability] = run
 	}
 	for _, capability := range audioanalysis.Capabilities {
 		entry := AudioCapabilityView{Capability: capability}
-		if run, ok := current[capability]; ok {
+		run, ok := current[capability]
+		if ok && s.AudioConfig != nil {
+			// A run produced by an older model configuration is not a current
+			// result: it reads as invalidated and never as a playable
+			// succeeded run, whatever the stored status says.
+			if resolved, resolveErr := s.AudioConfig.Resolve(capability); resolveErr == nil &&
+				(run.ModelID != resolved.ModelID || run.ModelRevision != resolved.ModelRevision || run.ConfigSHA256 != resolved.ConfigSHA256) {
+				run.Status = audioanalysis.StatusInvalidated
+				entry.Reason = "audio_result_invalidated"
+				entry.Action = "the model configuration changed; enqueue a new run"
+			}
+		}
+		if ok {
 			entry.Status = run.Status
 			view.Capabilities = append(view.Capabilities, entry)
+			view.Runs = append(view.Runs, run)
 			continue
 		}
 		status, reason, action := s.audioCapabilityStatus(ctx, recordingID, capability)
@@ -144,6 +156,16 @@ func (s *Service) EventAudioClip(ctx context.Context, eventID string) (*AudioCli
 			return nil, audioError(CodeAudioMissing, "该片段不可用", 404)
 		}
 		return nil, err
+	}
+	// An event of a run whose pinned model identity no longer matches the
+	// resolved configuration is not playable. Disabled or unavailable
+	// configurations have no identity to compare against and keep the
+	// original behaviour, so no old mismatched clip can ever be served.
+	if s.AudioConfig != nil {
+		if resolved, resolveErr := s.AudioConfig.Resolve(event.Capability); resolveErr == nil &&
+			(event.ModelID != resolved.ModelID || event.ModelRevision != resolved.ModelRevision || event.ConfigSHA256 != resolved.ConfigSHA256) {
+			return nil, audioError(CodeAudioMissing, "该片段不可用", 404)
+		}
 	}
 	var conversationID string
 	if err := s.Store.DB().QueryRowContext(ctx,

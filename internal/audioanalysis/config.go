@@ -2,11 +2,13 @@ package audioanalysis
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,6 +43,14 @@ type CapabilityConfig struct {
 	Files         []ModelFile `json:"files"`
 	Device        string      `json:"device"`
 	FrontendID    string      `json:"frontend_id"`
+	// Threshold, SpanSeconds and FbankBackend are the frontend tunings the
+	// Python adapter actually reads. nil means "not set": the config digest
+	// then stays exactly the legacy digest, and the three digest segments are
+	// only appended when at least one tuning is present. An explicitly empty
+	// fbank_backend is invalid, matching the Python validation.
+	Threshold    *float64 `json:"threshold,omitempty"`
+	SpanSeconds  *float64 `json:"span_seconds,omitempty"`
+	FbankBackend *string  `json:"fbank_backend,omitempty"`
 }
 
 // ModelFile pins one local model file.
@@ -58,6 +68,11 @@ type Resolved struct {
 	Device        string
 	FrontendID    string
 	ConfigSHA256  string
+	// Threshold, SpanSeconds and FbankBackend mirror the configured frontend
+	// tunings; nil/empty when the config does not set them.
+	Threshold    *float64
+	SpanSeconds  *float64
+	FbankBackend string
 }
 
 // Defaults for optional timeouts.
@@ -157,7 +172,24 @@ func (c *Config) Resolve(capability string) (Resolved, error) {
 	if device == "" {
 		device = "cpu"
 	}
-	configHash := sha256Hex(strings.Join([]string{capability, entry.ModelID, entry.ModelRevision, device, entry.FrontendID, strings.Join(canonical, ",")}, "\x00"))
+	threshold, spanSeconds, fbankBackend, err := entry.tunings()
+	if err != nil {
+		return Resolved{}, err
+	}
+	fbankSegment := ""
+	if fbankBackend != nil {
+		fbankSegment = *fbankBackend
+	}
+	parts := []string{
+		capability, entry.ModelID, entry.ModelRevision, device, entry.FrontendID,
+		strings.Join(canonical, ","),
+	}
+	// The three tuning segments are appended only when at least one tuning is
+	// explicitly set, so tunings-free configs keep the legacy digest.
+	if threshold != nil || spanSeconds != nil || fbankBackend != nil {
+		parts = append(parts, floatDigestSegment(threshold), floatDigestSegment(spanSeconds), fbankSegment)
+	}
+	configHash := sha256Hex(strings.Join(parts, "\x00"))
 	return Resolved{
 		Capability:    capability,
 		ModelID:       entry.ModelID,
@@ -166,7 +198,41 @@ func (c *Config) Resolve(capability string) (Resolved, error) {
 		Device:        device,
 		FrontendID:    entry.FrontendID,
 		ConfigSHA256:  configHash,
+		Threshold:     threshold,
+		SpanSeconds:   spanSeconds,
+		FbankBackend:  fbankSegment,
 	}, nil
+}
+
+// tunings validates the optional frontend tunings against exactly the domains
+// the Python adapter enforces, so both config surfaces accept the same
+// documents: threshold within (0,1), span_seconds within [0.05, 3600] and
+// fbank_backend one of the four backends (an explicitly empty value is
+// invalid).
+func (c CapabilityConfig) tunings() (threshold, spanSeconds *float64, fbankBackend *string, err error) {
+	if c.Threshold != nil && !(*c.Threshold > 0 && *c.Threshold < 1) {
+		return nil, nil, nil, NewError(CodeModelUnavailable, false, "capability threshold must be a number within (0,1)")
+	}
+	if c.SpanSeconds != nil && !(*c.SpanSeconds >= 0.05 && *c.SpanSeconds <= 3600.0) {
+		return nil, nil, nil, NewError(CodeModelUnavailable, false, "capability span_seconds must be a number within [0.05, 3600]")
+	}
+	if c.FbankBackend != nil {
+		switch *c.FbankBackend {
+		case "auto", "knf", "numpy", "python":
+		default:
+			return nil, nil, nil, NewError(CodeModelUnavailable, false, "capability fbank_backend must be auto, knf, numpy or python")
+		}
+	}
+	return c.Threshold, c.SpanSeconds, c.FbankBackend, nil
+}
+
+// floatDigestSegment encodes one tuning float as IEEE-754 64-bit big-endian
+// hex, or the empty segment when the tuning is absent.
+func floatDigestSegment(value *float64) string {
+	if value == nil {
+		return ""
+	}
+	return hex.EncodeToString(binary.BigEndian.AppendUint64(nil, math.Float64bits(*value)))
 }
 
 // verifyModelFile enforces existence, regular-file shape and a 64-hex SHA-256

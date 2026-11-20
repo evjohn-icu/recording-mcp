@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"recordingmcp/internal/plane"
 	"recordingmcp/internal/retention"
@@ -17,8 +19,20 @@ func (s *Service) CleanupForget(ctx context.Context, id string) error {
 		return err
 	}
 	defer release()
-	var conversationID string
-	if err := s.Store.DB().QueryRowContext(ctx, `SELECT conversation_id FROM forget_tombstones WHERE id=?`, id).Scan(&conversationID); err != nil {
+	var conversationID, affectedJSON string
+	if err := s.Store.DB().QueryRowContext(ctx, `SELECT conversation_id,affected_recordings_json FROM forget_tombstones WHERE id=?`, id).Scan(&conversationID, &affectedJSON); err != nil {
+		return err
+	}
+	// Analysis staging is removed for exactly the recordings persisted with
+	// the tombstone, inside the exclusive lock. The manifest list is written
+	// by the redaction transaction, so this never infers a range: a legacy
+	// tombstone carries '[]' and keeps its staging. A deletion failure keeps
+	// the forget pending for an explicit retry.
+	var affected []string
+	if err := json.Unmarshal([]byte(affectedJSON), &affected); err != nil {
+		return fmt.Errorf("forget staging manifest: %w", err)
+	}
+	if err := removeAnalysisStaging(s.audioRoot, affected); err != nil {
 		return err
 	}
 	rows, err := s.Store.DB().QueryContext(ctx, `SELECT path,COALESCE(start_byte,0),COALESCE(end_byte,0),remove_file FROM forget_files WHERE tombstone_id=? AND done=0 ORDER BY path`, id)
@@ -135,6 +149,33 @@ func (s *Service) CleanupForget(ctx context.Context, id string) error {
 	}
 	if _, err := s.Store.DB().ExecContext(ctx, `VACUUM`); err != nil {
 		return err
+	}
+	return nil
+}
+
+// removeAnalysisStaging deletes the per-recording analysis staging
+// directories of exactly the affected recordings beneath the managed audio
+// root. Missing directories stay a no-op; any other failure aborts cleanup so
+// the forget stays pending.
+func removeAnalysisStaging(rootPath string, recordingIDs []string) error {
+	if rootPath == "" || len(recordingIDs) == 0 {
+		return nil
+	}
+	root, err := os.OpenRoot(rootPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	for _, recordingID := range recordingIDs {
+		if recordingID == "" {
+			continue
+		}
+		if err := root.RemoveAll(retention.AnalysisStagingRel(recordingID)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
 	}
 	return nil
 }

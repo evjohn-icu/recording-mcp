@@ -35,18 +35,15 @@ def make_wav(path: pathlib.Path, seconds: int = 6) -> None:
 
 async def login(page, profile: str, password: str) -> None:
     await page.goto(BASE, wait_until="domcontentloaded")
-    if await page.locator("#auth-credential").count():
-        if await page.locator("#auth-profile").count():
-            await page.locator("#auth-profile").select_option(profile)
-        await page.locator("#auth-credential").fill(password)
-        await page.get_by_role("button", name="进入").click()
-        await page.locator(".profile-toolbar").wait_for(timeout=20000)
+    await page.locator("#auth-profile").select_option(profile, timeout=20000)
+    await page.locator("#auth-credential").fill(password)
+    await page.get_by_role("button", name="进入").click()
+    await page.locator(".profile-toolbar").get_by_text(f"配置：{profile}", exact=True).wait_for(timeout=20000)
 
 
 async def test_product_workflow(page, base: str, wav: pathlib.Path, record) -> str:
     """Steps 2-8: onboarding, import, phases, transcript, search, evidence, audio."""
     await page.goto(f"{base}/recordings", wait_until="domcontentloaded")
-    record("web-profile-login", True)
     await page.get_by_test_id("empty-onboarding").wait_for(timeout=15000)
     record("web-empty-onboarding", await page.locator(".timeline-row").count() == 0
            and await page.get_by_test_id("import-panel").is_visible())
@@ -163,6 +160,7 @@ async def run() -> dict:
         page.on("pageerror", lambda error: observations["page_errors"].append(str(error)))
         try:
             await login(page, "alpha", ALPHA)
+            record("web-profile-login", True)
             conversation_url = await test_product_workflow(page, BASE, wav, record)
             screenshot = OUT / "product-workflow-desktop.png"
             await page.screenshot(path=str(screenshot), full_page=True)

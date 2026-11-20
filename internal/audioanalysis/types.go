@@ -62,6 +62,7 @@ const (
 	CodeSourceSuperseded      = "audio_source_superseded"
 	CodeBarrierBlocked        = "audio_barrier_blocked"
 	CodeLeaseLost             = "audio_lease_lost"
+	CodeAudioSuperseded       = "audio_superseded"
 	CodeGPUEmbeddingConflict  = "audio_gpu_embedding_conflict"
 	CodeGPUBusy               = "audio_gpu_busy"
 )

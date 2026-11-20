@@ -97,6 +97,14 @@ type Config struct {
 	Now                func() time.Time
 	// Audio enables automatic VAD/tagging/diarization enqueue. Nil disables it.
 	Audio *audioanalysis.Config
+	// AudioStages reports the stages some worker claims right now: the
+	// worker's own verified stages united with the stages live workers
+	// heartbeat (process.ReadHeartbeats with a 30s window). A capability
+	// without a claimer is not queued even when its model is configured; a
+	// callback error fails the ingest attempt so the queue retries it. Nil
+	// keeps the legacy rule of queueing every configured capability, for
+	// callers that use ingest.Service directly.
+	AudioStages func(context.Context) (map[string]bool, error)
 }
 
 // validate checks the required dependencies.

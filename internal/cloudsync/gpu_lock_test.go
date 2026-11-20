@@ -70,14 +70,6 @@ with open(os.environ["LOCK_TRACE"], "a") as f:
 	}
 }
 
-func TestGPUFileLockHonorsTimeout(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "shared.lock")
-	release, err := acquireGPULock(context.Background(), path, time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer release()
-	if _, err := acquireGPULock(context.Background(), path, 100*time.Millisecond); err == nil {
-		t.Fatal("second acquire must time out while the lock is held")
-	}
-}
+// TestGPUFileLockHonorsTimeout was removed: gpulock_test.go's
+// TestGPULockSerializesProcesses already covers a second acquire timing out
+// through gpulock.Acquire directly.

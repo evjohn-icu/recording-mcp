@@ -3,6 +3,7 @@ package contextbuild
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -284,5 +285,71 @@ func TestBuildV2NoAssessorWithUnreturnedSourceIsUnknown(t *testing.T) {
 	}
 	if pkg.Sufficiency == nil || pkg.Sufficiency.Status != "unknown" {
 		t.Fatalf("status = %+v, want unknown for unassessed cited source", pkg.Sufficiency)
+	}
+}
+
+// TestBuildV2PoolPrefersDistinctSourceRefSets covers the two-slot pool with
+// two same-ref candidates and one independent candidate: the bounded pool
+// must keep the independent ref set instead of spending both slots on the
+// same citations. Identical summaries keep the BM25 scores equal so the
+// candidates stay in id order. In-pool candidates keep the original order and
+// the post-budget source dedupe still drops the leftover duplicate.
+func TestBuildV2PoolPrefersDistinctSourceRefSets(t *testing.T) {
+	f := newFixture(t)
+	f.conversation("conv:pool", "Pool", "rec:pool")
+	f.recording("rec:pool", "conv:pool", nil)
+	f.turn("t:one", "conv:pool", "rec:pool", 0, 1000, nil, "引用甲原话内容")
+	f.turn("t:two", "conv:pool", "rec:pool", 1, 2000, nil, "引用乙原话内容")
+	f.note("n:dup1", "conv:pool", "observation", "池标记 共享摘要", nil, []string{"t:one"})
+	f.note("n:dup2", "conv:pool", "observation", "池标记 共享摘要", nil, []string{"t:one"})
+	f.note("n:other", "conv:pool", "observation", "池标记 共享摘要", nil, []string{"t:two"})
+	pkg := f.build(nil, Request{
+		Query: "池标记", ConversationID: "conv:pool", RetrievalVersion: "v2", Mode: ModeLexical,
+		MaxItems: 4, MaxBytes: 65536, IncludeRawEvidence: true, RerankCandidateLimit: 2,
+	})
+	if got := itemIDs(pkg.Items); !reflect.DeepEqual(got, []string{"n:dup1", "n:other"}) {
+		t.Fatalf("items = %v, want the two distinct ref sets in pool order", got)
+	}
+	if !hasGap(pkg, "candidate_pool_limited") {
+		t.Fatalf("gaps = %+v, want candidate_pool_limited", pkg.Gaps)
+	}
+}
+
+// TestBuildV2PoolDuplicateBackfillsOversizedRefSet keeps the duplicate-fallback
+// semantics under the distinct-ref-set pool: an oversized first candidate is
+// skipped whole by the budget and the in-pool duplicate of its ref set takes
+// over, while the independent set keeps its earlier pool position. The
+// oversized summary carries an exclusive query term, so it is the first
+// candidate regardless of its BM25 length normalisation.
+func TestBuildV2PoolDuplicateBackfillsOversizedRefSet(t *testing.T) {
+	f := newFixture(t)
+	f.conversation("conv:pool", "Pool", "rec:pool")
+	f.recording("rec:pool", "conv:pool", nil)
+	f.turn("t:one", "conv:pool", "rec:pool", 0, 1000, nil, "引用甲原话内容")
+	f.turn("t:two", "conv:pool", "rec:pool", 1, 2000, nil, "引用乙原话内容")
+	f.note("n:big", "conv:pool", "observation", "独占词 "+strings.Repeat("大", 1500), nil, []string{"t:one"})
+	f.note("n:dup", "conv:pool", "observation", "其它摘要 backup", nil, []string{"t:one"})
+	f.note("n:other", "conv:pool", "observation", "其它摘要 independent", nil, []string{"t:two"})
+	pkg := f.build(nil, Request{
+		Query: "独占词", ConversationID: "conv:pool", RetrievalVersion: "v2", Mode: ModeLexical,
+		// MaxItems keeps the pinned conversation page wide enough to reach
+		// every note; the pool itself is bounded by RerankCandidateLimit.
+		MaxItems: 12, MaxBytes: 3000, IncludeRawEvidence: true, RerankCandidateLimit: 4,
+	})
+	if !containsString(pkg.Trace.Budget.SkippedItemIDs, "n:big") {
+		t.Fatalf("oversized first candidate not skipped: %v", pkg.Trace.Budget.SkippedItemIDs)
+	}
+	if containsString(itemIDs(pkg.Items), "n:big") {
+		t.Fatalf("oversized candidate entered the package: %v", itemIDs(pkg.Items))
+	}
+	// Distinct ref sets fill the pool first (t:one via n:big, t:two via
+	// n:other), the conversation item takes the third slot, and the remaining
+	// slot backfills with the t:one duplicate; after n:big is skipped the
+	// duplicate takes over its ref set.
+	if got := itemIDs(pkg.Items); !reflect.DeepEqual(got, []string{"n:other", "conv:pool", "n:dup"}) {
+		t.Fatalf("items = %v, want the distinct sets, the navigation item and the backfilling duplicate", got)
+	}
+	if !pkg.Truncated || !hasGap(pkg, "item_budget_exceeded") {
+		t.Fatalf("truncated=%v gaps=%+v", pkg.Truncated, pkg.Gaps)
 	}
 }

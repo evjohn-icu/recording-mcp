@@ -4,15 +4,22 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import math
 import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from retrieval_quality_gates import (config_signature, metric_number, quality_gate,
+                                     quality_gate_v3, retrieval_gate)  # noqa: E402,F401
 
 SPLIT_GROUPS = {"train": 80, "calibration": 40, "test": 40}
 SPLIT_QUESTIONS = {"train": 120, "calibration": 60, "test": 60}
@@ -24,7 +31,7 @@ V3_PARTIAL_BUCKETS = {"time_change", "revocation", "missing_evidence", "wrong_id
 V3_SPLIT_QUESTIONS = {"train": 260, "calibration": 260, "test": 260}
 V3_SPLIT_GROUPS = {"train": 110, "calibration": 110, "test": 110}
 THRESHOLD_HUNDREDTHS = tuple(range(0, 101))
-V3_LOCK_SCHEMA = "retrieval-v3-selection-lock-v2"
+V3_LOCK_SCHEMA = "retrieval-v3-selection-lock-v3"
 V3_LATENCY_COMPARISON = ("migration-budget cap; the v1 baseline is measured in the same run with the same "
                          "query order and budget, while v3 adds admission and evidence assessment")
 CJK = re.compile(r"[\u3400-\u9fff]")
@@ -324,18 +331,6 @@ def provider_status(provider: str, config: dict) -> str:
     return "NOT_RUN"
 
 
-def metric_number(metrics: dict, key: str, default: float) -> float:
-    value = metrics.get(key)
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-        return default
-    return float(value)
-
-
-def config_signature(configuration: dict) -> str:
-    canonical = json.dumps(configuration, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hashlib.sha256(canonical).hexdigest()
-
-
 def validate_selection_lock(lock: dict, fixture_hashes: dict, configuration_hash: str,
                             binary_hash: str) -> dict:
     selected = lock.get("selected") if isinstance(lock, dict) else None
@@ -431,6 +426,7 @@ def extract_run_metrics(report: dict, split_path: Path, split: str, version: str
                                 "final_gold_evidence_found", "rerank_calls",
                                 "assessor_calls", "model_calls", "assessment_failed", "rerank_failed",
                                 "expected_sufficiency", "evidence_completeness")
+    sufficiency_expectations: dict[str, str] = {}
     for row in rows:
         if any(key not in row for key in required_question_fields):
             missing = [key for key in required_question_fields if key not in row]
@@ -468,6 +464,15 @@ def extract_run_metrics(report: dict, split_path: Path, split: str, version: str
             expected_status = "sufficient" if complete_final_evidence else "insufficient"
             if row["expected_sufficiency"] != expected_status:
                 raise ReportProtocolError(f"question {row['id']} expected sufficiency disagrees with final evidence coverage")
+        # The final visible evidence decides the sufficiency accounting, not the
+        # authored label: an authored "sufficient" question that dropped a
+        # required ref is judged by its final coverage. Explicit "insufficient"
+        # labels are retained, and the v2 legacy "unknown" label is retained but
+        # never counted as a match.
+        sufficiency_expectation = "sufficient" if complete_final_evidence else "insufficient"
+        if authored_expected in ("insufficient", "unknown"):
+            sufficiency_expectation = authored_expected
+        sufficiency_expectations[row["id"]] = sufficiency_expectation
         if version == "v2" and row.get("sufficiency_status") not in ("sufficient", "insufficient", "unknown"):
             raise ReportProtocolError(f"question {row['id']} is missing a valid sufficiency status")
     answerable = [q for q in rows if not q["unanswerable"] and q.get("recall_eligible", True)]
@@ -493,9 +498,10 @@ def extract_run_metrics(report: dict, split_path: Path, split: str, version: str
         if metric["questions"] != expected_bucket_count:
             raise ReportProtocolError(f"bucket {key} has {metric['questions']} questions, expected {expected_bucket_count}")
         buckets[key] = metric
-    assessed = [q for q in rows if q["assessor_calls"] > 0]
-    false_sufficient_denominator = sum(q["expected_sufficiency"] == "insufficient" for q in assessed)
-    false_sufficient = sum(q["expected_sufficiency"] == "insufficient" and q.get("sufficiency_status") == "sufficient" for q in assessed)
+    assessed = [(q, sufficiency_expectations[q["id"]]) for q in rows if q["assessor_calls"] > 0]
+    false_sufficient_denominator = sum(expectation == "insufficient" for _q, expectation in assessed)
+    false_sufficient = sum(expectation == "insufficient" and q.get("sufficiency_status") == "sufficient"
+                           for q, expectation in assessed)
     assessor_configured = m["evidence_assessor_configured"]
     false_sufficient_rate = None
     if assessor_configured and false_sufficient_denominator:
@@ -512,7 +518,7 @@ def extract_run_metrics(report: dict, split_path: Path, split: str, version: str
         admission_failures = _required_number(m, "admission_failures", integer=True)
         if sum(_required_number(q, "forgotten_leakage", integer=True) for q in rows) != forgotten_leakage:
             raise ReportProtocolError("forgotten_leakage total does not match per_question rows")
-    return {"split": split, "mode": mode, "recall_at_5": selected_recall, "mrr_at_10": selected_mrr,
+    metrics = {"split": split, "mode": mode, "recall_at_5": selected_recall, "mrr_at_10": selected_mrr,
             "false_positive_rate": false_positive_queries / len(negatives),
             "false_positive_queries": false_positive_queries, "no_evidence_denominator": len(negatives),
             "answerable_denominator": len(answerable), "recall_denominator": len(answerable),
@@ -527,11 +533,12 @@ def extract_run_metrics(report: dict, split_path: Path, split: str, version: str
             "assessor_configured": assessor_configured, "false_sufficient": false_sufficient,
             "false_sufficient_denominator": false_sufficient_denominator,
             "false_sufficient_rate": false_sufficient_rate,
-            "sufficiency": {"status_counts": {status: sum(q.get("sufficiency_status") == status for q in assessed)
+            "sufficiency": {"status_counts": {status: sum(q.get("sufficiency_status") == status for q, _expectation in assessed)
                                                 for status in ("sufficient", "insufficient", "unknown")},
                             "scored": len(assessed),
-                            "matches": sum(q["expected_sufficiency"] != "unknown"
-                                           and q["expected_sufficiency"] == q.get("sufficiency_status") for q in assessed)},
+                            "matches": sum(expectation != "unknown"
+                                           and expectation == q.get("sufficiency_status")
+                                           for q, expectation in assessed)},
             "embedding_invocations": _required_number(m, "semantic_provider_embed_requests", integer=True),
             "model_calls": sum(q["model_calls"] for q in rows),
             "rerank_calls": sum(q["rerank_calls"] for q in rows),
@@ -541,63 +548,13 @@ def extract_run_metrics(report: dict, split_path: Path, split: str, version: str
             "none_false_positive_rate": false_positive_queries / len(negatives),
             "all_unanswerable_false_positive_rate": false_positive_queries / len(negatives),
             "stage_latencies": m.get("stage_latencies") if isinstance(m.get("stage_latencies"), dict) else {}}
-
-
-def retrieval_gate(metrics: dict, baseline: dict) -> dict:
-    fp_denom = metric_number(metrics, "no_evidence_denominator", 0)
-    fp_queries = metric_number(metrics, "false_positive_queries", -1)
-    fp_rate = metric_number(metrics, "false_positive_rate", 1)
-    fp_consistent = fp_denom > 0 and 0 <= fp_queries <= fp_denom and math.isclose(fp_rate, fp_queries / fp_denom, abs_tol=1e-12)
-    values = {
-        "recall_at_5_strictly_improves": metric_number(metrics, "recall_at_5", -1) > metric_number(baseline, "recall_at_5", 1),
-        "mrr_at_10_not_regressed": metric_number(metrics, "mrr_at_10", -1) >= metric_number(baseline, "mrr_at_10", 1),
-        "false_positive_rate_at_most_0_05": metric_number(metrics, "false_positive_rate", 1) <= .05,
-        "stale_leaks_zero": metric_number(metrics, "stale_leaks", -1) == 0,
-        "ambient_leaks_zero": metric_number(metrics, "ambient_leaks", -1) == 0,
-        "scope_leaks_zero": metric_number(metrics, "scope_leaks", -1) == 0,
-        "invalid_refs_zero": metric_number(metrics, "invalid_refs", -1) == 0,
-        "fixture_cross_split_leaks_zero": metric_number(metrics, "fixture_cross_split_leaks", -1) == 0,
-        "p95_at_most_1_5x_same_provider_v1": metric_number(metrics, "p95_ms", float("inf")) <= metric_number(baseline, "p95_ms", 0) * 1.5,
-        "embedding_and_rerank_failures_zero": all(metrics.get("failure_counts", {}).get(name, -1) == 0 for name in ("embedding", "rerank")),
-        "baseline_embedding_and_rerank_failures_zero": all(baseline.get("failure_counts", {}).get(name, -1) == 0 for name in ("embedding", "rerank")),
-        "baseline_p95_denominator_positive": metric_number(baseline, "p95_denominator", 0) > 0,
-        "baseline_answerable_denominator_positive": metric_number(baseline, "answerable_denominator", 0) > 0,
-        "answerable_denominator_positive": metric_number(metrics, "answerable_denominator", 0) > 0,
-        "no_evidence_denominator_positive": metric_number(metrics, "no_evidence_denominator", 0) > 0,
-        "p95_denominator_positive": metric_number(metrics, "p95_denominator", 0) > 0,
-        "recall_and_mrr_denominators_positive": metric_number(metrics, "recall_denominator", 0) > 0 and metric_number(metrics, "mrr_denominator", 0) > 0,
-        "false_positive_query_rate_matches_denominators": fp_consistent,
-    }
-    return {"passed": all(values.values()), "checks": values}
-
-
-def quality_gate(metrics: dict, baseline: dict) -> dict:
-    retrieval = retrieval_gate(metrics, baseline)
-    checks = dict(retrieval["checks"])
-    checks.update({
-        "assessor_configured": metrics.get("assessor_configured") is True,
-        "assessment_failures_zero": metrics.get("failure_counts", {}).get("assessment", -1) == 0,
-        "false_sufficient_rate_at_most_0_05": metric_number(metrics, "false_sufficient_rate", float("inf")) <= .05,
-        "insufficient_package_denominator_positive": metric_number(metrics, "false_sufficient_denominator", 0) > 0,
-    })
-    return {"passed": all(checks.values()), "checks": checks,
-            "retrieval_gate": retrieval}
-
-
-def quality_gate_v3(metrics: dict, baseline: dict) -> dict:
-    retrieval = retrieval_gate(metrics, baseline)
-    checks = dict(retrieval["checks"])
-    checks.update({
-        "assessor_configured": metrics.get("assessor_configured") is True,
-        "assessment_failures_zero": metrics.get("failure_counts", {}).get("assessment", -1) == 0,
-        "false_sufficient_rate_at_most_0_05": metric_number(metrics, "false_sufficient_rate", float("inf")) <= .05,
-        "insufficient_package_denominator_positive": metric_number(metrics, "false_sufficient_denominator", 0) > 0,
-        "recall_at_5_at_least_0_85": metric_number(metrics, "recall_at_5", -1) >= .85,
-        "none_false_positive_rate_at_most_0_05": metric_number(metrics, "none_false_positive_rate", 1) <= .05,
-        "forgotten_leakage_zero": metric_number(metrics, "forgotten_leakage", -1) == 0,
-        "admission_failures_zero": metric_number(metrics, "admission_failures", -1) == 0,
-    })
-    return {"passed": all(checks.values()), "checks": checks, "retrieval_gate": retrieval}
+    # The recall denominator lives in the report rows, not in this aggregate:
+    # v3-protocol runs (the v1 baseline included) publish the exact eligible id
+    # set so the gate can prove both sides scored the same unforgotten
+    # questions. Legacy v2-protocol runs keep their shape.
+    if getattr(args, "protocol", "v2") == "v3":
+        metrics["recall_eligible_ids"] = sorted(q["id"] for q in rows if q.get("recall_eligible") is True)
+    return metrics
 
 
 def select_v3_candidate(candidates: list[dict]) -> dict | None:
@@ -754,6 +711,18 @@ def identity_is_verifiable(identity: dict) -> tuple[bool, str]:
     return True, ""
 
 
+def _selected_policy_signature(lock: dict, backend: str, threshold_hundredths: int,
+                               fixture_sha256: str) -> str:
+    """Rebuild the selected-phase admission policy document from the lock."""
+    configuration = lock.get("configuration") if isinstance(lock, dict) else None
+    configuration = configuration if isinstance(configuration, dict) else {}
+    args = argparse.Namespace(embed_model=str(configuration.get("embedding_model") or ""),
+                              embed_revision=str(configuration.get("embedding_revision") or ""),
+                              assessor_model=str(configuration.get("assessor_model") or ""))
+    document = admission_policy_document(args, backend, threshold_hundredths, fixture_sha256, "selected")
+    return config_signature(document)
+
+
 def validate_v3_lock(lock: dict, fixture_hashes: dict, configuration_hash: str, template_hash: str,
                      binary_hash: str) -> dict:
     selected = lock.get("selected") if isinstance(lock, dict) else None
@@ -765,9 +734,18 @@ def validate_v3_lock(lock: dict, fixture_hashes: dict, configuration_hash: str, 
             not isinstance(selected, dict) or selected.get("version") != "v3" or
             selected.get("backend") not in ("hash", "openai") or
             not isinstance(selected.get("threshold_hundredths"), int) or
+            isinstance(selected.get("threshold_hundredths"), bool) or
             not 0 <= selected["threshold_hundredths"] <= 100 or
             not lock.get("calibration_gate", {}).get("passed")):
         raise ValueError("selection lock does not pin this fixture, configuration, template, binary and eligible v3 candidate")
+    if selected.get("threshold_hundredths") / 100 != selected.get("threshold"):
+        raise ValueError("selection lock threshold does not match its hundredths grid value")
+    if lock.get("selected_sha256") != config_signature(selected):
+        raise ValueError("selection lock selected candidate does not match its own digest")
+    if lock.get("selected_policy_sha256") != _selected_policy_signature(
+            lock, selected["backend"], selected["threshold_hundredths"],
+            fixture_hashes.get("retrieval.json", "")):
+        raise ValueError("selection lock selected policy does not match its own digest")
     configuration = lock.get("configuration")
     if not isinstance(configuration, dict) or config_signature(configuration) != lock["configuration_sha256"]:
         raise ValueError("selection lock configuration is missing or does not match its own hash")
@@ -783,11 +761,19 @@ def validate_v3_lock(lock: dict, fixture_hashes: dict, configuration_hash: str, 
     identity = lock.get("identity")
     if not isinstance(identity, dict) or identity.get("binary_sha256") != binary_hash:
         raise ValueError("selection lock identity is missing or names another binary")
+    if identity.get("embedding_provider") != "openai-compat":
+        # A hash-embedding calibration is diagnostic only: it cannot prove which
+        # real model answered, so it never mints a production lock.
+        raise ValueError("selection lock must pin a real openai-compat embedding provider")
+    if lock.get("final_rerun_uncached") is not True:
+        raise ValueError("selection lock must record a verified uncached final rerun")
     warmup = lock.get("warmup")
     if not isinstance(warmup, dict) or warmup.get("questions") != WARMUP["questions"]:
         raise ValueError("selection lock does not record the warmup rule")
     if not isinstance(selected.get("rerank"), bool):
         raise ValueError("selection lock has no valid reranker setting")
+    if selected["rerank"] != bool(configuration.get("rerank_endpoint") and configuration.get("rerank_model")):
+        raise ValueError("selection lock reranker setting does not match the restored configuration")
     return selected
 
 
@@ -841,9 +827,24 @@ def flush_embed_cache(url: str) -> None:
         raise RuntimeError("embedding cache flush did not confirm")
 
 
+def flush_embed_cache_safe(url: str) -> str:
+    """Run the configured cache flush; return "" on success, else a safe reason.
+
+    Expected transport/protocol failures become recorded evidence instead of an
+    unhandled exception; anything outside that set still propagates.
+    """
+    if not url:
+        return ""
+    try:
+        flush_embed_cache(url)
+    except (RuntimeError, OSError, urllib.error.URLError, http.client.HTTPException) as exc:
+        return f"{type(exc).__name__}: {exc}"
+    return ""
+
+
 def _run(binary: str, args: argparse.Namespace, split_path: Path, version: str,
          provider: str, rerank: bool, split: str, out: Path, extra: list[str] | None = None,
-         corpus: Path | None = None) -> dict:
+         corpus: Path | None = None, warmup: bool = False) -> dict:
     cmd = [binary, "--corpus", str(corpus or args.corpus), "--questions", "", "--links", "",
            "--retrieval", str(split_path), "--projection", "", "--max-items", "10", "--max-bytes", "65536",
            "--retrieval-version", version, "--embed-provider", "off" if provider == "lexical" else provider,
@@ -871,9 +872,22 @@ def _run(binary: str, args: argparse.Namespace, split_path: Path, version: str,
         return {"status": "TIMEOUT", "command": safe_command(cmd), "timeout_seconds": args.timeout,
                 "elapsed_seconds": time.monotonic() - start,
                 "stdout": str(exc.stdout or "")[-3000:], "stderr": str(exc.stderr or "")[-3000:]}
+    except OSError as exc:
+        # An expected spawn failure (for example the binary lost its exec bit
+        # between the digest and the spawn, after a holdout claim was already
+        # consumed): record the safe original reason as a FAIL result instead
+        # of crashing without a manifest.
+        return {"status": "FAIL", "command": safe_command(cmd), "exit_code": None,
+                "elapsed_seconds": time.monotonic() - start, "stdout": "",
+                "stderr": f"{type(exc).__name__}: {exc}", "spawn_error": True}
     result = {"status": "PASS" if proc.returncode == 0 and Path(out).exists() else "FAIL",
               "command": safe_command(cmd), "exit_code": proc.returncode, "elapsed_seconds": time.monotonic() - start,
               "stdout": proc.stdout[-3000:], "stderr": proc.stderr[-3000:]}
+    if warmup:
+        # A warmup is excluded from every metric: only the tool exit code and
+        # the report's existence decide its status, so a single-question
+        # warmup report can never be read as a full-eval result.
+        return {**result, "warmup": True, "questions": 1}
     if result["status"] == "PASS":
         try:
             report = json.loads(Path(out).read_text(encoding="utf-8"))
@@ -944,15 +958,31 @@ def warmup_split(retrieval_path: Path, out: Path) -> Path:
 
 
 def _warmup_run(args: argparse.Namespace, retrieval_path: Path, out: Path, version: str, backend: str,
-                rerank: bool, corpus: Path) -> dict:
-    """One warmup invocation on the train head, excluded from every metric."""
+                rerank: bool, corpus: Path, extra: list[str] | None = None) -> dict:
+    """One warmup invocation on the train head, excluded from every metric.
+
+    ``extra`` carries the real v3 policy and lifecycle of the measured run that
+    follows, so the warmup exercises the same admission path and forget state.
+    """
     path = warmup_split(retrieval_path, out)
-    flush_embed_cache(args.flush_embed_cache_url)
+    flush_error = flush_embed_cache_safe(args.flush_embed_cache_url)
+    if flush_error:
+        # The cache state is unproven, so the warmup question is not sent; the
+        # failure becomes recorded evidence on the warmup entry.
+        return {"version": version, "backend": backend, "status": "NOT_RUN",
+                "reason": f"embedding cache flush failed before the warmup: {flush_error}",
+                "flush_error": flush_error,
+                "cache_flushed": bool(args.flush_embed_cache_url), "questions": 0}
     result = _run(args.binary, args, path, version, backend, rerank, "train",
-                  out / f"warmup-{version}-{backend}.json", corpus=corpus)
-    flush_embed_cache(args.flush_embed_cache_url)
-    return {"version": version, "backend": backend, "status": result.get("status"),
-            "cache_flushed": bool(args.flush_embed_cache_url), "questions": 1}
+                  out / f"warmup-{version}-{backend}.json", extra=extra, corpus=corpus, warmup=True)
+    entry = {"version": version, "backend": backend, "status": result.get("status"),
+             "exit_code": result.get("exit_code"), "command": result.get("command"),
+             "stderr": (result.get("stderr") or "")[-800:],
+             "cache_flushed": bool(args.flush_embed_cache_url), "questions": 1}
+    post_error = flush_embed_cache_safe(args.flush_embed_cache_url)
+    if post_error:
+        entry["flush_error"] = post_error
+    return entry
 
 
 def run_v3(args: argparse.Namespace) -> int:
@@ -964,6 +994,8 @@ def run_v3(args: argparse.Namespace) -> int:
     hashes = verify_frozen_hashes_v3(root)
     if digest(retrieval_path) != hashes["retrieval.json"]:
         raise ValueError("v3 retrieval fixture must be the pinned frozen bytes")
+    if digest(lifecycle_path) != hashes["lifecycle.json"]:
+        raise ValueError("v3 lifecycle fixture must be the pinned frozen bytes")
     fixture_summary = validate_fixture_v3(retrieval_path, corpus_path, lifecycle_path)
     if (args.max_items, args.max_bytes) != (LOCK_BUDGET["max_items"], LOCK_BUDGET["max_bytes"]):
         raise ValueError("quality protocol fixes --max-items=10 and --max-bytes=65536")
@@ -1060,28 +1092,62 @@ def run_v3(args: argparse.Namespace) -> int:
         lock["holdout_started"] = True
         lock["holdout_started_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         atomic_write_json(lock_path, lock)
+        # The manifest pins the exact consumed lock bytes, so any later
+        # tampering with the lock breaks the holdout evidence.
+        results["selection_lock_sha256"] = digest(lock_path)
         test_file = _split_file(retrieval_path, "test", out)
         baseline_file = out / "retrieval-test-v1.json"
         baseline_file.write_text(test_file.read_text(encoding="utf-8"), encoding="utf-8")
-        warmups = []
-        if args.warmup:
-            warmups.append(_warmup_run(args, retrieval_path, out, "v1", backend, rerank, corpus_path))
-            warmups.append(_warmup_run(args, retrieval_path, out, "v3", backend, rerank, corpus_path))
-        flush_embed_cache(args.flush_embed_cache_url)
-        base = _run(args.binary, args, baseline_file, "v1", backend, rerank, "test", out / "v1-test.json",
-                    corpus=corpus_path)
         policy_path = policy_file(policy_dir, backend, threshold, "selected")
         extra = ["--admission-policy", str(policy_path), "--lifecycle", str(lifecycle_path)]
-        flush_embed_cache(args.flush_embed_cache_url)
-        candidate = _run(args.binary, args, test_file, "v3", backend, rerank, "test", out / "v3-test.json",
-                         extra=extra, corpus=corpus_path)
+        execution_error = ""
+
+        def holdout_flush(step: str) -> bool:
+            """Record an expected flush failure instead of crashing post-claim."""
+            nonlocal execution_error
+            reason = flush_embed_cache_safe(args.flush_embed_cache_url)
+            if reason and not execution_error:
+                execution_error = f"{step}: {reason}"
+            return not reason
+
+        warmups = []
+        if args.warmup:
+            warmups.append(_warmup_run(args, retrieval_path, out, "v1", backend, rerank, corpus_path,
+                                       extra=["--lifecycle", str(lifecycle_path)]))
+            warmups.append(_warmup_run(args, retrieval_path, out, "v3", backend, rerank, corpus_path,
+                                       extra=extra))
+            for entry in warmups:
+                if entry.get("flush_error") and not execution_error:
+                    execution_error = f"warmup-{entry.get('version')}: {entry['flush_error']}"
+        holdout_flush("before the v1 baseline")
+        if execution_error:
+            base = {"status": "NOT_RUN", "reason": execution_error}
+        else:
+            base = _run(args.binary, args, baseline_file, "v1", backend, rerank, "test",
+                        out / "v1-test.json", extra=["--lifecycle", str(lifecycle_path)],
+                        corpus=corpus_path)
+        holdout_flush("before the v3 candidate")
+        if execution_error:
+            candidate = {"status": "NOT_RUN", "reason": execution_error}
+        else:
+            candidate = _run(args.binary, args, test_file, "v3", backend, rerank, "test",
+                             out / "v3-test.json", extra=extra, corpus=corpus_path)
         results["runs"] = {"v1_test": base, "v3_test": candidate}
         results["warmup_runs"] = warmups
         results["selected_candidate"] = selected
-        if base["status"] == candidate["status"] == "PASS":
+        if execution_error:
+            results["cache_flush_error"] = {"reason": execution_error}
+        warmup_gate_failed = bool(args.warmup) and any(entry.get("status") != "PASS" for entry in warmups)
+        results["warmup_gate"] = {"required": bool(args.warmup), "passed": not warmup_gate_failed}
+        if warmup_gate_failed:
+            results["warmup_gate"]["reason"] = ("a configured warmup failed; the holdout ran cold and its "
+                                                "numbers are not gate evidence")
+        if base["status"] == candidate["status"] == "PASS" and not warmup_gate_failed and not execution_error:
             gate = quality_gate_v3(candidate["metrics"], base["metrics"])
             results["holdout_gate"] = gate
             results["quality_gate_passed"] = gate["passed"]
+        else:
+            results["quality_gate_passed"] = False
         results["protocol_config"]["test_touched"] = True
     elif args.phase == "profile":
         split_file = _split_file(retrieval_path, "train", out / "profile")
@@ -1095,10 +1161,13 @@ def run_v3(args: argparse.Namespace) -> int:
             policy_path = policy_file(policy_dir, backend, 0, "calibration")
             profile_extra = ["--admission-policy", str(policy_path), "--calibration-mode",
                              "--lifecycle", str(lifecycle_path), "--profile-admission"]
+            warmup_extra = ["--admission-policy", str(policy_path), "--lifecycle", str(lifecycle_path)]
             warmups = []
             if args.warmup:
-                warmups.append(_warmup_run(args, retrieval_path, out, "v1", backend, rerank, corpus_path))
-                warmups.append(_warmup_run(args, retrieval_path, out, "v3", backend, rerank, corpus_path))
+                warmups.append(_warmup_run(args, retrieval_path, out, "v1", backend, rerank, corpus_path,
+                                           extra=["--lifecycle", str(lifecycle_path)]))
+                warmups.append(_warmup_run(args, retrieval_path, out, "v3", backend, rerank, corpus_path,
+                                           extra=warmup_extra))
             flush_embed_cache(args.flush_embed_cache_url)
             baseline = _run(args.binary, args, split_file, "v1", backend, rerank, "train",
                             out / "profile-v1.json", corpus=corpus_path)
@@ -1119,11 +1188,14 @@ def run_v3(args: argparse.Namespace) -> int:
         for backend in backends:
             warmups_backend = []
             if args.warmup:
-                warmups_backend.append(_warmup_run(args, retrieval_path, out, "v1", backend, rerank, corpus_path))
+                warmups_backend.append(_warmup_run(args, retrieval_path, out, "v1", backend, rerank,
+                                                   corpus_path,
+                                                   extra=["--lifecycle", str(lifecycle_path)]))
             flush_embed_cache(args.flush_embed_cache_url)
             results["runs"][f"{split}/v1-{backend}"] = _run(
                 args.binary, args, split_file, "v1", backend, rerank, split,
-                out / f"{split}-v1-{backend}.json", corpus=corpus_path)
+                out / f"{split}-v1-{backend}.json", extra=["--lifecycle", str(lifecycle_path)],
+                corpus=corpus_path)
             results.setdefault("warmup_runs", []).extend(warmups_backend)
         candidates = []
         if not assessor_ready:
@@ -1169,7 +1241,8 @@ def run_v3(args: argparse.Namespace) -> int:
                          "--lifecycle", str(lifecycle_path)]
                 warmups_final = []
                 if args.warmup:
-                    warmups_final.append(_warmup_run(args, retrieval_path, out, "v3", backend, rerank, corpus_path))
+                    warmups_final.append(_warmup_run(args, retrieval_path, out, "v3", backend, rerank,
+                                                     corpus_path, extra=extra))
                 flush_embed_cache(args.flush_embed_cache_url)
                 rerun = _run(args.binary, args, split_file, "v3", backend, rerank, split,
                              out / f"{split}-v3-{backend}-t{threshold:03d}-uncached.json", extra=extra,
@@ -1182,6 +1255,25 @@ def run_v3(args: argparse.Namespace) -> int:
                     ready, reason = identity_is_verifiable(identity)
                     if not ready:
                         results["calibration_selection"] = f"The candidate is not lockable: {reason}."
+                    elif identity.get("embedding_provider") != "openai-compat":
+                        # The hash embedding stays diagnostic: it cannot prove
+                        # which real model answered, so no production lock.
+                        results["calibration_selection"] = (
+                            "The selected candidate used a diagnostic embedding provider; only a real "
+                            "openai-compat embedding with a verifiable assessor can mint a production lock.")
+                    elif not args.flush_embed_cache_url:
+                        # final_rerun_uncached would be an unprovable claim:
+                        # nothing ever flushed the cache before this rerun.
+                        results["calibration_selection"] = (
+                            "No verifiable --flush-embed-cache-url was configured, so the final rerun "
+                            "cannot be proven uncached; no production lock was created.")
+                    elif args.warmup and any(entry.get("status") != "PASS"
+                                             for entry in (results.get("warmup_runs") or [])):
+                        # Every configured warmup of a production gate must
+                        # pass; a failed warmup means the gate ran cold and its
+                        # numbers cannot back a lock.
+                        results["calibration_selection"] = (
+                            "A configured warmup failed; no production lock was created.")
                     elif gate["passed"]:
                         selected_payload = {"version": "v3", "backend": backend,
                                             "threshold_hundredths": threshold, "threshold": threshold / 100,
@@ -1194,7 +1286,13 @@ def run_v3(args: argparse.Namespace) -> int:
                                 "identity": identity, "budget": dict(LOCK_BUDGET),
                                 "warmup": dict(WARMUP), "binary_sha256": binary_hash,
                                 "selected": selected_payload,
-                                "calibration_metrics": rerun["metrics"], "calibration_gate": gate,
+                                "selected_sha256": config_signature(selected_payload),
+                                "selected_policy_sha256": _selected_policy_signature(
+                                    {"configuration": configuration}, backend, threshold,
+                                    hashes["retrieval.json"]),
+                                "calibration_metrics": rerun["metrics"],
+                                "calibration_baseline_metrics": baseline["metrics"],
+                                "calibration_gate": gate,
                                 "selection_basis": ("calibration only; recall@5 desc, mrr@10 desc, p95 asc, "
                                                     "stricter threshold first; final gate from one uncached rerun"),
                                 "cache_used_for_screening": True, "final_rerun_uncached": True,
@@ -1212,6 +1310,12 @@ def run_v3(args: argparse.Namespace) -> int:
     manifest = out / "manifest.json"
     manifest.write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(manifest)
+    if getattr(args, "protocol", "v2") == "v3" and args.phase == "holdout":
+        # A real holdout may only exit 0 when the recorded gate itself passed;
+        # calibration/profile keep their diagnostic rc semantics.
+        runs_ok = all(item.get("status") in ("PASS", "NOT_RUN") for item in results["runs"].values())
+        warmup_ok = (results.get("warmup_gate") or {}).get("passed", True)
+        return 0 if runs_ok and warmup_ok and results.get("quality_gate_passed") is True else 1
     return 0 if all(item.get("status") in ("PASS", "NOT_RUN") for item in results["runs"].values()) else 1
 
 

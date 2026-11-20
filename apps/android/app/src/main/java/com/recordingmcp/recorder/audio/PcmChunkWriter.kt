@@ -21,6 +21,9 @@ data class StopSummary(
     val totalSamples: Long,
 ) {
     val committedCount: Int get() = committed.size
+
+    /** finish 口径：已提交分块采样数之和（不含被丢弃尾块；totalSamples 仍表示捕获总数）。 */
+    val committedSamples: Long get() = committed.sumOf { it.sampleCount.toLong() }
 }
 
 /**

@@ -92,7 +92,13 @@ def _analyze(args, request):
     models.validate_request(request)
     config = _load_config(args.config)
     capability = request.get("capability")
-    resolved = models.resolve_capability(config, capability)
+    # Relative model pins resolve against the config file's own directory.
+    base_dir = os.path.dirname(os.path.abspath(args.config))
+    resolved = models.resolve_capability(config, capability, base_dir=base_dir)
+    # A stale run must never execute against a different model: verify the
+    # request's pinned identity against the actually resolved files before any
+    # PCM is read or inference starts.
+    models.verify_request_identity(request, resolved)
     samples = models.read_pcm(
         args.pcm,
         request.get("start_ms") if models._finite_int(request.get("start_ms")) else 0,

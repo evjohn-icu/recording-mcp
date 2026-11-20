@@ -5,8 +5,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"io"
-	"os"
 
 	"recordingmcp/internal/audioanalysis"
 	"recordingmcp/internal/process"
@@ -24,14 +22,23 @@ type audioPlan struct {
 	generation string
 }
 
-// audioPlans builds the enabled, verified audio requests for one import. A
-// capability whose model is unavailable is skipped; it must not block ASR.
-func (s *Service) audioPlans(ctx context.Context, recordingID, sourceSHA, pcmAbs string, durationMS int64) ([]audioPlan, error) {
-	if s.audioCfg == nil || s.audio == nil || durationMS <= 0 {
+// audioPlans builds the enabled, verified audio requests for one import. The
+// window and input hash come from the decoded PCM file itself
+// (WholePCMInput), never from the container metadata. With a claimable stage
+// set only capabilities a worker claims right now and whose model verifies are
+// queued; without one every configured capability is queued (legacy rule). A
+// capability whose model is unavailable is skipped; it must not block ASR. A
+// recording whose PCM holds less than one millisecond skips audio analysis
+// entirely and keeps ASR.
+func (s *Service) audioPlans(ctx context.Context, recordingID, sourceSHA, pcmRel string, claimable map[string]bool) ([]audioPlan, error) {
+	if s.audioCfg == nil || s.audio == nil {
 		return nil, nil
 	}
-	inputHash, err := hashFileBytes(ctx, pcmAbs)
+	durationMS, inputHash, err := audioanalysis.WholePCMInput(ctx, s.audioDir, pcmRel)
 	if err != nil {
+		if audioanalysis.ErrorCodeOf(err) == audioanalysis.CodeInputInvalid {
+			return nil, nil
+		}
 		return nil, err
 	}
 	source := sourceSHA
@@ -40,6 +47,9 @@ func (s *Service) audioPlans(ctx context.Context, recordingID, sourceSHA, pcmAbs
 	}
 	plans := make([]audioPlan, 0, len(audioCapabilities))
 	for _, capability := range audioCapabilities {
+		if claimable != nil && !claimable["audio_"+capability] {
+			continue
+		}
 		resolved, err := s.audioCfg.Resolve(capability)
 		if err != nil {
 			continue
@@ -74,33 +84,6 @@ func (s *Service) audioPlans(ctx context.Context, recordingID, sourceSHA, pcmAbs
 func audioGeneration(source, capability, revision, configHash string) string {
 	sum := sha256.Sum256([]byte(source + "\x00" + capability + "\x00" + revision + "\x00" + configHash))
 	return "ingest-" + hex.EncodeToString(sum[:])[:32]
-}
-
-// hashFileBytes hashes one managed file.
-func hashFileBytes(ctx context.Context, path string) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-	h := sha256.New()
-	buf := make([]byte, 64<<10)
-	for {
-		if err := ctx.Err(); err != nil {
-			return "", err
-		}
-		n, err := file.Read(buf)
-		if n > 0 {
-			h.Write(buf[:n])
-		}
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return "", err
-		}
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // enqueueAudioTx enqueues one planned audio run with its dependencies.

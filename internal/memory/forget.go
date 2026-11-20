@@ -869,25 +869,50 @@ func (s *Store) IsAINoteSuppressed(ctx context.Context, recordingID, sourceSegme
 
 // ---- resumable DB redaction implementation ----
 
-// purgeAudioAnalysis deletes every audio-analysis row of the affected
-// recordings. It runs inside the forget transaction, before job scrubbing.
-func purgeAudioAnalysis(ctx context.Context, tx *sql.Tx, t forgetTarget, conversationID string) error {
-	recordingIDs := []string{}
-	if t.recordingID != "" {
-		recordingIDs = append(recordingIDs, t.recordingID)
+// purgeAudioAnalysis deletes every audio-analysis row and every audio job of
+// the affected recordings. The recording range is selected once by the caller
+// (selectedRecordingIDs inside the redaction transaction) and passed in. The
+// audio job rows are deleted outright — including completed runs and legacy
+// jobs without a run — together with their attempts, retry requests and
+// dependency edges, so no idempotency key, input snapshot or lease metadata
+// survives the forget. Non-audio jobs keep the scrub treatment of
+// scrubJobs/scrubAttempts.
+func purgeAudioAnalysis(ctx context.Context, tx *sql.Tx, recordingIDs []string) error {
+	if len(recordingIDs) == 0 {
+		return nil
 	}
-	more, err := idsFromQuery(ctx, tx, `SELECT id FROM recordings WHERE conversation_id=?`, conversationID)
+	jobIDs, err := idsFromQuery(ctx, tx,
+		`SELECT id FROM processing_jobs WHERE input_snapshot_id IN (`+placeholders(recordingIDs)+`) AND stage LIKE 'audio\_%' ESCAPE '\'`,
+		stringsToAny(recordingIDs)...)
 	if err != nil {
 		return err
 	}
-	recordingIDs = append(recordingIDs, more...)
-	seen := map[string]bool{}
-	for _, recordingID := range recordingIDs {
-		if recordingID == "" || seen[recordingID] {
-			continue
+	jobIDs = uniqueStrings(jobIDs)
+	// Dependencies first: the edge rows reference the job rows that are
+	// deleted below, in both the parent and the child direction.
+	for _, jobID := range jobIDs {
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM processing_job_dependencies WHERE job_id=? OR dependency_id=?`, jobID, jobID); err != nil {
+			return err
 		}
-		seen[recordingID] = true
+	}
+	// Audio heads, runs, events and speaker vectors reference the job rows, so
+	// they are removed before the job rows themselves. A turn-level forget is
+	// deliberately conservative: the whole recording's acoustic analysis is
+	// invalidated and its vectors are deleted.
+	for _, recordingID := range recordingIDs {
 		if err := purgeAudioAnalysisTx(ctx, tx, recordingID); err != nil {
+			return err
+		}
+	}
+	for _, jobID := range jobIDs {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM processing_retry_requests WHERE job_id=?`, jobID); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM processing_attempts WHERE job_id=?`, jobID); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM processing_jobs WHERE id=?`, jobID); err != nil {
 			return err
 		}
 	}
@@ -918,6 +943,21 @@ func (s *Store) redactForgetDatabase(ctx context.Context, tombstoneID string) er
 		}
 		return ""
 	}()}, conversationID: conv, recordingID: rec, sourceSegment: segmentID, targetID: requested, segmentIndex: segment, startMS: start, endMS: end, locator: locator}
+	// The affected recording range is selected exactly once, in this redaction
+	// transaction, and persisted with the tombstone before any source row is
+	// erased: the cleanup coordinator removes exactly these recordings'
+	// analysis staging directories and must never recompute the range.
+	recordingIDs, err := selectedRecordingIDs(ctx, tx, t)
+	if err != nil {
+		return err
+	}
+	affectedJSON, err := json.Marshal(recordingIDs)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE forget_tombstones SET affected_recordings_json=? WHERE id=?`, string(affectedJSON), tombstoneID); err != nil {
+		return err
+	}
 	turnIDs, err := idsFromQuery(ctx, tx, turnSelectionSQL(t), turnSelectionArgs(t)...)
 	if err != nil {
 		return err
@@ -1020,11 +1060,11 @@ func (s *Store) redactForgetDatabase(ctx context.Context, tombstoneID string) er
 	if err := deleteIDs(ctx, tx, "memory_candidates", "id", candidateIDs); err != nil {
 		return err
 	}
-	// Audio-analysis rows reference processing_jobs, so they must be removed
-	// before the job rows are scrubbed. A turn-level forget is deliberately
-	// conservative: the whole recording's acoustic analysis is invalidated and
-	// its vectors are deleted.
-	if err := purgeAudioAnalysis(ctx, tx, t, conv); err != nil {
+	// Audio-analysis rows and their audio jobs reference processing_jobs, so
+	// they are removed here before the remaining job rows are scrubbed. The
+	// affected range is exactly the forget's recording selection; unrelated
+	// recordings of the conversation keep their analysis.
+	if err := purgeAudioAnalysis(ctx, tx, recordingIDs); err != nil {
 		return err
 	}
 	if err := scrubJobs(ctx, tx, jobIDs); err != nil {

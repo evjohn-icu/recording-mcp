@@ -32,6 +32,8 @@
 config_sha256, source_snapshot_sha256, generation)`。队列 key 为 `recording_id + capability + generation`；
 CLI 的 `request-id` 即 generation，重跑或模型升级必须使用新 generation。
 
+模型配置的相对路径以配置文件所在目录为基准。模型 ID、revision、实际文件 SHA 和配置摘要在模型执行前校验。若显式配置 `threshold`、`span_seconds` 或 `fbank_backend`，配置摘要按固定顺序纳入这三项，浮点值使用 IEEE-754 64 位大端十六进制。
+
 ## 3. Result
 
 `status` 固定为 `succeeded|failed|invalidated`。排队/运行状态来自 `processing_jobs`，不写入结果。
@@ -58,6 +60,7 @@ CLI 的 `request-id` 即 generation，重跑或模型升级必须使用新 gener
 - 提交事务检查 `audio_analysis_heads.desired_job_id`、running lease token 与未过期时间、profile/forget
   屏障、source 与 current 附件，然后原子写 events/active/head，并调用 `process.CompleteTx` 终结 job 与
   attempt。已终结的 worker 跳过外层 Complete。
+- worker 读取 PCM 前校验当前租约、遗忘与退役屏障、源记录和目标代次。持有有效租约的旧代次以 `audio_superseded` 结束 attempt，已失效的 run 保留其状态。适配器完成身份校验后的结构化失败进入同一失败事务，重试耗尽时 run 与 job 一起进入 failed。
 - 旧 generation、旧 snapshot、source superseded、forget 之后的迟到输出一律拒绝。
 - `generation` 相同但规范 payload 或依赖集不同 → `audio_request_conflict`；完全相同 → 幂等返回。
 

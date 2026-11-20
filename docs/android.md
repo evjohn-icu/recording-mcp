@@ -21,11 +21,11 @@ sdkmanager "platform-tools" "platforms;android-36" "platforms;android-37.0" "bui
 
 ```sh
 cd apps/android
-ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:testDebugUnitTest   # 34 个 JVM 单测
+ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:testDebugUnitTest
 ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:assembleDebug       # 产物 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-本轮实测：34/34 通过；APK 12,896,644 字节，sha256 `d4e702811e0e32e69dfa3262729ba4edc3c8a078e487f90e71a18d56f4f49ff9`。
+本轮以 JDK 17、Android SDK 37.0 和 build-tools 36.0.0 执行 `:app:testDebugUnitTest :app:assembleDebug`。57 个 JVM 单测全部通过，生成的 APK 为 12,896,644 字节，SHA-256 为 `c7086ed8c047f94bdd7a2fe705a3c9a40eb413949f0536003f5fdc28f56fa36d`。
 
 ## 版本与已知偏差（相对计划）
 
@@ -52,9 +52,11 @@ app/src/main/java/com/recordingmcp/recorder/
 ├── sync/UploadScheduler.kt   # 唯一 work 名 upload-<rid>-<seq>；EXPONENTIAL 30s；KEEP
 ├── sync/UploadWorker.kt      # 200 → CLOUD_PERSISTED；validation_failed/conflict_checksum/
 │                             #   conflict_payload → FAILED_PERMANENT；网络/5xx → retry
-├── sync/FinishWorker.kt      # finish；409 sequence_gap → 按 missing_sequences 补传后重试
+├── sync/FinishWorkflow.kt    # finish 决策（纯 JVM 可测）：显式零块本地成功零网络；manifest 不完整不 POST；
+│                             #   总量重算自提交块；持久化汇总不符先 GET 确认；真实冲突永久失败
+├── sync/FinishWorker.kt      # 调 FinishWorkflow：durable → COMPLETE；sequence_gap → 按 missing_sequences 补传后重试
 ├── sync/ReconcileWorker.kt   # 周期 15 min：孤儿 .part 清理、断点重排、DELETE_PENDING、
-│                             #   轮询 getRecording 回写 syncedAt/transcriptionState
+│                             #   轮询 getRecording 回写 syncedAt/transcriptionState；零块 COMPLETE 跳过
 └── ui/                       # 录音 / 历史 / 设置 三页；DisplayState 七态映射
 ```
 
@@ -63,6 +65,13 @@ app/src/main/java/com/recordingmcp/recorder/
 - chunk：`WRITING → PERSISTED → UPLOAD_PENDING → UPLOADING → CLOUD_PERSISTED`（或 `FAILED_RETRYABLE` / `FAILED_PERMANENT`）。
 - recording：`RECORDING → COMPLETE`（导出/删除路径 `DELETE_PENDING → DELETED`）。
 - 展示层 DisplayState：`LOCAL_ONLY → UPLOADING → CLOUD_PERSISTED → SYNCED/TRANSCRIPTION_PENDING/IN_MEMORY`，`PARTIAL_FAILURE` 优先；**CLOUD_PERSISTED 绝不显示为已进入记忆库**（有单测锁定该语义）。
+
+## finish 语义（零块与总量重算）
+
+- 停止/崩溃收尾只把「已提交分块」汇总进 finish 口径：`StopSummary.committedSamples`（捕获总量 `totalSamples` 另存，不含进 finish）。
+- 零提交块（<1 s 会话）本地记 `(0 块, 0 采样, 0 ms)` 且不入队 finish；`FinishWorkflow` 对显式零块 COMPLETE 本地成功、零网络请求（兼容旧版本排队任务）；Reconcile 对其不再 GET/重排。
+- finish 只在 seq `0..total-1` 连续且全部 `CLOUD_PERSISTED` 后 POST，总量 = 提交块之和（wire 契约不变，ingest-v1 三字段 minimum ≥ 1）。
+- 旧版本把丢弃尾块计入的持久化汇总：先 GET 确认——云端已按该汇总 complete → 成功且不重发；否则按重算总量 POST，真实 `conflict_payload` 仍为永久失败。
 
 ## 配对与凭据
 

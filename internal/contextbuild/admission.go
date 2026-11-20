@@ -109,6 +109,13 @@ func LoadAdmissionPolicy(path string) (*AdmissionPolicy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("contextbuild: read admission policy: %w", err)
 	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return nil, fmt.Errorf("contextbuild: decode admission policy: %w", err)
+	}
+	if threshold, ok := fields["threshold"]; !ok || string(threshold) == "null" {
+		return nil, errors.New("contextbuild: admission policy threshold must be present and non-null")
+	}
 	var policy AdmissionPolicy
 	if err := json.Unmarshal(data, &policy); err != nil {
 		return nil, fmt.Errorf("contextbuild: decode admission policy: %w", err)
@@ -420,29 +427,29 @@ func validateAdmissionAnswer(answer decision.Answer) (float64, error) {
 	if len(answer.Distribution) != len(relationPriority) {
 		return 0, errors.New("distribution must cover supports, refutes, related and unknown")
 	}
-	total := 0.0
-	probabilities := map[string]float64{}
+	total, maxProbability := 0.0, 0.0
 	for _, label := range relationPriority {
 		value, ok := answer.Distribution[label]
 		if !ok || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 1 {
 			return 0, fmt.Errorf("distribution value for %s is invalid", label)
 		}
-		probabilities[label] = value
+		maxProbability = max(maxProbability, value)
 		total += value
 	}
 	if math.Abs(total-1) > 1e-6 {
 		return 0, errors.New("distribution does not sum to 1")
 	}
-	// The choice must be the argmax under the fixed tie order.
+	var expected string
 	for _, label := range relationPriority {
-		if probabilities[label] > probabilities[answer.Choice]+1e-9 {
-			return 0, fmt.Errorf("choice %q is not the distribution argmax", answer.Choice)
-		}
-		if math.Abs(probabilities[label]-probabilities[answer.Choice]) <= 1e-9 && label == answer.Choice {
+		if maxProbability-answer.Distribution[label] <= 1e-9 {
+			expected = label
 			break
 		}
 	}
-	return probabilities[RelationSupports] + probabilities[RelationRefutes], nil
+	if answer.Choice != expected {
+		return 0, fmt.Errorf("choice %q is not the distribution argmax (expected %q)", answer.Choice, expected)
+	}
+	return answer.Distribution[RelationSupports] + answer.Distribution[RelationRefutes], nil
 }
 
 // renderAdmissionBlock serializes one candidate's complete own evidence.

@@ -66,10 +66,28 @@ func inspectProfile(ctx context.Context, db *sql.DB, name, profileRoot string) (
 	return ProfileEntry{ID: name, Schema: version, Audio: audio}, nil
 }
 
+// audioReferenceError reports the first profile whose managed audio references
+// are broken. Create, Verify and Restore share this exact judgment so a restore
+// never publishes what a backup or verification would refuse.
+func audioReferenceError(profiles []ProfileEntry) error {
+	for _, profile := range profiles {
+		if profile.Audio.Missing+profile.Audio.OutOfBounds+profile.Audio.HashMismatch > 0 {
+			return newError(CodeAudioMissing, "profile %s has %d missing and %d out-of-bounds audio reference(s)", profile.ID, profile.Audio.Missing, profile.Audio.OutOfBounds)
+		}
+	}
+	return nil
+}
+
 // validateRoot applies the restore-time checks to a freshly extracted root.
+// The managed audio references are validated with the same
+// missing/out-of-bounds/hash-mismatch judgment create and verify use, so a
+// broken stored reference is rejected before the destination is published.
 func validateRoot(ctx context.Context, root string) error {
-	_, err := inspectProfiles(ctx, root)
-	return err
+	profiles, err := inspectProfiles(ctx, root)
+	if err != nil {
+		return err
+	}
+	return audioReferenceError(profiles)
 }
 
 // integrityCheck requires PRAGMA integrity_check to return exactly one "ok"
@@ -135,11 +153,16 @@ func foreignKeyCheck(ctx context.Context, db *sql.DB, profile string) error {
 // profileAudioStatus validates the managed audio references of one profile.
 // A recording declared deleted is not a missing file; every other referenced
 // stitched file must exist inside the profile's audio directory, and every
-// recorded chunk must still match its stored hash and size.
+// recorded chunk must still match its stored hash and size. A completed turn
+// forget deliberately erases the hashes of retained chunks so unrelated turns
+// stay playable without disclosing pre-redaction content; such blank hashes
+// are only tolerated when the recording has a turn-scoped provider fence for
+// its device backed by a tombstone that is complete and fully redacted, and
+// the file existence, path and byte count are still validated.
 func profileAudioStatus(ctx context.Context, db *sql.DB, profileRoot string) (AudioStatus, error) {
 	status := AudioStatus{}
 	audioRoot := filepath.Join(profileRoot, "audio")
-	rows, err := db.QueryContext(ctx, `SELECT state,stitched_path FROM sync_recordings ORDER BY recording_id`)
+	rows, err := db.QueryContext(ctx, `SELECT recording_id,state,stitched_path,device_id FROM sync_recordings ORDER BY recording_id`)
 	if err != nil {
 		// A profile that predates cloud sync has no sync tables.
 		if strings.Contains(err.Error(), "no such table") {
@@ -147,13 +170,17 @@ func profileAudioStatus(ctx context.Context, db *sql.DB, profileRoot string) (Au
 		}
 		return status, fmt.Errorf("backup: read sync recordings: %w", err)
 	}
+	deviceByRecording := map[string]string{}
 	for rows.Next() {
+		var recordingID string
 		var state string
 		var stitched sql.NullString
-		if err := rows.Scan(&state, &stitched); err != nil {
+		var deviceID string
+		if err := rows.Scan(&recordingID, &state, &stitched, &deviceID); err != nil {
 			rows.Close()
 			return status, err
 		}
+		deviceByRecording[recordingID] = deviceID
 		if state == "deleted" {
 			status.DeclaredUnavailable++
 			continue
@@ -167,7 +194,11 @@ func profileAudioStatus(ctx context.Context, db *sql.DB, profileRoot string) (Au
 	if err := rows.Close(); err != nil {
 		return status, err
 	}
-	rows, err = db.QueryContext(ctx, `SELECT sha256,bytes,file_path FROM sync_chunks ORDER BY recording_id,seq`)
+	retainedBlankSHA, err := completedTurnForgetRecordings(ctx, db, deviceByRecording)
+	if err != nil {
+		return status, err
+	}
+	rows, err = db.QueryContext(ctx, `SELECT recording_id,sha256,bytes,file_path FROM sync_chunks ORDER BY recording_id,seq`)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return status, nil
@@ -175,10 +206,11 @@ func profileAudioStatus(ctx context.Context, db *sql.DB, profileRoot string) (Au
 		return status, fmt.Errorf("backup: read sync chunks: %w", err)
 	}
 	for rows.Next() {
+		var recordingID string
 		var expectedHash string
 		var expectedSize int64
 		var filePath string
-		if err := rows.Scan(&expectedHash, &expectedSize, &filePath); err != nil {
+		if err := rows.Scan(&recordingID, &expectedHash, &expectedSize, &filePath); err != nil {
 			rows.Close()
 			return status, err
 		}
@@ -192,8 +224,23 @@ func profileAudioStatus(ctx context.Context, db *sql.DB, profileRoot string) (Au
 			countAudioRef(&status, audioRefMissing)
 			continue
 		}
-		info, err := os.Lstat(path)
-		if err != nil || !info.Mode().IsRegular() || info.Size() != expectedSize {
+		info, lstatErr := os.Lstat(path)
+		if lstatErr != nil || !info.Mode().IsRegular() {
+			countAudioRef(&status, audioRefHashMismatch)
+			continue
+		}
+		if expectedHash == "" {
+			// Retained chunk of a completed turn forget: only the hash
+			// comparison is skipped; existence, path and byte count above and
+			// below still apply.
+			if !retainedBlankSHA[recordingID] || info.Size() != expectedSize {
+				countAudioRef(&status, audioRefHashMismatch)
+				continue
+			}
+			status.Available++
+			continue
+		}
+		if info.Size() != expectedSize {
 			countAudioRef(&status, audioRefHashMismatch)
 			continue
 		}
@@ -208,6 +255,40 @@ func profileAudioStatus(ctx context.Context, db *sql.DB, profileRoot string) (Au
 		return status, err
 	}
 	return status, nil
+}
+
+// completedTurnForgetRecordings maps provider recording ids whose retained
+// chunks may carry erased hashes: a turn-scoped provider fence must exist for
+// exactly the device the recording is synced under, backed by a tombstone
+// whose status is complete and whose database redaction is done.
+func completedTurnForgetRecordings(ctx context.Context, db *sql.DB, deviceByRecording map[string]string) (map[string]bool, error) {
+	rows, err := db.QueryContext(ctx, `
+SELECT f.provider_recording_id, f.device_id, t.scope, t.status, t.redaction_done
+FROM forget_provider_fences f
+JOIN forget_tombstones t ON t.id = f.tombstone_id`)
+	if err != nil {
+		return nil, fmt.Errorf("backup: read forget fences for blank chunk hashes: %w", err)
+	}
+	defer rows.Close()
+	allowed := map[string]bool{}
+	for rows.Next() {
+		var recordingID, deviceID, scope, forgetStatus string
+		var redactionDone int
+		if err := rows.Scan(&recordingID, &deviceID, &scope, &forgetStatus, &redactionDone); err != nil {
+			return nil, err
+		}
+		if scope != "turn" || forgetStatus != "complete" || redactionDone != 1 {
+			continue
+		}
+		if deviceID != deviceByRecording[recordingID] {
+			continue
+		}
+		allowed[recordingID] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return allowed, nil
 }
 
 type audioRefState int

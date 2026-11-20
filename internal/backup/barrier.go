@@ -35,8 +35,8 @@ var profileDBRel = filepath.Join("db", "context-memory.db")
 // ReadBarriers collects the forget barriers of every profile below root.
 //
 // The barrier identity set is:
-//   - every tombstone id,
-//   - every provider replay fence (tombstone, provider recording, device),
+//   - every tombstone (profile, id),
+//   - every provider replay fence (profile, tombstone, provider recording, device),
 //   - the profile_control retirement marker and tombstone,
 //   - every name in the trusted retired-profiles catalog.
 //
@@ -83,6 +83,11 @@ func ReadBarriers(ctx context.Context, root string) (BarrierSet, error) {
 	return set, nil
 }
 
+func barrierIdentity(parts ...string) string {
+	encoded, _ := json.Marshal(parts)
+	return string(encoded)
+}
+
 // readProfileBarriers reads one profile's forget rows.
 func readProfileBarriers(ctx context.Context, db *sql.DB, profile string) (ids, incomplete []string, err error) {
 	rows, err := db.QueryContext(ctx, `SELECT id FROM forget_tombstones ORDER BY id`)
@@ -95,7 +100,7 @@ func readProfileBarriers(ctx context.Context, db *sql.DB, profile string) (ids, 
 			rows.Close()
 			return nil, nil, err
 		}
-		ids = append(ids, "tombstone:"+id)
+		ids = append(ids, barrierIdentity("tombstone", profile, id))
 	}
 	if err := rows.Close(); err != nil {
 		return nil, nil, err
@@ -110,7 +115,7 @@ func readProfileBarriers(ctx context.Context, db *sql.DB, profile string) (ids, 
 			rows.Close()
 			return nil, nil, err
 		}
-		ids = append(ids, "fence:"+tombstone+"|"+provider+"|"+device)
+		ids = append(ids, barrierIdentity("fence", profile, tombstone, provider, device))
 	}
 	if err := rows.Close(); err != nil {
 		return nil, nil, err
@@ -125,6 +130,12 @@ func readProfileBarriers(ctx context.Context, db *sql.DB, profile string) (ids, 
 		return nil, nil, fmt.Errorf("backup: read profile control for %s: %w", profile, err)
 	default:
 		ids = append(ids, fmt.Sprintf("profile_control:%s:%d:%s", profile, retired, controlTombstone))
+		if retired == 1 && !profileRetirementCleaned(ctx, db) {
+			// A retired profile without the cleanup proof still has pending
+			// external cleanup; the root must not be archived or used as a
+			// barrier source until the cleanup finishes.
+			incomplete = append(incomplete, profile)
+		}
 	}
 	rows, err = db.QueryContext(ctx, `SELECT id FROM forget_tombstones WHERE redaction_done<>1 OR status<>'complete' ORDER BY id`)
 	if err != nil {
@@ -165,6 +176,47 @@ func readProfileBarriers(ctx context.Context, db *sql.DB, profile string) (ids, 
 	}
 	sort.Strings(incomplete)
 	return ids, incomplete, nil
+}
+
+// profileRetirementCleaned reports whether the profile_control row proves the
+// retirement cleanup finished. Databases written before the cleanup-proof
+// column existed cannot prove cleanup, so a retired profile on them stays
+// incomplete until a newer version records the proof; the column's presence is
+// probed with PRAGMA table_info and the database is never modified here.
+func profileRetirementCleaned(ctx context.Context, db *sql.DB) bool {
+	rows, err := db.QueryContext(ctx, `PRAGMA table_info(profile_control)`)
+	if err != nil {
+		return false
+	}
+	hasCleanupColumn := false
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
+			rows.Close()
+			return false
+		}
+		if name == "cleanup_done" {
+			hasCleanupColumn = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return false
+	}
+	if err := rows.Close(); err != nil {
+		return false
+	}
+	if !hasCleanupColumn {
+		return false
+	}
+	var cleaned int
+	if err := db.QueryRowContext(ctx, `SELECT cleanup_done FROM profile_control WHERE id=1`).Scan(&cleaned); err != nil {
+		return false
+	}
+	return cleaned == 1
 }
 
 // readRetiredCatalog reads the trusted root-level retirement catalog.

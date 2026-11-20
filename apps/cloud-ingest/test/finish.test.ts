@@ -116,6 +116,25 @@ describe("POST /v1/recordings/{id}/finish", () => {
     expect(await eventCount(recordingId, "recording.finished")).toBe(1);
   });
 
+  it("finishes a 30-second chunk after the recorder discards a half-second tail", async () => {
+    const dev = await pairDevice();
+    const rid = crypto.randomUUID();
+    expect((await createRecording(dev, rid)).status).toBe(201);
+    const committed = new Uint8Array(480_000 * 2);
+    const digest = await crypto.subtle.digest("SHA-256", committed);
+    const sha = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    expect((await putChunk(dev, rid, 0, committed, sha)).status).toBe(200);
+
+    const captured = await finishRecording(dev, rid, 1, 488_000, 30_500);
+    expect(captured.status).toBe(409);
+    expect(await errorCodeOf(captured)).toBe("conflict_payload");
+
+    const finish = await finishRecording(dev, rid, 1, 480_000, 30_000);
+    expect(finish.status).toBe(200);
+    expect(await finish.json()).toMatchObject({ state: "complete", total_chunks: 1, total_samples: 480_000, durable: true });
+    expect(await (await getRecording(dev.token, rid)).json()).toMatchObject({ total_duration_ms: 30_000 });
+  });
+
   it("returns conflict_payload when replaying finish with different totals after completion", async () => {
     const dev = await pairDevice();
     const recordingId = crypto.randomUUID();

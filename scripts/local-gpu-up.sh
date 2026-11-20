@@ -73,6 +73,7 @@ if [ -n "$ENV_FILE" ]; then
   case "$PORT" in ''|*[!0-9]*) die "port must be numeric" ;; esac
   case "$BACKEND" in ark|qwen) ;; *) die "backend must be ark or qwen" ;; esac
 fi
+SHARED_GPU_LOCK=${ASR_LOCK:-${XDG_RUNTIME_DIR:-$HOME/.local/state}/recording-mcp/recording-mcp-gpu.lock}
 
 TEST_MODE=${LOCAL_GPU_UP_TEST_MODE:-0}
 ARTIFACTS_DIR=$ROOT/artifacts/local-gpu
@@ -280,7 +281,7 @@ start_embedding() {
   local args=(--serve --host 127.0.0.1 --port "$port" --model Qwen/Qwen3-Embedding-0.6B
               --revision "$revision" --device "$device" --dtype auto --preload --verify-model)
   if [ "$device" != cpu ]; then
-    args+=(--gpu-lock "$PROFILES_ROOT/$PROFILE/gpu.lock")
+    args+=(--gpu-lock "$SHARED_GPU_LOCK")
   fi
   if [ -n "${EMBED_CMD:-}" ]; then
     sh -c "$EMBED_CMD" &
@@ -337,7 +338,7 @@ start_stack() {
   ASR_PROVIDER="$BACKEND" ASR_BACKEND="$BACKEND" \
   ASR_PYTHON="$PYTHON" ASR_SCRIPT="$ASR_RUNNER" ASR_DEVICE=cuda:0 ASR_DTYPE=float16 \
   ASR_TIMEOUT=2h ASR_LOAD_TIMEOUT=5m ASR_WINDOW_TIMEOUT=5m \
-  ASR_LOCK="$PROFILES_ROOT/$PROFILE/gpu.lock" ASR_LOCK_TIMEOUT=10m \
+  ASR_LOCK="$SHARED_GPU_LOCK" ASR_LOCK_TIMEOUT=10m \
   WORKER_HEALTH_PORT="$WORKER_HEALTH_PORT" \
     setsid "$START_SCRIPT" "$PROFILE" "$PORT" "$PROFILES_ROOT" &
   STACK_PID=$!

@@ -229,14 +229,34 @@ class GPUUpTests(unittest.TestCase):
         self.assertEqual([c["cycle"] for c in startup["cycles"]], [1, 2, 3, 4, 5])
 
     def test_lock_and_timeouts_are_forwarded(self):
+        runtime = self.root / "runtime"
         proc = self.run_launcher("--profile", "fixture", "--profiles-root", str(self.profiles),
-                                 "--backend", "ark", "--cycles", "2", "--no-build")
+                                 "--backend", "ark", "--cycles", "2", "--no-build",
+                                 XDG_RUNTIME_DIR=str(runtime), ASR_LOCK="")
         self.assertEqual(proc.returncode, 0, proc.stderr)
         log = self.log.read_text()
-        self.assertIn(f"ASR_LOCK={self.profiles}/fixture/gpu.lock", log)
+        self.assertIn(f"ASR_LOCK={runtime}/recording-mcp/recording-mcp-gpu.lock", log)
         self.assertIn("ASR_PROVIDER=ark", log)
         self.assertIn("ASR_TIMEOUT=2h", log)
         self.assertIn("WORKER_HEALTH_PORT=8789", log)
+
+    def test_cuda_embedding_and_asr_share_explicit_lock(self):
+        args_path = self.root / "embedding-args"
+        self.stub("bin/python", """#!/bin/sh
+printf '%s\\n' "$@" > "${0%/bin/python}/embedding-args"
+trap 'exit 0' TERM
+while :; do sleep 0.05; done
+""")
+        lock = self.root / "shared" / "custom.lock"
+        ready = f'for i in $(seq 1 100); do test -s "{args_path}" && exit 0; sleep 0.02; done; exit 1'
+        proc = self.run_launcher("--profile", "fixture", "--backend", "ark", "--with-embedding",
+                                 "--cycles", "2", "--no-build", ASR_LOCK=str(lock),
+                                 EMBED_DEVICE="cuda:0",
+                                 LOCAL_GPU_UP_EMBED_HEALTH_CMD=ready)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        args = args_path.read_text().splitlines()
+        self.assertEqual(args[args.index("--gpu-lock") + 1], str(lock))
+        self.assertIn(f"ASR_LOCK={lock}", self.log.read_text())
 
     def test_with_embedding_exports_openai_compatible_config(self):
         proc = self.run_launcher("--profile", "fixture", "--backend", "ark", "--with-embedding",

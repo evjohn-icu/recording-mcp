@@ -57,10 +57,11 @@ hash，任何变化都会以 `writers_active` 失败且不发布归档；归档�
 相对路径、大小、hash、schema、音频引用状态）。原生备份/恢复必须显式传入 `--confirm-writers-stopped`，
 它只是操作员断言，工具不会声称能阻止未参与加锁的进程。
 
-归档前还有两项硬性前置：每个 profile 的永久遗忘清理必须已完成（存在未完成 tombstone 或待清理文件时返回
-`forget_unfinished`），且受管音频引用必须完整（缺文件、越界或 chunk hash 不符会直接失败）。归档输出必须在
-profiles root 之外，已有同名归档会以 `archive_exists` 拒绝。脚本对不存在的 `--out` 目录按 `01777` 创建，
-因为备份容器以 UID 10001 运行，无法写入 `0700` 的宿主目录；复用已有目录时请保证该用户可写。
+归档前，每个 profile 的永久遗忘清理必须完成。未完成的 tombstone、待清理文件或缺少清理完成记录的已退役 profile 都会返回 `forget_unfinished`。旧版本退役的 profile 可通过原账号密码验证后重试退役，补记清理完成状态。
+
+归档要求受管音频引用完整。缺文件、越界或 chunk hash 不符都会失败。输出路径必须位于 profiles root 之外，已有同名归档返回 `archive_exists`。脚本用 `01777` 创建不存在的 `--out` 目录，使 UID 10001 的备份容器可写入。复用已有目录时请保证该用户可写。
+
+已完成 turn 遗忘且有匹配 provider fence 的保留块可以清空原始 SHA。备份、验证与恢复仍核对这类块的受管路径、文件存在性和字节数，恢复时对归档中的每个条目核验 manifest SHA。
 
 Docker（推荐，使用 `DATA_VOLUME`）：
 

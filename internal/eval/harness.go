@@ -706,6 +706,20 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 			if q.ExpectedSufficiency != "" {
 				expectedSufficiency = q.ExpectedSufficiency
 			}
+			// The package decides the sufficiency accounting, not the authored
+			// label: an authored "sufficient" question that dropped a required
+			// ref is judged by its final coverage. Explicit "insufficient"
+			// labels are retained, and the v2 legacy "unknown" label is
+			// retained but never counted as a match. The reported row label
+			// stays the authored one so report/fixture agreement is checkable.
+			assessedSufficiency := "insufficient"
+			if !q.Unanswerable && len(q.GoldEvidenceTurnIDs) > 0 &&
+				finalGoldEvidenceFound == len(q.GoldEvidenceTurnIDs) {
+				assessedSufficiency = "sufficient"
+			}
+			if q.ExpectedSufficiency == "insufficient" || q.ExpectedSufficiency == "unknown" {
+				assessedSufficiency = q.ExpectedSufficiency
+			}
 			forgottenLeak := 0
 			for _, item := range pkg.Items {
 				if forbidden[item.ID] {
@@ -732,13 +746,13 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 			}
 			if pkg.Sufficiency != nil && assessorCalls > 0 {
 				report.Metrics.EvidenceAssessmentScored++
-				if expectedSufficiency == "insufficient" {
+				if assessedSufficiency == "insufficient" {
 					report.Metrics.EvidenceAssessmentIncompletePackages++
 				}
-				if pkg.Sufficiency.Status == expectedSufficiency {
+				if pkg.Sufficiency.Status == assessedSufficiency && assessedSufficiency != "unknown" {
 					report.Metrics.EvidenceAssessmentMatches++
 				}
-				if pkg.Sufficiency.Status == "sufficient" && expectedSufficiency == "insufficient" {
+				if pkg.Sufficiency.Status == "sufficient" && assessedSufficiency == "insufficient" {
 					report.Metrics.EvidenceAssessmentFalseSufficient++
 				}
 			}
@@ -908,12 +922,16 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 	}
 	calcRetrievalBuckets(&report)
 	report.Metrics.StageLatencies = stageLatencies(report.PerQuestion)
+	// The admission engine p50/p95 is taken over every ModeHybrid row: a
+	// question that never reached the assessor engine contributes a 0, so a
+	// sparse engine load cannot hide behind a percentile over busy rows only.
+	// The total engine call count is reported separately from the same rows.
 	engineValues := []float64{}
 	for _, row := range report.PerQuestion {
-		if row.AdmissionEngineCalls > 0 {
+		if row.Mode == "hybrid" {
 			engineValues = append(engineValues, row.AdmissionEngineLatencyMS)
-			report.Metrics.AdmissionEngineCalls += row.AdmissionEngineCalls
 		}
+		report.Metrics.AdmissionEngineCalls += row.AdmissionEngineCalls
 	}
 	report.Metrics.AdmissionEngineLatencyMSP50 = percentile(engineValues, .50)
 	report.Metrics.AdmissionEngineLatencyMSP95 = percentile(engineValues, .95)

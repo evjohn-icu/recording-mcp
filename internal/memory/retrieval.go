@@ -358,18 +358,26 @@ func (s *Store) ListConversations(ctx context.Context, f ConversationFilter) (Co
 // together with up to radius turns before and after it within the same
 // recording, in transcript order, including superseded revisions. Every turn
 // carries a Stale marker so audit callers can see which rows belong to a
-// superseded revision.
+// superseded revision. A non-positive maxBytes falls back to the documented
+// default byte budget; it never disables truncation.
 func (s *Store) GetEvidenceContext(ctx context.Context, turnID string, radius, maxBytes int) (EvidenceContext, error) {
-	return s.evidenceContext(ctx, turnID, radius, maxBytes, false)
+	if maxBytes <= 0 {
+		maxBytes = defaultEvidenceMaxByte
+	}
+	return s.evidenceContext(ctx, turnID, radius, maxBytes, false, false)
 }
 
 // GetCurrentEvidenceContext is the current-state lookup for derived consumers
 // such as build_context: the window only contains turns of the active
 // transcript revision (plus legacy turns without attachment rows) and the
 // target itself must be current. Superseded history is reachable only through
-// GetEvidenceContext.
+// GetEvidenceContext. A non-positive maxBytes falls back to the documented
+// default byte budget; it never disables truncation.
 func (s *Store) GetCurrentEvidenceContext(ctx context.Context, turnID string, radius, maxBytes int) (EvidenceContext, error) {
-	return s.evidenceContext(ctx, turnID, radius, maxBytes, true)
+	if maxBytes <= 0 {
+		maxBytes = defaultEvidenceMaxByte
+	}
+	return s.evidenceContext(ctx, turnID, radius, maxBytes, true, false)
 }
 
 // GetCurrentEvidenceWindow returns the complete current-revision window around
@@ -378,13 +386,10 @@ func (s *Store) GetCurrentEvidenceContext(ctx context.Context, turnID string, ra
 // window before the caller decides which turns to keep, which would silently
 // drop the centre turn or a neighbour.
 func (s *Store) GetCurrentEvidenceWindow(ctx context.Context, turnID string, radius int) (EvidenceContext, error) {
-	return s.evidenceContext(ctx, turnID, radius, noEvidenceByteLimit, true)
+	return s.evidenceContext(ctx, turnID, radius, 0, true, true)
 }
 
-// noEvidenceByteLimit marks an unbudgeted evidence lookup.
-const noEvidenceByteLimit = -1
-
-func (s *Store) evidenceContext(ctx context.Context, turnID string, radius, maxBytes int, currentOnly bool) (EvidenceContext, error) {
+func (s *Store) evidenceContext(ctx context.Context, turnID string, radius, maxBytes int, currentOnly, unbounded bool) (EvidenceContext, error) {
 	if err := ctx.Err(); err != nil {
 		return EvidenceContext{}, err
 	}
@@ -396,10 +401,8 @@ func (s *Store) evidenceContext(ctx context.Context, turnID string, radius, maxB
 	} else if radius == 0 {
 		radius = defaultEvidenceRadius
 	}
-	if maxBytes < 0 {
+	if unbounded {
 		maxBytes = math.MaxInt
-	} else if maxBytes == 0 {
-		maxBytes = defaultEvidenceMaxByte
 	}
 
 	targetLookup := `SELECT recording_id FROM turns WHERE id=?`

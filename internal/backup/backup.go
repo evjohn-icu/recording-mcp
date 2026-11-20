@@ -161,9 +161,20 @@ func Create(ctx context.Context, opts CreateOptions) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, err
 	}
+	if err := audioReferenceError(profiles); err != nil {
+		return Manifest{}, err
+	}
+	// Defense in depth: every profile the manifest describes must actually be
+	// archived. An exclusion rule or snapshot gap that dropped a profile's
+	// database would otherwise publish a silently useless archive.
+	archived := make(map[string]bool, len(before))
+	for _, file := range before {
+		archived[file.Path] = true
+	}
 	for _, profile := range profiles {
-		if profile.Audio.Missing+profile.Audio.OutOfBounds+profile.Audio.HashMismatch > 0 {
-			return Manifest{}, newError(CodeAudioMissing, "profile %s has %d missing and %d out-of-bounds audio reference(s)", profile.ID, profile.Audio.Missing, profile.Audio.OutOfBounds)
+		rel := filepath.ToSlash(filepath.Join(profile.ID, profileDBRel))
+		if !archived[rel] {
+			return Manifest{}, newError(CodeInvalidArchive, "profile %s has no archived database at %s", profile.ID, rel)
 		}
 	}
 	manifest := Manifest{
@@ -189,10 +200,19 @@ func Create(ctx context.Context, opts CreateOptions) (Manifest, error) {
 		_ = os.Remove(tmp)
 		return Manifest{}, newError(CodeWritersActive, "files changed during the copy; stop every writer and retry")
 	}
-	if err := os.Rename(tmp, out); err != nil {
+	// Publish with a hard link so a concurrent backup with the same output
+	// cannot silently replace this archive: the loser observes os.ErrExist and
+	// reports archive_exists. The staging file is the same inode as the
+	// published archive, so removing it after a successful link never drops
+	// published bytes.
+	if err := os.Link(tmp, out); err != nil {
 		_ = os.Remove(tmp)
+		if errors.Is(err, os.ErrExist) {
+			return Manifest{}, newError(CodeArchiveExists, "archive already exists: %s", filepath.Base(out))
+		}
 		return Manifest{}, fmt.Errorf("backup: publish archive: %w", err)
 	}
+	_ = os.Remove(tmp)
 	return manifest, nil
 }
 
@@ -298,10 +318,8 @@ func Verify(ctx context.Context, opts VerifyOptions) (VerifyReport, error) {
 	if err != nil {
 		return VerifyReport{}, err
 	}
-	for _, profile := range profiles {
-		if profile.Audio.Missing+profile.Audio.OutOfBounds+profile.Audio.HashMismatch > 0 {
-			return VerifyReport{}, newError(CodeAudioMissing, "profile %s has %d missing and %d out-of-bounds audio reference(s)", profile.ID, profile.Audio.Missing, profile.Audio.OutOfBounds)
-		}
+	if err := audioReferenceError(profiles); err != nil {
+		return VerifyReport{}, err
 	}
 	barriers, err := ReadBarriers(ctx, root)
 	if err != nil {
