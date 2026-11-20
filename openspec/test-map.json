@@ -86,6 +86,27 @@
       "test_anchor": "TestRunAuthoredQualityFixtureReportsAccountingBucketsAndMRR"
     },
     {
+      "id": "retrieval.direct-note-ranking",
+      "status": "covered",
+      "spec": "openspec/specs/retrieval/spec.md",
+      "test_file": "internal/contextbuild/build_test.go",
+      "test_anchor": "TestTextQueryDirectNoteAndDeterministicTies"
+    },
+    {
+      "id": "retrieval.direct-query-before-navigation",
+      "status": "covered",
+      "spec": "openspec/specs/retrieval/spec.md",
+      "test_file": "internal/contextbuild/build_test.go",
+      "test_anchor": "TestTextQueryDirectHitSurvivesNavigation"
+    },
+    {
+      "id": "retrieval.queryless-kind-order",
+      "status": "covered",
+      "spec": "openspec/specs/retrieval/spec.md",
+      "test_file": "internal/contextbuild/build_test.go",
+      "test_anchor": "TestBrowseRetainsKindOrder"
+    },
+    {
       "id": "retrieval.topic-evidence-scope",
       "status": "covered",
       "spec": "openspec/specs/retrieval/spec.md",
@@ -1083,6 +1104,975 @@
       "spec": "openspec/changes/local-intelligence-reliability/specs/release-validation/spec.md",
       "test_file": "scripts/test_release_commands.py",
       "test_anchor": "test_not_run_requires_reason"
+    },
+    {
+      "id": "CE04-C1-01",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisLifecycle"
+    },
+    {
+      "id": "CE04-C1-02",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisLifecycle"
+    },
+    {
+      "id": "CE04-C1-03",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisLifecycle"
+    },
+    {
+      "id": "CE04-C1-04",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisRejectsInvalidResult"
+    },
+    {
+      "id": "CE04-C1-05",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisLifecycle"
+    },
+    {
+      "id": "CE04-C1-06",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisLifecycle"
+    },
+    {
+      "id": "CE04-C1-07",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisForgetDuringCommit"
+    },
+    {
+      "id": "CE04-C1-08",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisEndToEnd"
+    },
+    {
+      "id": "CE04-C1-09",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisRevisionInvalidation"
+    },
+    {
+      "id": "CE04-C1-10",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisModelReplacement"
+    },
+    {
+      "id": "CE04-C1-11",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisForgetDuringCommit"
+    },
+    {
+      "id": "CE04-C1-12",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/migrations/audio_analysis_test.go",
+      "test_anchor": "TestAudioAnalysisUpgradePreservesSources"
+    },
+    {
+      "id": "CE04-C3-01",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/process/process_test.go",
+      "test_anchor": "TestJobDependenciesWaitWithoutAttempts"
+    },
+    {
+      "id": "CE04-C3-02",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioFailUnclaimedReleasesDependents"
+    },
+    {
+      "id": "CE04-C3-03",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioFailUnclaimedReleasesDependents"
+    },
+    {
+      "id": "CE04-C3-04",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisIdentityNeedsReview"
+    },
+    {
+      "id": "CE04-C3-05",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/audioanalysis/audio_test.go",
+      "test_anchor": "TestAudioAnalysisIdentityNeedsReview"
+    },
+    {
+      "id": "CE04-C3-06",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/app/audio_analysis_test.go",
+      "test_anchor": "TestEventAudioClipReadsExactRange"
+    },
+    {
+      "id": "CE04-C3-07",
+      "status": "pending",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md"
+    },
+    {
+      "id": "CE04-C2-01",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "scripts/test_audio_analysis.py",
+      "test_anchor": "test_silence_versus_tone"
+    },
+    {
+      "id": "CE04-C2-02",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "scripts/test_audio_analysis.py",
+      "test_anchor": "test_segments_clamped_and_overlaps_ambiguous"
+    },
+    {
+      "id": "CE04-C2-03",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "scripts/test_audio_analysis.py",
+      "test_anchor": "test_zero_norm_vector_is_no_valid_voiceprint"
+    },
+    {
+      "id": "CE04-C2-04",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "scripts/test_audio_analysis.py",
+      "test_anchor": "test_hash_mismatch"
+    },
+    {
+      "id": "CE04-C2-05",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/audio-analysis/spec.md",
+      "test_file": "internal/gpulock/gpulock_test.go",
+      "test_anchor": "TestGPULockSerializesProcesses"
+    },
+    {
+      "id": "CE04-A1-01",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/semantic/provider_unavailable_test.go",
+      "test_anchor": "TestProviderUnavailableClassification"
+    },
+    {
+      "id": "CE04-A1-02",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/semantic/provider_unavailable_test.go",
+      "test_anchor": "TestProviderUnavailableClassification"
+    },
+    {
+      "id": "CE04-A1-03",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/semantic/provider_unavailable_test.go",
+      "test_anchor": "TestProviderUnavailableClassification"
+    },
+    {
+      "id": "CE04-A1-04",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/semantic/provider_unavailable_test.go",
+      "test_anchor": "TestReadyPropagatesDatabaseErrors"
+    },
+    {
+      "id": "CE04-A1-05",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/build_degradation_test.go",
+      "test_anchor": "TestSemanticReadinessEmptyIndexIsNotOutage"
+    },
+    {
+      "id": "CE04-A1-06",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/build_degradation_test.go",
+      "test_anchor": "TestSemanticGracefulDegradation"
+    },
+    {
+      "id": "CE04-A1-07",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/build_degradation_test.go",
+      "test_anchor": "TestSemanticGracefulDegradation"
+    },
+    {
+      "id": "CE04-A1-08",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/build_degradation_test.go",
+      "test_anchor": "TestSemanticGracefulDegradation"
+    },
+    {
+      "id": "CE04-A2-01",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/budget_v04_test.go",
+      "test_anchor": "TestContextBudgetSkipsOversizedCandidates"
+    },
+    {
+      "id": "CE04-A2-02",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/budget_v04_test.go",
+      "test_anchor": "TestContextBudgetSkipsOversizedCandidates"
+    },
+    {
+      "id": "CE04-A2-03",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/budget_v04_test.go",
+      "test_anchor": "TestContextBudgetSkipsOversizedCandidates"
+    },
+    {
+      "id": "CE04-A2-04",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/budget_v04_test.go",
+      "test_anchor": "TestContextBudgetEvidenceWindows"
+    },
+    {
+      "id": "CE04-A2-05",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/budget_v04_test.go",
+      "test_anchor": "TestContextBudgetEvidenceWindows"
+    },
+    {
+      "id": "CE04-A2-06",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/budget_v04_test.go",
+      "test_anchor": "TestContextBudgetEvidenceWindows"
+    },
+    {
+      "id": "CE04-A2-07",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/budget_v04_test.go",
+      "test_anchor": "TestContextBudgetEvidenceWindows"
+    },
+    {
+      "id": "CE04-A2-08",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/budget_v04_test.go",
+      "test_anchor": "TestContextBudgetEvidenceWindows"
+    },
+    {
+      "id": "CE04-A2-09",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/budget_v04_test.go",
+      "test_anchor": "TestContextBudgetEvidenceWindows"
+    },
+    {
+      "id": "CE04-A2-10",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/contextbuild/budget_v04_test.go",
+      "test_anchor": "TestContextBudgetEvidenceWindows"
+    },
+    {
+      "id": "CE04-A3-01",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/backup/backup_test.go",
+      "test_anchor": "TestWriteTarFileDetectsWriterChange"
+    },
+    {
+      "id": "CE04-A3-02",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/backup/backup_test.go",
+      "test_anchor": "TestRestoreRejectsPathTraversal"
+    },
+    {
+      "id": "CE04-A3-03",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/backup/backup_test.go",
+      "test_anchor": "TestRestoreDetectsCorruptDatabase"
+    },
+    {
+      "id": "CE04-A3-04",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/backup/backup_test.go",
+      "test_anchor": "TestBackupRestoreIntegrityAndAudio"
+    },
+    {
+      "id": "CE04-A3-05",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/backup/backup_test.go",
+      "test_anchor": "TestBackupRejectsPreForgetArchive"
+    },
+    {
+      "id": "CE04-A3-06",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/backup/backup_test.go",
+      "test_anchor": "TestRestoreRejectsUnfinishedSourceForget"
+    },
+    {
+      "id": "CE04-A3-07",
+      "status": "pending",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md"
+    },
+    {
+      "id": "CE04-A3-08",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "scripts/test_productization_deploy.py",
+      "test_anchor": "test_backup_restore_preserves_sources"
+    },
+    {
+      "id": "CE04-A3-09",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/context-reliability-v04/spec.md",
+      "test_file": "internal/backup/backup_test.go",
+      "test_anchor": "TestBackupRestoreIntegrityAndAudio"
+    },
+    {
+      "id": "CE04-B1-01",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_v3_test.go",
+      "test_anchor": "TestBuildV3AdmissionAndSufficiency"
+    },
+    {
+      "id": "CE04-B1-02",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_v3_test.go",
+      "test_anchor": "TestBuildV3AdmissionAndSufficiency"
+    },
+    {
+      "id": "CE04-B1-03",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_v3_test.go",
+      "test_anchor": "TestBuildV3AdmissionAndSufficiency"
+    },
+    {
+      "id": "CE04-B1-04",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_v3_test.go",
+      "test_anchor": "TestBuildV3AdmissionAndSufficiency"
+    },
+    {
+      "id": "CE04-B1-05",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_v3_test.go",
+      "test_anchor": "TestBuildV3AdmissionAndSufficiency"
+    },
+    {
+      "id": "CE04-B1-06",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_v3_test.go",
+      "test_anchor": "TestBuildV3AdmissionAndSufficiency"
+    },
+    {
+      "id": "CE04-B1-07",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_v3_test.go",
+      "test_anchor": "TestBuildV3AdmissionAndSufficiency"
+    },
+    {
+      "id": "CE04-B1-08",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_v3_test.go",
+      "test_anchor": "TestBuildV3AdmissionAndSufficiency"
+    },
+    {
+      "id": "CE04-B1-09",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_v3_test.go",
+      "test_anchor": "TestBuildV3AdmissionAndSufficiency"
+    },
+    {
+      "id": "CE04-B1-10",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_v3_test.go",
+      "test_anchor": "TestBuildV3AdmissionAndSufficiency"
+    },
+    {
+      "id": "CE04-B1-11",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_v3_test.go",
+      "test_anchor": "TestBuildV3AdmissionAndSufficiency"
+    },
+    {
+      "id": "CE04-B1-12",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_v3_test.go",
+      "test_anchor": "TestBuildV3AdmissionAndSufficiency"
+    },
+    {
+      "id": "CE04-B2-01",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_fixture_is_frozen_and_valid"
+    },
+    {
+      "id": "CE04-B2-02",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_selection_orders_recall_mrr_p95_then_stricter_threshold"
+    },
+    {
+      "id": "CE04-B2-03",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_gate_requires_recall_fp_lifecycle_and_admission"
+    },
+    {
+      "id": "CE04-B2-04",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_holdout_claim_is_single_use"
+    },
+    {
+      "id": "CE04-B2-05",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_gate_requires_recall_fp_lifecycle_and_admission"
+    },
+    {
+      "id": "CE04-B2-06",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_policy_document_pins_integer_threshold"
+    },
+    {
+      "id": "CE04-D-01",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_missing_manifest_reports_every_category_not_run"
+    },
+    {
+      "id": "CE04-D-02",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_missing_categories_are_reported_not_run"
+    },
+    {
+      "id": "CE04-D-03",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_unauthorized_sample_is_rejected_before_audio"
+    },
+    {
+      "id": "CE04-D-04",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_hash_mismatch_fails_and_missing_file_is_not_run"
+    },
+    {
+      "id": "CE04-D-05",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_audio_acceptance_metrics.py",
+      "test_anchor": "test_empty_reference_is_not_evaluable"
+    },
+    {
+      "id": "CE04-D-06",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_audio_acceptance_metrics.py",
+      "test_anchor": "test_no_adjudications_not_run"
+    },
+    {
+      "id": "CE04-D-07",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_audio_acceptance_metrics.py",
+      "test_anchor": "test_linear_interpolation"
+    },
+    {
+      "id": "CE04-D-08",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_audio_acceptance_metrics.py",
+      "test_anchor": "test_linear_interpolation"
+    },
+    {
+      "id": "CE04-D-09",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_production_needs_a_pre_approved_threshold"
+    },
+    {
+      "id": "CE04-D-10",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_missing_trusted_asr_configuration_is_blocked_not_passed"
+    },
+    {
+      "id": "CE04-D-11",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_missing_manifest_reports_every_category_not_run"
+    },
+    {
+      "id": "CE04-D-12",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_audio_acceptance_metrics.py",
+      "test_anchor": "test_digest_mismatch_does_not_adjudicate"
+    },
+    {
+      "id": "CE04F-GOLD-001",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_prepare_writes_private_artifacts_and_an_unsigned_draft"
+    },
+    {
+      "id": "CE04F-GOLD-002",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_draft_cannot_be_finalized"
+    },
+    {
+      "id": "CE04F-GOLD-003",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_unsigned_or_incomplete_review_is_refused"
+    },
+    {
+      "id": "CE04F-GOLD-004",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_reviewed_draft_becomes_a_frozen_manifest"
+    },
+    {
+      "id": "CE04F-GOLD-005",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_audio_acceptance_metrics.py",
+      "test_anchor": "test_maximum_matching_beats_greedy"
+    },
+    {
+      "id": "CE04F-GOLD-006",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_audio_acceptance_metrics.py",
+      "test_anchor": "test_one_supported_ref_and_one_out_of_scope_ref_pair"
+    },
+    {
+      "id": "CE04F-GOLD-007",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_audio_acceptance_metrics.py",
+      "test_anchor": "test_partial_review_reports_null_not_the_selected_subset"
+    },
+    {
+      "id": "CE04F-GOLD-008",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_adjudication_digest_mismatch_fails"
+    },
+    {
+      "id": "CE04F-GOLD-009",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_empty_reference_and_empty_prediction_stay_distinct"
+    },
+    {
+      "id": "CE04F-GOLD-010",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_one_broken_sample_does_not_block_another"
+    },
+    {
+      "id": "CE04F-GOLD-011",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_score_touches_no_model_or_service"
+    },
+    {
+      "id": "CE04F-GOLD-012",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_missing_trusted_asr_configuration_is_blocked_not_passed"
+    },
+    {
+      "id": "CE04F-GOLD-013",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_valid_gold_is_no_longer_reported_as_not_run"
+    },
+    {
+      "id": "CE04F-GOLD-014",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_eer_coverage_requires_two_speakers_and_negatives"
+    },
+    {
+      "id": "CE04F-GOLD-015",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_every_turn_of_a_multi_page_recording_is_collected"
+    },
+    {
+      "id": "CE04F-GOLD-016",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_probe_uses_the_stack_profile_root_and_environment"
+    },
+    {
+      "id": "CE04F-GOLD-017",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_events_use_the_recording_clock_and_only_succeeded_runs"
+    },
+    {
+      "id": "CE04F-GOLD-018",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_candidates_and_confirmed_records_become_unique_predictions"
+    },
+    {
+      "id": "CE04F-GOLD-019",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_long_audio_reliability.py",
+      "test_anchor": "test_a_truncated_trail_is_not_complete"
+    },
+    {
+      "id": "CE04F-GOLD-020",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_a_complete_set_becomes_one_frozen_manifest"
+    },
+    {
+      "id": "CE04F-GOLD-021",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_a_duplicate_global_query_id_is_refused"
+    },
+    {
+      "id": "CE04F-GOLD-022",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_a_set_without_speaker_evaluation_coverage_is_refused"
+    },
+    {
+      "id": "CE04F-GOLD-023",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_a_symlinked_audio_source_is_refused"
+    },
+    {
+      "id": "CE04F-GOLD-024",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_a_draft_keeps_every_verdict_empty"
+    },
+    {
+      "id": "CE04F-GOLD-025",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_unknown_adjudication_ids_are_refused"
+    },
+    {
+      "id": "CE04F-GOLD-026",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_boundary_values_pass"
+    },
+    {
+      "id": "CE04F-GOLD-027",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_one_low_category_fails_the_whole_gate"
+    },
+    {
+      "id": "CE04F-GOLD-028",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_a_missing_category_blocks"
+    },
+    {
+      "id": "CE04F-GOLD-029",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_experimental_eer_blocks"
+    },
+    {
+      "id": "CE04F-GOLD-030",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_a_missing_diarization_field_is_not_replaced_by_asr_labels"
+    },
+    {
+      "id": "CE04F-GOLD-031",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/real-audio-acceptance/spec.md",
+      "test_file": "scripts/test_review_audio_acceptance.py",
+      "test_anchor": "test_calibration_scores_do_not_change_the_result"
+    },
+    {
+      "id": "CE04F-LATENCY-001",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_profile_writes_no_lock_and_never_touches_test"
+    },
+    {
+      "id": "CE04F-LATENCY-002",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_profile_reports_a_model_bound_configuration"
+    },
+    {
+      "id": "CE04F-LATENCY-003",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_request_test.go",
+      "test_anchor": "TestAdmissionCapBoundaryIsExact"
+    },
+    {
+      "id": "CE04F-LATENCY-004",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "internal/contextbuild/admission_request_test.go",
+      "test_anchor": "TestAdmissionRequestSizeMatchesWholeMarshal"
+    },
+    {
+      "id": "CE04F-HOLDOUT-001",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_output_directory_must_be_new_or_empty"
+    },
+    {
+      "id": "CE04F-HOLDOUT-002",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_calibration_executes_every_threshold_and_one_uncached_rerun"
+    },
+    {
+      "id": "CE04F-HOLDOUT-003",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_final_uncached_failure_writes_no_lock"
+    },
+    {
+      "id": "CE04F-HOLDOUT-004",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_holdout_restores_the_locked_configuration"
+    },
+    {
+      "id": "CE04F-HOLDOUT-005",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_holdout_rejects_the_calibration_cache"
+    },
+    {
+      "id": "CE04F-HOLDOUT-006",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_holdout_cannot_be_replayed_after_a_crash"
+    },
+    {
+      "id": "CE04F-HOLDOUT-007",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_lock_rejects_unpinned_or_started_locks"
+    },
+    {
+      "id": "CE04F-HOLDOUT-008",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_unverifiable_assessor_identity_blocks_the_lock"
+    },
+    {
+      "id": "CE04F-HOLDOUT-009",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_flush_url_must_match_the_embedding_service"
+    },
+    {
+      "id": "CE04F-HOLDOUT-010",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/evidence-admission-v3/spec.md",
+      "test_file": "scripts/test_retrieval_quality_v2.py",
+      "test_anchor": "test_v3_holdout_rejects_a_conflicting_explicit_flag_before_any_test_query"
+    },
+    {
+      "id": "CE04F-RELEASE-001",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_pass_without_a_command_is_rejected"
+    },
+    {
+      "id": "CE04F-RELEASE-002",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_missing_artifact_is_rejected"
+    },
+    {
+      "id": "CE04F-RELEASE-003",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_v3_failure_does_not_block_v1_merge_but_blocks_release"
+    },
+    {
+      "id": "CE04F-RELEASE-004",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_experimental_evidence_cannot_support_production"
+    },
+    {
+      "id": "CE04F-RELEASE-005",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_snapshot_hash_mismatch_is_rejected"
+    },
+    {
+      "id": "CE04F-RELEASE-006",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_historical_evidence_cannot_justify_merge"
+    },
+    {
+      "id": "CE04F-RELEASE-007",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_snapshot_must_pin_a_head_and_diff"
+    },
+    {
+      "id": "CE04F-RELEASE-008",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_release_ready_needs_current_pass_rows"
+    },
+    {
+      "id": "CE04F-RELEASE-009",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_release_ready_requires_the_production_anchors"
+    },
+    {
+      "id": "CE04F-RELEASE-010",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_a_hand_written_gate_pass_is_recomputed"
+    },
+    {
+      "id": "CE04F-RELEASE-011",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_a_threshold_digest_mismatch_is_rejected"
+    },
+    {
+      "id": "CE04F-RELEASE-012",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_a_mismatched_adjudication_denominator_is_rejected"
+    },
+    {
+      "id": "CE04F-RELEASE-013",
+      "status": "covered",
+      "spec": "openspec/changes/context-engine-v04-followup/specs/context-release-evidence/spec.md",
+      "test_file": "scripts/test_context_engine_release.py",
+      "test_anchor": "test_a_missing_gate_pointer_is_rejected"
     }
   ]
 }

@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"recordingmcp/internal/decision"
 	"recordingmcp/internal/memory"
@@ -126,6 +127,16 @@ type EvidenceRef struct {
 	GlobalStartMS   *int64   `json:"global_start_ms"`
 	GlobalEndMS     *int64   `json:"global_end_ms"`
 	UsedByItemIDs   []string `json:"used_by_item_ids"`
+	// Optional provenance metadata hydrated from the current store. It is
+	// additive so existing consumers keep working; an unknown value stays
+	// empty/null instead of a fabricated default.
+	RecordingID        string  `json:"recording_id,omitempty"`
+	ConversationID     string  `json:"conversation_id,omitempty"`
+	TranscriptRevision string  `json:"transcript_revision,omitempty"`
+	SourceStatus       string  `json:"source_status,omitempty"`
+	SpeakerConfirmed   bool    `json:"speaker_confirmed,omitempty"`
+	SpeakerPersonID    *string `json:"speaker_person_id,omitempty"`
+	RecordingStartedAt string  `json:"recording_started_at,omitempty"`
 }
 
 // Gap is one deterministic coverage caveat.
@@ -207,11 +218,19 @@ type LinkExpansion struct {
 	ToID     string `json:"to_id"`
 }
 
-// BudgetTrace records the realized budget usage.
+// BudgetTrace records the realized budget usage. The skipped lists name what
+// the budget omitted, in first-traversal order, so a consumer can tell a
+// budgeted omission from a hard filter. They stay empty (and absent from JSON)
+// when nothing was skipped.
 type BudgetTrace struct {
 	BytesUsed    int `json:"bytes_used"`
 	ItemsUsed    int `json:"items_used"`
 	EvidenceUsed int `json:"evidence_used"`
+	// SkippedItemIDs lists items the byte budget omitted whole.
+	SkippedItemIDs []string `json:"skipped_item_ids,omitempty"`
+	// SkippedEvidenceTurnIDs lists cited turns omitted by the byte budget, by
+	// a hard scope/current filter, or because the centre turn was unavailable.
+	SkippedEvidenceTurnIDs []string `json:"skipped_evidence_turn_ids,omitempty"`
 }
 
 // Trace is the assembly audit trail. It contains no model reasoning.
@@ -222,6 +241,38 @@ type Trace struct {
 	StaleFiltered  []string        `json:"stale_filtered"`
 	DecisionRerank bool            `json:"decision_rerank"`
 	Budget         BudgetTrace     `json:"budget"`
+	// Admission is present only for v3 requests that reached the gate.
+	Admission *AdmissionTrace `json:"admission,omitempty"`
+}
+
+// AdmissionTrace records the v3 candidate gate: how many candidates were
+// considered, which the bounded pool dropped, which were rejected with what
+// reason, and the assessor's per-candidate verdict.
+type AdmissionTrace struct {
+	Schema    string  `json:"schema,omitempty"`
+	Threshold float64 `json:"threshold,omitempty"`
+	// LatencyMS is the time spent hydrating candidate evidence and calling the
+	// assessor for this package.
+	LatencyMS      float64                  `json:"latency_ms,omitempty"`
+	AssessorModel  string                   `json:"assessor_model,omitempty"`
+	Candidates     int                      `json:"candidates"`
+	Admitted       int                      `json:"admitted"`
+	PoolLimitedIDs []string                 `json:"pool_limited_ids,omitempty"`
+	Rejected       []AdmissionRejection     `json:"rejected,omitempty"`
+	Decisions      []AdmissionDecisionTrace `json:"decisions,omitempty"`
+}
+
+// AdmissionRejection names one candidate the gate refused and why.
+type AdmissionRejection struct {
+	ItemID string `json:"item_id"`
+	Reason string `json:"reason"`
+}
+
+// AdmissionDecisionTrace mirrors one assessor verdict for audit.
+type AdmissionDecisionTrace struct {
+	ItemID      string  `json:"item_id"`
+	Relation    string  `json:"relation"`
+	Probability float64 `json:"probability"`
 }
 
 // SemanticTrace records the semantic recall branch. Indexed counts the hits the
@@ -452,9 +503,10 @@ func validRerankAnswer(answer decision.Answer) bool {
 
 // candidate is one recalled item plus the retrieval branches that produced it.
 type candidate struct {
-	item     memory.Item
-	score    float64
-	evidence []string
+	item           memory.Item
+	score          float64
+	evidence       []string
+	queryMatchTier uint8
 	// sources maps branch -> raw branch score (max per branch).
 	sources map[string]float64
 	// linkIDs lists the confirmed links whose expansion contributed this item.
@@ -481,6 +533,16 @@ type Deps struct {
 	Reranker Reranker
 	Semantic semantic.SemanticRetriever
 	Assessor EvidenceAssessor
+	// CandidateAssessor gates v3 admission. It is optional: when it is nil
+	// and v3 is requested the package reports admission_unavailable instead of
+	// silently falling back to v1/v2.
+	CandidateAssessor CandidateAssessor
+	// AdmissionPolicy pins the v3 provider/model, assessor and threshold.
+	AdmissionPolicy *AdmissionPolicy
+	// AllowCalibrationPolicy lets the offline runner exercise a calibration
+	// policy. Served requests never set it, so they reject calibration
+	// policies.
+	AllowCalibrationPolicy bool
 }
 
 // Build assembles a deterministic context package.
@@ -507,10 +569,10 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	if req.RetrievalVersion == "" {
 		req.RetrievalVersion = "v1"
 	}
-	if req.RetrievalVersion != "v1" && req.RetrievalVersion != "v2" {
-		return Package{}, errors.New("build_context: retrieval_version must be v1 or v2")
+	if req.RetrievalVersion != "v1" && req.RetrievalVersion != "v2" && req.RetrievalVersion != "v3" {
+		return Package{}, errors.New("build_context: retrieval_version must be v1, v2 or v3")
 	}
-	if req.RetrievalVersion == "v2" {
+	if req.RetrievalVersion == "v2" || req.RetrievalVersion == "v3" {
 		switch typed := rerank.(type) {
 		case DecisionReranker:
 			rerank = DecisionRerankerV2{Engine: typed.Engine}
@@ -713,15 +775,38 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	// already excludes stale and ambient rows; resolving the hit through
 	// GetItem keeps the same hard guards behind every other branch.
 	if req.Mode != ModeLexical {
+		ready := false
+		readinessFailed := false
+		if deps.Semantic != nil {
+			var readyErr error
+			ready, readyErr = deps.Semantic.Ready(ctx)
+			if readyErr != nil {
+				// A cancelled request wins over any backend diagnosis: the
+				// caller asked for the work to stop.
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return Package{}, ctxErr
+				}
+				// A broken store is not an empty index and not a provider
+				// outage. Keep the lexical result set, but report the failure
+				// instead of silently pretending the index was empty.
+				readinessFailed = true
+				ready = false
+				pkg.Degraded = true
+				degradeReasons = append(degradeReasons, "semantic readiness_db_error")
+				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "semantic_unavailable", Detail: "semantic readiness_db_error: " + safeErrorDetail(readyErr)})
+			}
+		}
 		switch {
 		case deps.Semantic == nil:
 			pkg.Degraded = true
 			degradeReasons = append(degradeReasons, "semantic backend not configured")
 			pkg.Gaps = append(pkg.Gaps, Gap{Kind: "semantic_unavailable", Detail: "no semantic backend configured; lexical retrieval only"})
-		case !deps.Semantic.Ready():
-			pkg.Degraded = true
-			degradeReasons = append(degradeReasons, "semantic index empty")
-			pkg.Gaps = append(pkg.Gaps, Gap{Kind: "semantic_index_empty", Detail: "semantic index has no rows for the configured provider/model"})
+		case !ready:
+			if !readinessFailed {
+				pkg.Degraded = true
+				degradeReasons = append(degradeReasons, "semantic index empty")
+				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "semantic_index_empty", Detail: "semantic index has no rows for the configured provider/model"})
+			}
 			pkg.Trace.Semantic.Backend = deps.Semantic.Describe()
 		default:
 			pkg.Trace.Semantic.Backend = deps.Semantic.Describe()
@@ -729,7 +814,19 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 				limit := recallLimit
 				hits, err := deps.Semantic.Search(ctx, query, semantic.SearchOptions{ConversationID: convID, Limit: limit})
 				if err != nil {
-					return Package{}, err
+					if ctxErr := ctx.Err(); ctxErr != nil {
+						return Package{}, ctxErr
+					}
+					var unavailable *semantic.ProviderUnavailableError
+					if !errors.As(err, &unavailable) {
+						return Package{}, err
+					}
+					// Degradable provider outage: keep the lexical, navigation
+					// and confirmed-link results already collected.
+					pkg.Degraded = true
+					degradeReasons = append(degradeReasons, "semantic search unavailable: "+unavailable.Reason)
+					pkg.Gaps = append(pkg.Gaps, Gap{Kind: "semantic_unavailable", Detail: "semantic search unavailable: " + unavailable.Reason})
+					hits = nil
 				}
 				pkg.Trace.Semantic.Query = query
 				pkg.Trace.Semantic.Indexed = len(hits)
@@ -896,10 +993,17 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 
 	pkg.Coverage.Scanned = candidates.scanned()
 
-	// Step 5 (before budgeting): rank the candidates and drop items whose
-	// evidence is already fully covered by a better-ranked item.
-	ordered := dedupeBySourceEvidence(candidates.sorted())
-	if req.RetrievalVersion == "v2" && len(ordered) > 0 {
+	// Step 5 (before budgeting): rank the candidates. Source-evidence dedupe is
+	// applied only when an item is actually accepted (step 6), never here: a
+	// candidate the budget skips must not reserve its sources, or an oversized
+	// note would silently hide a smaller turn citing the same turn.
+	rankingQuery := query
+	if req.RetrievalVersion == "v3" {
+		rankingQuery = ""
+	}
+	ordered := candidates.sorted(rankingQuery)
+	poolLimitedIDs := []string{}
+	if (req.RetrievalVersion == "v2" || req.RetrievalVersion == "v3") && len(ordered) > 0 {
 		limit := req.RerankCandidateLimit
 		if limit <= 0 {
 			limit = defaultRerankPool
@@ -911,109 +1015,274 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 		if poolEnd > len(ordered) {
 			poolEnd = len(ordered)
 		}
+		poolLimitedIDs = []string{}
 		if poolEnd < len(ordered) {
-			pkg.Gaps = append(pkg.Gaps, Gap{Kind: "candidate_pool_limited", Detail: fmt.Sprintf("v2 candidate pool limited to %d items", poolEnd)})
+			for _, dropped := range ordered[poolEnd:] {
+				poolLimitedIDs = append(poolLimitedIDs, dropped.item.ID)
+			}
+			if req.RetrievalVersion == "v3" {
+				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "admission_pool_limited", Detail: fmt.Sprintf("v3 admission pool limited to %d candidates", poolEnd)})
+			} else {
+				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "candidate_pool_limited", Detail: fmt.Sprintf("v2 candidate pool limited to %d items", poolEnd)})
+			}
 		}
 		ordered = ordered[:poolEnd]
-		if rerank != nil {
-			beforeInputLimit := poolEnd
-			// Keep the serialized decision input bounded, including the query.
-			for poolEnd > 0 && rerankInputBytes(query, candidateItems(ordered[:poolEnd])) > maxRerankInputBytes {
-				poolEnd--
-			}
-			if poolEnd < beforeInputLimit {
-				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "rerank_input_limited", Detail: fmt.Sprintf("v2 rerank input limited to %d candidates by the 64 KiB cap", poolEnd)})
-			}
-			ordered = ordered[:poolEnd]
-		}
 		if rerank == nil {
 			pkg.Degraded = true
 			degradeReasons = append(degradeReasons, degradeNoReranker)
 			pkg.Gaps = append(pkg.Gaps, Gap{Kind: "rerank_unavailable", Detail: "v2 reranking not configured; deterministic candidate order used"})
-		} else if poolEnd == 0 {
-			pkg.Degraded = true
-			degradeReasons = append(degradeReasons, "decision rerank input exceeds 64 KiB")
-			pkg.Gaps = append(pkg.Gaps, Gap{Kind: "rerank_failed", Detail: "no candidate fits the 64 KiB rerank input limit"})
 		} else {
-			original := candidateItems(ordered)
-			returned, err := rerank.Rerank(ctx, query, cloneItems(original))
-			if err != nil || !validPermutation(original, returned) {
+			// The 64 KiB input cap skips oversized candidates individually and
+			// keeps every smaller one, so the submitted subset stays in its
+			// original slots after the permutation is validated.
+			subset, omitted := fitRerankSubset(query, ordered)
+			if len(omitted) > 0 {
+				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "rerank_input_limited", Detail: fmt.Sprintf("v2 rerank input skipped %d oversized candidate(s) by the 64 KiB cap", len(omitted))})
+			}
+			if len(subset) == 0 {
 				pkg.Degraded = true
-				detail := "reranker returned an invalid item permutation"
-				if err != nil {
-					detail = "reranker failed: " + err.Error()
-				}
-				degradeReasons = append(degradeReasons, detail)
-				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "rerank_failed", Detail: detail})
+				degradeReasons = append(degradeReasons, "decision rerank input exceeds 64 KiB")
+				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "rerank_failed", Detail: "no candidate fits the 64 KiB rerank input limit"})
 			} else {
-				pkg.Trace.DecisionRerank = true
-				reorderedCandidates := reorderCandidates(ordered, returned)
-				ordered = reorderedCandidates
+				original := make([]memory.Item, 0, len(subset))
+				for _, idx := range subset {
+					original = append(original, ordered[idx].item)
+				}
+				returned, err := rerank.Rerank(ctx, query, cloneItems(original))
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return Package{}, ctxErr
+				}
+				if err != nil || !validPermutation(original, returned) {
+					pkg.Degraded = true
+					detail := "reranker returned an invalid item permutation"
+					if err != nil {
+						detail = "reranker failed: " + err.Error()
+					}
+					degradeReasons = append(degradeReasons, detail)
+					pkg.Gaps = append(pkg.Gaps, Gap{Kind: "rerank_failed", Detail: detail})
+				} else {
+					pkg.Trace.DecisionRerank = true
+					ordered = fillRerankSlots(ordered, subset, returned)
+				}
 			}
 		}
 	}
 
-	// Step 6: budget the ranked items, then (step 4) attach evidence windows
-	// for up to three selected items while the byte budget allows.
-	selected := []memory.Item{}
-	evidence := []EvidenceRef{}
-	evidenceIndex := map[string]int{}
+	// Step 5b: v3 evidence admission, after ranking/reranking and before dedupe
+	// and the budget. Only admitted candidates can become items or evidence.
+	if req.RetrievalVersion == "v3" {
+		if query == "" {
+			// An explicit navigation request has no question to assess: the
+			// navigation context is still returned, but nothing claims to
+			// answer the query.
+			pkg.Gaps = append(pkg.Gaps, Gap{Kind: "assessment_query_missing", Detail: "no query to assess; navigation context only"})
+			pkg.Sufficiency = &EvidenceAssessment{Status: "unknown", EvidenceRefs: []string{}}
+		} else {
+			switch {
+			case deps.AdmissionPolicy.Validate(deps.AllowCalibrationPolicy) != nil:
+				return admissionBlocked(pkg, degradeReasons, "admission_unavailable", deps.AdmissionPolicy.Validate(deps.AllowCalibrationPolicy).Error()), nil
+			case deps.Semantic == nil:
+				return admissionBlocked(pkg, degradeReasons, "admission_unavailable", "semantic backend not configured"), nil
+			case !deps.AdmissionPolicy.MatchesIdentity(deps.Semantic.Describe()):
+				return admissionBlocked(pkg, degradeReasons, "admission_unavailable", "admission policy does not match the configured embedding provider"), nil
+			case deps.CandidateAssessor == nil:
+				return admissionBlocked(pkg, degradeReasons, "admission_unavailable", "candidate assessor not configured"), nil
+			}
+			admissionStarted := time.Now()
+			candidatesForAdmission, rejections, err := buildAdmissionCandidates(ctx, store, db, scope, ordered)
+			if err != nil {
+				return Package{}, err
+			}
+			decisions, err := deps.CandidateAssessor.AssessCandidates(ctx, query, candidatesForAdmission)
+			if err != nil {
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return Package{}, ctxErr
+				}
+				return admissionBlocked(pkg, degradeReasons, "admission_failed", "candidate assessment failed"), nil
+			}
+			if err := validateAdmissionDecisions(candidatesForAdmission, decisions, deps.AdmissionPolicy.Threshold); err != nil {
+				return admissionBlocked(pkg, degradeReasons, "admission_failed", err.Error()), nil
+			}
+			decisionByID := make(map[string]AdmissionDecision, len(decisions))
+			for _, decision := range decisions {
+				decisionByID[decision.ItemID] = decision
+			}
+			admitted := map[string]bool{}
+			decisionTraces := make([]AdmissionDecisionTrace, 0, len(decisions))
+			rejected := append([]AdmissionRejection(nil), rejections...)
+			for _, cand := range candidatesForAdmission {
+				decision, ok := decisionByID[cand.Item.ID]
+				if !ok {
+					continue
+				}
+				decisionTraces = append(decisionTraces, AdmissionDecisionTrace{ItemID: decision.ItemID, Relation: decision.Relation, Probability: decision.Probability})
+				if decision.Relation != RelationSupports && decision.Relation != RelationRefutes {
+					rejected = append(rejected, AdmissionRejection{ItemID: cand.Item.ID, Reason: "relation_" + decision.Relation})
+					continue
+				}
+				if decision.Probability < deps.AdmissionPolicy.Threshold {
+					rejected = append(rejected, AdmissionRejection{ItemID: cand.Item.ID, Reason: "below_threshold"})
+					continue
+				}
+				admitted[cand.Item.ID] = true
+			}
+			kept := make([]candidate, 0, len(ordered))
+			for _, cand := range ordered {
+				if admitted[cand.item.ID] {
+					kept = append(kept, cand)
+				}
+			}
+			ordered = kept
+			admissionLatency := float64(time.Since(admissionStarted)) / float64(time.Millisecond)
+			pkg.Trace.Admission = &AdmissionTrace{
+				LatencyMS:      admissionLatency,
+				Schema:         AdmissionPolicySchema,
+				Threshold:      deps.AdmissionPolicy.Threshold,
+				AssessorModel:  deps.AdmissionPolicy.AssessorModel,
+				Candidates:     len(candidatesForAdmission),
+				Admitted:       len(kept),
+				PoolLimitedIDs: poolLimitedIDs,
+				Rejected:       rejected,
+				Decisions:      decisionTraces,
+			}
+		}
+	}
+
+	// Step 6: budget the ranked items first, then attach evidence windows. An
+	// item that cannot fit is skipped whole (never truncated) and its sources
+	// never block a later, smaller item. Invalid UTF-8 is a hard error and is
+	// checked after the hard filters but before any budget decision.
+	for _, c := range ordered {
+		if !utf8.ValidString(c.item.Summary) || !utf8.ValidString(c.item.Content) {
+			return Package{}, fmt.Errorf("contextbuild: invalid_utf8_content: item %q is not valid UTF-8", c.item.ID)
+		}
+	}
+	selected := []candidate{}
+	seenSources := map[string]bool{}
+	skippedItemIDs := []string{}
+	skippedEvidenceTurnIDs := []string{}
 	bytesUsed := 0
-	truncated := false
-	evidenceFetched := 0
-	includeBudgetedEvidence := req.IncludeRawEvidence || (req.RetrievalVersion == "v2" && deps.Assessor != nil)
+	itemBudgetExceeded := false
+	maxItemsReached := false
 	for _, c := range ordered {
 		if len(selected) >= maxItems {
-			truncated = true
+			maxItemsReached = true
 			break
+		}
+		if candidateSourcesCovered(c, seenSources) {
+			// Source-evidence dedupe is not a budget omission: it must not set
+			// Truncated or emit a budget gap.
+			continue
 		}
 		itemBytes := len(c.item.Summary) + len(c.item.Content)
 		if bytesUsed+itemBytes > maxBytes {
-			truncated = true
-			break
+			skippedItemIDs = appendUnique(skippedItemIDs, c.item.ID)
+			itemBudgetExceeded = true
+			continue
 		}
-		selected = append(selected, c.item)
+		selected = append(selected, c)
+		claimCandidateSources(c, seenSources)
 		bytesUsed += itemBytes
+	}
 
-		if !includeBudgetedEvidence || evidenceFetched >= maxEvidenceItems {
+	// Step 7: evidence windows for accepted items, in their final stable order.
+	// The centre turn gates the window: when it is missing, filtered or over
+	// budget the whole window is skipped and does not consume one of the three
+	// allowed window slots. Neighbours are tried centre -> previous -> next and
+	// the emitted refs stay in transcript order.
+	evidence := []EvidenceRef{}
+	evidenceIndex := map[string]int{}
+	windowsAccepted := 0
+	evidenceBudgetExceeded := false
+	evidenceMissing := false
+	includeBudgetedEvidence := req.IncludeRawEvidence || req.RetrievalVersion == "v3" || (req.RetrievalVersion == "v2" && deps.Assessor != nil)
+	for _, c := range selected {
+		if !includeBudgetedEvidence || windowsAccepted >= maxEvidenceItems {
 			continue
 		}
 		turnID := c.firstEvidenceTurn()
 		if turnID == "" {
 			continue
 		}
-		remaining := maxBytes - bytesUsed
-		if remaining <= 0 {
-			truncated = true
-			continue
-		}
-		evidenceFetched++
-		// Current-state evidence only: the window comes from the current-only
-		// lookup, so a superseded neighbour can never enter the package. Scope
-		// is inherited from the citing item (it already passed the hard scope,
-		// and the window is the same recording as that item).
-		window, err := store.GetCurrentEvidenceContext(ctx, turnID, evidenceRadius, remaining)
+		window, err := store.GetCurrentEvidenceWindow(ctx, turnID, evidenceRadius)
 		if err != nil {
+			if errors.Is(err, memory.ErrNotFound) {
+				skippedEvidenceTurnIDs = appendUnique(skippedEvidenceTurnIDs, turnID)
+				evidenceMissing = true
+				continue
+			}
 			return Package{}, err
 		}
-		if window.Truncated {
-			truncated = true
-		}
 		for _, turn := range window.Turns {
-			allowed, err := scope.allowsEvidence(ctx, db, turn.ID)
+			if !utf8.ValidString(turn.Text) {
+				return Package{}, fmt.Errorf("contextbuild: invalid_utf8_content: turn %q is not valid UTF-8", turn.ID)
+			}
+		}
+		center := -1
+		for i := range window.Turns {
+			if window.Turns[i].IsTarget {
+				center = i
+			}
+		}
+		allowed := make([]bool, len(window.Turns))
+		for i, turn := range window.Turns {
+			ok, err := scope.allowsEvidence(ctx, db, turn.ID)
 			if err != nil {
 				return Package{}, err
 			}
-			if !allowed {
+			allowed[i] = ok
+		}
+		if center < 0 || !allowed[center] {
+			// The centre is gone from the current scope (superseded, ambient,
+			// outside the requested scope). Its neighbours cannot stand in for
+			// it, so the window contributes nothing.
+			skippedEvidenceTurnIDs = appendUnique(skippedEvidenceTurnIDs, turnID)
+			evidenceMissing = true
+			continue
+		}
+		centerBytes := len(window.Turns[center].Text)
+		if bytesUsed+centerBytes > maxBytes {
+			skippedEvidenceTurnIDs = appendUnique(skippedEvidenceTurnIDs, window.Turns[center].ID)
+			evidenceBudgetExceeded = true
+			continue
+		}
+		windowsAccepted++
+		attempts := []int{center}
+		if center > 0 {
+			attempts = append(attempts, center-1)
+		}
+		if center+1 < len(window.Turns) {
+			attempts = append(attempts, center+1)
+		}
+		acceptedIdx := make([]int, 0, len(attempts))
+		windowBytes := bytesUsed
+		for _, idx := range attempts {
+			turn := window.Turns[idx]
+			if !allowed[idx] {
+				if idx != center {
+					skippedEvidenceTurnIDs = appendUnique(skippedEvidenceTurnIDs, turn.ID)
+				}
 				continue
 			}
-			if idx, ok := evidenceIndex[turn.ID]; ok {
-				evidence[idx].UsedByItemIDs = appendUnique(evidence[idx].UsedByItemIDs, c.item.ID)
+			if _, ok := evidenceIndex[turn.ID]; ok {
+				acceptedIdx = append(acceptedIdx, idx)
 				continue
 			}
-			if bytesUsed+len(turn.Text) > maxBytes {
-				truncated = true
-				break
+			if windowBytes+len(turn.Text) > maxBytes {
+				skippedEvidenceTurnIDs = appendUnique(skippedEvidenceTurnIDs, turn.ID)
+				evidenceBudgetExceeded = true
+				continue
+			}
+			windowBytes += len(turn.Text)
+			acceptedIdx = append(acceptedIdx, idx)
+		}
+		// Emit this window's accepted refs in transcript order.
+		sort.Ints(acceptedIdx)
+		for _, idx := range acceptedIdx {
+			turn := window.Turns[idx]
+			if existing, ok := evidenceIndex[turn.ID]; ok {
+				evidence[existing].UsedByItemIDs = appendUnique(evidence[existing].UsedByItemIDs, c.item.ID)
+				continue
 			}
 			evidenceIndex[turn.ID] = len(evidence)
 			evidence = append(evidence, EvidenceRef{
@@ -1024,12 +1293,25 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 				GlobalEndMS:     turn.GlobalEndMS,
 				UsedByItemIDs:   []string{c.item.ID},
 			})
-			bytesUsed += len(turn.Text)
 		}
+		bytesUsed = windowBytes
+	}
+	truncated := itemBudgetExceeded || evidenceBudgetExceeded || maxItemsReached
+	if itemBudgetExceeded {
+		pkg.Gaps = append(pkg.Gaps, Gap{Kind: "item_budget_exceeded", Detail: fmt.Sprintf("%d item(s) skipped by the byte budget", len(skippedItemIDs))})
+	}
+	if evidenceBudgetExceeded {
+		pkg.Gaps = append(pkg.Gaps, Gap{Kind: "evidence_budget_exceeded", Detail: fmt.Sprintf("%d evidence turn(s) skipped by the byte budget", len(skippedEvidenceTurnIDs))})
+	}
+	if evidenceMissing {
+		pkg.Gaps = append(pkg.Gaps, Gap{Kind: "evidence_missing", Detail: "cited evidence is no longer available in the current scope"})
 	}
 
 	// v1 preserves its historical post-budget shadow rerank.
-	items := selected
+	items := make([]memory.Item, 0, len(selected))
+	for _, c := range selected {
+		items = append(items, c.item)
+	}
 	if len(items) == 0 {
 		items = []memory.Item{}
 	}
@@ -1040,6 +1322,9 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 		degradeReasons = append([]string{degradeNoReranker}, degradeReasons...)
 	} else if len(items) > 0 {
 		reordered, err := rerank.Rerank(ctx, query, items)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return Package{}, ctxErr
+		}
 		if err != nil {
 			pkg.Degraded = true
 			degradeReasons = append(degradeReasons, "decision rerank failed: "+err.Error())
@@ -1057,9 +1342,11 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	pkg.Evidence = evidence
 	pkg.Truncated = truncated
 	pkg.Trace.Budget = BudgetTrace{
-		BytesUsed:    bytesUsed,
-		ItemsUsed:    len(items),
-		EvidenceUsed: len(evidence),
+		BytesUsed:              bytesUsed,
+		ItemsUsed:              len(items),
+		EvidenceUsed:           len(evidence),
+		SkippedItemIDs:         skippedItemIDs,
+		SkippedEvidenceTurnIDs: skippedEvidenceTurnIDs,
 	}
 	pkg.Coverage.Conversations = coveredConversations(items, convID)
 	pkg.Coverage.TopicIDs = coveredTopics(items)
@@ -1099,7 +1386,10 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	if err := collectGaps(ctx, db, &pkg, truncated); err != nil {
 		return Package{}, err
 	}
-	if req.RetrievalVersion == "v2" {
+	if err := hydrateFinalEvidence(ctx, store, pkg.Evidence); err != nil {
+		return Package{}, err
+	}
+	if req.RetrievalVersion == "v2" || req.RetrievalVersion == "v3" {
 		pkg.Sufficiency = &EvidenceAssessment{Status: "unknown", EvidenceRefs: []string{}}
 		if deps.Assessor == nil {
 			pkg.Degraded = true
@@ -1118,6 +1408,9 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 				pkg.Sufficiency = &EvidenceAssessment{Status: "insufficient", EvidenceRefs: []string{}}
 			} else {
 				assessment, err := deps.Assessor.Assess(ctx, query, assessmentEvidence)
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return Package{}, ctxErr
+				}
 				if err != nil {
 					pkg.Degraded = true
 					degradeReasons = append(degradeReasons, "evidence assessment failed: "+err.Error())
@@ -1134,7 +1427,31 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	}
 	pkg.Ranking = rankingFor(items, candidates)
 	pkg.DegradeReason = strings.Join(degradeReasons, "; ")
+	if err := ctx.Err(); err != nil {
+		return Package{}, err
+	}
 	return pkg, nil
+}
+
+// safeErrorDetail renders an error for a public gap without leaking response
+// bodies, tokens or endpoint parameters. Database diagnostics rarely contain
+// any of those, but URLs are redacted and the detail is bounded anyway.
+func safeErrorDetail(err error) string {
+	if err == nil {
+		return ""
+	}
+	detail := strings.TrimSpace(err.Error())
+	if idx := strings.Index(detail, "http://"); idx >= 0 {
+		detail = detail[:idx] + "[url]"
+	}
+	if idx := strings.Index(detail, "https://"); idx >= 0 {
+		detail = detail[:idx] + "[url]"
+	}
+	detail = strings.ReplaceAll(detail, "Bearer ", "Bearer [redacted]")
+	if len(detail) > 240 {
+		detail = detail[:240]
+	}
+	return detail
 }
 
 // rankingFor reports the retrieval provenance of every returned item, in item
@@ -1230,22 +1547,6 @@ func validPermutation(original, reordered []memory.Item) bool {
 		used[found] = true
 	}
 	return true
-}
-
-func reorderCandidates(original []candidate, reordered []memory.Item) []candidate {
-	byKey := make(map[string][]candidate, len(original))
-	for i := range original {
-		c := original[i]
-		k := candidateKey(c.item)
-		byKey[k] = append(byKey[k], c)
-	}
-	out := make([]candidate, 0, len(original))
-	for _, item := range reordered {
-		k := candidateKey(item)
-		out = append(out, byKey[k][0])
-		byKey[k] = byKey[k][1:]
-	}
-	return out
 }
 
 func validAssessment(a EvidenceAssessment, evidence []EvidenceRef) bool {
@@ -1426,53 +1727,118 @@ func (c *candidateSet) scanned() Scanned {
 	return s
 }
 
-// sorted ranks candidates deterministically: notes before turns before
-// conversations, then higher score, then id ascending.
-func (c *candidateSet) sorted() []candidate {
+// sorted puts direct matches ahead of expansions for text queries. Without a
+// ranking query, it orders by kind, score, then ID for browsing and v3.
+func (c *candidateSet) sorted(query string) []candidate {
+	const (
+		fullQueryMatch uint8 = iota
+		directMatch
+		expandedMatch
+	)
+	query = strings.ToLower(query)
 	out := make([]candidate, 0, len(c.order))
 	for _, cand := range c.order {
-		out = append(out, *cand)
+		ranked := *cand
+		if query != "" {
+			_, lexical := cand.sources[SourceLexical]
+			_, semantic := cand.sources[SourceSemantic]
+			ranked.queryMatchTier = expandedMatch
+			if lexical || semantic {
+				ranked.queryMatchTier = directMatch
+			}
+			if lexical {
+				text := cand.item.Summary
+				if cand.item.Kind == "turn" {
+					text = cand.item.Content
+				}
+				if strings.Contains(strings.ToLower(text), query) {
+					ranked.queryMatchTier = fullQueryMatch
+				}
+			}
+		}
+		out = append(out, ranked)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
-		ri, rj := kindRank(out[i].item.Kind), kindRank(out[j].item.Kind)
+		a, b := &out[i], &out[j]
+		if query != "" {
+			if a.queryMatchTier != b.queryMatchTier {
+				return a.queryMatchTier < b.queryMatchTier
+			}
+			if a.score != b.score {
+				return a.score > b.score
+			}
+		}
+		ri, rj := kindRank(a.item.Kind), kindRank(b.item.Kind)
 		if ri != rj {
 			return ri < rj
 		}
-		if out[i].score != out[j].score {
-			return out[i].score > out[j].score
+		if a.score != b.score {
+			return a.score > b.score
 		}
-		return out[i].item.ID < out[j].item.ID
+		return a.item.ID < b.item.ID
 	})
 	return out
 }
 
-// dedupeBySourceEvidence drops, in rank order, any item whose evidence turns
-// are already fully covered by an earlier item. Items with no evidence are
-// always kept (the empty set carries no information).
-func dedupeBySourceEvidence(ordered []candidate) []candidate {
-	seen := map[string]bool{}
-	out := make([]candidate, 0, len(ordered))
-	for _, cand := range ordered {
-		ev := evidenceOf(cand.item)
-		if len(cand.evidence) > 0 {
-			ev = cand.evidence
+// candidateEvidenceIDs returns the source turn ids a candidate cites: the
+// hydrated evidence when present, otherwise the item's own evidence ids.
+func candidateEvidenceIDs(c candidate) []string {
+	if len(c.evidence) > 0 {
+		return c.evidence
+	}
+	return evidenceOf(c.item)
+}
+
+// candidateSourcesCovered reports whether every source turn of the candidate
+// is already claimed by an accepted item. An item with no sources is never
+// deduped.
+func candidateSourcesCovered(c candidate, seen map[string]bool) bool {
+	ev := candidateEvidenceIDs(c)
+	if len(ev) == 0 {
+		return false
+	}
+	for _, id := range ev {
+		if !seen[id] {
+			return false
 		}
-		if len(ev) > 0 {
-			subset := true
-			for _, id := range ev {
-				if !seen[id] {
-					subset = false
-					break
-				}
-			}
-			if subset {
-				continue
-			}
+	}
+	return true
+}
+
+// claimCandidateSources reserves the candidate's source turns. It is called
+// only for accepted items, so a skipped candidate never hides a later one.
+func claimCandidateSources(c candidate, seen map[string]bool) {
+	for _, id := range candidateEvidenceIDs(c) {
+		seen[id] = true
+	}
+}
+
+// fitRerankSubset keeps every candidate that still fits the 64 KiB decision
+// request, skipping oversized ones individually. The returned indices are the
+// submitted slots in their original order; omitted candidates keep their
+// pre-rerank slot.
+func fitRerankSubset(query string, ordered []candidate) ([]int, []string) {
+	subset := make([]int, 0, len(ordered))
+	omitted := []string{}
+	items := make([]memory.Item, 0, len(ordered))
+	for i, cand := range ordered {
+		trial := append(append([]memory.Item(nil), items...), cand.item)
+		if rerankInputBytes(query, trial) > maxRerankInputBytes {
+			omitted = append(omitted, cand.item.ID)
+			continue
 		}
-		out = append(out, cand)
-		for _, id := range ev {
-			seen[id] = true
-		}
+		items = trial
+		subset = append(subset, i)
+	}
+	return subset, omitted
+}
+
+// fillRerankSlots writes the reranked subset back into the submitted slots and
+// leaves omitted candidates exactly where they were.
+func fillRerankSlots(ordered []candidate, subset []int, reordered []memory.Item) []candidate {
+	out := append([]candidate(nil), ordered...)
+	for k, idx := range subset {
+		out[idx].item = reordered[k]
 	}
 	return out
 }

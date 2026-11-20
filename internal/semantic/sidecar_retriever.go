@@ -146,14 +146,30 @@ func loadMatchingSidecar(ctx context.Context, db *sql.DB, p Provider, path strin
 	fp := hex.EncodeToString(sum.Sum(nil))
 	return LoadHNSWSidecar(path, p.ID(), p.Model(), fp, p.Dims())
 }
-func (r *HNSWRetriever) Ready() bool {
-	if r == nil {
-		return false
+
+// Ready reports whether the retriever can serve. A loaded in-memory graph
+// must never mask a canonical database failure: the exact fallback and the
+// hit-resolution path both read the database, so its probe error is returned
+// even when the graph is present.
+func (r *HNSWRetriever) Ready(ctx context.Context) (bool, error) {
+	if r == nil || r.Provider == nil || r.DB == nil {
+		return false, nil
 	}
 	r.mu.RLock()
 	idx := r.index
 	r.mu.RUnlock()
-	return r.Provider != nil && r.DB != nil && ((idx != nil && len(idx.Nodes) > 0) || (r.Exact != nil && r.Exact.Ready()))
+	indexed := idx != nil && len(idx.Nodes) > 0
+	if r.Exact == nil {
+		return indexed, nil
+	}
+	ready, err := r.Exact.Ready(ctx)
+	if err != nil {
+		return false, err
+	}
+	if indexed {
+		return true, nil
+	}
+	return ready, nil
 }
 func (r *HNSWRetriever) HasIndex() bool {
 	if r == nil {

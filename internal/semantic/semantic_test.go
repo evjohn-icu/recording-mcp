@@ -643,8 +643,8 @@ func TestIndexIncludesStaleAndAmbientButSearchFiltersThem(t *testing.T) {
 	// turn indexed while current and superseded later.
 	markTurnStale(t, db, "t:stale", "conv:a", "rec:a")
 	r := &SQLiteRetriever{DB: db, Provider: NewHashProvider(64)}
-	if !r.Ready() {
-		t.Fatal("retriever should be ready after indexing")
+	if ok, err := r.Ready(context.Background()); err != nil || !ok {
+		t.Fatalf("retriever should be ready after indexing: ok=%v err=%v", ok, err)
 	}
 	hits, err := r.Search(context.Background(), "珠海搬家会议记录", SearchOptions{})
 	if err != nil {

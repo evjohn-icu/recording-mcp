@@ -1,0 +1,106 @@
+{
+  "protocol": "v3",
+  "phase": "profile",
+  "fixture_sha256": {
+    "corpus.json": "a831e66aaf024732cd62ce1211299fda49c2e5a430f53e658073fb56a192089d",
+    "lifecycle.json": "ae25f9c50c8f2758ba928fda7a192427606eb57c283136e468bafac72db03123",
+    "retrieval.json": "5d9b0884527103be00a3f0297d01d2a6ae4b2223f2bf99ee5910de815cd9d3e4"
+  },
+  "fixture": {
+    "questions": 780,
+    "groups": 330,
+    "splits": {
+      "train": 110,
+      "calibration": 110,
+      "test": 110
+    },
+    "split_questions": {
+      "train": 260,
+      "calibration": 260,
+      "test": 260
+    },
+    "bucket_counts": {
+      "direct_fact": 10,
+      "synonym": 10,
+      "negation": 10,
+      "time_change": 10,
+      "cross_session": 10,
+      "multi_source": 10,
+      "revocation": 10,
+      "missing_evidence": 10,
+      "wrong_identity_proposal": 10,
+      "numeric_constraint": 10,
+      "decision_commitment": 10
+    },
+    "lifecycle_sources": 30,
+    "partial_buckets": [
+      "missing_evidence",
+      "revocation",
+      "time_change",
+      "wrong_identity_proposal"
+    ],
+    "fixture_cross_split_leaks": 0
+  },
+  "protocol_config": {
+    "max_items": 10,
+    "max_bytes": 65536,
+    "test_touched": false,
+    "threshold_grid": [
+      0,
+      100
+    ],
+    "latency_comparison": "migration-budget cap; the v1 baseline is measured in the same run with the same query order and budget, while v3 adds admission and evidence assessment",
+    "lifecycle_sources": 30,
+    "warmup": {
+      "questions": 1,
+      "source": "train",
+      "cache_flush": true
+    },
+    "cache_flush": "",
+    "configuration": {
+      "protocol": "v3",
+      "embedding_endpoint": "",
+      "embedding_model": "",
+      "embedding_dims": 0,
+      "embedding_input_type": false,
+      "embedding_key_env": "",
+      "embedding_revision": "not-configured",
+      "rerank_endpoint": "",
+      "rerank_model": "",
+      "assessor_endpoint": "",
+      "assessor_model": "",
+      "admission_batch_questions": 0,
+      "max_items": 10,
+      "max_bytes": 65536
+    },
+    "configuration_sha256": "ce2833b538e2c8d7b33c003e05304486b26429bbdefccdd01305cf9eac3e7e11"
+  },
+  "provider_status": {
+    "openai_embedding": "NOT_RUN",
+    "reranker": "NOT_RUN",
+    "assessor": "NOT_RUN"
+  },
+  "identity": {
+    "embedding_provider": "hash-ngram-v1",
+    "embedding_model": "",
+    "embedding_revision": "not-configured",
+    "embedding_dims": 0,
+    "embedding_input_type": false,
+    "assessor_model": "",
+    "assessor_actual_model": "",
+    "binary_sha256": "23cb5cda209ed79e91800fe24ae0f4ec5162eac485acae334dd1820c15a46651",
+    "prompt_identity": "internal/contextbuild/admission.go:admissionQuestion",
+    "prompt_note": "the admission prompt lives in the pinned binary; the policy template hash pins the rubric and threshold document"
+  },
+  "binary_sha256": "23cb5cda209ed79e91800fe24ae0f4ec5162eac485acae334dd1820c15a46651",
+  "runs": {
+    "profile": {
+      "status": "NOT_RUN",
+      "reason": "the bounded v3 profile needs --assessor-url and --assessor-model"
+    }
+  },
+  "quality_gate_passed": false,
+  "default_changed": false,
+  "selection_lock": null,
+  "calibration_selection": "profile only: no threshold grid, no lock and no test question; the measured numbers are a lower bound for this train configuration"
+}

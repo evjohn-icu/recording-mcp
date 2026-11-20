@@ -41,28 +41,36 @@ type authoredRetrievalQuestion struct {
 	ExpectStaleExcluded   bool           `json:"expect_stale_excluded"`
 	Notes                 string         `json:"notes"`
 	EvidenceCompleteness  string         `json:"evidence_completeness,omitempty"`
+	// ExpectedSufficiency is the authored label for v3 questions. When set it
+	// overrides the computed label, which only knows complete/none.
+	ExpectedSufficiency string `json:"expected_sufficiency,omitempty"`
+	// ExpectForgottenExcluded marks a v3 question whose sources are forgotten
+	// by the lifecycle fixture before retrieval.
+	ExpectForgottenExcluded bool `json:"expect_forgotten_excluded,omitempty"`
 }
 
 // RetrievalQuestion is one resolved retrieval question.
 type RetrievalQuestion struct {
-	ID                    string
-	GroupID               string
-	Split                 string
-	Bucket                string
-	Query                 string
-	Purpose               string
-	Notes                 string
-	GoldEvidenceTurnIDs   []string
-	GoldTopicIDs          []string
-	Unanswerable          bool
-	GoldTop1TurnID        string
-	ScopeConversationID   string
-	ScopeTopicID          string
-	ScopeStartedAfter     *time.Time
-	ScopeStartedBefore    *time.Time
-	ExpectAmbientExcluded bool
-	ExpectStaleExcluded   bool
-	EvidenceCompleteness  string
+	ID                      string
+	GroupID                 string
+	Split                   string
+	Bucket                  string
+	Query                   string
+	Purpose                 string
+	Notes                   string
+	GoldEvidenceTurnIDs     []string
+	GoldTopicIDs            []string
+	Unanswerable            bool
+	GoldTop1TurnID          string
+	ScopeConversationID     string
+	ScopeTopicID            string
+	ScopeStartedAfter       *time.Time
+	ScopeStartedBefore      *time.Time
+	ExpectAmbientExcluded   bool
+	ExpectStaleExcluded     bool
+	EvidenceCompleteness    string
+	ExpectedSufficiency     string
+	ExpectForgottenExcluded bool
 }
 
 type retrievalFile struct {
@@ -73,7 +81,7 @@ type retrievalFile struct {
 // LoadRetrievalQuestions reads the retrieval fixture and resolves every human
 // reference against the ingested database. A missing file disables the
 // retrieval pass.
-func LoadRetrievalQuestions(ctx context.Context, db *sql.DB, path string) ([]RetrievalQuestion, error) {
+func LoadRetrievalQuestions(ctx context.Context, db *sql.DB, path string, forgottenTurnRefs map[string]string) ([]RetrievalQuestion, error) {
 	if path == "" {
 		return nil, nil
 	}
@@ -108,19 +116,21 @@ func LoadRetrievalQuestions(ctx context.Context, db *sql.DB, path string) ([]Ret
 			return nil, fmt.Errorf("retrieval question %q is unanswerable but has gold refs", aq.ID)
 		}
 		q := RetrievalQuestion{
-			ID:                    aq.ID,
-			GroupID:               aq.GroupID,
-			Split:                 aq.Split,
-			Bucket:                aq.Bucket,
-			Query:                 aq.Query,
-			Purpose:               aq.Purpose,
-			Notes:                 aq.Notes,
-			GoldEvidenceTurnIDs:   append([]string(nil), aq.GoldEvidenceTurnIDs...),
-			GoldTopicIDs:          append([]string(nil), aq.GoldTopicIDs...),
-			Unanswerable:          aq.Unanswerable,
-			ExpectAmbientExcluded: aq.ExpectAmbientExcluded,
-			ExpectStaleExcluded:   aq.ExpectStaleExcluded,
-			EvidenceCompleteness:  aq.EvidenceCompleteness,
+			ID:                      aq.ID,
+			GroupID:                 aq.GroupID,
+			Split:                   aq.Split,
+			Bucket:                  aq.Bucket,
+			Query:                   aq.Query,
+			Purpose:                 aq.Purpose,
+			Notes:                   aq.Notes,
+			GoldEvidenceTurnIDs:     append([]string(nil), aq.GoldEvidenceTurnIDs...),
+			GoldTopicIDs:            append([]string(nil), aq.GoldTopicIDs...),
+			Unanswerable:            aq.Unanswerable,
+			ExpectAmbientExcluded:   aq.ExpectAmbientExcluded,
+			ExpectStaleExcluded:     aq.ExpectStaleExcluded,
+			EvidenceCompleteness:    aq.EvidenceCompleteness,
+			ExpectedSufficiency:     aq.ExpectedSufficiency,
+			ExpectForgottenExcluded: aq.ExpectForgottenExcluded,
 		}
 		if q.GroupID == "" {
 			q.GroupID = q.ID
@@ -133,6 +143,14 @@ func LoadRetrievalQuestions(ctx context.Context, db *sql.DB, path string) ([]Ret
 		}
 		for _, ref := range aq.GoldTurnRefs {
 			id, err := resolveTurnRef(ctx, db, ref)
+			if err != nil && aq.ExpectForgottenExcluded {
+				// A forgotten-source question keeps its authored ref: the
+				// lifecycle fixture removed the turn by design, and the
+				// forbidden ID set preserves the leakage denominator.
+				if stored, ok := forgottenTurnRefs[turnRefKey(ref)]; ok {
+					id, err = stored, nil
+				}
+			}
 			if err != nil {
 				return nil, fmt.Errorf("retrieval question %q: %w", aq.ID, err)
 			}
@@ -147,6 +165,11 @@ func LoadRetrievalQuestions(ctx context.Context, db *sql.DB, path string) ([]Ret
 		}
 		if aq.GoldTop1TurnRef != nil {
 			id, err := resolveTurnRef(ctx, db, *aq.GoldTop1TurnRef)
+			if err != nil && aq.ExpectForgottenExcluded {
+				if stored, ok := forgottenTurnRefs[turnRefKey(*aq.GoldTop1TurnRef)]; ok {
+					id, err = stored, nil
+				}
+			}
 			if err != nil {
 				return nil, fmt.Errorf("retrieval question %q: gold top1: %w", aq.ID, err)
 			}
@@ -233,4 +256,10 @@ func resolveConversationID(ctx context.Context, db *sql.DB, ref string) (string,
 	default:
 		return "", fmt.Errorf("scope conversation %q matched %d conversations; pin a stored id instead", ref, len(ids))
 	}
+}
+
+// turnRefKey identifies an authored turn ref independently of the resolved
+// database ID.
+func turnRefKey(ref TurnRef) string {
+	return ref.SegmentID + "\x00" + ref.TranscriptRevision + "\x00" + ref.TurnID
 }

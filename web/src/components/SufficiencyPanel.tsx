@@ -1,4 +1,4 @@
-import type { HybridView } from '../api/types'
+import type { AdmissionTrace, HybridView } from '../api/types'
 
 const STATUS_LABELS: Record<string, string> = {
   sufficient: '证据充分',
@@ -16,6 +16,31 @@ const ASSESSMENT_GAP_KINDS: Record<string, true> = {
   evidence_assessment_unavailable: true,
   evidence_assessment_failed: true,
   budget_exhausted: true,
+}
+
+function AdmissionDiagnostics({ admission }: { admission: AdmissionTrace }) {
+  const poolLimited = admission.pool_limited_ids?.length ?? 0
+  const rejected = admission.rejected ?? []
+  return (
+    <div className="sufficiency-admission" data-testid="sufficiency-admission">
+      <p className="sufficiency-admission-title">v3 准入</p>
+      <ul className="sufficiency-admission-stats">
+        <li>候选：{admission.candidates}，准入：{admission.admitted}，池上限截断：{poolLimited}</li>
+        <li>准入阈值：{admission.threshold ?? '未提供'}</li>
+        <li>评估模型：{admission.assessor_model || '未提供'}</li>
+        {rejected.length > 0 && (
+          <li>
+            拒绝：{rejected.length} 条
+            <ul className="sufficiency-admission-rejections">
+              {rejected.map((entry) => (
+                <li key={`${entry.item_id}-${entry.reason}`}>{entry.item_id}：{entry.reason}</li>
+              ))}
+            </ul>
+          </li>
+        )}
+      </ul>
+    </div>
+  )
 }
 
 function formatTime(ms: number | null | undefined): string {
@@ -39,7 +64,7 @@ function conversationForTurn(pkg: HybridView, turnId: string): string {
 }
 
 export function SufficiencyPanel({ pkg, retrievalVersion }: { pkg: HybridView; retrievalVersion: string }) {
-  if (retrievalVersion !== 'v2') return null
+  if (retrievalVersion !== 'v2' && retrievalVersion !== 'v3') return null
   const assessment = pkg.sufficiency
   if (!assessment) return null
   const status = STATUS_LABELS[assessment.status] ? assessment.status : 'unknown'
@@ -78,6 +103,7 @@ export function SufficiencyPanel({ pkg, retrievalVersion }: { pkg: HybridView; r
           {gaps.map((gap) => <li key={`${gap.kind}-${gap.detail}`}>{gap.kind}：{gap.detail}</li>)}
         </ul>
       )}
+      {pkg.trace.admission && <AdmissionDiagnostics admission={pkg.trace.admission} />}
       {pkg.degraded && pkg.degrade_reason && (
         <p className="sufficiency-degraded">降级原因：{pkg.degrade_reason}</p>
       )}

@@ -275,8 +275,8 @@ func (s *Server) handleHybrid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	version := strings.TrimSpace(r.URL.Query().Get("retrieval_version"))
-	if version != "" && version != "v1" && version != "v2" {
-		writeBadRequest(w, "retrieval_version must be v1 or v2")
+	if version != "" && version != "v1" && version != "v2" && version != "v3" {
+		writeBadRequest(w, "retrieval_version must be v1, v2 or v3")
 		return
 	}
 	poolLimit, err := queryInt(r, "rerank_candidate_limit", 64, 1, 128)
@@ -304,6 +304,11 @@ func (s *Server) handleHybrid(w http.ResponseWriter, r *http.Request) {
 		writeBadRequest(w, err.Error())
 		return
 	}
+	includeRawEvidence, err := queryBool(r, "include_raw_evidence")
+	if err != nil {
+		writeBadRequest(w, err.Error())
+		return
+	}
 	req := contextbuild.Request{
 		Purpose:              "web_search",
 		Query:                q,
@@ -315,6 +320,7 @@ func (s *Server) handleHybrid(w http.ResponseWriter, r *http.Request) {
 		MaxBytes:             maxBytes,
 		RetrievalVersion:     version,
 		RerankCandidateLimit: poolLimit,
+		IncludeRawEvidence:   includeRawEvidence,
 	}
 	if topic := strings.TrimSpace(r.URL.Query().Get("topic_id")); topic != "" {
 		req.TopicIDs = []string{topic}

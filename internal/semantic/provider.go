@@ -10,8 +10,76 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"syscall"
+	"time"
 	"unicode"
 )
+
+// Provider outage reasons. They are a closed set so a caller can switch on
+// them without parsing error text. Only these four conditions are degradable:
+// anything else (bad request, malformed response, wrong vector shape) must
+// fail the caller rather than silently degrade retrieval.
+const (
+	ReasonProviderTimeout     = "provider_timeout"
+	ReasonConnectionRefused   = "connection_refused"
+	ReasonModelUnavailable    = "model_unavailable"
+	ReasonProviderUnavailable = "provider_unavailable"
+)
+
+// ProviderUnavailableError marks an embedding endpoint outage the caller may
+// degrade from. Error() deliberately carries only the reason and a sanitized
+// cause: never the response body, the API token or URL parameters.
+type ProviderUnavailableError struct {
+	Reason string
+	Cause  error
+}
+
+func (e *ProviderUnavailableError) Error() string {
+	if e == nil {
+		return "<nil>"
+	}
+	if e.Cause != nil {
+		return fmt.Sprintf("semantic: embedding provider unavailable (%s): %v", e.Reason, e.Cause)
+	}
+	return fmt.Sprintf("semantic: embedding provider unavailable (%s)", e.Reason)
+}
+
+func (e *ProviderUnavailableError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
+}
+
+// IsProviderUnavailable reports whether err is a degradable provider outage.
+func IsProviderUnavailable(err error) bool {
+	var target *ProviderUnavailableError
+	return errors.As(err, &target)
+}
+
+// errContextCancelled wraps a request-context error so callers can tell a
+// caller cancellation apart from a provider-side timeout. errors.Is keeps
+// working through Unwrap, so errors.Is(err, context.Canceled) stays true.
+type errContextCancelled struct{ cause error }
+
+func (e errContextCancelled) Error() string { return e.cause.Error() }
+
+func (e errContextCancelled) Unwrap() error { return e.cause }
+
+// sanitizedTransportError strips the URL and request metadata the http client
+// embeds in *url.Error, keeping only a stable, non-sensitive description.
+func sanitizedTransportError(err error) error {
+	switch {
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return errors.New("connection refused")
+	case errors.Is(err, syscall.ECONNRESET):
+		return errors.New("connection reset")
+	case errors.Is(err, io.EOF):
+		return errors.New("connection closed")
+	default:
+		return errors.New("transport error")
+	}
+}
 
 // DefaultHashDims is the default dimension count of the offline hashing
 // provider. 256 dims keeps hash collisions low for local-scale corpora while
@@ -209,12 +277,20 @@ type OpenAICompatProvider struct {
 	ModelName  string
 	Dimensions int
 	HTTPClient *http.Client
+	// Timeout bounds one embedding call (request plus body read). Zero uses
+	// DefaultProviderTimeout. It is applied through a request-scoped child
+	// context so a shared http.Client is never mutated.
+	Timeout time.Duration
 	// SendInputType opts in to the non-standard input_type field. The bundled
 	// Qwen server uses it to prepend the query instruction; strict
 	// OpenAI-compatible endpoints reject unknown body fields, so it is off by
 	// default.
 	SendInputType bool
 }
+
+// DefaultProviderTimeout is the per-call embedding deadline used when
+// OpenAICompatProvider.Timeout is unset.
+const DefaultProviderTimeout = 30 * time.Second
 
 func (p OpenAICompatProvider) ID() string { return "openai-compat" }
 
@@ -234,6 +310,10 @@ type embedResponse struct {
 	} `json:"data"`
 	Error *struct {
 		Message string `json:"message"`
+		// Code is the structured error identifier (for example
+		// model_not_found). Classification uses this field only; message text
+		// is never matched.
+		Code string `json:"code"`
 	} `json:"error"`
 }
 
@@ -245,6 +325,13 @@ func (p OpenAICompatProvider) Embed(ctx context.Context, texts []string) ([]Vect
 
 // EmbedRole optionally sends input_type. The bundled local server needs it for
 // query instruction selection; other endpoints can reject the field.
+//
+// The call runs under a request-scoped timeout derived from ctx (see Timeout).
+// A caller cancellation is returned verbatim, a provider-side timeout becomes
+// *ProviderUnavailableError with ReasonProviderTimeout, and a refused
+// connection, 502/503/504 or structured model_not_found become the other
+// degradable reasons. Every other failure stays a plain error so retrieval
+// never masks a programming or protocol fault as an outage.
 func (p OpenAICompatProvider) EmbedRole(ctx context.Context, texts []string, role EmbedRole) ([]Vector, error) {
 	endpoint := strings.TrimSpace(p.Endpoint)
 	if endpoint == "" {
@@ -252,6 +339,9 @@ func (p OpenAICompatProvider) EmbedRole(ctx context.Context, texts []string, rol
 	}
 	if len(texts) == 0 {
 		return nil, errors.New("semantic: no texts to embed")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	inputType := ""
 	if p.SendInputType && (role == RoleDocument || role == RoleQuery) {
@@ -261,7 +351,13 @@ func (p OpenAICompatProvider) EmbedRole(ctx context.Context, texts []string, rol
 	if err != nil {
 		return nil, fmt.Errorf("semantic: encode embedding request: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	timeout := p.Timeout
+	if timeout <= 0 {
+		timeout = DefaultProviderTimeout
+	}
+	callCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(callCtx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("semantic: build embedding request: %w", err)
 	}
@@ -275,22 +371,52 @@ func (p OpenAICompatProvider) EmbedRole(ctx context.Context, texts []string, rol
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("semantic: embedding request: %w", err)
+		return nil, classifyTransportError(ctx, callCtx, err)
 	}
 	defer resp.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxEmbeddingResponseBytes))
 	if err != nil {
-		return nil, fmt.Errorf("semantic: read embedding response: %w", err)
+		return nil, classifyTransportError(ctx, callCtx, err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("semantic: embedding endpoint returned %s: %s", resp.Status, snippet(data))
+		var parsed embedResponse
+		code := ""
+		if json.Unmarshal(data, &parsed) == nil && parsed.Error != nil {
+			code = parsed.Error.Code
+		}
+		switch {
+		case code == "model_not_found":
+			return nil, &ProviderUnavailableError{Reason: ReasonModelUnavailable, Cause: errors.New("model_not_found")}
+		case resp.StatusCode == http.StatusBadGateway || resp.StatusCode == http.StatusServiceUnavailable || resp.StatusCode == http.StatusGatewayTimeout:
+			return nil, &ProviderUnavailableError{
+				Reason: ReasonProviderUnavailable,
+				Cause:  fmt.Errorf("http status %d", resp.StatusCode),
+			}
+		default:
+			return nil, fmt.Errorf("semantic: embedding endpoint returned http status %d", resp.StatusCode)
+		}
+	}
+	if errors.Is(callCtx.Err(), context.DeadlineExceeded) {
+		// The parent context is still live (checked above), so the derived
+		// deadline is the provider's own timeout, not a caller deadline.
+		return nil, &ProviderUnavailableError{Reason: ReasonProviderTimeout, Cause: errors.New("request deadline exceeded")}
 	}
 	var parsed embedResponse
 	if err := json.Unmarshal(data, &parsed); err != nil {
 		return nil, fmt.Errorf("semantic: decode embedding response: %w", err)
 	}
-	if parsed.Error != nil && parsed.Error.Message != "" {
-		return nil, fmt.Errorf("semantic: embedding endpoint error: %s", parsed.Error.Message)
+	if parsed.Error != nil {
+		if parsed.Error.Code == "model_not_found" {
+			return nil, &ProviderUnavailableError{Reason: ReasonModelUnavailable, Cause: errors.New("model_not_found")}
+		}
+		code := strings.TrimSpace(parsed.Error.Code)
+		if code == "" {
+			code = "provider error"
+		}
+		return nil, fmt.Errorf("semantic: embedding endpoint error code %s", code)
 	}
 	if len(parsed.Data) != len(texts) {
 		return nil, fmt.Errorf("semantic: embedding endpoint returned %d embeddings for %d inputs", len(parsed.Data), len(texts))
@@ -305,13 +431,25 @@ func (p OpenAICompatProvider) EmbedRole(ctx context.Context, texts []string, rol
 	return out, nil
 }
 
-// snippet returns a bounded, whitespace-trimmed excerpt of a response body for
-// error messages.
-func snippet(data []byte) string {
-	const limit = 512
-	t := strings.TrimSpace(string(data))
-	if len(t) > limit {
-		t = t[:limit] + "..."
+// classifyTransportError maps a client/read failure to either the caller's own
+// context error or a degradable provider outage. The cause is sanitized so no
+// URL, query string or token can leak into logs or gaps.
+func classifyTransportError(ctx, callCtx context.Context, err error) error {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
 	}
-	return t
+	if errors.Is(callCtx.Err(), context.DeadlineExceeded) {
+		return &ProviderUnavailableError{Reason: ReasonProviderTimeout, Cause: errors.New("request deadline exceeded")}
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return &ProviderUnavailableError{Reason: ReasonProviderTimeout, Cause: errors.New("request deadline exceeded")}
+	}
+	var netErr interface{ Timeout() bool }
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return &ProviderUnavailableError{Reason: ReasonProviderTimeout, Cause: errors.New("network timeout")}
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return &ProviderUnavailableError{Reason: ReasonConnectionRefused, Cause: sanitizedTransportError(err)}
+	}
+	return fmt.Errorf("semantic: embedding request failed: %w", sanitizedTransportError(err))
 }

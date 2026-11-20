@@ -1,0 +1,186 @@
+{
+  "schema": "retrieval-lifecycle-v1",
+  "description": "Deterministic forget list for v3 calibration r1: the superseded r1 turn of every revocation group must be forgotten before retrieval evaluation.",
+  "sources": [
+    {
+      "segment_id": "seg-rev-train-01",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-train-01: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-train-02",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-train-02: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-train-03",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-train-03: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-train-04",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-train-04: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-train-05",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-train-05: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-train-06",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-train-06: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-train-07",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-train-07: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-train-08",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-train-08: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-train-09",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-train-09: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-train-10",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-train-10: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-calibration-01",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-calibration-01: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-calibration-02",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-calibration-02: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-calibration-03",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-calibration-03: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-calibration-04",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-calibration-04: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-calibration-05",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-calibration-05: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-calibration-06",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-calibration-06: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-calibration-07",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-calibration-07: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-calibration-08",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-calibration-08: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-calibration-09",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-calibration-09: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-calibration-10",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-calibration-10: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-test-01",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-test-01: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-test-02",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-test-02: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-test-03",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-test-03: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-test-04",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-test-04: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-test-05",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-test-05: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-test-06",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-test-06: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-test-07",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-test-07: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-test-08",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-test-08: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-test-09",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-test-09: 已撤回的旧通知必须在遗忘后不可检索"
+    },
+    {
+      "segment_id": "seg-rev-test-10",
+      "transcript_revision": "r1",
+      "turn_id": "old",
+      "reason": "revocation group rev-test-10: 已撤回的旧通知必须在遗忘后不可检索"
+    }
+  ]
+}

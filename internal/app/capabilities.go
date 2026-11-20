@@ -35,6 +35,9 @@ type GeneratorCapability struct {
 type RetrievalCapability struct {
 	DefaultVersion string `json:"default_version"`
 	V2Available    bool   `json:"v2_available"`
+	// V3Available reports an experimentally configured admission policy. It
+	// never changes the default version.
+	V3Available bool `json:"v3_available"`
 }
 
 // WorkerCapability describes the live worker pool.
@@ -67,9 +70,13 @@ const MaxUploadBytes int64 = 2 << 30
 // fresh worker heartbeats.
 func (s *Service) Capabilities(ctx context.Context) (Capabilities, error) {
 	out := Capabilities{
-		Version:   "beta",
-		Retrieval: RetrievalCapability{DefaultVersion: "v1", V2Available: true},
-		Limits:    Limits{UploadBytes: MaxUploadBytes},
+		Version: "beta",
+		Retrieval: RetrievalCapability{
+			DefaultVersion: "v1",
+			V2Available:    true,
+			V3Available:    s.AdmissionPolicy != nil && s.AdmissionPolicy.Validate(false) == nil && s.CandidateAssessor != nil && s.Semantic != nil,
+		},
+		Limits: Limits{UploadBytes: MaxUploadBytes},
 	}
 	provider := strings.TrimSpace(s.ASRProvider)
 	out.ASR.Provider = provider

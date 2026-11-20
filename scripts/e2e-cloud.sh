@@ -13,7 +13,16 @@ SERVER="http://127.0.0.1:$PORT"
 ADMIN_TOKEN="e2e-admin"
 export WRANGLER_SEND_METRICS=false
 export NO_UPDATE_NOTIFIER=1
-E2E_ROOT=data/e2e
+E2E_ROOT="${RECORDING_E2E_ROOT:-data/e2e}"
+if [ -n "${RECORDING_E2E_ROOT:-}" ]; then
+	# An explicit external root must be empty: this script deletes scenario
+	# directories below it and must never touch unrelated data.
+	if [ -d "$E2E_ROOT" ] && [ -n "$(ls -A "$E2E_ROOT" 2>/dev/null)" ]; then
+		echo "e2e-cloud: refusing non-empty RECORDING_E2E_ROOT=$E2E_ROOT" >&2
+		exit 2
+	fi
+fi
+mkdir -p "$E2E_ROOT"
 SCENARIOS="normal offline-recover crash-restart duplicate bad-checksum gap r2-after-write d1-manifest d1-event response-drop"
 
 WPID=""

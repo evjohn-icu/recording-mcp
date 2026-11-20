@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"recordingmcp/internal/audioanalysis"
 	"time"
 
 	"recordingmcp/internal/cloudsync"
@@ -94,6 +95,8 @@ type Config struct {
 	ASRResourceID      string
 	TranscriptRevision string
 	Now                func() time.Time
+	// Audio enables automatic VAD/tagging/diarization enqueue. Nil disables it.
+	Audio *audioanalysis.Config
 }
 
 // validate checks the required dependencies.

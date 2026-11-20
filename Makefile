@@ -16,6 +16,8 @@ build:
 	go build -o bin/context-eval ./cmd/context-eval
 	go build -o bin/context-embed ./cmd/context-embed
 	go build -o bin/context-sync ./cmd/context-sync
+	go build -o bin/context-backup ./cmd/context-backup
+	go build -o bin/context-audio ./cmd/context-audio
 	go build -o bin/record-sim ./cmd/record-sim
 
 web:

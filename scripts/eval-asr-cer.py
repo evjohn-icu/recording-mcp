@@ -13,36 +13,17 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
-import re
 import subprocess
 import sys
-import unicodedata
 
-CN_DIGITS = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
-             "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "幺": 1}
-CN_UNITS = {"十": 10, "百": 100, "千": 1000}
-CN_RUN = re.compile(r"[零〇一二三四五六七八九两幺十百千]+")
-KEEP = re.compile(r"[^\u4e00-\u9fffA-Za-z0-9]")
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
+from audio_acceptance_metrics import edit_distance, normalize_text
 
-def _cn_number(run: str) -> str:
-    if not any(ch in CN_UNITS for ch in run):
-        return "".join(str(CN_DIGITS[ch]) for ch in run)
-    total = 0
-    digit = None
-    for ch in run:
-        if ch in CN_DIGITS:
-            digit = CN_DIGITS[ch]
-        else:
-            total += (1 if digit is None else digit) * CN_UNITS[ch]
-            digit = None
-    return str(total + (digit or 0))
-
-
-def normalize(text: str) -> str:
-    text = unicodedata.normalize("NFKC", text)
-    text = CN_RUN.sub(lambda m: _cn_number(m.group(0)), text)
-    return KEEP.sub("", text)
+# Historical module-level names kept for existing tests/scripts; both now
+# delegate to the shared metrics module (no duplicated implementation here).
+normalize = normalize_text
+levenshtein = edit_distance
 
 
 def load_reference(path: pathlib.Path) -> str:
@@ -53,18 +34,6 @@ def load_reference(path: pathlib.Path) -> str:
             return "".join(t.get("text", "") for t in turns)
         raise SystemExit("reference JSON has no turns[]")
     return path.read_text(encoding="utf-8")
-
-
-def levenshtein(a: str, b: str) -> int:
-    if len(a) < len(b):
-        a, b = b, a
-    previous = list(range(len(b) + 1))
-    for i, ca in enumerate(a, 1):
-        current = [i]
-        for j, cb in enumerate(b, 1):
-            current.append(min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (ca != cb)))
-        previous = current
-    return previous[-1]
 
 
 def run_runner(args) -> list[dict]:
@@ -107,7 +76,7 @@ def main() -> int:
     windows = run_runner(args)
     hypothesis = "".join(w.get("text", "") for w in windows)
     reference = load_reference(pathlib.Path(args.reference))
-    ref_norm, hyp_norm = normalize(reference), normalize(hypothesis)
+    ref_norm, hyp_norm = normalize_text(reference), normalize_text(hypothesis)
     distance = levenshtein(hyp_norm, ref_norm)
     result = {
         "backend": args.backend,

@@ -50,6 +50,8 @@ services:
       - hash
       - --asr-provider
       - ${ASR_PROVIDER:-off}
+      - --audio-analysis-config
+      - ${AUDIO_ANALYSIS_CONFIG:-}
     environment:
       MEMORY_PROFILE_PASSWORD: ${MEMORY_PROFILE_PASSWORD:?set MEMORY_PROFILE_PASSWORD in .env}
       VOLC_API_KEY: ${VOLC_API_KEY:-}
@@ -83,6 +85,8 @@ services:
       - ${GENERATOR_PROVIDER:-off}
       - --embed-provider
       - ${EMBED_PROVIDER:-hash}
+      - --audio-analysis-config
+      - ${AUDIO_ANALYSIS_CONFIG:-}
       - --health-addr
       - 127.0.0.1:8789
     environment:

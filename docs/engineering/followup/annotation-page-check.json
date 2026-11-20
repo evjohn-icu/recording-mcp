@@ -1,0 +1,21 @@
+{
+  "schema": "context-engine-annotation-page-check-v1",
+  "target": "synthetic 2 s mono 16 kHz WAV prepared with scripts/review-audio-acceptance.py prepare",
+  "browser": "headless Chromium via the omp browser tool, served over http://127.0.0.1 localhost only",
+  "observations": {
+    "external_resources": 0,
+    "category_options": 5,
+    "region_rows_after_add": 2,
+    "unsigned_export_provenance": "draft",
+    "signed_export_provenance": "human",
+    "signed_export_scored_regions": [
+      {
+        "start_ms": 200,
+        "end_ms": 800
+      }
+    ],
+    "signed_export_category": "quiet_two_person",
+    "clock_substitution": "player.currentTime was replaced with a settable value because headless Chromium reported no seekable range; every other page handler ran unchanged"
+  },
+  "note": "synthetic page only; no real recording, transcript or screenshot is stored"
+}

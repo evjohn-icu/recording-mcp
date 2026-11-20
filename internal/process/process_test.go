@@ -443,3 +443,83 @@ func TestRetryBackoff(t *testing.T) {
 		}
 	}
 }
+
+// TestJobDependenciesWaitWithoutAttempts proves a dependent job is never
+// claimed while its parent is non-terminal, that waiting consumes no attempt,
+// that a terminal parent (succeeded or failed) releases the child, and that a
+// conflicting re-enqueue is rejected without partial writes.
+func TestJobDependenciesWaitWithoutAttempts(t *testing.T) {
+	ctx := context.Background()
+	db := newDB(t)
+	now := time.Now()
+	parent, _, err := Enqueue(ctx, db, Spec{Stage: "audio_vad", InputSnapshotID: "snap", IdempotencyKey: "parent"}, now)
+	if err != nil {
+		t.Fatalf("enqueue parent: %v", err)
+	}
+	child, _, err := Enqueue(ctx, db, Spec{Stage: "asr", InputSnapshotID: "snap", IdempotencyKey: "child", Dependencies: []string{parent}}, now)
+	if err != nil {
+		t.Fatalf("enqueue child: %v", err)
+	}
+	// Nothing is claimable while the parent is queued.
+	if job, err := Claim(ctx, db, ClaimOptions{WorkerID: "w", Stages: []string{"asr"}, Lease: time.Minute, Now: now}); !errors.Is(err, ErrNoJob) {
+		t.Fatalf("claim with queued parent = %+v, %v; want ErrNoJob", job, err)
+	}
+	// The parent runs and enters retry_wait: still blocking.
+	parentJob, err := Claim(ctx, db, ClaimOptions{WorkerID: "w", Stages: []string{"audio_vad"}, Lease: time.Minute, Now: now})
+	if err != nil {
+		t.Fatalf("claim parent: %v", err)
+	}
+	if err := Fail(ctx, db, parentJob.ID, parentJob.LeaseToken, `{"code":"retry"}`, true, now); err != nil {
+		t.Fatalf("retry parent: %v", err)
+	}
+	if job, err := Claim(ctx, db, ClaimOptions{WorkerID: "w", Stages: []string{"asr"}, Lease: time.Minute, Now: now.Add(time.Hour)}); !errors.Is(err, ErrNoJob) {
+		t.Fatalf("claim with retry_wait parent = %+v, %v; want ErrNoJob", job, err)
+	}
+	var attempts int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM processing_attempts WHERE job_id=?`, child).Scan(&attempts); err != nil {
+		t.Fatal(err)
+	}
+	if attempts != 0 {
+		t.Fatalf("waiting consumed %d attempts", attempts)
+	}
+	// Exhausting the parent's budget terminally fails it and releases the child.
+	parentJob, err = Claim(ctx, db, ClaimOptions{WorkerID: "w", Stages: []string{"audio_vad"}, Lease: time.Minute, Now: now.Add(time.Hour)})
+	if err != nil {
+		t.Fatalf("reclaim parent: %v", err)
+	}
+	if err := Fail(ctx, db, parentJob.ID, parentJob.LeaseToken, `{"code":"fatal"}`, false, now.Add(time.Hour)); err != nil {
+		t.Fatalf("fail parent: %v", err)
+	}
+	claimed, err := Claim(ctx, db, ClaimOptions{WorkerID: "w", Stages: []string{"asr"}, Lease: time.Minute, Now: now.Add(2 * time.Hour)})
+	if err != nil || claimed.ID != child {
+		t.Fatalf("claim after failed parent = %+v, %v", claimed, err)
+	}
+
+	// A conflicting dependency set on the same key is rejected and adds no edge.
+	before, _ := dependencyRows(ctx, db, child)
+	if _, _, err := Enqueue(ctx, db, Spec{Stage: "asr", InputSnapshotID: "snap", IdempotencyKey: "child", Dependencies: nil}, now); !errors.Is(err, ErrConflict) {
+		t.Fatalf("conflicting re-enqueue error = %v, want ErrConflict", err)
+	}
+	after, _ := dependencyRows(ctx, db, child)
+	if before != after {
+		t.Fatalf("conflict partially wrote dependencies: %d -> %d", before, after)
+	}
+	// Self dependency is rejected.
+	if _, _, err := Enqueue(ctx, db, Spec{Stage: "asr", InputSnapshotID: "snap", IdempotencyKey: "self", Dependencies: []string{jobIDFor("self")}}, now); err == nil {
+		t.Fatal("self dependency accepted")
+	}
+	// A nonexistent parent fails on the foreign key.
+	if _, _, err := Enqueue(ctx, db, Spec{Stage: "asr", InputSnapshotID: "snap", IdempotencyKey: "orphan", Dependencies: []string{"missing"}}, now); err == nil {
+		t.Fatal("nonexistent dependency accepted")
+	}
+}
+
+// dependencyRows counts stored dependency edges of one job.
+func dependencyRows(ctx context.Context, db *sql.DB, jobID string) (int, error) {
+	var count int
+	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM processing_job_dependencies WHERE job_id=?`, jobID).Scan(&count)
+	return count, err
+}
+
+// jobIDFor mirrors the queue's deterministic job id for a key.
+func jobIDFor(key string) string { return jobID(key) }

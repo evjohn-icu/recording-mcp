@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"recordingmcp/internal/app"
+	"recordingmcp/internal/audioanalysis"
 	"recordingmcp/internal/cloudsync"
 	"recordingmcp/internal/contextbrief"
 	"recordingmcp/internal/contextbuild"
@@ -135,9 +136,11 @@ func main() {
 	semanticModel := flag.String("semantic-model", "", "embedding model name (required when --semantic-provider=openai)")
 	semanticKeyEnv := flag.String("semantic-key-env", "", "environment variable holding the embeddings API key (openai only)")
 	semanticInputType := flag.Bool("semantic-input-type", false, "send the non-standard input_type field (needed by the bundled Qwen embedding server)")
+	audioAnalysisConfig := flag.String("audio-analysis-config", "", "path to an audio-analysis-config-v1 JSON (empty disables audio analysis)")
 	decisionURL := flag.String("decision-url", "", "optional Decision engine endpoint used to rerank hybrid search items (empty disables reranking)")
 	sufficiencyURL := flag.String("sufficiency-url", "", "optional Decision endpoint for v2 evidence sufficiency (empty disables assessment)")
-	sufficiencyModel := flag.String("sufficiency-model", "", "model identity for v2 evidence sufficiency")
+	sufficiencyModel := flag.String("sufficiency-model", "", "model identity for v2/v3 evidence assessment")
+	admissionPolicyPath := flag.String("admission-policy", "", "path to an evidence-admission-policy-v1 JSON; enables the experimental retrieval v3 gate")
 	decisionModel := flag.String("decision-model", "jev-style-2b-v2", "model name sent to the Decision engine for reranking")
 	worldlineURL := flag.String("worldline-decision-url", "", "local loopback system_one endpoint for worldline semantic suggestions")
 	worldlineModel := flag.String("worldline-decision-model", "decision-v3-0.8b", "actual local decision model for worldline suggestions")
@@ -149,6 +152,28 @@ func main() {
 	briefPolishPiProvider := flag.String("brief-polish-pi-provider", "", "explicit Pi provider for brief polishing; never executes key commands")
 	briefPolishPiModels := flag.String("brief-polish-pi-models-file", "", "Pi models.json path (only read with --brief-polish-pi-provider)")
 	flag.Parse()
+	var audioCfg *audioanalysis.Config
+	if raw := strings.TrimSpace(*audioAnalysisConfig); raw != "" {
+		loaded, err := audioanalysis.LoadConfig(raw)
+		if err != nil {
+			log.Fatal(err)
+		}
+		audioCfg = loaded
+	}
+	var admissionPolicy *contextbuild.AdmissionPolicy
+	if raw := strings.TrimSpace(*admissionPolicyPath); raw != "" {
+		policy, err := contextbuild.LoadAdmissionPolicy(raw)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := policy.Validate(false); err != nil {
+			log.Fatal(err)
+		}
+		if strings.TrimSpace(*sufficiencyURL) == "" || *sufficiencyModel != policy.AssessorModel {
+			log.Fatal("--admission-policy requires --sufficiency-url and --sufficiency-model matching the policy assessor_model")
+		}
+		admissionPolicy = policy
+	}
 	var briefPolisher contextbrief.Polisher
 	var briefPolishErr error
 	if *briefPolishPiProvider != "" {
@@ -260,6 +285,18 @@ func main() {
 				rerank = &contextbuild.DecisionReranker{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*decisionURL), Model: *decisionModel}}
 			}
 			svc := app.New(store, retriever, rerank, paths.Audio)
+			svc.AdmissionPolicy = admissionPolicy
+			if audioCfg != nil {
+				svc.AudioConfig = audioCfg
+				svc.AudioRuns = audioanalysis.NewStore(store.DB())
+			}
+			if audioCfg != nil {
+				svc.AudioConfig = audioCfg
+				svc.AudioRuns = audioanalysis.NewStore(store.DB())
+			}
+			if admissionPolicy != nil {
+				svc.CandidateAssessor = contextbuild.DecisionCandidateAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
+			}
 			svc.ASRProvider = *asrProvider
 			svc.ASRInitError = asrInitMessage
 			svc.BriefPolisher = briefPolisher
@@ -398,6 +435,14 @@ func main() {
 		rerank = &contextbuild.DecisionReranker{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*decisionURL), Model: *decisionModel}}
 	}
 	svc := app.New(store, retriever, rerank, *audioDir)
+	svc.AdmissionPolicy = admissionPolicy
+	if audioCfg != nil {
+		svc.AudioConfig = audioCfg
+		svc.AudioRuns = audioanalysis.NewStore(store.DB())
+	}
+	if admissionPolicy != nil {
+		svc.CandidateAssessor = contextbuild.DecisionCandidateAssessor{Engine: &decision.SystemOneClient{Endpoint: strings.TrimSpace(*sufficiencyURL), Model: *sufficiencyModel}}
+	}
 	svc.ASRProvider = *asrProvider
 	svc.ASRInitError = asrInitMessage
 	svc.BriefPolisher = briefPolisher

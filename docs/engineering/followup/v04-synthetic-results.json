@@ -1,0 +1,122 @@
+{
+  "started_at": "2026-11-13T11:52:00Z",
+  "scenarios": [
+    {
+      "id": "v04.synthetic",
+      "spec": "context-engine-v04.protocol",
+      "kind": "synthetic-closed-loop",
+      "label": "synthetic",
+      "audio_analysis_config": false,
+      "status": "PASS",
+      "wall_seconds": 0.23,
+      "rtf": 0.0767,
+      "expected_chunks": 1,
+      "completed_chunks": 1,
+      "failed_chunks": 0,
+      "coverage_ms": 3000,
+      "duration_ms": 3000,
+      "turns": 1,
+      "playable_turns": 1,
+      "job_statuses": [
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded"
+      ],
+      "note": "fixture ASR and synthetic WAV; protocol only, not an accuracy result"
+    },
+    {
+      "id": "T4",
+      "spec": "long-audio.window-resume",
+      "kind": "go-test",
+      "command": "go test ./internal/ingest -run ^TestRunASRJobResumesCommittedWindows$ -count=1",
+      "status": "PASS",
+      "exit_code": 0,
+      "wall_seconds": 0.66,
+      "output_tail": [
+        "ok  \trecordingmcp/internal/ingest\t0.236s"
+      ]
+    },
+    {
+      "id": "T5",
+      "spec": "long-audio.coverage",
+      "kind": "go-test",
+      "command": "go test ./internal/ingest -run ^TestRunASRJobCoverageAccounting$ -count=1",
+      "status": "PASS",
+      "exit_code": 0,
+      "wall_seconds": 0.58,
+      "output_tail": [
+        "ok  \trecordingmcp/internal/ingest\t0.186s"
+      ]
+    },
+    {
+      "id": "T6",
+      "spec": "long-audio.partial-failure",
+      "kind": "go-test",
+      "command": "go test ./internal/ingest -run ^TestRunASRJobKeepsPartialStateOnWindowFailure$ -count=1",
+      "status": "PASS",
+      "exit_code": 0,
+      "wall_seconds": 0.66,
+      "output_tail": [
+        "ok  \trecordingmcp/internal/ingest\t0.255s"
+      ]
+    },
+    {
+      "id": "T7",
+      "spec": "long-audio.oom-actionable",
+      "kind": "go-test",
+      "command": "go test ./internal/ingest -run ^TestRunASRJobMapsCUDAOutOfMemory$ -count=1",
+      "status": "PASS",
+      "exit_code": 0,
+      "wall_seconds": 0.6,
+      "output_tail": [
+        "ok  \trecordingmcp/internal/ingest\t0.190s"
+      ]
+    },
+    {
+      "id": "T8",
+      "spec": "long-audio.indexing-restart",
+      "kind": "go-test",
+      "command": "go test ./internal/ingest -run ^TestEmbedJobResumesAfterTranscriptCommit$ -count=1",
+      "status": "PASS",
+      "exit_code": 0,
+      "wall_seconds": 0.74,
+      "output_tail": [
+        "ok  \trecordingmcp/internal/ingest\t0.341s"
+      ]
+    },
+    {
+      "id": "T9",
+      "spec": "long-audio.duplicate-import",
+      "kind": "go-test",
+      "command": "go test ./internal/ingest -run ^TestImportDuplicateBytesReuseJob$ -count=1",
+      "status": "PASS",
+      "exit_code": 0,
+      "wall_seconds": 0.56,
+      "output_tail": [
+        "ok  \trecordingmcp/internal/ingest\t0.165s"
+      ]
+    },
+    {
+      "id": "T10",
+      "spec": "long-audio.progress-projection",
+      "kind": "go-test",
+      "command": "go test ./internal/ingest -run ^TestProcessingStatusProjectsASRProgress$ -count=1",
+      "status": "PASS",
+      "exit_code": 0,
+      "wall_seconds": 0.6,
+      "output_tail": [
+        "ok  \trecordingmcp/internal/ingest\t0.198s"
+      ]
+    }
+  ],
+  "metrics": {
+    "passed": 8,
+    "failed": 0,
+    "not_run": 0,
+    "blocked": 0,
+    "local_only": true
+  },
+  "protocol": "context-engine-v04",
+  "finished_at": "2026-11-13T11:52:05Z"
+}

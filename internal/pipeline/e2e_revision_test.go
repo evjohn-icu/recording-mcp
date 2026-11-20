@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"path/filepath"
+	"recordingmcp/internal/audioanalysis"
 	"strings"
 	"testing"
 	"time"
@@ -121,11 +122,49 @@ func TestEndToEndSupersedeReprocess(t *testing.T) {
 	}
 	v1TurnID := oldNote.EvidenceTurnIDs[0]
 
+	// A speaker-mapping run pinned to the v1 attachment must be invalidated by
+	// the supersede transaction, while pure acoustic runs stay valid.
+	var v1AttachmentID string
+	if err := db.QueryRow(`SELECT id FROM source_attachments WHERE segment_id='seg-1' AND transcript_revision='rev-1'`).Scan(&v1AttachmentID); err != nil {
+		t.Fatalf("v1 attachment id: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO processing_jobs(id,stage,input_snapshot_id,idempotency_key,status,priority,payload_json,max_attempts,attempt_count,available_at,created_at,updated_at)
+ VALUES('job:audio-map','audio_speaker','snap','audio-map-key','succeeded',0,'{}',3,1,1,1,1)`); err != nil {
+		t.Fatalf("seed audio job: %v", err)
+	}
+	snapshot, err := audioanalysis.SnapshotHash([]audioanalysis.AttachmentRef{{ID: v1AttachmentID, Revision: "rev-1"}})
+	if err != nil {
+		t.Fatalf("snapshot hash: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO audio_analysis_runs(id,job_id,recording_id,source_audio_sha256,input_sha256,source_attachment_ids_json,source_snapshot_sha256,capability,start_ms,end_ms,model_id,model_revision,config_sha256,generation,status,active,result_json,created_at,updated_at)
+ VALUES('run:map','job:audio-map',?,?,?,?,?,'speaker',0,1000,'campplus','rev-1',?,'gen-map','succeeded',1,'{}',1,1)`,
+		report.RecordingID, strings.Repeat("a", 64), strings.Repeat("b", 64),
+		`["`+v1AttachmentID+`"]`, snapshot, strings.Repeat("c", 64)); err != nil {
+		t.Fatalf("seed audio run: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO audio_analysis_heads(recording_id,capability,desired_job_id,current_run_id) VALUES(?,'speaker','job:audio-map','run:map')`, report.RecordingID); err != nil {
+		t.Fatalf("seed audio head: %v", err)
+	}
+
 	// --- v2 supersedes rev-1 ---
 	v2 := e2eResult("seg-1", "rev-2", "utt-1", v2Text, 0)
 	v2.Source.SupersedesRevision = "rev-1"
 	if _, err := store.IngestTranscript(ctx, v2); err != nil {
 		t.Fatalf("ingest v2 supersede: %v", err)
+	}
+	var audioStatus string
+	if err := db.QueryRow(`SELECT status FROM audio_analysis_runs WHERE id='run:map'`).Scan(&audioStatus); err != nil {
+		t.Fatalf("audio run status: %v", err)
+	}
+	if audioStatus != "invalidated" {
+		t.Fatalf("mapping run status = %q, want invalidated", audioStatus)
+	}
+	var currentRun sql.NullString
+	if err := db.QueryRow(`SELECT current_run_id FROM audio_analysis_heads WHERE recording_id=? AND capability='speaker'`, report.RecordingID).Scan(&currentRun); err != nil {
+		t.Fatalf("audio head: %v", err)
+	}
+	if currentRun.Valid {
+		t.Fatalf("audio head still points at %q", currentRun.String)
 	}
 	var stale int
 	if err := db.QueryRow(`SELECT stale FROM derived_artifacts WHERE kind='note' AND artifact_id=?`, oldNote.ID).Scan(&stale); err != nil {
