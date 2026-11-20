@@ -74,7 +74,8 @@ func (s *Service) Capabilities(ctx context.Context) (Capabilities, error) {
 		Retrieval: RetrievalCapability{
 			DefaultVersion: "v1",
 			V2Available:    true,
-			V3Available:    s.AdmissionPolicy != nil && s.AdmissionPolicy.Validate(false) == nil && s.CandidateAssessor != nil && s.Semantic != nil,
+			V3Available: s.AdmissionPolicy != nil && s.AdmissionPolicy.Validate(false) == nil &&
+				s.CandidateAssessor != nil && s.Semantic != nil && s.AdmissionPolicy.MatchesIdentity(s.Semantic.Describe()),
 		},
 		Limits: Limits{UploadBytes: MaxUploadBytes},
 	}

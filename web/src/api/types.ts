@@ -157,7 +157,7 @@ export interface Capabilities {
   version: string
   asr: ASRCapability
   generator: { enabled: boolean }
-  retrieval: { default_version: string; v2_available: boolean; v3_available: boolean }
+  retrieval?: { default_version: string; v2_available: boolean; v3_available: boolean }
   worker: { alive: boolean; count: number }
   limits: { upload_bytes: number }
 }

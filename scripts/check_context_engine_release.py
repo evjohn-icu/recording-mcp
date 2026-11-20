@@ -25,9 +25,15 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import re
+import stat
+import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from retrieval_quality_gates import config_signature, quality_gate_v3  # noqa: E402,F401
 
 SCHEMA = "context-engine-v04-release-results-v2"
 DECISION_SCHEMA = "context-engine-v04-decision-v1"
@@ -46,6 +52,11 @@ PRODUCTION_METRICS = ("cer_max", "wer_max", "der_max", "event_precision_min", "e
 # A release candidate must carry these three current rows: the audio quality
 # gate, the v3 calibration and the independent v3 holdout.
 REQUIRED_RELEASE_ROWS = ("audio.production-gate", "v3.calibration", "v3.holdout")
+# The selection-lock protocol the calibration row must pin; the runner's lock
+# writer owns the same value.
+V3_LOCK_SCHEMA = "retrieval-v3-selection-lock-v3"
+# The two runs a v3 holdout manifest must report, v1 baseline first.
+V3_RUN_IDS = ("v1_test", "v3_test")
 
 
 def sha256_file(path: Path) -> str:
@@ -326,6 +337,278 @@ def _check_audio_gate(gate_id: str, by_id: dict[str, dict], decision: dict,
         _recompute_gate(gate, thresholds, errors)
 
 
+def _failed_check_names(gate: dict) -> str:
+    checks = gate.get("checks")
+    failed = sorted(name for name, ok in checks.items() if not ok) if isinstance(checks, dict) else []
+    return ", ".join(failed) if failed else "no named checks"
+
+
+def _v3_row_artifact(row_id: str, by_id: dict[str, dict], root: Path, document_dir: Path | None,
+                     errors: list[str]) -> tuple[dict | None, Path | None]:
+    """Load a v3 release row's JSON artifact after the generic integrity checks."""
+    row = by_id.get(row_id)
+    if row is None:
+        # The missing-anchor check already reported the absent row.
+        return None, None
+    if row.get("status") != "PASS":
+        errors.append(f"{row_id}: v3 evidence is {row.get('status')}, not PASS")
+        return None, None
+    if row.get("evidence_kind") != "current":
+        errors.append(f"{row_id}: v3 evidence must be current, not {row.get('evidence_kind')}")
+        return None, None
+    artifact = str(row.get("artifact") or "")
+    if not artifact:
+        kind = "selection lock" if row_id == "v3.calibration" else "holdout manifest"
+        errors.append(f"{row_id}: PASS evidence needs the {kind} artifact")
+        return None, None
+    target = _resolve(root, document_dir, artifact)
+    if not target.is_file():
+        errors.append(f"{row_id}: artifact not found: {artifact}")
+        return None, None
+    payload = _read_json(target, f"{row_id} artifact", errors)
+    if payload is None:
+        return None, None
+    return payload, target
+
+
+def _v3_selected_policy_document(lock: dict, backend: str, threshold_hundredths: int,
+                                 fixture_sha256: str) -> dict:
+    """Rebuild the selected-phase admission policy document from the lock, the
+    same way the runner's ``_selected_policy_signature`` does."""
+    configuration = lock.get("configuration") if isinstance(lock, dict) else None
+    configuration = configuration if isinstance(configuration, dict) else {}
+    if backend == "hash":
+        provider_id, model_id = "hash-ngram-v1", "hash-ngram-v1"
+    else:
+        provider_id, model_id = "openai-compat", str(configuration.get("embedding_model") or "")
+    return {"schema_version": "evidence-admission-policy-v1", "retrieval_version": "v3",
+            "provider_id": provider_id, "model_id": model_id,
+            "model_revision": str(configuration.get("embedding_revision") or ""),
+            "assessor_model": str(configuration.get("assessor_model") or ""),
+            "fixture_sha256": fixture_sha256,
+            "threshold": threshold_hundredths / 100, "phase": "selected"}
+
+
+def _check_v3_failure_counts(prefix: str, label: str, metrics: dict, errors: list[str]) -> None:
+    counts = metrics.get("failure_counts")
+    if not isinstance(counts, dict):
+        errors.append(f"{prefix}: {label} failure_counts must be an object")
+
+
+def _check_v3_selection_lock(lock: dict, errors: list[str]) -> None:
+    """The consumed calibration lock: schema, pins, identity and stored gate.
+
+    Every defect is reported as a descriptive error naming the offending
+    field; nothing here raises on attacker-controlled content.
+    """
+    prefix = "v3.calibration"
+    if lock.get("schema") != V3_LOCK_SCHEMA:
+        errors.append(f"{prefix}: selection lock schema must be {V3_LOCK_SCHEMA}, "
+                      f"not {lock.get('schema')!r}")
+        return
+    selected = lock.get("selected")
+    if not isinstance(selected, dict):
+        errors.append(f"{prefix}: selection lock selected candidate must be an object")
+        return
+    if selected.get("version") != "v3":
+        errors.append(f"{prefix}: selection lock selected version must be v3, not {selected.get('version')!r}")
+    backend = selected.get("backend")
+    if backend != "openai":
+        errors.append(f"{prefix}: selection lock selected backend must be openai for the "
+                      f"real-provider lock, not {backend!r}")
+    if not isinstance(selected.get("rerank"), bool):
+        errors.append(f"{prefix}: selection lock selected rerank must be a boolean")
+    threshold_hundredths = selected.get("threshold_hundredths")
+    if isinstance(threshold_hundredths, bool) or not isinstance(threshold_hundredths, int) \
+            or not 0 <= threshold_hundredths <= 100:
+        errors.append(f"{prefix}: selection lock threshold_hundredths must be an integer between 0 and 100")
+        threshold_hundredths = None
+    else:
+        threshold = selected.get("threshold")
+        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
+            errors.append(f"{prefix}: selection lock selected threshold must be a number")
+        elif threshold != threshold_hundredths / 100:
+            errors.append(f"{prefix}: selection lock selected threshold must exactly equal "
+                          "threshold_hundredths / 100")
+    if config_signature(selected) != lock.get("selected_sha256"):
+        errors.append(f"{prefix}: selection lock selected candidate does not match its selected_sha256")
+    fixture_hashes = lock.get("fixture_sha256")
+    if not isinstance(fixture_hashes, dict) or not fixture_hashes:
+        errors.append(f"{prefix}: selection lock fixture_sha256 must be a non-empty object")
+    else:
+        for name, recorded in sorted(fixture_hashes.items()):
+            if not SHA256_RE.match(str(recorded)):
+                errors.append(f"{prefix}: selection lock fixture_sha256.{name} must be 64 hex characters")
+    if not SHA256_RE.match(str(lock.get("binary_sha256") or "")):
+        errors.append(f"{prefix}: selection lock binary_sha256 must be 64 hex characters")
+    configuration = lock.get("configuration")
+    if not isinstance(configuration, dict):
+        errors.append(f"{prefix}: selection lock configuration must be an object")
+    elif config_signature(configuration) != lock.get("configuration_sha256"):
+        errors.append(f"{prefix}: selection lock configuration does not match its configuration_sha256")
+    identity = lock.get("identity")
+    if not isinstance(identity, dict):
+        errors.append(f"{prefix}: selection lock identity must be an object")
+    else:
+        if identity.get("embedding_provider") != "openai-compat":
+            errors.append(f"{prefix}: selection lock identity.embedding_provider must be the real "
+                          f"openai-compat provider, not {identity.get('embedding_provider')!r}")
+        if identity.get("binary_sha256") != lock.get("binary_sha256"):
+            errors.append(f"{prefix}: selection lock identity does not pin the locked binary")
+        assessor_model = str(identity.get("assessor_model") or "")
+        if not assessor_model.strip() or (isinstance(configuration, dict) and
+                                          assessor_model != str(configuration.get("assessor_model") or "")):
+            errors.append(f"{prefix}: selection lock identity.assessor_model must be present and "
+                          "match the locked configuration")
+        if assessor_model.endswith("latest") \
+                and not str(identity.get("assessor_actual_model") or "").strip():
+            errors.append(f"{prefix}: selection lock identity.assessor_actual_model is required for "
+                          "the floating 'latest' assessor alias")
+        embedding_model = str(identity.get("embedding_model") or "")
+        if not embedding_model.strip() or (isinstance(configuration, dict) and
+                                           embedding_model != str(configuration.get("embedding_model") or "")):
+            errors.append(f"{prefix}: selection lock identity.embedding_model must be present and "
+                          "match the locked configuration")
+        embedding_revision = str(identity.get("embedding_revision") or "")
+        if not embedding_revision.strip() or (isinstance(configuration, dict) and
+                                              embedding_revision != str(configuration.get("embedding_revision") or "")):
+            errors.append(f"{prefix}: selection lock identity.embedding_revision must be present and "
+                          "match the locked configuration")
+        if isinstance(configuration, dict):
+            if identity.get("embedding_dims") != configuration.get("embedding_dims"):
+                errors.append(f"{prefix}: selection lock identity.embedding_dims must match the "
+                              "locked configuration")
+            if identity.get("embedding_input_type") != configuration.get("embedding_input_type"):
+                errors.append(f"{prefix}: selection lock identity.embedding_input_type must match "
+                              "the locked configuration")
+    if isinstance(configuration, dict) and isinstance(selected.get("rerank"), bool) \
+            and bool(configuration.get("rerank_endpoint") and configuration.get("rerank_model")) \
+            is not selected["rerank"]:
+        errors.append(f"{prefix}: selection lock selected rerank does not match the configured "
+                      "rerank endpoint and model")
+    if isinstance(fixture_hashes, dict) and isinstance(threshold_hundredths, int) \
+            and isinstance(fixture_hashes.get("retrieval.json"), str):
+        document = _v3_selected_policy_document(lock, backend, threshold_hundredths,
+                                                fixture_hashes["retrieval.json"])
+        if config_signature(document) != lock.get("selected_policy_sha256"):
+            errors.append(f"{prefix}: selection lock selected_policy_sha256 does not match the "
+                          "selected admission policy")
+    calibration_metrics = lock.get("calibration_metrics")
+    baseline_metrics = lock.get("calibration_baseline_metrics")
+    if not isinstance(calibration_metrics, dict):
+        errors.append(f"{prefix}: selection lock calibration_metrics must be an object")
+    else:
+        _check_v3_failure_counts(prefix, "selection lock calibration_metrics",
+                                 calibration_metrics, errors)
+    if not isinstance(baseline_metrics, dict):
+        errors.append(f"{prefix}: selection lock calibration_baseline_metrics must be an object")
+    else:
+        _check_v3_failure_counts(prefix, "selection lock calibration_baseline_metrics",
+                                 baseline_metrics, errors)
+    gate = lock.get("calibration_gate")
+    if not isinstance(gate, dict) or gate.get("passed") is not True:
+        errors.append(f"{prefix}: selection lock calibration_gate.passed must be true")
+    if lock.get("final_rerun_uncached") is not True:
+        errors.append(f"{prefix}: selection lock must record final_rerun_uncached=true")
+    if lock.get("holdout_started") is not True:
+        errors.append(f"{prefix}: selection lock has not been consumed by the holdout")
+    if isinstance(calibration_metrics, dict) and isinstance(baseline_metrics, dict):
+        recomputed = quality_gate_v3(calibration_metrics, baseline_metrics)
+        if not recomputed["passed"]:
+            errors.append(f"{prefix}: recomputed calibration gate failed: {_failed_check_names(recomputed)}")
+        if isinstance(gate, dict) and recomputed["checks"] != gate.get("checks"):
+            errors.append(f"{prefix}: selection lock calibration_gate checks disagree with the "
+                          "recomputed gate")
+
+
+def _check_v3_holdout_manifest(manifest: dict, lock: dict | None, lock_path: Path | None,
+                               errors: list[str]) -> None:
+    """The holdout manifest must pin the calibration lock and recompute PASS."""
+    prefix = "v3.holdout"
+    if manifest.get("protocol") != "v3" or manifest.get("phase") != "holdout":
+        errors.append(f"{prefix}: holdout manifest must record protocol v3 and phase holdout")
+    manifest_fixture = manifest.get("fixture_sha256")
+    if isinstance(manifest_fixture, dict):
+        for name, recorded in sorted(manifest_fixture.items()):
+            if not SHA256_RE.match(str(recorded)):
+                errors.append(f"{prefix}: holdout manifest fixture_sha256.{name} must be 64 hex characters")
+    if manifest.get("binary_sha256") is not None and not SHA256_RE.match(str(manifest.get("binary_sha256"))):
+        errors.append(f"{prefix}: holdout manifest binary_sha256 must be 64 hex characters")
+    if lock_path is not None:
+        recorded = str(manifest.get("selection_lock_sha256") or "")
+        if not SHA256_RE.match(recorded):
+            errors.append(f"{prefix}: holdout manifest selection_lock_sha256 must be 64 hex characters")
+        elif sha256_file(lock_path) != recorded:
+            errors.append(f"{prefix}: holdout manifest selection_lock_sha256 does not match the "
+                          "calibration selection lock")
+    if isinstance(lock, dict):
+        if manifest.get("fixture_sha256") != lock.get("fixture_sha256"):
+            errors.append(f"{prefix}: holdout manifest fixture_sha256 does not match the "
+                          "calibration selection lock")
+        if manifest.get("binary_sha256") != lock.get("binary_sha256"):
+            errors.append(f"{prefix}: holdout manifest binary_sha256 does not match the "
+                          "calibration selection lock")
+        if manifest.get("identity") != lock.get("identity"):
+            errors.append(f"{prefix}: holdout manifest identity does not match the "
+                          "calibration selection lock")
+        if manifest.get("selected_candidate") != lock.get("selected"):
+            errors.append(f"{prefix}: holdout manifest selected_candidate does not match the "
+                          "calibration selection lock")
+        protocol_config = manifest.get("protocol_config")
+        if not isinstance(protocol_config, dict):
+            errors.append(f"{prefix}: holdout manifest protocol_config must be an object")
+        else:
+            if protocol_config.get("test_touched") is not True:
+                errors.append(f"{prefix}: holdout manifest protocol_config.test_touched must be true")
+            if protocol_config.get("configuration") != lock.get("configuration") \
+                    or protocol_config.get("configuration_sha256") != lock.get("configuration_sha256"):
+                errors.append(f"{prefix}: holdout manifest configuration does not match the "
+                              "calibration selection lock")
+    runs = manifest.get("runs")
+    if not isinstance(runs, dict):
+        errors.append(f"{prefix}: holdout manifest runs must be an object")
+        return
+    run_metrics: dict[str, dict] = {}
+    for run_id in V3_RUN_IDS:
+        run = runs.get(run_id)
+        if not isinstance(run, dict):
+            errors.append(f"{prefix}: holdout manifest runs.{run_id} must be an object")
+            continue
+        if run.get("status") != "PASS":
+            errors.append(f"{prefix}: holdout manifest runs.{run_id}.status must be PASS, "
+                          f"not {run.get('status')!r}")
+        metrics = run.get("metrics")
+        if not isinstance(metrics, dict):
+            errors.append(f"{prefix}: holdout manifest runs.{run_id}.metrics must be an object")
+        else:
+            _check_v3_failure_counts(prefix, f"runs.{run_id} metrics", metrics, errors)
+            run_metrics[run_id] = metrics
+    if len(run_metrics) == len(V3_RUN_IDS):
+        recomputed = quality_gate_v3(run_metrics["v3_test"], run_metrics["v1_test"])
+        if not recomputed["passed"]:
+            errors.append(f"{prefix}: recomputed holdout gate failed: {_failed_check_names(recomputed)}")
+    if manifest.get("quality_gate_passed") is not True:
+        errors.append(f"{prefix}: holdout manifest quality_gate_passed must be true")
+
+
+def _check_v3_evidence(by_id: dict[str, dict], root: Path, document_dir: Path | None,
+                       errors: list[str]) -> None:
+    """Verify the v3 calibration lock and the holdout manifest that consumed it.
+
+    Both required release rows must carry hash-verified JSON artifacts: the
+    calibration row points at a consumed v3 selection lock whose stored gate
+    matches a recomputation of its own metrics, and the holdout row points at
+    a manifest pinning that same lock, configuration, fixture and binary with
+    both test runs passing the same shared gate.
+    """
+    lock, lock_path = _v3_row_artifact("v3.calibration", by_id, root, document_dir, errors)
+    manifest, _manifest_path = _v3_row_artifact("v3.holdout", by_id, root, document_dir, errors)
+    if isinstance(lock, dict):
+        _check_v3_selection_lock(lock, errors)
+    if isinstance(manifest, dict):
+        _check_v3_holdout_manifest(manifest, lock if isinstance(lock, dict) else None, lock_path, errors)
+
+
 def check(document: dict, root: Path, document_dir: Path | None = None) -> tuple[list[str], list[str]]:
     """Return (errors, warnings)."""
     errors: list[str] = []
@@ -488,6 +771,7 @@ def check(document: dict, root: Path, document_dir: Path | None = None) -> tuple
         thresholds, thresholds_digest = _production_thresholds(decision, root, document_dir, errors)
         _check_audio_gate(gate_id, by_id, decision, thresholds, thresholds_digest,
                           root, document_dir, errors)
+        _check_v3_evidence(by_id, root, document_dir, errors)
     if release == "READY" and merge != "READY":
         errors.append("release READY requires merge READY")
     if decision["production_ready_recommendation"]:
@@ -541,15 +825,166 @@ def _resolve(root: Path, document_dir: Path | None, relative: str) -> Path:
     return root / path
 
 
+def _run_git(root: Path, *args: str) -> subprocess.CompletedProcess:
+    """Run one git command inside root; never raises, callers read the result."""
+    try:
+        return subprocess.run(["git", "-C", os.fspath(root), *args], capture_output=True)
+    except OSError as error:  # git binary missing or not executable
+        return subprocess.CompletedProcess(args, 127, b"", str(error).encode("utf-8"))
+
+
+def _git_failure(command: str, proc: subprocess.CompletedProcess) -> str:
+    detail = proc.stderr.decode("utf-8", "replace").strip() or f"exit code {proc.returncode}"
+    return f"git {command} is not readable ({detail})"
+
+
+def _report_rel(root: Path, document_path: Path) -> str | None:
+    """The document path relative to root, or None when it lives outside root."""
+    document_abs = Path(os.path.abspath(os.fspath(document_path)))
+    root_abs = Path(os.path.abspath(os.fspath(root)))
+    try:
+        return document_abs.relative_to(root_abs).as_posix()
+    except ValueError:
+        return None
+
+
+def _pathspec(rel: str | None) -> list[str]:
+    """Scope both git commands to the repository, excluding the report itself."""
+    if rel is None:  # an external report: there is no report path to exclude
+        return ["--", "."]
+    return ["--", ".", f":(exclude,literal){rel}"]
+
+
+def _worktree_fingerprint(root: Path, document_path: Path) -> tuple[dict | None, str | None]:
+    """Return ({candidate_head, uncommitted_diff_sha256}, None) or (None, error).
+
+    ``uncommitted_diff_sha256 = sha256(status_bytes + diff_bytes + untracked_bytes)``
+    where both git commands run ``-- . ':(exclude,literal)<report path>'``.
+    Untracked entries are collected from the raw-bytes porcelain output (rename
+    and copy records consume their paired second field), sorted by raw path
+    bytes, and hashed by file bytes or, for symlinks, by link-target bytes.
+    """
+    pathspec = _pathspec(_report_rel(root, document_path))
+    status = _run_git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all", *pathspec)
+    if status.returncode != 0:
+        return None, _git_failure("status", status)
+    diff = _run_git(root, "diff", "HEAD", "--binary", "--no-ext-diff", "--no-color", *pathspec)
+    if diff.returncode != 0:
+        return None, _git_failure("diff", diff)
+    untracked_paths: list[bytes] = []
+    fields = status.stdout.split(b"\0")
+    index = 0
+    while index < len(fields):
+        entry = fields[index]
+        index += 1
+        if not entry:
+            break
+        if entry.startswith(b"?? "):
+            untracked_paths.append(entry[3:])
+        if len(entry) >= 2 and (entry[0:1] in (b"R", b"C") or entry[1:2] in (b"R", b"C")):
+            index += 1  # rename/copy records pair the original path as a second field
+    untracked = bytearray()
+    for raw_path in sorted(untracked_paths):
+        full = os.path.join(os.fsencode(root), raw_path)
+        try:
+            info = os.lstat(full)
+            if stat.S_ISLNK(info.st_mode):
+                payload = os.readlink(full)
+            elif stat.S_ISREG(info.st_mode):
+                with open(full, "rb") as handle:
+                    payload = handle.read()
+            else:
+                return None, ("untracked worktree entry is neither file nor symlink: "
+                              f"{os.fsdecode(raw_path)!r}")
+        except OSError as error:
+            return None, (f"untracked worktree entry could not be read: "
+                          f"{os.fsdecode(raw_path)!r} ({error})")
+        untracked += raw_path + b"\0"
+        untracked += hashlib.sha256(payload).hexdigest().encode("ascii") + b"\0"
+    head = _run_git(root, "rev-parse", "HEAD")
+    if head.returncode != 0:
+        return None, _git_failure("rev-parse HEAD", head)
+    digest = hashlib.sha256(bytes(status.stdout) + bytes(diff.stdout) + bytes(untracked)).hexdigest()
+    return {"candidate_head": head.stdout.strip().decode("ascii"),
+            "uncommitted_diff_sha256": digest}, None
+
+
+def verify_git_snapshot(snapshot: dict | None, root: Path, document_path: Path) -> list[str]:
+    """Verify the evidence snapshot against the actual git state of root.
+
+    The candidate must be HEAD, or an ancestor of HEAD whose only diff is the
+    evidence document itself -- compared with ``--no-renames``, so a rename
+    into the report path cannot pose as a report-only commit. The recorded
+    ``uncommitted_diff_sha256`` must equal the worktree fingerprint. Unreadable
+    git, unknown candidates, stale candidates and drifted fingerprints all
+    become verdict errors; the structural ``check()`` stays Git-free.
+    """
+    if not isinstance(snapshot, dict):
+        return []  # the structural check already reported the snapshot problem
+    head = _run_git(root, "rev-parse", "HEAD")
+    if head.returncode != 0:
+        return ["evidence snapshot could not be verified: " + _git_failure("rev-parse HEAD", head)]
+    head_sha = head.stdout.strip().decode("ascii")
+    errors: list[str] = []
+    candidate = str(snapshot.get("candidate_head") or "")
+    exists = _run_git(root, "rev-parse", "--verify", "--quiet", f"{candidate}^{{commit}}")
+    if exists.returncode != 0:
+        errors.append("evidence_snapshot.candidate_head is not a commit in this "
+                      f"repository: {candidate}")
+    elif head_sha != candidate:
+        ancestry = _run_git(root, "merge-base", "--is-ancestor", candidate, "HEAD")
+        if ancestry.returncode == 1:
+            errors.append("evidence snapshot is stale: candidate_head "
+                          f"{candidate} is not an ancestor of HEAD {head_sha}")
+        elif ancestry.returncode != 0:
+            errors.append("evidence snapshot could not be verified: "
+                          + _git_failure("merge-base", ancestry))
+        else:
+            names = _run_git(root, "diff", "--name-only", "-z", "--no-renames", candidate, "HEAD")
+            if names.returncode != 0:
+                errors.append("evidence snapshot could not be verified: "
+                              + _git_failure("diff", names))
+            else:
+                rel = _report_rel(root, document_path)
+                outside = [os.fsdecode(path) for path in names.stdout.split(b"\0")
+                           if path and (rel is None or os.fsdecode(path) != rel)]
+                if outside:
+                    errors.append("evidence snapshot is stale: HEAD moved past candidate_head "
+                                  f"{candidate} with changes outside the report: "
+                                  + ", ".join(outside))
+    fingerprint, fingerprint_error = _worktree_fingerprint(root, document_path)
+    if fingerprint_error is not None:
+        errors.append("evidence snapshot could not be verified: " + fingerprint_error)
+        return errors
+    recorded = str(snapshot.get("uncommitted_diff_sha256") or "")
+    if recorded != fingerprint["uncommitted_diff_sha256"]:
+        suffix = f" (recorded {recorded})" if recorded else ""
+        errors.append("evidence_snapshot.uncommitted_diff_sha256 does not match the worktree "
+                      f"fingerprint {fingerprint['uncommitted_diff_sha256']}{suffix}")
+    return errors
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("document", type=Path)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1],
                         help="repository root used to resolve relative evidence paths")
     parser.add_argument("--json", action="store_true", help="emit a machine-readable verdict")
+    parser.add_argument("--print-worktree-fingerprint", action="store_true",
+                        help="print {candidate_head, uncommitted_diff_sha256} for the current "
+                             "worktree (report path excluded) instead of a verdict")
     args = parser.parse_args()
+    if args.print_worktree_fingerprint:
+        fingerprint, error = _worktree_fingerprint(args.root, args.document)
+        if error is not None:
+            print(f"error: {error}", file=sys.stderr)
+            return 1
+        print(json.dumps(fingerprint, sort_keys=True))
+        return 0
     document = json.loads(args.document.read_text(encoding="utf-8"))
     errors, warnings = check(document, args.root, args.document.parent)
+    snapshot = (document.get("decision") or {}).get("evidence_snapshot")
+    errors.extend(verify_git_snapshot(snapshot, args.root, args.document))
     verdict = {"status": "PASS" if not errors else "FAIL", "errors": errors, "warnings": warnings,
                "merge_readiness": (document.get("decision") or {}).get("merge_readiness"),
                "release_readiness": (document.get("decision") or {}).get("release_readiness")}

@@ -52,7 +52,7 @@ func TestAudioAnalysisUpgradePreservesSources(t *testing.T) {
 		t.Fatalf("re-apply: %v", err)
 	}
 	version, err := Version(ctx, db)
-	if err != nil || version != 23 {
+	if err != nil || version < 23 {
 		t.Fatalf("schema version = %d, %v", version, err)
 	}
 }

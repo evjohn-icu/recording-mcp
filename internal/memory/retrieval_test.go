@@ -248,6 +248,56 @@ func TestGetEvidenceContextRadiusAndTruncation(t *testing.T) {
 	}
 }
 
+// TestEvidenceBudgetTreatsNonPositiveMaxBytesAsDefault pins the two budgeted
+// public evidence lookups: maxBytes <= 0 must fall back to the documented
+// default byte budget instead of silently disabling truncation. Only
+// GetCurrentEvidenceWindow is unbudgeted.
+func TestEvidenceBudgetTreatsNonPositiveMaxBytesAsDefault(t *testing.T) {
+	s := openTempStore(t)
+	ctx := context.Background()
+
+	conv := `INSERT INTO conversations(id,title,summary,annotation_version,annotation_basis,recording_id,source_sha256,transcript_version,duration_ms,transcript_json,annotations_json) VALUES(?,?,'','v1','',?,?,?,?, '{}','{}')`
+	mustExec(t, s, conv, "conv:big", "Big", "rec:big", "sha", "tv", 36000)
+	rec := `INSERT INTO recordings(id,conversation_id,source_file,source_sha256,duration_ms,recording_started_at,absolute_time_known) VALUES(?,?,'file','sha',?,?,?)`
+	mustExec(t, s, rec, "rec:big", "conv:big", 36000, "2026-03-01T10:00:00Z", 1)
+	for i := range 6 {
+		seedTurn(t, s, fmt.Sprintf("t:b%d", i), "conv:big", "rec:big", i, int64(1000*(i+1)), strings.Repeat("字", 2000))
+	}
+
+	budgeted, err := s.GetEvidenceContext(ctx, "t:b2", 10, defaultEvidenceMaxByte)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := evidenceIDs(budgeted); !sameStrings(got, []string{"t:b0", "t:b1"}) || !budgeted.Truncated {
+		t.Fatalf("default budget = %v truncated=%v, want the first two turns truncated", got, budgeted.Truncated)
+	}
+
+	for name, maxBytes := range map[string]int{"negative": -1, "zero": 0} {
+		got, err := s.GetEvidenceContext(ctx, "t:b2", 10, maxBytes)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if !sameStrings(evidenceIDs(got), evidenceIDs(budgeted)) || got.Truncated != budgeted.Truncated {
+			t.Fatalf("%s max_bytes window = %v truncated=%v, want the default budget", name, evidenceIDs(got), got.Truncated)
+		}
+		current, err := s.GetCurrentEvidenceContext(ctx, "t:b2", 10, maxBytes)
+		if err != nil {
+			t.Fatalf("%s current: %v", name, err)
+		}
+		if !sameStrings(evidenceIDs(current), evidenceIDs(budgeted)) || current.Truncated != budgeted.Truncated {
+			t.Fatalf("%s current window = %v truncated=%v, want the default budget", name, evidenceIDs(current), current.Truncated)
+		}
+	}
+
+	unbounded, err := s.GetCurrentEvidenceWindow(ctx, "t:b2", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := evidenceIDs(unbounded); len(got) != 6 || unbounded.Truncated {
+		t.Fatalf("unbounded window = %v truncated=%v, want every turn without truncation", got, unbounded.Truncated)
+	}
+}
+
 func TestSearchMemoryScopesCaseEscapesAndCursor(t *testing.T) {
 	s := seedRetrieval(t)
 	ctx := context.Background()

@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"recordingmcp/internal/asrinput"
+	"recordingmcp/internal/gpulock"
 )
 
 // Window is one ASR window in the shared plan. The Go planner and
@@ -117,7 +118,7 @@ type LocalTranscriber struct {
 	LoadTimeout time.Duration
 	// WindowTimeout bounds one window; zero means five minutes.
 	WindowTimeout time.Duration
-	// LockPath serializes local inference across processes; empty disables it.
+	// LockPath overrides the user-level GPU lock used by CUDA inference.
 	LockPath string
 	// LockTimeout bounds waiting for LockPath; zero means ten minutes.
 	LockTimeout time.Duration
@@ -266,8 +267,10 @@ func (t LocalTranscriber) transcribe(ctx context.Context, pcmPath string, meta M
 	}
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	if strings.TrimSpace(t.LockPath) != "" {
-		release, err := acquireGPULock(ctx, t.LockPath, t.LockTimeout)
+	device := strings.ToLower(strings.TrimSpace(t.Device))
+	// The Python runner defaults to CUDA when no device was supplied.
+	if device == "" || strings.HasPrefix(device, "cuda") {
+		release, err := gpulock.Acquire(ctx, strings.TrimSpace(t.LockPath), t.LockTimeout)
 		if err != nil {
 			return nil, err
 		}

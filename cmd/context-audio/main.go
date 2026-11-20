@@ -5,16 +5,12 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -158,22 +154,23 @@ func (r resolvedRecording) request(resolved audioanalysis.Resolved, capability s
 // resolveRecording reads the managed PCM window and its provenance.
 func resolveRecording(ctx context.Context, db *sql.DB, audioRoot, recordingID string) (resolvedRecording, error) {
 	out := resolvedRecording{recordingID: recordingID}
-	var durationMS int64
-	if err := db.QueryRowContext(ctx, `SELECT duration_ms,source_sha256 FROM recordings WHERE id=?`, recordingID).Scan(&durationMS, &out.sourceHash); err != nil {
+	var sourceHash string
+	if err := db.QueryRowContext(ctx, `SELECT source_sha256 FROM recordings WHERE id=?`, recordingID).Scan(&sourceHash); err != nil {
 		return out, fmt.Errorf("recording not found: %w", err)
 	}
-	out.durationMS = durationMS
-	path, err := stitchedPath(ctx, db, audioRoot, recordingID)
+	out.sourceHash = sourceHash
+	rel, err := audioanalysis.ResolveRecordingPCM(ctx, db, audioRoot, recordingID)
 	if err != nil {
 		return out, err
 	}
-	hash, err := hashFile(path)
+	endMS, windowHash, err := audioanalysis.WholePCMInput(ctx, audioRoot, rel)
 	if err != nil {
 		return out, err
 	}
-	out.inputHash = hash
+	out.durationMS = endMS
+	out.inputHash = windowHash
 	if len(out.sourceHash) != 64 {
-		out.sourceHash = hash
+		out.sourceHash = windowHash
 	}
 	rows, err := db.QueryContext(ctx, `SELECT id,transcript_revision FROM source_attachments WHERE recording_id=? AND active=1 ORDER BY id`, recordingID)
 	if err != nil {
@@ -220,57 +217,7 @@ func resolveDependencies(ctx context.Context, db *sql.DB, recordingID, capabilit
 	return dependencies, nil
 }
 
-// stitchedPath mirrors the app's provenance resolution.
-func stitchedPath(ctx context.Context, db *sql.DB, audioRoot, recordingID string) (string, error) {
-	if strings.TrimSpace(audioRoot) == "" {
-		return "", errors.New("audio directory is required")
-	}
-	var device, provider, stitched sql.NullString
-	err := db.QueryRowContext(ctx,
-		`SELECT json_extract(a.source_json,'$.device_id'), json_extract(a.source_json,'$.recording_id'), s.stitched_path
-		 FROM source_attachments a
-		 JOIN sync_recordings s
-		   ON s.recording_id = json_extract(a.source_json,'$.recording_id')
-		  AND s.device_id   = json_extract(a.source_json,'$.device_id')
-		 WHERE a.recording_id=? AND s.state!='deleted' AND s.stitched_path IS NOT NULL AND s.stitched_path!=''
-		 ORDER BY a.id LIMIT 1`, recordingID).Scan(&device, &provider, &stitched)
-	if err != nil {
-		return "", fmt.Errorf("managed audio not found: %w", err)
-	}
-	if !device.Valid || !provider.Valid || !stitched.Valid {
-		return "", errors.New("audio provenance is incomplete")
-	}
-	if memory.RecordingID(device.String, provider.String) != recordingID {
-		return "", errors.New("audio provenance does not match the recording")
-	}
-	root, err := filepath.Abs(audioRoot)
-	if err != nil {
-		return "", err
-	}
-	abs, err := filepath.Abs(stitched.String)
-	if err != nil {
-		return "", err
-	}
-	rel, err := filepath.Rel(root, abs)
-	if err != nil || rel == "." || rel == ".." || filepath.IsAbs(rel) || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return "", errors.New("audio path escapes the managed root")
-	}
-	return abs, nil
-}
-
-func hashFile(path string) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, file); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
+// splitCapabilities parses the CLI capability list, keeping supported names.
 func splitCapabilities(raw string) []string {
 	out := []string{}
 	for _, part := range strings.Split(raw, ",") {

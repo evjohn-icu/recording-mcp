@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"unicode/utf8"
 
 	"recordingmcp/internal/memory"
 )
@@ -57,18 +58,47 @@ func sourceStatusForKind(kind string) string {
 	}
 }
 
-// buildAdmissionCandidates hydrates every candidate's own current evidence and
-// sorts it by transcript time and turn id. Candidates whose evidence is
-// missing, filtered or empty are returned as rejections and never submitted.
+// buildAdmissionCandidates hydrates every candidate's canonical own evidence
+// and sorts it by transcript time and turn id. Note candidates re-read their
+// raw note_evidence refs in one batch, so a scope-trimmed in-memory subset or
+// a detail-evidence fallback can never stand in for a citation; turn
+// candidates cite their own canonical row id; conversation candidates are
+// navigation-only and are submitted only when their recording source still
+// exists. Candidates whose required refs are missing, out of scope or not
+// valid UTF-8 are rejected whole and never submitted.
 func buildAdmissionCandidates(ctx context.Context, store *memory.Store, db *sql.DB, scope *requestScope, ordered []candidate) ([]AdmissionCandidate, []AdmissionRejection, error) {
 	candidates := make([]AdmissionCandidate, 0, len(ordered))
 	rejections := []AdmissionRejection{}
+	noteRefs, err := hydrateEvidence(ctx, db, candidateItems(ordered), true)
+	if err != nil {
+		return nil, nil, err
+	}
+	convSources, err := conversationSourcesExist(ctx, db, scope, admissionConversationIDs(ordered))
+	if err != nil {
+		return nil, nil, err
+	}
 	for _, cand := range ordered {
 		if err := ctx.Err(); err != nil {
 			return nil, nil, err
 		}
 		status := sourceStatusForKind(cand.item.Kind)
-		ids := candidateEvidenceIDs(cand)
+		if cand.item.Kind == "conversation" {
+			if !convSources[cand.item.ID] {
+				rejections = append(rejections, AdmissionRejection{ItemID: cand.item.ID, Reason: "no_source_evidence"})
+				continue
+			}
+			// A conversation is navigation only: it is submitted without
+			// evidence refs and can never claim raw or derived content.
+			candidates = append(candidates, AdmissionCandidate{
+				Item:         cand.item,
+				Evidence:     []EvidenceRef{},
+				Sources:      sortedSourceNames(cand.sources),
+				Scores:       cloneScores(cand.sources),
+				SourceStatus: status,
+			})
+			continue
+		}
+		ids := admissionRequiredRefs(cand, noteRefs)
 		if len(ids) == 0 {
 			rejections = append(rejections, AdmissionRejection{ItemID: cand.item.ID, Reason: "no_source_evidence"})
 			continue
@@ -86,22 +116,26 @@ func buildAdmissionCandidates(ctx context.Context, store *memory.Store, db *sql.
 			return nil, nil, err
 		}
 		refs := make([]EvidenceRef, 0, len(rows))
-		filtered := false
+		reason := ""
 		for _, row := range rows {
+			if !utf8.ValidString(row.Text) {
+				reason = "invalid_utf8_evidence"
+				break
+			}
 			allowed, err := scope.allowsEvidence(ctx, db, row.ID)
 			if err != nil {
 				return nil, nil, err
 			}
 			if !allowed {
-				filtered = true
+				reason = "filtered_evidence"
 				break
 			}
 			ref := evidenceRefFromRow(row, metadata[row.ID])
 			ref.UsedByItemIDs = []string{cand.item.ID}
 			refs = append(refs, ref)
 		}
-		if filtered {
-			rejections = append(rejections, AdmissionRejection{ItemID: cand.item.ID, Reason: "filtered_evidence"})
+		if reason != "" {
+			rejections = append(rejections, AdmissionRejection{ItemID: cand.item.ID, Reason: reason})
 			continue
 		}
 		sortEvidenceRefs(refs)
@@ -114,6 +148,174 @@ func buildAdmissionCandidates(ctx context.Context, store *memory.Store, db *sql.
 		})
 	}
 	return candidates, rejections, nil
+}
+
+// admissionRequiredRefs returns the candidate's canonical required refs:
+// notes cite their stored note_evidence rows, turns cite their own canonical
+// row id. The in-memory candidate evidence — which the scope pre-filter may
+// have trimmed — is never a substitute.
+func admissionRequiredRefs(cand candidate, noteRefs map[string][]string) []string {
+	if isNoteKind(cand.item.Kind) {
+		return noteRefs[cand.item.ID]
+	}
+	return evidenceOf(cand.item)
+}
+
+// admissionConversationIDs lists the conversation candidates in pool order.
+func admissionConversationIDs(ordered []candidate) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, cand := range ordered {
+		if cand.item.Kind != "conversation" || cand.item.ID == "" || seen[cand.item.ID] {
+			continue
+		}
+		seen[cand.item.ID] = true
+		out = append(out, cand.item.ID)
+	}
+	return out
+}
+
+// conversationSourcesExist reports which conversations still have a valid
+// existing source: their recording row exists and at least one current,
+// readable turn inside the requested scope remains (an ambient-only or fully
+// superseded conversation is not a legal navigation candidate). The check is
+// existence-only, so a navigation-only candidate never carries text and no
+// filter-excluded content can leak through it.
+func conversationSourcesExist(ctx context.Context, db *sql.DB, scope *requestScope, ids []string) (map[string]bool, error) {
+	out := make(map[string]bool, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	query := `SELECT c.id FROM conversations c JOIN recordings r ON r.id=c.recording_id
+ WHERE c.id IN (` + placeholders(len(ids)) + `)
+ AND EXISTS(SELECT 1 FROM turns t WHERE t.conversation_id=c.id AND ` + memory.CurrentSpeechTurnPredicate("t")
+	args := append([]any(nil), stringsToAny(ids)...)
+	if scope.topicScoped() {
+		topics := sortedKeys(scope.topicIDs)
+		query += ` AND EXISTS(SELECT 1 FROM turn_topics tt WHERE tt.turn_id=t.id AND tt.topic_id IN (` + placeholders(len(topics)) + `))`
+		args = append(args, stringsToAny(topics)...)
+	}
+	query += `)`
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
+// assembleAdmittedEvidence builds the v3 evidence from the refs each selected
+// item presented at admission, within the remaining byte budget. Every ref is
+// revalidated against the current store and the request scope and must still
+// match the revision and text the assessor reviewed; any failed ref drops the
+// whole item's evidence and records it as missing. An item's refs enter the
+// budget atomically — nothing of an over-budget item is charged and later
+// candidates are still tried — a ref shared with an earlier item is charged
+// once and merges UsedByItemIDs, and at most maxEvidenceItems selected items
+// provide evidence. The returned refs keep the reviewed content ordered by
+// transcript time and turn id.
+func assembleAdmittedEvidence(ctx context.Context, store *memory.Store, db *sql.DB, scope *requestScope, selected []candidate, admitted map[string][]EvidenceRef, maxBytes, bytesUsed int) ([]EvidenceRef, int, []string, bool, bool, error) {
+	evidence := []EvidenceRef{}
+	index := map[string]int{}
+	skipped := []string{}
+	budgetExceeded := false
+	missing := false
+	providers := 0
+	for _, c := range selected {
+		if providers >= maxEvidenceItems {
+			break
+		}
+		refs := admitted[candidateKey(c.item)]
+		if len(refs) == 0 {
+			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, bytesUsed, nil, false, false, err
+		}
+		ids := make([]string, 0, len(refs))
+		for _, ref := range refs {
+			ids = append(ids, ref.TurnID)
+		}
+		rows, gone, err := store.GetCurrentTurns(ctx, ids)
+		if err != nil {
+			return nil, bytesUsed, nil, false, false, err
+		}
+		if len(gone) > 0 {
+			for _, id := range gone {
+				skipped = appendUnique(skipped, id)
+			}
+			missing = true
+			continue
+		}
+		byID := make(map[string]memory.CurrentTurnRow, len(rows))
+		for _, row := range rows {
+			byID[row.ID] = row
+		}
+		type reviewedRef struct {
+			ref     EvidenceRef
+			textLen int
+			deduped bool
+		}
+		reviewed := make([]reviewedRef, 0, len(refs))
+		needs := 0
+		brokenRef := ""
+		for _, ref := range refs {
+			row, ok := byID[ref.TurnID]
+			if !ok || !utf8.ValidString(row.Text) || row.Text != ref.Text || row.TranscriptRevision != ref.TranscriptRevision {
+				brokenRef = ref.TurnID
+				break
+			}
+			allowed, err := scope.allowsEvidence(ctx, db, row.ID)
+			if err != nil {
+				return nil, bytesUsed, nil, false, false, err
+			}
+			if !allowed {
+				brokenRef = ref.TurnID
+				break
+			}
+			entry := reviewedRef{ref: ref, textLen: len(row.Text)}
+			if _, seen := index[ref.TurnID]; seen {
+				entry.deduped = true
+			} else {
+				needs += entry.textLen
+			}
+			reviewed = append(reviewed, entry)
+		}
+		if brokenRef != "" {
+			skipped = appendUnique(skipped, brokenRef)
+			missing = true
+			continue
+		}
+		if bytesUsed+needs > maxBytes {
+			for _, entry := range reviewed {
+				skipped = appendUnique(skipped, entry.ref.TurnID)
+			}
+			budgetExceeded = true
+			continue
+		}
+		providers++
+		for _, entry := range reviewed {
+			if entry.deduped {
+				shared := &evidence[index[entry.ref.TurnID]]
+				shared.UsedByItemIDs = appendUnique(shared.UsedByItemIDs, c.item.ID)
+				continue
+			}
+			ref := entry.ref
+			ref.UsedByItemIDs = appendUnique(nil, c.item.ID)
+			index[ref.TurnID] = len(evidence)
+			evidence = append(evidence, ref)
+		}
+		bytesUsed += needs
+	}
+	sortEvidenceRefs(evidence)
+	return evidence, bytesUsed, skipped, budgetExceeded, missing, nil
 }
 
 // sortedSourceNames returns the retrieval branch names in stable order.

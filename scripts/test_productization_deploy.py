@@ -7,10 +7,12 @@ skipped unless RUN_DOCKER_DEPLOYMENT_TEST=1 because they build an image.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
 import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -58,12 +60,20 @@ def wait_http(url: str, timeout: float = 180) -> None:
 @unittest.skipUnless(ENABLED, "set RUN_DOCKER_DEPLOYMENT_TEST=1 to build and run containers")
 class DeploymentTest(unittest.TestCase):
     project: str
+    # Every import_wav call consumes the next sequence number so the synthetic
+    # PCM bytes are unique across the whole suite run; `imported` is the ledger
+    # of (sequence, PCM hash, conversation id) used for uniqueness assertions
+    # and failure diagnostics.
+    pcm_sequence: int
+    imported: list[dict]
 
     @classmethod
     def setUpClass(cls) -> None:
         if not docker_available():
             raise unittest.SkipTest("docker daemon is not available")
         cls.tmp = tempfile.mkdtemp(prefix="recording-mcp-deploy-")
+        cls.pcm_sequence = 0
+        cls.imported = []
         cls.project = f"recording-mcp-verify-{os.getpid()}"
         # Docker Desktop can keep a stale forward for 8788; a dynamic host port
         # keeps parallel/disposable projects independent and is what CI uses.
@@ -134,7 +144,9 @@ class DeploymentTest(unittest.TestCase):
     def test_three_restarts_keep_imported_data(self) -> None:
         self.run_compose("up", "-d")
         wait_http(self.health_url())
-        conversation_id = self.import_wav()
+        # Own import plus any earlier imports in this volume (full suite runs
+        # this test last, after the turn-forget and backup tests).
+        self.import_wav()
 
         for _ in range(3):
             restart = self.run_compose("restart", "web", "worker", timeout=300)
@@ -143,7 +155,11 @@ class DeploymentTest(unittest.TestCase):
             cookie, csrf = self.login()
             page = self.api_json("/api/conversations", cookie, csrf)
             ids = [item["conversation_id"] for item in page.get("items", [])]
-            self.assertIn(conversation_id, ids, f"imported data lost after restart: {ids}")
+            missing = [row["conversation_id"] for row in type(self).imported
+                       if row["conversation_id"] not in ids]
+            self.assertFalse(
+                missing,
+                f"imported data lost after restart: {missing} (listed: {ids})")
 
     def login(self) -> tuple[str, str]:
         # The compose web runs in single-profile mode, so this server exposes
@@ -189,17 +205,21 @@ class DeploymentTest(unittest.TestCase):
                     f"compose ps:\n{ps.stdout}\nworker logs:\n{logs.stdout}\n{logs.stderr}"
                 )
             time.sleep(1)
+        # The suite shares one profile/volume across tests and the ingest keys
+        # imports by the SHA-256 of the uploaded bytes, so repeated PCM content
+        # is answered as an idempotent duplicate re-upload of an older
+        # conversation and never enqueues new work. A class-level counter makes
+        # every import unique and deterministic instead of relying on a
+        # collision-prone low-byte time marker.
+        frames = bytearray(b"\x00\x00" * 16000)
+        type(self).pcm_sequence += 1
+        struct.pack_into("<Q", frames, 0, type(self).pcm_sequence)
+        pcm_sha256 = hashlib.sha256(frames).hexdigest()
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as handle:
             with wave.open(handle.name, "wb") as wav:
                 wav.setnchannels(1)
                 wav.setsampwidth(2)
                 wav.setframerate(16000)
-                # The suite shares one profile/volume across tests, so an
-                # identical WAV would be an idempotent re-import of the prior
-                # test's conversation and would never enqueue new work.
-                frames = bytearray(b"\x00\x00" * 16000)
-                frames[0] = os.getpid() & 0xFF
-                frames[1] = time.time_ns() & 0xFF
                 wav.writeframes(bytes(frames))
             path = Path(handle.name)
         boundary = "----deploy-test"
@@ -209,14 +229,50 @@ class DeploymentTest(unittest.TestCase):
         data = prefix + path.read_bytes() + suffix
         path.unlink()
         imported = self.api_json("/api/imports", cookie, csrf, data, f"multipart/form-data; boundary={boundary}")
+        ledger = type(self).imported
+        record = {"sequence": type(self).pcm_sequence, "pcm_sha256": pcm_sha256}
+        # A duplicate response would mean the bytes matched a previous import in
+        # this volume: the ingest would reuse the older conversation and the
+        # processing poll below could silently pass on already-completed work.
+        if imported.get("duplicate") or not imported.get("conversation_id"):
+            raise AssertionError(
+                "import was rejected as duplicate or returned no conversation: "
+                f"{imported}\nthis import: {record}\nprior imports in this volume: {ledger}"
+            )
         conversation_id = imported["conversation_id"]
+        record["conversation_id"] = conversation_id
+        if conversation_id in {row["conversation_id"] for row in ledger}:
+            raise AssertionError(
+                f"import reused a prior conversation: {record}\nprior imports in this volume: {ledger}"
+            )
+        ledger.append(record)
         deadline = time.time() + 120
         while time.time() < deadline:
             snapshot = self.api_json(f"/api/conversations/{conversation_id}/processing", cookie, csrf)
+            # Fail fast on ingest/asr jobs that already ended failed or
+            # cancelled instead of waiting out the poll timeout.
+            stuck = [job for job in snapshot.get("jobs", [])
+                     if job.get("stage") in ("ingest", "asr")
+                     and job.get("status") in ("failed", "cancelled")]
+            if stuck:
+                raise AssertionError(self.pipeline_diagnostics(
+                    snapshot, f"ingest/asr stage ended failed/cancelled: {stuck}"))
             if snapshot.get("current_stage") == "completed":
                 return conversation_id
             time.sleep(0.5)
-        raise AssertionError(f"import did not finish: {snapshot}")
+        raise AssertionError(self.pipeline_diagnostics(snapshot, "import did not finish"))
+
+    def pipeline_diagnostics(self, snapshot: dict, message: str) -> str:
+        """Snapshot plus worker/web logs so a stalled or failed import can be
+        triaged without rerunning the suite."""
+        ps = self.run_compose("ps", "--format", "json")
+        logs = self.run_compose("logs", "--tail=80", "worker", "web")
+        return (
+            f"{message}\nsnapshot: {snapshot}\n"
+            f"imports in this volume: {type(self).imported}\n"
+            f"compose ps:\n{ps.stdout}\n"
+            f"worker/web logs (tail 80):\n{logs.stdout}\n{logs.stderr}"
+        )
 
     def test_startup_without_external_api_reports_unavailable(self) -> None:
         # The stack is started with ASR_PROVIDER=fixture in this harness, so a

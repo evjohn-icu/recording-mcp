@@ -665,7 +665,7 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	// note_evidence first: items discovered through navigation or confirmed
 	// links must stay citable and take part in the source-evidence dedupe.
 	addQueryPage := func(page memory.Page, branch string, linkIDs []string) error {
-		evMap, err := hydrateEvidence(ctx, db, page.Items)
+		evMap, err := hydrateEvidence(ctx, db, page.Items, false)
 		if err != nil {
 			return err
 		}
@@ -1011,22 +1011,53 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 		if limit > maxRerankPool {
 			limit = maxRerankPool
 		}
-		poolEnd := limit
-		if poolEnd > len(ordered) {
-			poolEnd = len(ordered)
+		// The bounded pool prefers original order but spends its slots on
+		// distinct source-ref sets first: candidates sharing the same
+		// non-empty, sorted, deduplicated ref set only fill the remaining
+		// positions. In-pool candidates keep their original order; the
+		// post-budget source dedupe still drops leftover duplicates, and an
+		// oversized representative can fall back to an in-pool duplicate of
+		// its ref set.
+		pool := make([]candidate, 0, minInt(limit, len(ordered)))
+		seenRefSets := map[string]bool{}
+		chosen := make([]bool, len(ordered))
+		duplicates := []int{}
+		for i, cand := range ordered {
+			refs := candidateEvidenceIDs(cand)
+			if len(refs) > 0 && seenRefSets[refSetKey(refs)] {
+				duplicates = append(duplicates, i)
+				continue
+			}
+			if len(pool) >= limit {
+				continue
+			}
+			if len(refs) > 0 {
+				seenRefSets[refSetKey(refs)] = true
+			}
+			pool = append(pool, cand)
+			chosen[i] = true
+		}
+		for _, i := range duplicates {
+			if len(pool) >= limit {
+				break
+			}
+			pool = append(pool, ordered[i])
+			chosen[i] = true
 		}
 		poolLimitedIDs = []string{}
-		if poolEnd < len(ordered) {
-			for _, dropped := range ordered[poolEnd:] {
-				poolLimitedIDs = append(poolLimitedIDs, dropped.item.ID)
-			}
-			if req.RetrievalVersion == "v3" {
-				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "admission_pool_limited", Detail: fmt.Sprintf("v3 admission pool limited to %d candidates", poolEnd)})
-			} else {
-				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "candidate_pool_limited", Detail: fmt.Sprintf("v2 candidate pool limited to %d items", poolEnd)})
+		for i, cand := range ordered {
+			if !chosen[i] {
+				poolLimitedIDs = append(poolLimitedIDs, cand.item.ID)
 			}
 		}
-		ordered = ordered[:poolEnd]
+		if len(poolLimitedIDs) > 0 {
+			if req.RetrievalVersion == "v3" {
+				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "admission_pool_limited", Detail: fmt.Sprintf("v3 admission pool limited to %d candidates", len(pool))})
+			} else {
+				pkg.Gaps = append(pkg.Gaps, Gap{Kind: "candidate_pool_limited", Detail: fmt.Sprintf("v2 candidate pool limited to %d items", len(pool))})
+			}
+		}
+		ordered = pool
 		if rerank == nil {
 			pkg.Degraded = true
 			degradeReasons = append(degradeReasons, degradeNoReranker)
@@ -1070,6 +1101,10 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 
 	// Step 5b: v3 evidence admission, after ranking/reranking and before dedupe
 	// and the budget. Only admitted candidates can become items or evidence.
+	// admittedEvidence holds the assessor-reviewed refs of every admitted
+	// candidate, keyed like the items; the v3 evidence assembly may only emit
+	// these refs, never a neighbour window.
+	admittedEvidence := map[string][]EvidenceRef{}
 	if req.RetrievalVersion == "v3" {
 		if query == "" {
 			// An explicit navigation request has no question to assess: the
@@ -1125,6 +1160,7 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 					continue
 				}
 				admitted[cand.Item.ID] = true
+				admittedEvidence[candidateKey(cand.Item)] = cand.Evidence
 			}
 			kept := make([]candidate, 0, len(ordered))
 			for _, cand := range ordered {
@@ -1185,19 +1221,22 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 		bytesUsed += itemBytes
 	}
 
-	// Step 7: evidence windows for accepted items, in their final stable order.
-	// The centre turn gates the window: when it is missing, filtered or over
-	// budget the whole window is skipped and does not consume one of the three
-	// allowed window slots. Neighbours are tried centre -> previous -> next and
-	// the emitted refs stay in transcript order.
+	// Step 7: evidence for accepted items, in their final stable order. v1/v2
+	// and the queryless v3 navigation use the legacy windows: the centre turn
+	// gates the window, neighbours are tried centre -> previous -> next within
+	// one of the three allowed window slots and the emitted refs stay in
+	// transcript order. An explicit v3 query instead assembles only the refs
+	// its admitted candidates presented to the assessor, revalidated against
+	// the current store and scope.
 	evidence := []EvidenceRef{}
 	evidenceIndex := map[string]int{}
 	windowsAccepted := 0
 	evidenceBudgetExceeded := false
 	evidenceMissing := false
 	includeBudgetedEvidence := req.IncludeRawEvidence || req.RetrievalVersion == "v3" || (req.RetrievalVersion == "v2" && deps.Assessor != nil)
+	v3QueryEvidence := req.RetrievalVersion == "v3" && query != ""
 	for _, c := range selected {
-		if !includeBudgetedEvidence || windowsAccepted >= maxEvidenceItems {
+		if v3QueryEvidence || !includeBudgetedEvidence || windowsAccepted >= maxEvidenceItems {
 			continue
 		}
 		turnID := c.firstEvidenceTurn()
@@ -1240,11 +1279,16 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 			evidenceMissing = true
 			continue
 		}
-		centerBytes := len(window.Turns[center].Text)
-		if bytesUsed+centerBytes > maxBytes {
-			skippedEvidenceTurnIDs = appendUnique(skippedEvidenceTurnIDs, window.Turns[center].ID)
-			evidenceBudgetExceeded = true
-			continue
+		if _, seen := evidenceIndex[window.Turns[center].ID]; !seen {
+			// A centre already carried by an earlier window is reused before
+			// the byte cap: charging it again would drop this item's whole
+			// window and its attribution for bytes already paid.
+			centerBytes := len(window.Turns[center].Text)
+			if bytesUsed+centerBytes > maxBytes {
+				skippedEvidenceTurnIDs = appendUnique(skippedEvidenceTurnIDs, window.Turns[center].ID)
+				evidenceBudgetExceeded = true
+				continue
+			}
 		}
 		windowsAccepted++
 		attempts := []int{center}
@@ -1296,6 +1340,15 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 		}
 		bytesUsed = windowBytes
 	}
+	if v3QueryEvidence && includeBudgetedEvidence {
+		var skipped []string
+		var assembleErr error
+		evidence, bytesUsed, skipped, evidenceBudgetExceeded, evidenceMissing, assembleErr = assembleAdmittedEvidence(ctx, store, db, scope, selected, admittedEvidence, maxBytes, bytesUsed)
+		if assembleErr != nil {
+			return Package{}, assembleErr
+		}
+		skippedEvidenceTurnIDs = append(skippedEvidenceTurnIDs, skipped...)
+	}
 	truncated := itemBudgetExceeded || evidenceBudgetExceeded || maxItemsReached
 	if itemBudgetExceeded {
 		pkg.Gaps = append(pkg.Gaps, Gap{Kind: "item_budget_exceeded", Detail: fmt.Sprintf("%d item(s) skipped by the byte budget", len(skippedItemIDs))})
@@ -1317,6 +1370,9 @@ func Build(ctx context.Context, deps Deps, req Request) (Package, error) {
 	}
 	if req.RetrievalVersion == "v2" {
 		// v2 already ranked the bounded candidate pool before budgeting.
+	} else if req.RetrievalVersion == "v3" {
+		// v3 keeps the pool permutation that ran before admission and the
+		// budget; the post-budget shadow rerank is a v1-only behaviour.
 	} else if rerank == nil {
 		pkg.Degraded = true
 		degradeReasons = append([]string{degradeNoReranker}, degradeReasons...)
@@ -1789,6 +1845,29 @@ func candidateEvidenceIDs(c candidate) []string {
 	return evidenceOf(c.item)
 }
 
+// refSetKey builds the bounded-pool grouping key: a candidate's non-empty
+// source refs, sorted and deduplicated, joined by NUL so distinct ref sets
+// never collide through concatenation.
+func refSetKey(refs []string) string {
+	sortedRefs := append([]string(nil), refs...)
+	sort.Strings(sortedRefs)
+	deduped := sortedRefs[:0]
+	for i, ref := range sortedRefs {
+		if i == 0 || ref != sortedRefs[i-1] {
+			deduped = append(deduped, ref)
+		}
+	}
+	return strings.Join(deduped, "\x00")
+}
+
+// minInt returns the smaller of two ints.
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // candidateSourcesCovered reports whether every source turn of the candidate
 // is already claimed by an accepted item. An item with no sources is never
 // deduped.
@@ -1862,12 +1941,15 @@ func (c candidate) firstEvidenceTurn() string {
 }
 
 // hydrateEvidence resolves evidence turn ids (ordered by ordinal) for note
-// items whose stored view carries none, in one query per page. Items with no
-// evidence rows yield nothing, matching the legacy no-evidence convention.
-func hydrateEvidence(ctx context.Context, db *sql.DB, items []memory.Item) (map[string][]string, error) {
+// items in one query per page. With allNotes=false only items whose stored
+// view carries none are resolved, matching the legacy no-evidence convention.
+// With allNotes=true every note is resolved so a caller that must compare a
+// candidate against its canonical stored refs (v3 admission) never trusts the
+// scope-trimmed in-memory subset. Items with no evidence rows yield nothing.
+func hydrateEvidence(ctx context.Context, db *sql.DB, items []memory.Item, allNotes bool) (map[string][]string, error) {
 	ids := []string{}
 	for _, it := range items {
-		if isNoteKind(it.Kind) && len(it.EvidenceTurnIDs) == 0 {
+		if isNoteKind(it.Kind) && (allNotes || len(it.EvidenceTurnIDs) == 0) {
 			ids = append(ids, it.ID)
 		}
 	}

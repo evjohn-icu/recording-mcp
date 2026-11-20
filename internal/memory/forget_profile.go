@@ -46,6 +46,25 @@ func (s *Store) ProfileRetirement(ctx context.Context) (string, bool, error) {
 	return id, retired == 1, err
 }
 
+// MarkProfileRetirementCleaned records the durable cleanup proof for the
+// retired profile after every external cleanup step succeeded. Calling it
+// again after completion succeeds; without an active retirement fence it is an
+// error, so a misplaced call cannot invent a proof.
+func (s *Store) MarkProfileRetirementCleaned(ctx context.Context) error {
+	result, err := s.db.ExecContext(ctx, `UPDATE profile_control SET cleanup_done=1 WHERE id=1 AND retired=1`)
+	if err != nil {
+		return fmt.Errorf("mark profile retirement cleaned: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("mark profile retirement cleaned: %w", err)
+	}
+	if affected == 0 {
+		return errors.New("no retired profile fence to mark cleaned")
+	}
+	return nil
+}
+
 // PurgeRetiredProfile removes every canonical SQLite content row while
 // retaining only the minimal profile_control retirement marker. It is safe to
 // retry after a crash; the purge runs in one transaction.

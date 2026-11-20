@@ -67,6 +67,14 @@ func (s *Service) CleanupRetiredProfile(ctx context.Context, tasksDir string) er
 	if index, ok := s.Semantic.(interface{ Invalidate() }); ok {
 		index.Invalidate()
 	}
+	// The cleanup proof is recorded only after the event store, the main
+	// database WAL/VACUUM and every managed audio/tasks/index/backup file were
+	// cleaned successfully. A failure before this point stays resumable: the
+	// password-gated retry reruns the idempotent cleanup and records the proof
+	// then.
+	if err := s.Store.MarkProfileRetirementCleaned(ctx); err != nil {
+		return err
+	}
 	return nil
 }
 

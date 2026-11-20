@@ -1,6 +1,6 @@
 # 端到端场景与验证（ingest-v1 链路）
 
-一键回归：`make e2e-cloud`（即 `sh scripts/e2e-cloud.sh`）。脚本对每个场景起独立 `wrangler dev`（本地 miniflare，`--persist-to` 隔离状态），跑完即杀进程；日志与产物在 `data/e2e/<scenario>/`。端口可用 `PORT=8788` 覆盖。
+一键回归可用 `make e2e-cloud`（即 `sh scripts/e2e-cloud.sh`）。每个场景单独启动本地 Wrangler，结束时关闭进程。日志与产物默认位于 `data/e2e/<scenario>/`，该场景的 Wrangler 状态位于 `<scenario>/.wrangler-state`。可用 `RECORDING_E2E_ROOT` 指定空目录，用 `PORT` 指定空闲端口。
 
 场景编排：`record-sim`（模拟录音 + 契约验证）→ `context-sync --asr fixture`（拉取 + 校验 + 转写入库）→ `context-worker`（extract/publish/curate/embed）→ `e2e-verify.py`（MCP stdio 断言检索命中）。
 

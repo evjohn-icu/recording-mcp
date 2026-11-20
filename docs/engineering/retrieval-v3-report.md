@@ -24,7 +24,7 @@
 
 ## 2. 行为与安全边界
 
-- `retrieval_version=v3` 必须显式选择；默认仍为 `v1` + hash provider。
+- 默认检索为 `v1` + hash provider。搜索页只在能力探测确认准入策略与模型匹配时提供 v3 选项。URL 显式请求 `retrieval_version=v3` 时，搜索页保留该值并发送给服务端，由服务端返回准入结果或降级信息。
 - 缺 policy、标识不匹配、`phase=calibration` 被服务端拒绝、评估失败 → v3 返回空 Items/Evidence、
   sufficiency=unknown、degraded 与 `admission_unavailable|admission_failed`；不回退 v1/v2。
 - 空 query 的显式导航返回导航上下文，`assessment_query_missing`，不声称回答问题。

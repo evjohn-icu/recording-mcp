@@ -216,24 +216,6 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	importer, err := ingest.New(ingest.Config{
-		Store: store, DB: db, AudioDir: *audioDir, Audio: audioCfg,
-		Decoder:       &ingest.FFmpegDecoder{FFmpeg: *ffmpegPath, FFprobe: *ffprobePath},
-		Transcription: transcriber,
-		ASRProvider:   *asrProvider, ASRModel: *asrModel, ASRResourceID: *asrResourceID,
-		TranscriptRevision: ingest.DefaultTranscriptRevision,
-	})
-	if err != nil {
-		return fmt.Errorf("configure importer: %w", err)
-	}
-	embedProviderImpl, err := buildEmbedProvider(*embedProvider, *embedDims, *embedEndpoint, *embedModel, *embedKeyEnv, *embedInputType)
-	if err != nil {
-		return err
-	}
-	inner, err := buildExecutor(*executor, db, store, *decisionURL, *decisionModel, gen, *syntheticDelay, absDBPath, *curatorCommand, *curatorModel, *curatorTimeout, embedProviderImpl, importer, audioCfg, audioCfgPath, audioStages, audioStore)
-	if err != nil {
-		return err
-	}
 	profileSelected := flag.Lookup("profile") != nil && strings.TrimSpace(flag.Lookup("profile").Value.String()) != ""
 	explicitStages := false
 	flag.Visit(func(f *flag.Flag) {
@@ -250,8 +232,60 @@ func run() error {
 			}
 		}
 	}
-	if audioStore != nil {
-		if err := recoverAudioStages(context.Background(), audioStore, jobStages, audioUnavailable, time.Now()); err != nil {
+	// effectiveAudioStages is the claim-stage gate the importer consults before
+	// queueing audio jobs: this worker's own valid stages (explicit stages are
+	// kept as-is; an audio stage only counts when its model verified and an
+	// executor is wired) united with the stages live workers heartbeat.
+	effectiveAudioStages := func(ctx context.Context) (map[string]bool, error) {
+		valid := map[string]bool{}
+		for _, stage := range jobStages {
+			if capability, isAudio := strings.CutPrefix(stage, "audio_"); isAudio {
+				if _, wired := audioStages[capability]; wired {
+					valid[stage] = true
+				}
+				continue
+			}
+			valid[stage] = true
+		}
+		beats, err := process.ReadHeartbeats(ctx, db, time.Now(), 30*time.Second)
+		if err != nil {
+			return nil, err
+		}
+		for _, beat := range beats {
+			for _, stage := range beat.Stages {
+				valid[stage] = true
+			}
+		}
+		return valid, nil
+	}
+	importer, err := ingest.New(ingest.Config{
+		Store: store, DB: db, AudioDir: *audioDir, Audio: audioCfg,
+		Decoder:       &ingest.FFmpegDecoder{FFmpeg: *ffmpegPath, FFprobe: *ffprobePath},
+		Transcription: transcriber,
+		ASRProvider:   *asrProvider, ASRModel: *asrModel, ASRResourceID: *asrResourceID,
+		TranscriptRevision: ingest.DefaultTranscriptRevision,
+		AudioStages:        effectiveAudioStages,
+	})
+	if err != nil {
+		return fmt.Errorf("configure importer: %w", err)
+	}
+	embedProviderImpl, err := buildEmbedProvider(*embedProvider, *embedDims, *embedEndpoint, *embedModel, *embedKeyEnv, *embedInputType)
+	if err != nil {
+		return err
+	}
+	inner, err := buildExecutor(*executor, db, store, *decisionURL, *decisionModel, gen, *syntheticDelay, absDBPath, *curatorCommand, *curatorModel, *curatorTimeout, embedProviderImpl, importer, audioCfg, audioCfgPath, audioStages, audioStore)
+	if err != nil {
+		return err
+	}
+	// runAudioRecovery drives recoverAudioStages: the claimer union is only
+	// meaningful once this worker's own heartbeat is live, so the first pass
+	// runs after a successful heartbeat write (also in --once mode) and every
+	// following heartbeat tick.
+	runAudioRecovery := func(ctx context.Context, now time.Time) {
+		if audioStore == nil {
+			return
+		}
+		if err := recoverAudioStages(ctx, audioStore, jobStages, audioUnavailable, now); err != nil {
 			logger.Printf("context-worker: audio stage recovery: %v", err)
 		}
 	}
@@ -309,6 +343,7 @@ func run() error {
 			logger.Printf("remove worker heartbeat failed: %v", err)
 		}
 	}()
+	runAudioRecovery(ctx, time.Now())
 
 	if *once {
 		ran, err := worker.RunOnce(ctx, cfg)
@@ -353,6 +388,7 @@ func run() error {
 				if err := process.WriteHeartbeat(beatCtx, db, heartbeat, now); err != nil {
 					logger.Printf("worker heartbeat failed: %v", err)
 				}
+				runAudioRecovery(beatCtx, now)
 			}
 		}
 	}()

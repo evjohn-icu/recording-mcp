@@ -26,9 +26,22 @@ type snapshotFile struct {
 // snapshot hashes every regular file below root. Symlinks and special files
 // are refused: a profile root is trusted local state, never a link farm, and
 // following a link could copy data from outside the root.
+//
+// The legal profile set comes from profileNames, so a first-level profile
+// directory is always archived, even when it is named "cache"; only the
+// managed backups/cache/.cache subdirectories inside profiles and root-level
+// cache directories that are not profiles stay excluded.
 func snapshot(root string) ([]snapshotFile, error) {
+	profiles, err := profileNames(root)
+	if err != nil {
+		return nil, err
+	}
+	profileSet := make(map[string]bool, len(profiles))
+	for _, name := range profiles {
+		profileSet[name] = true
+	}
 	files := []snapshotFile{}
-	err := filepath.WalkDir(root, func(current string, entry os.DirEntry, err error) error {
+	err = filepath.WalkDir(root, func(current string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -41,7 +54,7 @@ func snapshot(root string) ([]snapshotFile, error) {
 		}
 		rel = filepath.ToSlash(rel)
 		if entry.IsDir() {
-			if isExcludedDir(rel) {
+			if isExcludedDir(rel, profileSet) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -69,14 +82,23 @@ func snapshot(root string) ([]snapshotFile, error) {
 
 // isExcludedDir reports whether rel is a directory whose contents must not be
 // archived: a profile's own backup output and external caches are not part of
-// the restorable state.
-func isExcludedDir(rel string) bool {
+// the restorable state. Component 0 is the profile directory itself, and a real
+// profile is kept even when it is named "cache"; its managed
+// backups/cache/.cache subdirectories stay excluded, and a root-level cache
+// directory that is not a profile stays excluded as well. The adapter staging
+// root <profile>/audio/.analysis-tmp is disposable working data and stays
+// excluded at exactly that path; unrelated historical directories with the
+// same name elsewhere remain part of the archive.
+func isExcludedDir(rel string, profiles map[string]bool) bool {
 	parts := strings.Split(rel, "/")
+	if len(parts) == 3 && parts[2] == ".analysis-tmp" && parts[1] == "audio" && parts[0] != "" {
+		return true
+	}
 	for i, part := range parts {
 		if part == "backups" && i == 1 {
 			return true
 		}
-		if part == "cache" || part == ".cache" {
+		if (part == "cache" || part == ".cache") && (i > 0 || !profiles[part]) {
 			return true
 		}
 	}

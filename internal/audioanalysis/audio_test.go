@@ -6,10 +6,12 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -532,6 +534,134 @@ func TestAudioAnalysisRejectsInvalidResult(t *testing.T) {
 	}
 }
 
+// TestAudioEnqueueRunIDIdentity pins plan 4.1: the manual entry point must
+// complete the schema/recording/capability fields, derive
+// ComputeRunID(req, generation) and fill an empty run_id with it before
+// validation; an explicit run_id that disagrees with the request identity is
+// audio_input_invalid, not a validation error about a missing field.
+func TestAudioEnqueueRunIDIdentity(t *testing.T) {
+	ctx := context.Background()
+	f := newAudioFixture(t)
+
+	req := f.request(CapabilityVAD, "gen-fill", nil)
+	req.RunID = ""
+	out, err := f.audio.Enqueue(ctx, EnqueueInput{
+		RecordingID: f.recording, Capability: CapabilityVAD,
+		Generation: "gen-fill", Request: req, MaxAttempts: 3,
+	})
+	if err != nil {
+		t.Fatalf("Enqueue without run_id: %v", err)
+	}
+	want := ComputeRunID(req, "gen-fill")
+	if out.RunID != want {
+		t.Fatalf("out.RunID = %q, want computed %q", out.RunID, want)
+	}
+	var storedRun string
+	if err := f.db.QueryRowContext(ctx, `SELECT id FROM audio_analysis_runs WHERE job_id=?`, out.JobID).Scan(&storedRun); err != nil {
+		t.Fatal(err)
+	}
+	if storedRun != want {
+		t.Fatalf("stored run id = %q, want %q", storedRun, want)
+	}
+	var payloadJSON string
+	if err := f.db.QueryRowContext(ctx, `SELECT payload_json FROM processing_jobs WHERE id=?`, out.JobID).Scan(&payloadJSON); err != nil {
+		t.Fatal(err)
+	}
+	var decoded jobPayload
+	if err := json.Unmarshal([]byte(payloadJSON), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Request.RunID != want {
+		t.Fatalf("queued payload run_id = %q, want %q", decoded.Request.RunID, want)
+	}
+	// The same empty-run_id request replays as the identical canonical payload.
+	repeat, err := f.audio.Enqueue(ctx, EnqueueInput{
+		RecordingID: f.recording, Capability: CapabilityVAD,
+		Generation: "gen-fill", Request: req, MaxAttempts: 3,
+	})
+	if err != nil {
+		t.Fatalf("replay without run_id: %v", err)
+	}
+	if repeat.Inserted || repeat.JobID != out.JobID || repeat.RunID != out.RunID {
+		t.Fatalf("replay = %+v, want idempotent %+v", repeat, out)
+	}
+
+	// An explicit run_id that does not match the derived identity is rejected
+	// even though every other field validates.
+	bad := f.request(CapabilityVAD, "gen-mismatch", nil)
+	bad.RunID = strings.Repeat("f", 64)
+	if _, err := f.audio.Enqueue(ctx, EnqueueInput{
+		RecordingID: f.recording, Capability: CapabilityVAD,
+		Generation: "gen-mismatch", Request: bad, MaxAttempts: 3,
+	}); ErrorCodeOf(err) != CodeInputInvalid {
+		t.Fatalf("mismatched run_id error = %v, want %q", err, CodeInputInvalid)
+	}
+	var runs int
+	if err := f.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM audio_analysis_runs WHERE capability=?`, CapabilityVAD).Scan(&runs); err != nil {
+		t.Fatal(err)
+	}
+	if runs != 1 {
+		t.Fatalf("mismatched run_id inserted a run: %d", runs)
+	}
+}
+
+// TestAudioEnqueueReplayDependencySet pins plan 4.1: a same-generation replay
+// compares the canonical payload first and then still runs the queue's
+// dependency-set validation. A changed parent set is audio_request_conflict
+// (process.ErrConflict mapped), a reordered or deduplicated set replays the
+// same job and run, and no replay may move the desired head.
+func TestAudioEnqueueReplayDependencySet(t *testing.T) {
+	ctx := context.Background()
+	f := newAudioFixture(t)
+	p1 := f.enqueue(CapabilityVAD, "p1", nil)
+	p2 := f.enqueue(CapabilityVAD, "p2", nil)
+	first := f.enqueue(CapabilityTagging, "child", []string{p1.JobID, p2.JobID})
+	if !first.Inserted {
+		t.Fatalf("first enqueue = %+v", first)
+	}
+
+	// Reordered and duplicated dependencies normalise to the stored set: the
+	// replay returns the existing job and run without changing the head.
+	replay, err := f.audio.Enqueue(ctx, EnqueueInput{
+		RecordingID: f.recording, Capability: CapabilityTagging, Generation: "child",
+		Request: f.request(CapabilityTagging, "child", nil),
+		Dependencies: []string{p2.JobID, p1.JobID, p1.JobID}, MaxAttempts: 3,
+	})
+	if err != nil {
+		t.Fatalf("reordered replay: %v", err)
+	}
+	if replay.Inserted || replay.JobID != first.JobID || replay.RunID != first.RunID {
+		t.Fatalf("reordered replay = %+v, want idempotent %+v", replay, first)
+	}
+
+	// Dropping a parent changes the dependency set: conflict, no silent rewire.
+	if _, err := f.audio.Enqueue(ctx, EnqueueInput{
+		RecordingID: f.recording, Capability: CapabilityTagging, Generation: "child",
+		Request: f.request(CapabilityTagging, "child", nil),
+		Dependencies: []string{p1.JobID}, MaxAttempts: 3,
+	}); ErrorCodeOf(err) != CodeRequestConflict {
+		t.Fatalf("dropped-parent replay error = %v, want %q", err, CodeRequestConflict)
+	}
+	// An unknown parent id is also a dependency-set change, not a silent accept.
+	if _, err := f.audio.Enqueue(ctx, EnqueueInput{
+		RecordingID: f.recording, Capability: CapabilityTagging, Generation: "child",
+		Request: f.request(CapabilityTagging, "child", nil),
+		Dependencies: []string{"job:phantom"}, MaxAttempts: 3,
+	}); ErrorCodeOf(err) != CodeRequestConflict {
+		t.Fatalf("phantom-parent replay error = %v, want %q", err, CodeRequestConflict)
+	}
+
+	var desired, current sql.NullString
+	if err := f.db.QueryRowContext(ctx,
+		`SELECT desired_job_id,current_run_id FROM audio_analysis_heads WHERE recording_id=? AND capability=?`,
+		f.recording, CapabilityTagging).Scan(&desired, &current); err != nil {
+		t.Fatal(err)
+	}
+	if !desired.Valid || desired.String != first.JobID || current.Valid {
+		t.Fatalf("head moved by replays: desired=%v current=%v", desired, current)
+	}
+}
+
 // TestAudioFailUnclaimedReleasesDependents proves a stage that this worker does
 // not run is terminated with a safe code so a dependent job can proceed.
 func TestAudioFailUnclaimedReleasesDependents(t *testing.T) {
@@ -562,5 +692,550 @@ func TestAudioFailUnclaimedReleasesDependents(t *testing.T) {
 	claimed, err := process.Claim(ctx, f.db, process.ClaimOptions{WorkerID: "w", Stages: []string{"audio_speaker"}, Lease: time.Minute})
 	if err != nil || claimed.ID != child {
 		t.Fatalf("child not released: %+v err=%v", claimed, err)
+	}
+}
+
+// --- Plan 4.6: Runner.RunJob claim checks and failure semantics. ---
+
+// probeResolver counts how often RunJob obtained the PCM window.
+type probeResolver struct{ calls int }
+
+func (r *probeResolver) RecordingWindow(context.Context, string, int64, int64) (io.ReadCloser, error) {
+	r.calls++
+	return io.NopCloser(bytes.NewReader(bytes.Repeat([]byte{0x01, 0x02}, 2000*16))), nil
+}
+
+func (r *probeResolver) SourceAudioSHA256(context.Context, string) (string, error) { return "", nil }
+
+// probeAnalyzer counts how often RunJob invoked the adapter.
+type probeAnalyzer struct{ calls int }
+
+func (a *probeAnalyzer) Analyze(context.Context, Request, io.Reader) (Result, error) {
+	a.calls++
+	return Result{SchemaVersion: ContractSchema, Status: StatusSucceeded}, nil
+}
+
+// fixedResultAnalyzer always returns the prepared result, standing in for an
+// adapter that ran to completion and reported a terminal failure.
+type fixedResultAnalyzer struct{ result Result }
+
+func (a fixedResultAnalyzer) Analyze(context.Context, Request, io.Reader) (Result, error) {
+	return a.result, nil
+}
+
+// claimAt claims a specific job at an explicit instant, so retry backoff and
+// lease recovery are deterministic.
+func (f *audioFixture) claimAt(jobID string, now time.Time, workerID string) process.Job {
+	f.t.Helper()
+	job, err := process.Claim(context.Background(), f.db, process.ClaimOptions{
+		WorkerID: workerID,
+		Stages:   []string{"audio_vad", "audio_tagging", "audio_diarization", "audio_speaker"},
+		Lease:    time.Minute, ProcessorVersion: "test", Now: now,
+	})
+	if err != nil {
+		f.t.Fatalf("Claim: %v", err)
+	}
+	if job.ID != jobID {
+		f.t.Fatalf("claimed %s, want %s", job.ID, jobID)
+	}
+	return *job
+}
+
+// claimLease claims a specific job with a custom lease length.
+func (f *audioFixture) claimLease(jobID string, lease time.Duration) process.Job {
+	f.t.Helper()
+	job, err := process.Claim(context.Background(), f.db, process.ClaimOptions{
+		WorkerID: "worker-a",
+		Stages:   []string{"audio_vad", "audio_tagging", "audio_diarization", "audio_speaker"},
+		Lease:    lease, ProcessorVersion: "test",
+	})
+	if err != nil {
+		f.t.Fatalf("Claim: %v", err)
+	}
+	if job.ID != jobID {
+		f.t.Fatalf("claimed %s, want %s", job.ID, jobID)
+	}
+	return *job
+}
+
+// jobStatusOf reads one processing job's status.
+func jobStatusOf(t *testing.T, db *sql.DB, jobID string) string {
+	t.Helper()
+	var status string
+	if err := db.QueryRowContext(context.Background(), `SELECT status FROM processing_jobs WHERE id=?`, jobID).Scan(&status); err != nil {
+		t.Fatalf("job status %s: %v", jobID, err)
+	}
+	return status
+}
+
+// runRow reads one audio run row through its job id.
+func runRow(t *testing.T, db *sql.DB, jobID string) (status string, active int, errorCode sql.NullString) {
+	t.Helper()
+	if err := db.QueryRowContext(context.Background(),
+		`SELECT status,active,error_code FROM audio_analysis_runs WHERE job_id=?`, jobID).
+		Scan(&status, &active, &errorCode); err != nil {
+		t.Fatalf("run row %s: %v", jobID, err)
+	}
+	return status, active, errorCode
+}
+
+// lastErrorCode returns the code recorded on the newest attempt error.
+func lastErrorCode(t *testing.T, db *sql.DB, jobID string) string {
+	t.Helper()
+	entry, err := process.LastError(context.Background(), db, jobID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return entry.Code
+}
+
+// TestAudioRunnerRetryableThenSucceeds pins plan 4.6: a retryable adapter
+// failure parks the job in retry_wait within the attempt budget while the run
+// row stays running, and the next attempt after the backoff completes both.
+func TestAudioRunnerRetryableThenSucceeds(t *testing.T) {
+	ctx := context.Background()
+	f := newAudioFixture(t)
+	out, err := f.audio.Enqueue(ctx, EnqueueInput{
+		RecordingID: f.recording, Capability: CapabilityVAD, Generation: "retry-1",
+		Request: f.request(CapabilityVAD, "retry-1", nil), MaxAttempts: 3,
+	})
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	runner := &Runner{Store: f.audio, Analyzer: scriptedAnalyzer{err: NewError(CodeGPUBusy, true, "gpu busy")}, Resolver: bytesResolver{data: f.pcm}}
+	job1 := f.claim(out.JobID)
+	if err := runner.RunJob(ctx, job1); err != nil {
+		t.Fatalf("RunJob retryable: %v", err)
+	}
+	if status := jobStatusOf(t, f.db, out.JobID); status != "retry_wait" {
+		t.Fatalf("job status = %q, want retry_wait", status)
+	}
+	if status, _, _ := runRow(t, f.db, out.JobID); status != StatusRunning {
+		t.Fatalf("run status = %q, want running within the attempt budget", status)
+	}
+	if code := lastErrorCode(t, f.db, out.JobID); code != CodeGPUBusy {
+		t.Fatalf("attempt error code = %q, want %q", code, CodeGPUBusy)
+	}
+	job2 := f.claimAt(out.JobID, time.Now().Add(6*time.Second), "worker-test")
+	runner.Analyzer = scriptedAnalyzer{events: []Event{{ID: "e1", EventType: EventSpeechActivity, StartMS: 0, EndMS: 500, Payload: map[string]any{"state": "speech"}}}}
+	if err := runner.RunJob(ctx, job2); err != nil {
+		t.Fatalf("RunJob after retry: %v", err)
+	}
+	if status := jobStatusOf(t, f.db, out.JobID); status != "succeeded" {
+		t.Fatalf("job status = %q, want succeeded", status)
+	}
+	if status, active, _ := runRow(t, f.db, out.JobID); status != StatusSucceeded || active != 1 {
+		t.Fatalf("run = %s/%d, want succeeded/1", status, active)
+	}
+	if _, ok := f.current(CapabilityVAD); !ok {
+		t.Fatal("recovered attempt did not publish a current run")
+	}
+}
+
+// TestAudioRunnerRetryableExhaustedSyncsRunAndReleasesChild pins plan 4.6:
+// when the retry budget is exhausted the job enters terminal failed and the
+// run row is synced to failed with the adapter's code even though the adapter
+// reported the failure as retryable; the failed parent releases its child.
+func TestAudioRunnerRetryableExhaustedSyncsRunAndReleasesChild(t *testing.T) {
+	ctx := context.Background()
+	f := newAudioFixture(t)
+	parent, err := f.audio.Enqueue(ctx, EnqueueInput{
+		RecordingID: f.recording, Capability: CapabilityVAD, Generation: "exh-1",
+		Request: f.request(CapabilityVAD, "exh-1", nil), MaxAttempts: 2,
+	})
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	child, _, err := process.Enqueue(ctx, f.db, process.Spec{
+		Stage: "audio_speaker", InputSnapshotID: f.recording,
+		IdempotencyKey: "exh-child", Dependencies: []string{parent.JobID},
+	}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &Runner{Store: f.audio, Analyzer: scriptedAnalyzer{err: NewError(CodeGPUBusy, true, "gpu busy")}, Resolver: bytesResolver{data: f.pcm}}
+	job1 := f.claim(parent.JobID)
+	if err := runner.RunJob(ctx, job1); err != nil {
+		t.Fatalf("first RunJob: %v", err)
+	}
+	if status := jobStatusOf(t, f.db, parent.JobID); status != "retry_wait" {
+		t.Fatalf("job status = %q, want retry_wait", status)
+	}
+	job2 := f.claimAt(parent.JobID, time.Now().Add(6*time.Second), "worker-test")
+	if err := runner.RunJob(ctx, job2); err != nil {
+		t.Fatalf("second RunJob: %v", err)
+	}
+	if status := jobStatusOf(t, f.db, parent.JobID); status != "failed" {
+		t.Fatalf("exhausted job status = %q, want failed", status)
+	}
+	status, active, errorCode := runRow(t, f.db, parent.JobID)
+	if status != StatusFailed || active != 0 || !errorCode.Valid || errorCode.String != CodeGPUBusy {
+		t.Fatalf("exhausted run = %s/%d/%v, want failed/0/%s", status, active, errorCode, CodeGPUBusy)
+	}
+	if code := lastErrorCode(t, f.db, parent.JobID); code != CodeGPUBusy {
+		t.Fatalf("attempt error code = %q, want %q", code, CodeGPUBusy)
+	}
+	claimed, err := process.Claim(ctx, f.db, process.ClaimOptions{
+		WorkerID: "worker-test", Stages: []string{"audio_speaker"}, Lease: time.Minute,
+	})
+	if err != nil || claimed.ID != child {
+		t.Fatalf("child not released by the exhausted parent: %+v err=%v", claimed, err)
+	}
+}
+
+// TestAudioRunnerFatalFailureFailsRun pins the fatal path: a non-retryable
+// adapter failure fails the run and the job at once.
+func TestAudioRunnerFatalFailureFailsRun(t *testing.T) {
+	ctx := context.Background()
+	f := newAudioFixture(t)
+	out := f.enqueue(CapabilityDiarization, "fatal-1", nil)
+	job := f.claim(out.JobID)
+	runner := &Runner{Store: f.audio, Analyzer: scriptedAnalyzer{err: NewError(CodeDisabled, false, "capability off")}, Resolver: bytesResolver{data: f.pcm}}
+	if err := runner.RunJob(ctx, job); err != nil {
+		t.Fatalf("RunJob fatal: %v", err)
+	}
+	if status := jobStatusOf(t, f.db, out.JobID); status != "failed" {
+		t.Fatalf("job status = %q, want failed", status)
+	}
+	status, active, errorCode := runRow(t, f.db, out.JobID)
+	if status != StatusFailed || active != 0 || !errorCode.Valid || errorCode.String != CodeDisabled {
+		t.Fatalf("run = %s/%d/%v, want failed/0/%s", status, active, errorCode, CodeDisabled)
+	}
+	if code := lastErrorCode(t, f.db, out.JobID); code != CodeDisabled {
+		t.Fatalf("attempt error code = %q, want %q", code, CodeDisabled)
+	}
+}
+
+// TestAudioRunnerSupersededGenerationTerminatesOnce pins plan 4.6: while the
+// first attempt still holds a live lease, a newer generation supersedes it;
+// the stale worker must terminate its attempt exactly once with
+// audio_superseded and leave the invalidated run untouched.
+func TestAudioRunnerSupersededGenerationTerminatesOnce(t *testing.T) {
+	ctx := context.Background()
+	f := newAudioFixture(t)
+	first := f.enqueue(CapabilityVAD, "sup-1", nil)
+	job1 := f.claim(first.JobID)
+	// A new generation is desired while job1 is still running on a live lease.
+	second := f.enqueue(CapabilityVAD, "sup-2", nil)
+	if status, _, _ := runRow(t, f.db, first.JobID); status != StatusInvalidated {
+		t.Fatalf("superseded run status = %q, want invalidated", status)
+	}
+	resolver := &probeResolver{}
+	analyzer := &probeAnalyzer{}
+	runner := &Runner{Store: f.audio, Analyzer: analyzer, Resolver: resolver}
+	// The stale worker must not analyse; the claim check fires first.
+	if err := runner.RunJob(ctx, job1); err != nil {
+		t.Fatalf("stale RunJob: %v", err)
+	}
+	if analyzer.calls != 0 || resolver.calls != 0 {
+		t.Fatalf("superseded worker analysed the stale input (resolver=%d analyzer=%d)", resolver.calls, analyzer.calls)
+	}
+	if status := jobStatusOf(t, f.db, first.JobID); status != "failed" {
+		t.Fatalf("superseded job status = %q, want failed", status)
+	}
+	if code := lastErrorCode(t, f.db, first.JobID); code != "audio_superseded" {
+		t.Fatalf("attempt error code = %q, want audio_superseded", code)
+	}
+	if status, active, _ := runRow(t, f.db, first.JobID); status != StatusInvalidated || active != 0 {
+		t.Fatalf("superseded run = %s/%d, want invalidated/0", status, active)
+	}
+	var attempts int
+	if err := f.db.QueryRowContext(ctx, `SELECT attempt_count FROM processing_jobs WHERE id=?`, first.JobID).Scan(&attempts); err != nil {
+		t.Fatal(err)
+	}
+	// A repeated stale RunJob must not terminate the job a second time.
+	if err := runner.RunJob(ctx, job1); err != nil {
+		t.Fatalf("second stale RunJob: %v", err)
+	}
+	var attemptsAfter int
+	if err := f.db.QueryRowContext(ctx, `SELECT attempt_count FROM processing_jobs WHERE id=?`, first.JobID).Scan(&attemptsAfter); err != nil {
+		t.Fatal(err)
+	}
+	if attemptsAfter != attempts {
+		t.Fatalf("attempt count moved from %d to %d on a repeated stale run", attempts, attemptsAfter)
+	}
+	if code := lastErrorCode(t, f.db, first.JobID); code != "audio_superseded" {
+		t.Fatalf("attempt error code changed to %q", code)
+	}
+	// The desired generation still reaches a terminal state; the superseded
+	// run never becomes current again.
+	job2 := f.claim(second.JobID)
+	runner.Analyzer = scriptedAnalyzer{err: NewError(CodeDisabled, false, "capability off")}
+	runner.Resolver = bytesResolver{data: f.pcm}
+	if err := runner.RunJob(ctx, job2); err != nil {
+		t.Fatalf("desired RunJob: %v", err)
+	}
+	if status := jobStatusOf(t, f.db, second.JobID); status != "failed" {
+		t.Fatalf("desired job status = %q, want failed", status)
+	}
+	if status, active, _ := runRow(t, f.db, first.JobID); status != StatusInvalidated || active != 0 {
+		t.Fatalf("superseded run mutated by the desired failure: %s/%d", status, active)
+	}
+	var current []byte
+	if err := f.db.QueryRowContext(ctx, `SELECT current_run_id FROM audio_analysis_heads WHERE recording_id=? AND capability=?`, f.recording, CapabilityVAD).Scan(&current); err != nil {
+		t.Fatal(err)
+	}
+	if current != nil {
+		t.Fatalf("head points at %s although no current result exists", current)
+	}
+	if _, ok := f.current(CapabilityVAD); ok {
+		t.Fatal("superseded generation became current again")
+	}
+}
+
+// TestAudioRunnerOldResultPointerStaysInactive pins that a completed older
+// generation keeps its result pointer while its terminal job is never mutated
+// by a stale worker and its run can never re-activate, even when the desired
+// generation fails fatally.
+func TestAudioRunnerOldResultPointerStaysInactive(t *testing.T) {
+	ctx := context.Background()
+	f := newAudioFixture(t)
+	first := f.enqueue(CapabilityVAD, "ptr-1", nil)
+	job1 := f.claim(first.JobID)
+	req1 := f.request(CapabilityVAD, "ptr-1", nil)
+	if _, err := f.audio.Commit(ctx, CommitInput{JobID: job1.ID, LeaseToken: job1.LeaseToken, Result: f.result(req1, StatusSucceeded, nil)}); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+	// A new generation supersedes the succeeded run.
+	second := f.enqueue(CapabilityVAD, "ptr-2", nil)
+	// A stale worker replaying the already-terminal job must not mutate it.
+	if err := (&Runner{Store: f.audio, Analyzer: &probeAnalyzer{}, Resolver: &probeResolver{}}).RunJob(ctx, job1); err != nil {
+		t.Fatalf("stale RunJob on terminal job: %v", err)
+	}
+	if status := jobStatusOf(t, f.db, first.JobID); status != "succeeded" {
+		t.Fatalf("terminal job mutated by the stale worker: %q", status)
+	}
+	var resultJSON string
+	if err := f.db.QueryRowContext(ctx, `SELECT result_json FROM audio_analysis_runs WHERE id=?`, first.RunID).Scan(&resultJSON); err != nil {
+		t.Fatal(err)
+	}
+	if resultJSON == "" || resultJSON == "{}" {
+		t.Fatalf("old result pointer lost: %q", resultJSON)
+	}
+	// The desired generation fails fatally; the old run must not re-activate.
+	job2 := f.claim(second.JobID)
+	runner := &Runner{Store: f.audio, Analyzer: scriptedAnalyzer{err: NewError(CodeDisabled, false, "capability off")}, Resolver: bytesResolver{data: f.pcm}}
+	if err := runner.RunJob(ctx, job2); err != nil {
+		t.Fatalf("desired RunJob: %v", err)
+	}
+	if status := jobStatusOf(t, f.db, second.JobID); status != "failed" {
+		t.Fatalf("desired job status = %q, want failed", status)
+	}
+	status, active, _ := runRow(t, f.db, first.JobID)
+	if status != StatusInvalidated || active != 0 {
+		t.Fatalf("old run re-activated: %s/%d", status, active)
+	}
+	var current []byte
+	if err := f.db.QueryRowContext(ctx, `SELECT current_run_id FROM audio_analysis_heads WHERE recording_id=? AND capability=?`, f.recording, CapabilityVAD).Scan(&current); err != nil {
+		t.Fatal(err)
+	}
+	if current != nil {
+		t.Fatalf("head points at %s although the desired generation failed", current)
+	}
+	if _, ok := f.current(CapabilityVAD); ok {
+		t.Fatal("old generation with a result pointer became current again")
+	}
+}
+
+// TestAudioRunnerLeaseLostSkipsInput pins plan 4.6: a worker that lost its
+// lease is detected before any PCM is read; the stale attempt must not mutate
+// the new owner's state and the new owner completes normally.
+func TestAudioRunnerLeaseLostSkipsInput(t *testing.T) {
+	ctx := context.Background()
+	f := newAudioFixture(t)
+	out := f.enqueue(CapabilityVAD, "lease-2", nil)
+	jobA := f.claimLease(out.JobID, 30*time.Millisecond)
+	// A claim after the short lease expired re-owns the same job.
+	jobB := f.claimAt(out.JobID, time.Now().Add(10*time.Second), "worker-b")
+	if jobB.LeaseToken == jobA.LeaseToken {
+		t.Fatal("expected worker-b to hold a fresh lease")
+	}
+	resolver := &probeResolver{}
+	analyzer := &probeAnalyzer{}
+	runner := &Runner{Store: f.audio, Analyzer: analyzer, Resolver: resolver}
+	if err := runner.RunJob(ctx, jobA); err != nil {
+		t.Fatalf("stale RunJob: %v", err)
+	}
+	if resolver.calls != 0 || analyzer.calls != 0 {
+		t.Fatalf("lease-lost worker obtained input (resolver=%d analyzer=%d)", resolver.calls, analyzer.calls)
+	}
+	var status, leaseToken string
+	if err := f.db.QueryRowContext(ctx, `SELECT status,lease_token FROM processing_jobs WHERE id=?`, out.JobID).Scan(&status, &leaseToken); err != nil {
+		t.Fatal(err)
+	}
+	if status != "running" || leaseToken != jobB.LeaseToken {
+		t.Fatalf("job = %s with token %q, want running with worker-b's token", status, leaseToken)
+	}
+	// worker-b still owns the job and completes it.
+	runner.Analyzer = scriptedAnalyzer{events: []Event{{ID: "e1", EventType: EventSpeechActivity, StartMS: 0, EndMS: 500, Payload: map[string]any{"state": "speech"}}}}
+	runner.Resolver = bytesResolver{data: f.pcm}
+	if err := runner.RunJob(ctx, jobB); err != nil {
+		t.Fatalf("new owner RunJob: %v", err)
+	}
+	if status := jobStatusOf(t, f.db, out.JobID); status != "succeeded" {
+		t.Fatalf("job status = %q, want succeeded", status)
+	}
+	if _, ok := f.current(CapabilityVAD); !ok {
+		t.Fatal("new owner's result is not current")
+	}
+}
+
+// TestAudioRunnerFailedResultRoutesThroughFailurePath pins plan 4.6: an
+// adapter Result with status=failed carries its structured code and retryable
+// flag into the same failure machinery as Store.Fail; the job is never
+// completed as a success, and only a later successful attempt completes it.
+func TestAudioRunnerFailedResultRoutesThroughFailurePath(t *testing.T) {
+	ctx := context.Background()
+	f := newAudioFixture(t)
+	out, err := f.audio.Enqueue(ctx, EnqueueInput{
+		RecordingID: f.recording, Capability: CapabilityVAD, Generation: "failres-1",
+		Request: f.request(CapabilityVAD, "failres-1", nil), MaxAttempts: 3,
+	})
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	job1 := f.claim(out.JobID)
+	req := f.request(CapabilityVAD, "failres-1", nil)
+	failedResult := f.result(req, StatusFailed, nil)
+	failedResult.Error = NewError(CodeModelUnavailable, true, "adapter says retry")
+	runner := &Runner{Store: f.audio, Analyzer: fixedResultAnalyzer{result: failedResult}, Resolver: bytesResolver{data: f.pcm}}
+	if err := runner.RunJob(ctx, job1); err != nil {
+		t.Fatalf("RunJob with failed result: %v", err)
+	}
+	status := jobStatusOf(t, f.db, out.JobID)
+	if status != "retry_wait" {
+		t.Fatalf("job status = %q, want retry_wait (a failed adapter result must not complete the job)", status)
+	}
+	if status, active, _ := runRow(t, f.db, out.JobID); status != StatusRunning || active != 0 {
+		t.Fatalf("run = %s/%d, want running/0 within the attempt budget", status, active)
+	}
+	if code := lastErrorCode(t, f.db, out.JobID); code != CodeModelUnavailable {
+		t.Fatalf("attempt error code = %q, want %q", code, CodeModelUnavailable)
+	}
+	job2 := f.claimAt(out.JobID, time.Now().Add(6*time.Second), "worker-test")
+	runner.Analyzer = scriptedAnalyzer{events: []Event{{ID: "e1", EventType: EventSpeechActivity, StartMS: 0, EndMS: 500, Payload: map[string]any{"state": "speech"}}}}
+	if err := runner.RunJob(ctx, job2); err != nil {
+		t.Fatalf("RunJob after failed result: %v", err)
+	}
+	if status := jobStatusOf(t, f.db, out.JobID); status != "succeeded" {
+		t.Fatalf("job status = %q, want succeeded", status)
+	}
+	if _, ok := f.current(CapabilityVAD); !ok {
+		t.Fatal("recovered attempt is not current")
+	}
+}
+
+// TestAudioRunnerFailedResultIdentityEnforced pins that the failure response's
+// identity is fully validated before it is processed: a failed result naming
+// another run is refused as audio_result_invalid, not replayed as a retryable
+// model failure.
+func TestAudioRunnerFailedResultIdentityEnforced(t *testing.T) {
+	ctx := context.Background()
+	f := newAudioFixture(t)
+	out := f.enqueue(CapabilityVAD, "failres-id", nil)
+	job := f.claim(out.JobID)
+	wrongReq := f.request(CapabilityVAD, "failres-id-other", nil)
+	badResult := f.result(wrongReq, StatusFailed, nil)
+	badResult.Error = NewError(CodeModelUnavailable, true, "not this run")
+	runner := &Runner{Store: f.audio, Analyzer: fixedResultAnalyzer{result: badResult}, Resolver: bytesResolver{data: f.pcm}}
+	if err := runner.RunJob(ctx, job); err != nil {
+		t.Fatalf("RunJob with mismatched failed result: %v", err)
+	}
+	if status := jobStatusOf(t, f.db, out.JobID); status != "failed" {
+		t.Fatalf("job status = %q, want failed", status)
+	}
+	status, active, errorCode := runRow(t, f.db, out.JobID)
+	if status != StatusFailed || active != 0 || !errorCode.Valid || errorCode.String != CodeResultInvalid {
+		t.Fatalf("run = %s/%d/%v, want failed/0/%s", status, active, errorCode, CodeResultInvalid)
+	}
+	if code := lastErrorCode(t, f.db, out.JobID); code != CodeResultInvalid {
+		t.Fatalf("attempt error code = %q, want %q", code, CodeResultInvalid)
+	}
+}
+
+// callbackAnalyzer delegates Analyze to a test callback so fixtures can race
+// the queue while the adapter is still running.
+type callbackAnalyzer struct {
+	callback func(ctx context.Context, req Request, pcm io.Reader) (Result, error)
+}
+
+func (a callbackAnalyzer) Analyze(ctx context.Context, req Request, pcm io.Reader) (Result, error) {
+	return a.callback(ctx, req, pcm)
+}
+
+// TestAudioRunnerSupersededDuringInference pins the mid-inference
+// supersession: a newer generation enqueued while the adapter is still running
+// must terminate the attempt exactly once with audio_superseded for every
+// adapter outcome, and the invalidated run must stay untouched.
+func TestAudioRunnerSupersededDuringInference(t *testing.T) {
+	scenarios := []struct {
+		name    string
+		outcome func(f *audioFixture, req Request) (Result, error)
+	}{
+		{
+			name: "succeeded_result",
+			outcome: func(f *audioFixture, req Request) (Result, error) {
+				return f.result(req, StatusSucceeded, nil), nil
+			},
+		},
+		{
+			name: "failed_result",
+			outcome: func(f *audioFixture, req Request) (Result, error) {
+				failed := f.result(req, StatusFailed, nil)
+				failed.Error = NewError(CodeModelUnavailable, true, "adapter says retry")
+				return failed, nil
+			},
+		},
+		{
+			name: "adapter_error",
+			outcome: func(f *audioFixture, req Request) (Result, error) {
+				return Result{}, NewError(CodeGPUBusy, true, "gpu busy")
+			},
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			ctx := context.Background()
+			f := newAudioFixture(t)
+			first := f.enqueue(CapabilityVAD, "supmid-1", nil)
+			job1 := f.claim(first.JobID)
+			req1 := f.request(CapabilityVAD, "supmid-1", nil)
+			secondJob := ""
+			adapter := callbackAnalyzer{callback: func(_ context.Context, _ Request, _ io.Reader) (Result, error) {
+				// The newer generation lands while gen-1 is mid-inference.
+				out, err := f.audio.Enqueue(ctx, EnqueueInput{
+					RecordingID: f.recording, Capability: CapabilityVAD, Generation: "supmid-2",
+					Request: f.request(CapabilityVAD, "supmid-2", nil), MaxAttempts: 3,
+				})
+				if err != nil {
+					return Result{}, err
+				}
+				secondJob = out.JobID
+				return scenario.outcome(f, req1)
+			}}
+			runner := &Runner{Store: f.audio, Analyzer: adapter, Resolver: bytesResolver{data: f.pcm}}
+			if err := runner.RunJob(ctx, job1); err != nil {
+				t.Fatalf("RunJob: %v", err)
+			}
+			if secondJob == "" {
+				t.Fatal("the adapter did not enqueue the newer generation")
+			}
+			if status := jobStatusOf(t, f.db, first.JobID); status != "failed" {
+				t.Fatalf("superseded attempt status = %q, want failed", status)
+			}
+			if code := lastErrorCode(t, f.db, first.JobID); code != "audio_superseded" {
+				t.Fatalf("attempt error code = %q, want audio_superseded", code)
+			}
+			if status, active, _ := runRow(t, f.db, first.JobID); status != StatusInvalidated || active != 0 {
+				t.Fatalf("run = %s/%d, want invalidated/0", status, active)
+			}
+			var desired string
+			if err := f.db.QueryRowContext(ctx, `SELECT desired_job_id FROM audio_analysis_heads WHERE recording_id=? AND capability=?`, f.recording, CapabilityVAD).Scan(&desired); err != nil {
+				t.Fatal(err)
+			}
+			if desired != secondJob {
+				t.Fatalf("head desired = %s, want the newer generation %s", desired, secondJob)
+			}
+		})
 	}
 }

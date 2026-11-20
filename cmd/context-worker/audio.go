@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -82,9 +83,10 @@ func buildAudioStages(configPath string, db *sql.DB, store *memory.Store, audioD
 		stages[capability] = &audioStage{
 			capability: capability,
 			runner: &audioanalysis.Runner{
-				Store:    audioStore,
-				Analyzer: analyzer,
-				Resolver: resolver,
+				Store:     audioStore,
+				Analyzer:  analyzer,
+				Resolver:  resolver,
+				AudioRoot: audioDir,
 			},
 		}
 	}
@@ -92,9 +94,33 @@ func buildAudioStages(configPath string, db *sql.DB, store *memory.Store, audioD
 	return cfg, abs, stages, unavailable, audioStore, nil
 }
 
-// recoverAudioStages terminates claimable audio jobs of stages this worker does
-// not run, so a disabled or unavailable model cannot block ASR dependents.
+// recoverAudioStages terminates claimable audio jobs of stages nobody claims,
+// so a disabled or unavailable model cannot block ASR dependents. It is driven
+// by the pipeline worker after its first successful heartbeat and on every 5s
+// heartbeat tick (--once included).
+//
+// The claim set is the live valid-stage union: the stages live workers
+// (heartbeat at most 30 seconds old, inclusive) still claim, plus this
+// worker's own configured stages — a worker never terminates jobs of a stage
+// it would claim itself. Recovery only fires when a live worker actually
+// claims ingest or ASR: those are the dependents it unblocks, and an audio
+// stage without a claimant that also has no ingest/ASR claimant anywhere has
+// no dependent to unblock.
 func recoverAudioStages(ctx context.Context, audioStore *audioanalysis.Store, enabled []string, unavailable map[string]string, now time.Time) error {
+	live, err := liveWorkerStages(ctx, audioStore.DB, now)
+	if err != nil {
+		return err
+	}
+	if !live["ingest"] && !live["asr"] {
+		return nil
+	}
+	protected := map[string]bool{}
+	for _, stage := range enabled {
+		protected[stage] = true
+	}
+	for stage := range live {
+		protected[stage] = true
+	}
 	rows, err := audioStore.DB.QueryContext(ctx,
 		`SELECT DISTINCT stage FROM processing_jobs WHERE stage LIKE 'audio\_%' ESCAPE '\' AND (status IN ('queued','retry_wait') OR (status='running' AND lease_expires_at IS NOT NULL AND lease_expires_at<=?))`,
 		now.UnixMilli())
@@ -114,14 +140,7 @@ func recoverAudioStages(ctx context.Context, audioStore *audioanalysis.Store, en
 		return err
 	}
 	for _, stage := range pending {
-		enabledStage := false
-		for _, candidate := range enabled {
-			if candidate == stage {
-				enabledStage = true
-				break
-			}
-		}
-		if enabledStage {
+		if protected[stage] {
 			continue
 		}
 		code := audioanalysis.CodeDisabled
@@ -135,6 +154,33 @@ func recoverAudioStages(ctx context.Context, audioStore *audioanalysis.Store, en
 	return nil
 }
 
+// liveWorkerStages returns the union of stages that live workers — heartbeats
+// at most 30 seconds old, inclusive — still claim.
+func liveWorkerStages(ctx context.Context, db *sql.DB, now time.Time) (map[string]bool, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT stages_json FROM worker_heartbeats WHERE last_seen_at >= ?`,
+		now.Add(-30*time.Second).UnixMilli())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	valid := map[string]bool{}
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		var stages []string
+		if err := json.Unmarshal([]byte(raw), &stages); err != nil {
+			continue
+		}
+		for _, stage := range stages {
+			valid[stage] = true
+		}
+	}
+	return valid, rows.Err()
+}
+
 // recordingAudioResolver serves the requested PCM window from the managed
 // audio directory. It never accepts a caller-supplied path.
 type recordingAudioResolver struct {
@@ -143,14 +189,19 @@ type recordingAudioResolver struct {
 }
 
 func (r *recordingAudioResolver) RecordingWindow(ctx context.Context, recordingID string, startMS, endMS int64) (io.ReadCloser, error) {
-	path, err := r.stitchedPath(ctx, recordingID)
+	rel, err := audioanalysis.ResolveRecordingPCM(ctx, r.db, r.audioRoot, recordingID)
 	if err != nil {
 		return nil, err
 	}
 	if startMS < 0 || endMS <= startMS || endMS > int64(^uint64(0)>>1)/32 {
 		return nil, audioanalysis.NewError(audioanalysis.CodeInputInvalid, false, "invalid window")
 	}
-	info, err := os.Lstat(path)
+	root, err := os.OpenRoot(r.audioRoot)
+	if err != nil {
+		return nil, audioanalysis.NewError(audioanalysis.CodeModelUnavailable, false, "audio directory is not readable")
+	}
+	defer root.Close()
+	info, err := root.Stat(rel)
 	if err != nil || !info.Mode().IsRegular() {
 		return nil, audioanalysis.NewError(audioanalysis.CodeModelUnavailable, false, "audio file is missing")
 	}
@@ -159,7 +210,7 @@ func (r *recordingAudioResolver) RecordingWindow(ctx context.Context, recordingI
 	if from >= info.Size() || to > info.Size() {
 		return nil, audioanalysis.NewError(audioanalysis.CodeInputInvalid, false, "window exceeds the audio file")
 	}
-	file, err := os.Open(path)
+	file, err := root.Open(rel)
 	if err != nil {
 		return nil, audioanalysis.NewError(audioanalysis.CodeModelUnavailable, false, "audio file is unreadable")
 	}
@@ -172,51 +223,6 @@ func (r *recordingAudioResolver) SourceAudioSHA256(ctx context.Context, recordin
 		return "", err
 	}
 	return hash, nil
-}
-
-// stitchedPath resolves the managed audio file through the provenance bridge.
-func (r *recordingAudioResolver) stitchedPath(ctx context.Context, recordingID string) (string, error) {
-	if strings.TrimSpace(r.audioRoot) == "" {
-		return "", audioanalysis.NewError(audioanalysis.CodeModelUnavailable, false, "no audio directory configured")
-	}
-	rows, err := r.db.QueryContext(ctx,
-		`SELECT json_extract(source_json,'$.device_id'), json_extract(source_json,'$.recording_id'), s.stitched_path
-		 FROM source_attachments a
-		 JOIN sync_recordings s
-		   ON s.recording_id = json_extract(a.source_json,'$.recording_id')
-		  AND s.device_id   = json_extract(a.source_json,'$.device_id')
-		 WHERE a.recording_id=? AND s.state!='deleted' AND s.stitched_path IS NOT NULL AND s.stitched_path!=''
-		 ORDER BY a.id LIMIT 1`, recordingID)
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-	if !rows.Next() {
-		return "", audioanalysis.NewError(audioanalysis.CodeModelUnavailable, false, "no managed audio for this recording")
-	}
-	var device, provider, stitched sql.NullString
-	if err := rows.Scan(&device, &provider, &stitched); err != nil {
-		return "", err
-	}
-	if !device.Valid || !provider.Valid || !stitched.Valid {
-		return "", audioanalysis.NewError(audioanalysis.CodeModelUnavailable, false, "audio provenance is incomplete")
-	}
-	if memory.RecordingID(device.String, provider.String) != recordingID {
-		return "", audioanalysis.NewError(audioanalysis.CodeModelUnavailable, false, "audio provenance does not match the recording")
-	}
-	root, err := filepath.Abs(r.audioRoot)
-	if err != nil {
-		return "", err
-	}
-	abs, err := filepath.Abs(stitched.String)
-	if err != nil {
-		return "", err
-	}
-	rel, err := filepath.Rel(root, abs)
-	if err != nil || rel == "." || rel == ".." || filepath.IsAbs(rel) || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return "", audioanalysis.NewError(audioanalysis.CodeModelUnavailable, false, "audio path escapes the managed root")
-	}
-	return abs, nil
 }
 
 // sectionReadCloser keeps the underlying file open for the section reader.

@@ -209,7 +209,7 @@ class RecordingService : Service() {
             val totalSamples: Long
             if (summary != null) {
                 totalChunks = summary.committedCount
-                totalSamples = summary.totalSamples
+                totalSamples = summary.committedSamples
             } else {
                 // 进程已换代的崩溃恢复：以已落盘分块行如实汇总。
                 val rows = graph.db.chunkDao().listForRecording(targetId)
@@ -224,26 +224,34 @@ class RecordingService : Service() {
                 totalSamples,
                 durationMs,
             )
-            UploadScheduler.enqueueFinish(applicationContext, targetId)
+            // 零提交块（<1 s）如实 (0 块, 0 采样, 0 ms)：ingest-v1 禁止零载荷 finish，不入队。
+            if (totalChunks > 0) {
+                UploadScheduler.enqueueFinish(applicationContext, targetId)
+            }
             ServiceCompat.stopForeground(this@RecordingService, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
     }
 
-    /** 上一进程崩溃遗留的 RECORDING 行：按已落盘分块如实置为 COMPLETE（尾块已随进程死亡丢弃）。 */
+    /** 上一进程崩溃遗留的 RECORDING 行：按已落盘分块如实置为 COMPLETE（尾块已随进程死亡丢弃）；有提交块时立即排 finish。 */
     private suspend fun finalizeStaleRecording() {
         if (activeRecordingId != null) return // 本实例正在录音，无遗留
         val graph = Graph.get(applicationContext)
         val stale = graph.db.recordingDao().getActive() ?: return
         val rows = graph.db.chunkDao().listForRecording(stale.recordingId)
         val rowSamples = rows.sumOf { it.sampleCount.toLong() }
+        // 恢复分支按 Room 落盘分块如实汇总（零块 → (0,0,0)；不用可能含丢弃尾块的持久化回退值）。
         graph.db.recordingDao().updateFinished(
             stale.recordingId,
             RecordingState.COMPLETE.name,
-            stale.totalChunks ?: rows.size,
-            stale.totalSamples ?: rowSamples,
-            stale.durationMs ?: (rowSamples * 1000 / AudioCapture.SAMPLE_RATE),
+            rows.size,
+            rowSamples,
+            rowSamples * 1000 / AudioCapture.SAMPLE_RATE,
         )
+        // 只在有提交块时排 finish（零块不可构造 ingest-v1 finish）。
+        if (rows.isNotEmpty()) {
+            UploadScheduler.enqueueFinish(applicationContext, stale.recordingId)
+        }
     }
 
     /** 停止路径的尾块持久化（与采集期回调同一存储语义，但同步等待完成）。 */

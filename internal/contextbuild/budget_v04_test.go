@@ -339,6 +339,87 @@ func (r *recordingReranker) Rerank(_ context.Context, _ string, items []memory.I
 	return out, nil
 }
 
+// TestEvidenceWindowReusesIndexedCentreBeforeByteCap covers the legacy
+// window-path regression: a centre turn that is already in the evidence index
+// must be reused (and attributed) before the byte cap is checked, so a second
+// item citing it keeps its attribution instead of losing its whole window to
+// a double-charged centre.
+func TestEvidenceWindowReusesIndexedCentreBeforeByteCap(t *testing.T) {
+	for _, version := range []string{"", "v2"} {
+		t.Run("version_"+func() string {
+			if version == "" {
+				return "v1"
+			}
+			return version
+		}(), func(t *testing.T) {
+			f := newFixture(t)
+			start := "2026-03-01T10:00:00Z"
+			f.conversation("conv:reuse", "Reuse", "rec:reuse")
+			f.recording("rec:reuse", "conv:reuse", &start)
+			f.turn("t:zero", "conv:reuse", "rec:reuse", 0, 1000, nil, strings.Repeat("零", 134))
+			f.turn("t:one", "conv:reuse", "rec:reuse", 1, 2000, nil, strings.Repeat("壹", 200))
+			f.turn("t:two", "conv:reuse", "rec:reuse", 2, 3000, nil, strings.Repeat("贰", 200))
+			f.turn("t:three", "conv:reuse", "rec:reuse", 3, 4000, nil, strings.Repeat("叁", 200))
+			f.note("n:first", "conv:reuse", "observation", "复用预算 first note", nil, []string{"t:one"})
+			f.note("n:second", "conv:reuse", "observation", "复用预算 second note", nil, []string{"t:two"})
+
+			// No conversation scope: pinning one would pull the recording's
+			// turns into the candidate set and charge their content to the
+			// item budget before the windows run. The notes are recalled
+			// lexically; navigation adds the conversation item only.
+			probe := f.build(nil, Request{Query: "复用预算", RetrievalVersion: version, IncludeRawEvidence: true, MaxBytes: 65536})
+			budget := 0
+			for _, id := range []string{"n:first", "n:second"} {
+				item, ok := itemByID(probe, id)
+				if !ok {
+					t.Fatalf("probe item %s missing: %v", id, itemIDs(probe.Items))
+				}
+				budget += itemTextBytes(item)
+			}
+			turnBytes := map[string]int{}
+			for _, id := range []string{"t:zero", "t:one", "t:two", "t:three"} {
+				var text string
+				if err := f.db.QueryRow(`SELECT content FROM turns WHERE id=?`, id).Scan(&text); err != nil {
+					t.Fatalf("turn %s: %v", id, err)
+				}
+				turnBytes[id] = len(text)
+			}
+			// One byte short of fitting the second window's already-indexed
+			// centre a second time: the buggy path charges t:two twice and
+			// drops n:second's whole window and attribution.
+			budget += turnBytes["t:zero"] + turnBytes["t:one"] + turnBytes["t:two"] + turnBytes["t:two"] - 1
+
+			req := Request{Query: "复用预算", RetrievalVersion: version, IncludeRawEvidence: true, MaxBytes: budget}
+			pkg := f.build(nil, req)
+
+			attributed := false
+			for _, ref := range pkg.Evidence {
+				if ref.TurnID != "t:two" {
+					continue
+				}
+				if !containsString(ref.UsedByItemIDs, "n:second") {
+					t.Fatalf("t:second item lost its centre attribution: used-by=%v", ref.UsedByItemIDs)
+				}
+				if !containsString(ref.UsedByItemIDs, "n:first") {
+					t.Fatalf("first item's attribution lost: used-by=%v", ref.UsedByItemIDs)
+				}
+				attributed = true
+			}
+			if !attributed {
+				t.Fatalf("t:two missing from evidence: %+v", pkg.Evidence)
+			}
+			if containsString(pkg.Trace.Budget.SkippedEvidenceTurnIDs, "t:two") {
+				t.Fatalf("an already-indexed centre was reported skipped: %v", pkg.Trace.Budget.SkippedEvidenceTurnIDs)
+			}
+			// The remaining neighbour still exceeds the budget, so the build
+			// keeps its honest truncation record.
+			if !containsString(pkg.Trace.Budget.SkippedEvidenceTurnIDs, "t:three") || !hasGap(pkg, "evidence_budget_exceeded") {
+				t.Fatalf("skipped=%v gaps=%+v", pkg.Trace.Budget.SkippedEvidenceTurnIDs, pkg.Gaps)
+			}
+		})
+	}
+}
+
 func TestContextBudgetRerankSkipsOversizedCandidate(t *testing.T) {
 	f := newFixture(t)
 	start := "2026-03-01T10:00:00Z"

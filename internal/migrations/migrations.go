@@ -181,6 +181,8 @@ var migrations = []migration{
 	{version: 21, name: "recording-source-bytes", run: applyRecordingSourceBytes},
 	{version: 22, name: "asr-progress", run: applyASRProgress},
 	audioAnalysisMigration,
+	{version: 24, name: "profile-retirement-cleanup", run: applyProfileRetirementCleanup},
+	{version: 25, name: "forget-audio-staging", run: applyForgetAudioStaging},
 }
 
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);`

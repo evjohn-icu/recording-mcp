@@ -48,9 +48,9 @@ scripts/local-gpu-up.sh --profile sprint3 --backend ark --with-embedding
 
 ASR、embedding 与音频分析可以通过同一锁文件串行使用 GPU。Go 在未配置锁路径时使用用户级默认值 `${XDG_RUNTIME_DIR:-$HOME/.local/state}/recording-mcp/recording-mcp-gpu.lock`，使用 `flock(LOCK_EX|LOCK_NB)` 每 200 ms 重试。多个 profile 使用该默认路径时会相互等待。
 
-- `local-gpu-up.sh` 选择 profile 内的 `gpu.lock`，传给 worker 的 `--asr-lock`，以及 `--with-embedding` 启动的 CUDA embedding 服务。ASR 默认等锁 10 分钟。
+- `local-gpu-up.sh` 将用户级锁路径传给 worker 的 `--asr-lock` 和 CUDA embedding 服务的 `--gpu-lock`。`ASR_LOCK` 可覆盖这两处路径。ASR 默认等锁 10 分钟，CPU 或 fixture 不领取 GPU 锁。
 - Python embedding 服务在 CUDA 设备上以 `--gpu-lock` 在模型加载与每批推理外加锁，超时返回 HTTP 503 `GPU busy`。
-- CUDA 音频分析在整个适配器子进程生命周期内持锁。与启动器并用时，在音频分析配置的 `gpu_lock` 中填写启动器所用锁文件的绝对路径。持锁后发现空闲显存小于 1024 MiB 时返回可重试的 `audio_gpu_busy`。
+- CUDA 音频分析在整个适配器子进程生命周期内持锁。部署显式配置 `ASR_LOCK` 时，音频分析配置的 `gpu_lock` 需指向同一绝对路径。持锁后发现空闲显存小于 1024 MiB 时返回可重试的 `audio_gpu_busy`。
 - `--with-embedding` 同时向 worker/web 传 `--embed-input-type` / `--semantic-input-type`（本地 Qwen 服务的 query 指令开关）；该字段默认关闭，避免严格 OpenAI 兼容端点拒绝未知字段。
 - 启动器默认关闭音频分析。手动配置时，worker 和读取状态的 Web / MCP 进程需使用同一份配置。 [启用与显式入队](../processing.md#可选音频分析启用与显式入队)
 

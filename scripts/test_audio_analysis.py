@@ -11,13 +11,17 @@ framing math, validation rules and CLI protocol instead.
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import importlib.util
 import json
 import math
+import os
 import pathlib
 import struct
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from unittest import mock
 
@@ -1183,6 +1187,292 @@ class CliTests(unittest.TestCase):
         )
         self.assertNotEqual(process.returncode, 0)
         self.assertNotIn("Traceback", process.stderr)
+
+
+# ---------------------------------------------------------------------------
+# plan 4.7: model identity and config digest gating
+# ---------------------------------------------------------------------------
+
+
+@contextlib.contextmanager
+def _chdir(path):
+    previous = os.getcwd()
+    os.chdir(str(path))
+    try:
+        yield
+    finally:
+        os.chdir(previous)
+
+
+class ModelIdentityGateTests(unittest.TestCase):
+    """The adapter verifies the request's model identity and config digest
+    against the actually resolved model files BEFORE any inference runs, and
+    relative model paths resolve against the config file's own directory.
+
+    The digest is the Go ``Config.Resolve`` digest: capability, model id,
+    model revision, device, frontend id and the ordered ``basename=sha256``
+    file list joined with NUL, plus three more NUL-joined segments —
+    ``threshold`` and ``span_seconds`` as IEEE-754 64-bit big-endian hex and
+    ``fbank_backend`` verbatim — appended only when at least one tuning is
+    present, so tunings-free configs keep the legacy digest.
+    """
+
+    @staticmethod
+    def load_cli():
+        script_dir = str(SCRIPT.parent)
+        if script_dir not in sys.path:
+            sys.path.insert(0, script_dir)
+        spec = importlib.util.spec_from_file_location("audio_analysis_cli", str(SCRIPT))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def setUp(self):
+        self.cli = self.load_cli()
+        # The CLI module imports its own audio_analysis_models instance; patch
+        # that one, not the test module's copy, so inference stubs are seen.
+        self.models = self.cli.models
+
+    @staticmethod
+    def float_segment(value):
+        return struct.pack(">d", float(value)).hex()
+
+    @classmethod
+    def config_digest(cls, config, capability="vad"):
+        cap = config["capabilities"][capability]
+        files = [(entry["path"], entry["sha256"]) for entry in cap["files"]]
+        tunings = {
+            key: cap[key]
+            for key in ("threshold", "span_seconds", "fbank_backend")
+            if key in cap
+        }
+        parts = [
+            capability,
+            cap["model_id"],
+            cap["model_revision"],
+            cap.get("device") or "cpu",
+            cap.get("frontend_id") or "",
+            ",".join(
+                pathlib.Path(path).name + "=" + digest for path, digest in files
+            ),
+        ]
+        if tunings:
+            parts.append(
+                cls.float_segment(tunings["threshold"])
+                if "threshold" in tunings
+                else ""
+            )
+            parts.append(
+                cls.float_segment(tunings["span_seconds"])
+                if "span_seconds" in tunings
+                else ""
+            )
+            parts.append(
+                str(tunings["fbank_backend"]) if "fbank_backend" in tunings else ""
+            )
+        return hashlib.sha256("\x00".join(parts).encode("utf-8")).hexdigest()
+
+    def identity_request(self, config, capability="vad", **overrides):
+        cap = config["capabilities"][capability]
+        files = {entry["path"]: entry["sha256"] for entry in cap["files"]}
+        if "model_files_sha256" in overrides:
+            files = overrides.pop("model_files_sha256")
+        return make_request(
+            capability=capability,
+            model_id=cap["model_id"],
+            model_revision=cap["model_revision"],
+            model_files_sha256=files,
+            config_sha256=self.config_digest(config, capability),
+            **overrides,
+        )
+
+    def write_identity_config(self, tmp, tunings=None):
+        model = pathlib.Path(tmp) / "campplus.onnx"
+        model.write_bytes(b"campplus-onnx-bytes")
+        digest = self.models.sha256_file(str(model))
+        overrides = {"model_id": "campplus"}
+        if tunings:
+            overrides.update(tunings)
+        config = make_config(
+            files=[{"path": str(model), "sha256": digest}], **overrides
+        )
+        config_path = pathlib.Path(tmp) / "audio-config.json"
+        config_path.write_text(json.dumps(config), encoding="utf-8")
+        return config, config_path
+
+    def analyze_args(self, tmp, request):
+        start_ms = request.get("start_ms") or 0
+        end_ms = request.get("end_ms") or 1000
+        pcm = pcm_bytes([0] * (end_ms - start_ms) * 16)
+        request["input_sha256"] = hashlib.sha256(pcm).hexdigest()
+        request_path = pathlib.Path(tmp) / "request.json"
+        pcm_path = pathlib.Path(tmp) / "audio.pcm"
+        request_path.write_text(json.dumps(request), encoding="utf-8")
+        pcm_path.write_bytes(pcm)
+        return types.SimpleNamespace(
+            request=str(request_path),
+            pcm=str(pcm_path),
+            config=str(pathlib.Path(tmp) / "audio-config.json"),
+            out=str(pathlib.Path(tmp) / "out.json"),
+        )
+
+    def run_analyze(self, tmp, request, config_path):
+        args = self.analyze_args(tmp, request)
+        args.config = str(config_path)
+        session = FakeVadSession([0.9] * 32)
+        with fake_numpy(), mock.patch.object(
+            self.models, "_onnx_session", return_value=session
+        ):
+            result, embeddings = self.cli._analyze(args, request)
+        return result, embeddings
+
+    def assert_identity_rejected(self, tmp, request, config_path):
+        args = self.analyze_args(tmp, request)
+        args.config = str(config_path)
+        with fake_numpy(), mock.patch.object(
+            self.models,
+            "_onnx_session",
+            side_effect=AssertionError(
+                "inference must not run for a mismatched identity"
+            ),
+        ):
+            with self.assertRaises(self.models.AdapterError) as caught:
+                self.cli._analyze(args, request)
+        self.assertEqual(caught.exception.code, "audio_model_unavailable")
+
+    def test_matching_identity_runs_inference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config, config_path = self.write_identity_config(
+                tmp, tunings={"threshold": 0.5}
+            )
+            request = self.identity_request(config)
+            result, embeddings = self.run_analyze(tmp, request, config_path)
+            self.assertIsNone(embeddings)
+            self.assertEqual(result["status"], "succeeded")
+            self.assertEqual(len(result["events"]), 1)
+            self.models.validate_result(result, request, 1000)
+
+    def test_tunings_free_config_keeps_legacy_digest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config, config_path = self.write_identity_config(tmp)
+            request = self.identity_request(config)
+            result, _ = self.run_analyze(tmp, request, config_path)
+            self.assertEqual(result["status"], "succeeded")
+
+    def test_request_model_id_mismatch_rejected_before_inference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config, config_path = self.write_identity_config(tmp)
+            request = self.identity_request(config)
+            request["model_id"] = "other-model"
+            self.assert_identity_rejected(tmp, request, config_path)
+
+    def test_request_model_revision_mismatch_rejected_before_inference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config, config_path = self.write_identity_config(tmp)
+            request = self.identity_request(config)
+            request["model_revision"] = "other-rev"
+            self.assert_identity_rejected(tmp, request, config_path)
+
+    def test_request_model_files_mismatch_rejected_before_inference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config, config_path = self.write_identity_config(tmp)
+            request = self.identity_request(config)
+            model_path = config["capabilities"]["vad"]["files"][0]["path"]
+            request["model_files_sha256"] = {model_path: "e" * 64}
+            self.assert_identity_rejected(tmp, request, config_path)
+
+    def test_threshold_only_change_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config, config_path = self.write_identity_config(
+                tmp, tunings={"threshold": 0.5}
+            )
+            request = self.identity_request(config)
+            drifted = json.loads(json.dumps(config))
+            drifted["capabilities"]["vad"]["threshold"] = 0.6
+            request["config_sha256"] = self.config_digest(drifted)
+            self.assert_identity_rejected(tmp, request, config_path)
+
+    def test_span_seconds_only_change_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config, config_path = self.write_identity_config(tmp)
+            request = self.identity_request(config)
+            drifted = json.loads(json.dumps(config))
+            drifted["capabilities"]["vad"]["span_seconds"] = 5.0
+            request["config_sha256"] = self.config_digest(drifted)
+            self.assert_identity_rejected(tmp, request, config_path)
+
+    def test_fbank_backend_only_change_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config, config_path = self.write_identity_config(tmp)
+            request = self.identity_request(config)
+            drifted = json.loads(json.dumps(config))
+            drifted["capabilities"]["vad"]["fbank_backend"] = "python"
+            request["config_sha256"] = self.config_digest(drifted)
+            self.assert_identity_rejected(tmp, request, config_path)
+
+    def test_config_file_switched_mid_run_rejected(self):
+        # The queued run was resolved under config A; the config file now says
+        # something else. The adapter reads the file fresh per run and must
+        # refuse the stale identity before inference.
+        with tempfile.TemporaryDirectory() as tmp:
+            config, config_path = self.write_identity_config(tmp)
+            request = self.identity_request(config)
+            drifted = json.loads(json.dumps(config))
+            drifted["capabilities"]["vad"]["model_revision"] = "rev2"
+            config_path.write_text(json.dumps(drifted), encoding="utf-8")
+            self.assert_identity_rejected(tmp, request, config_path)
+
+    def test_relative_model_path_resolves_against_config_directory(self):
+        with tempfile.TemporaryDirectory() as outer:
+            root = pathlib.Path(outer)
+            cfg_dir = root / "profiles" / "alpha"
+            (cfg_dir / "models").mkdir(parents=True)
+            model = cfg_dir / "models" / "campplus.onnx"
+            model.write_bytes(b"campplus-onnx-bytes")
+            digest = self.models.sha256_file(str(model))
+            config = make_config(
+                files=[{"path": "models/campplus.onnx", "sha256": digest}],
+                model_id="campplus",
+            )
+            config_path = cfg_dir / "audio-config.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            # Go producers pin the resolved absolute path, so the request keys
+            # the model file by its absolute location even though the config
+            # stores the relative path.
+            request = self.identity_request(
+                config, model_files_sha256={str(model): digest}
+            )
+            with tempfile.TemporaryDirectory() as elsewhere:
+                with _chdir(elsewhere):
+                    result, _ = self.run_analyze(cfg_dir, request, config_path)
+            self.assertEqual(result["status"], "succeeded")
+
+    def test_resolve_capability_base_dir_keyword(self):
+        with tempfile.TemporaryDirectory() as outer:
+            root = pathlib.Path(outer)
+            cfg_dir = root / "config-home"
+            (cfg_dir / "models").mkdir(parents=True)
+            model = cfg_dir / "models" / "campplus.onnx"
+            model.write_bytes(b"campplus-onnx-bytes")
+            digest = self.models.sha256_file(str(model))
+            config = make_config(
+                files=[{"path": "models/campplus.onnx", "sha256": digest}],
+                model_id="campplus",
+            )
+            with tempfile.TemporaryDirectory() as elsewhere:
+                with _chdir(elsewhere):
+                    resolved = models.resolve_capability(
+                        config, "vad", base_dir=str(cfg_dir)
+                    )
+            self.assertEqual(resolved["files"], [str(model)])
+            self.assertEqual(resolved["model_id"], "campplus")
+            self.assertEqual(resolved["device"], "cpu")
+            # The no-keyword default keeps the historical working-directory
+            # behaviour the existing tests rely on: relative pins stay
+            # relative and resolve against the current working directory.
+            with _chdir(cfg_dir):
+                resolved = self.models.resolve_capability(config, "vad")
+            self.assertEqual(resolved["files"], ["models/campplus.onnx"])
 
 
 if __name__ == "__main__":

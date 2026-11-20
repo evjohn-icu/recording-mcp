@@ -72,26 +72,29 @@ class ReconcileWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 }
 
                 RecordingState.COMPLETE.name -> {
-                    val detail = try {
-                        api.getRecording(recording.recordingId)
-                    } catch (e: ApiError) {
-                        null // 404 等：下轮再看
-                    } catch (e: IOException) {
-                        null
-                    }
-                    if (detail != null) {
-                        if (detail.state != "complete") {
-                            // 云端未 finish（例如上传中断后服务重启）：重新走 FinishWorker。
-                            UploadScheduler.enqueueFinish(applicationContext, recording.recordingId)
+                    // 显式零块完成（0 块）：云端无法 complete、无上传/同步意义 —— 跳过 GET 与 finish 重排。
+                    if (!FinishWorkflow.isExplicitZeroComplete(recording)) {
+                        val detail = try {
+                            api.getRecording(recording.recordingId)
+                        } catch (e: ApiError) {
+                            null // 404 等：下轮再看
+                        } catch (e: IOException) {
+                            null
                         }
-                        recordingDao.updateSyncInfo(
-                            recording.recordingId,
-                            parseRfc3339ToEpochMs(detail.sync?.syncedAt),
-                            detail.sync?.transcriptionState,
-                        )
-                        val transcriptionState = detail.sync?.transcriptionState
-                        if (settings.deleteAfterAck() && transcriptionState != null && transcriptionState in ACKED_TRANSCRIPTION_STATES) {
-                            purgeAudioFiles(recording.recordingId)
+                        if (detail != null) {
+                            if (detail.state != "complete") {
+                                // 云端未 finish（例如上传中断后服务重启）：重新走 FinishWorker。
+                                UploadScheduler.enqueueFinish(applicationContext, recording.recordingId)
+                            }
+                            recordingDao.updateSyncInfo(
+                                recording.recordingId,
+                                parseRfc3339ToEpochMs(detail.sync?.syncedAt),
+                                detail.sync?.transcriptionState,
+                            )
+                            val transcriptionState = detail.sync?.transcriptionState
+                            if (settings.deleteAfterAck() && transcriptionState != null && transcriptionState in ACKED_TRANSCRIPTION_STATES) {
+                                purgeAudioFiles(recording.recordingId)
+                            }
                         }
                     }
                 }

@@ -44,6 +44,8 @@ type Service struct {
 	importJID string
 	audio     *audioanalysis.Store
 	audioCfg  *audioanalysis.Config
+	// audioStages is the optional effective-claim-stage gate (Config.AudioStages).
+	audioStages func(context.Context) (map[string]bool, error)
 }
 
 // New builds the importer. The audio directory is resolved once so a later
@@ -71,12 +73,22 @@ func New(cfg Config) (*Service, error) {
 		store: cfg.Store, db: cfg.DB, audioDir: audioDir, decoder: cfg.Decoder,
 		trans: cfg.Transcription, provider: strings.ToLower(strings.TrimSpace(cfg.ASRProvider)),
 		model: cfg.ASRModel, resource: cfg.ASRResourceID, revision: revision, now: now,
-		audio: audioanalysis.NewStore(cfg.DB), audioCfg: cfg.Audio,
+		audio: audioanalysis.NewStore(cfg.DB), audioCfg: cfg.Audio, audioStages: cfg.AudioStages,
 	}, nil
 }
 
 // Decoder exposes the configured decoder for diagnostics.
 func (s *Service) Decoder() Decoder { return s.decoder }
+
+// effectiveAudioStages reports the stages some worker claims right now, or nil
+// when no gate is configured: the legacy rule of queueing every configured
+// capability then applies.
+func (s *Service) effectiveAudioStages(ctx context.Context) (map[string]bool, error) {
+	if s.audioStages == nil {
+		return nil, nil
+	}
+	return s.audioStages(ctx)
+}
 
 func (s *Service) decoderOrErr() (Decoder, error) {
 	if s.decoder == nil {
@@ -256,9 +268,71 @@ func (s *Service) existingImport(ctx context.Context, conversationID, recordingI
 	return true, jobID, nil
 }
 
+// rowQuerier covers *sql.DB and *sql.Tx for checks that run both outside and
+// inside the write transaction.
+type rowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// barrierError is the ingest-side projection of the shared forget/retirement
+// barrier. It is fatal: a forgotten or retired source must never be re-imported.
+func barrierError(detail string) *Error {
+	return &Error{
+		Code:      audioanalysis.CodeBarrierBlocked,
+		Message:   "录音已遗忘或档案已退役，回放拒绝",
+		Action:    "该录音已被永久遗忘，无需重新导入",
+		FatalFlag: true,
+		Err:       audioanalysis.NewError(audioanalysis.CodeBarrierBlocked, false, detail),
+	}
+}
+
+// committedIngest reports whether the pinned asr job of this import
+// (`asr|<providerRecordingID>|<sourceSHA>`) already exists, so a replayed
+// attempt returns the original success reference instead of re-decoding and
+// clobbering the committed sync row and audio DAG. Barrier precedence: when
+// the source was forgotten or retired (or its recording row was scrubbed) the
+// original barrier error is returned and the scrubbed job is never treated as
+// a replay success.
+func committedIngest(ctx context.Context, q rowQuerier, p ingestPayload) (bool, error) {
+	recordingID := memory.RecordingID(p.DeviceID, p.ProviderRecordingID)
+	var tombstones int
+	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM forget_tombstones WHERE recording_id=?`, recordingID).Scan(&tombstones); err != nil {
+		return false, err
+	}
+	if tombstones > 0 {
+		return false, barrierError("the recording has a permanent-forget tombstone")
+	}
+	var retired int
+	if err := q.QueryRowContext(ctx, `SELECT retired FROM profile_control WHERE id=1`).Scan(&retired); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return false, err
+	}
+	if retired == 1 {
+		return false, barrierError("the profile is retired")
+	}
+	var recordings int
+	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM recordings WHERE id=?`, recordingID).Scan(&recordings); err != nil {
+		return false, err
+	}
+	if recordings == 0 {
+		return false, barrierError("the recording no longer exists")
+	}
+	var jobID string
+	err := q.QueryRowContext(ctx,
+		`SELECT id FROM processing_jobs WHERE idempotency_key=?`,
+		"asr|"+p.ProviderRecordingID+"|"+p.SourceSHA256).Scan(&jobID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // RunIngestJob decodes the stored upload to PCM, records the sync_recording and
-// queues the ASR stage. It is idempotent: replay overwrites the same row and
-// reuses the same ASR job key.
+// queues the ASR stage. It is idempotent: a replay whose asr job already exists
+// returns the original success reference, and the heartbeat read plus the audio
+// plan generation each run exactly once outside the write transaction.
 func (s *Service) RunIngestJob(ctx context.Context, job process.Job) (string, error) {
 	var p ingestPayload
 	if err := json.Unmarshal([]byte(job.PayloadJSON), &p); err != nil {
@@ -266,6 +340,14 @@ func (s *Service) RunIngestJob(ctx context.Context, job process.Job) (string, er
 	}
 	if p.ConversationID == "" || p.ProviderRecordingID == "" || p.AudioPath == "" {
 		return "", &Error{Code: "invalid_job_payload", Message: "ingest job payload is incomplete", FatalFlag: true}
+	}
+	// The replay checkpoint runs before the decode so a crash replay after a
+	// committed attempt (or after a VAD reconfiguration) cannot overwrite the
+	// committed sync/DAG state.
+	if committed, err := committedIngest(ctx, s.db, p); err != nil {
+		return "", err
+	} else if committed {
+		return "ingested:" + p.ConversationID, nil
 	}
 	audioAbs, err := s.resolve(p.AudioPath)
 	if err != nil {
@@ -288,6 +370,18 @@ func (s *Service) RunIngestJob(ctx context.Context, job process.Job) (string, er
 	if durationMS <= 0 {
 		durationMS = st.Size() / 32
 	}
+	// The heartbeat read and the plan generation each run once outside the
+	// write transaction: with SetMaxOpenConns(1) the same database cannot
+	// serve a nested query from inside the transaction. A heartbeat failure
+	// fails this attempt so the queue retries it.
+	claimable, err := s.effectiveAudioStages(ctx)
+	if err != nil {
+		return "", err
+	}
+	plans, err := s.audioPlans(ctx, p.RecordingID, p.SourceSHA256, pcmRel, claimable)
+	if err != nil {
+		return "", err
+	}
 	payload, err := json.Marshal(asrPayload{
 		ConversationID: p.ConversationID, RecordingID: p.RecordingID,
 		ProviderRecordingID: p.ProviderRecordingID, ProviderConversationID: p.ProviderConversationID,
@@ -302,16 +396,20 @@ func (s *Service) RunIngestJob(ctx context.Context, job process.Job) (string, er
 		return "", err
 	}
 	defer tx.Rollback()
+	// Re-check the replay checkpoint at transaction start: a forget, a
+	// retirement or a concurrent first attempt may have committed since the
+	// pre-decode check. The barrier takes precedence over the replay success.
+	if committed, err := committedIngest(ctx, tx, p); err != nil {
+		return "", err
+	} else if committed {
+		return "ingested:" + p.ConversationID, nil
+	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO sync_recordings(recording_id,owner,device_id,state,total_chunks,total_samples,stitched_path,transcript_revision,transcription_state,updated_at)
 		VALUES(?,?,?,'downloaded',1,?,?,?,'pending',?)
 		ON CONFLICT(recording_id) DO UPDATE SET state='downloaded', total_chunks=1, total_samples=excluded.total_samples,
 			stitched_path=excluded.stitched_path, transcript_revision=excluded.transcript_revision,
 			transcription_state='pending', last_error=NULL, updated_at=excluded.updated_at`,
 		p.ProviderRecordingID, ImportOwner, p.DeviceID, durationMS*16, pcmAbs, s.revision, now.UnixMilli()); err != nil {
-		return "", err
-	}
-	plans, err := s.audioPlans(ctx, p.RecordingID, p.SourceSHA256, pcmAbs, durationMS)
-	if err != nil {
 		return "", err
 	}
 	audioJobs := map[string]string{}

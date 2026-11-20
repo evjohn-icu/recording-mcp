@@ -6,7 +6,6 @@
 set -eu
 
 cd "$(dirname "$0")/.."
-ROOT=$(pwd)
 
 PORT="${PORT:-8787}"
 SERVER="http://127.0.0.1:$PORT"
@@ -23,6 +22,7 @@ if [ -n "${RECORDING_E2E_ROOT:-}" ]; then
 	fi
 fi
 mkdir -p "$E2E_ROOT"
+E2E_ROOT=$(cd "$E2E_ROOT" && pwd -P)
 SCENARIOS="normal offline-recover crash-restart duplicate bad-checksum gap r2-after-write d1-manifest d1-event response-drop"
 
 WPID=""
@@ -135,7 +135,7 @@ run_scenario() {
 
 	echo "== [$s] 1/8 d1 migrations =="
 	(cd apps/cloud-ingest && ./node_modules/.bin/wrangler d1 migrations apply recording-mcp-ingest \
-		--local --persist-to "$ROOT/$dir/.wrangler-state") \
+		--local --persist-to "$dir/.wrangler-state") \
 		> "$dir/migrate.log" 2>&1 ||
 		{ tail -n 30 "$dir/migrate.log" >&2; fail "[$s] d1 migrations 失败"; }
 
@@ -144,7 +144,7 @@ run_scenario() {
 		fail "[$s] 端口 $PORT 仍被占用（上一场景 server 未退出）"
 	fi
 	(cd apps/cloud-ingest &&
-		exec setsid ./node_modules/.bin/wrangler dev --port "$PORT" --persist-to "$ROOT/$dir/.wrangler-state") \
+		exec setsid ./node_modules/.bin/wrangler dev --port "$PORT" --persist-to "$dir/.wrangler-state") \
 		> "$dir/wrangler.log" 2>&1 &
 	WPID=$!
 	ready=""
